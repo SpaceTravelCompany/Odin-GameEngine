@@ -126,7 +126,7 @@ colorTransform:^ColorTransform = nil, vtable:^IObjectVTable = nil) where intrins
 }
 
 _Super_Image_Deinit :: proc(self:^Image) {
-    mem.ICheckInit_Deinit(&self.checkInit)
+    _Super_IObject_Deinit(auto_cast self)
 }
 
 Image_GetTexture :: #force_inline proc "contextless" (self:^Image) -> ^Texture {
@@ -310,7 +310,7 @@ camera:^Camera, projection:^Projection, colorTransform:^ColorTransform = nil, vt
 }   
 
 _Super_TileImage_Deinit :: proc(self:^TileImage) {
-    mem.ICheckInit_Deinit(&self.checkInit)
+    _Super_IObject_Deinit(auto_cast self)
 }
 
 TileImage_GetTileTextureArray :: #force_inline proc "contextless" (self:^TileImage) -> ^TileTextureArray {

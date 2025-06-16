@@ -15,6 +15,7 @@ import "core:sync"
 import "core:thread"
 import vk "vendor:vulkan"
 import "vendor:glfw"
+import "core:sys/windows"
 
 vkInstance: vk.Instance
 vkDevice: vk.Device
@@ -619,7 +620,7 @@ vkCreateSwapChainAndImageViews :: proc() {
 		surface = vkSurface
 	}
 	when ODIN_OS == .Windows {
-		if __isFullScreenEx && VK_EXT_full_screen_exclusive_support {
+		if __isFullScreenEx && VK_EXT_full_screen_exclusive_support() {
 			fullScreenWinInfo : vk.SurfaceFullScreenExclusiveWin32InfoEXT
 			fullScreenInfo := vk.SurfaceFullScreenExclusiveInfoEXT{
 				sType = vk.StructureType.SURFACE_FULL_SCREEN_EXCLUSIVE_INFO_EXT,
@@ -630,12 +631,12 @@ vkCreateSwapChainAndImageViews :: proc() {
 				fullScreenWinInfo = vk.SurfaceFullScreenExclusiveWin32InfoEXT{
 					sType = vk.StructureType.SURFACE_FULL_SCREEN_EXCLUSIVE_WIN32_INFO_EXT,
 					pNext = nil,
-					hMonitor = currentMonitor.__windows.hmonitor,
+					hmonitor = glfwGetCurrentHMONITOR(),
 				}
 				fullScreenInfo.pNext = &fullScreenWinInfo
 			}
 			swapChainCreateInfo.pNext = &fullScreenInfo
-		}i
+		}
 	}
 	queueFamiliesIndices := [2]u32{vkGraphicsFamilyIndex, vkPresentFamilyIndex}
 	if vkGraphicsFamilyIndex != vkPresentFamilyIndex {
@@ -1282,7 +1283,6 @@ vkCreateSurface :: vkRecreateSurface
 vkSetFullScreenEx :: proc() {
 	when ODIN_OS == .Windows {
 		if VK_EXT_full_screen_exclusive_support() && __isFullScreenEx {
-			Windows_ChangeFullScreen()
 			res := vk.AcquireFullScreenExclusiveModeEXT(vkDevice, vkSwapchain)
 			if res != .SUCCESS do trace.panic_log("AcquireFullScreenExclusiveModeEXT : ", res)
 			vkReleasedFullScreenEx = false

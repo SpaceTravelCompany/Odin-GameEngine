@@ -13,10 +13,15 @@ when GLFW_SHARED {
 is_android :: ODIN_PLATFORM_SUBTARGET == .Android
 is_mobile :: is_android
 
-when !is_mobile {
 LIBGLFW3 :: "../" + library.LIBPATH + "/libglfw3" + library.ARCH_end
 
-foreign import glfw { LIBGLFW3 }
+when !is_mobile {
+when ODIN_OS == .Windows {
+	foreign import glfw { LIBGLFW3 ,"system:user32.lib", "system:gdi32.lib", "system:shell32.lib"}
+} else {
+	foreign import glfw { LIBGLFW3 }
+}
+
 
 #assert(size_of(c.int) == size_of(b32))
 

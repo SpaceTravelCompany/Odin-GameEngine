@@ -271,7 +271,8 @@ when is_android {
 	printfln :: fmt.printfln
 	printf :: fmt.printf
 	print :: fmt.print
-	printCustomAndroid :: proc(args: ..any, logPriority: android.LogPriority = .INFO, sep := " ") -> int {
+
+	printCustomAndroid :: proc(args: ..any, logPriority:any = "", sep := " ") -> int {
 		_ = logPriority
 		return print(..args, sep = sep)
 	}

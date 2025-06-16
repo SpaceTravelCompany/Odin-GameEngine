@@ -3,6 +3,7 @@ package engine
 import "core:sync"
 import "core:debug/trace"
 import "core:math/linalg"
+import "core:sys/windows"
 
 @(private) __windowWidth: Maybe(int)
 @(private) __windowHeight: Maybe(int)

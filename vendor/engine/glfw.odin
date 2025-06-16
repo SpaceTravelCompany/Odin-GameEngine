@@ -66,6 +66,16 @@ glfwStart :: proc() {
     //CreateRenderFuncThread()
 }
 
+when ODIN_OS == .Windows {
+glfwGetCurrentHMONITOR :: proc "contextless" () -> windows.HMONITOR {
+    if wnd == nil do trace.panic_log("glfwGetCurrentHMONITOR : wnd is nil")
+    hWnd := glfw.GetWin32Window(wnd)
+    if hWnd == nil do trace.panic_log("glfwGetCurrentHMONITOR : hWnd is nil")
+
+    return windows.MonitorFromWindow(hWnd, windows.Monitor_From_Flags.MONITOR_DEFAULTTONEAREST)
+}   
+}
+
 glfwSetFullScreenMode :: proc "contextless" (monitor:^MonitorInfo) {
     for &m, i in monitors {
         if raw_data(m.name) == raw_data(monitor.name) {
@@ -163,11 +173,12 @@ glfwSystemInit :: proc() {
         when is_log {
             println("XFIT SYSLOG processorCoreLen : ", processorCoreLen)
         }
+        if processorCoreLen == 0 do trace.panic_log("processorCoreLen can't zero")
 	} else when ODIN_OS == .Windows {
 		//TODO (xfitgd)
 	}
 
-    if processorCoreLen == 0 do trace.panic_log("processorCoreLen can't zero")
+    
 
     when is_log do glfw.SetErrorCallback(glfwErrorCallback)
 }
