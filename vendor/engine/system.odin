@@ -5,6 +5,7 @@ import "core:fmt"
 import "core:math"
 import "core:math/linalg"
 import "core:os"
+import "core:sys/windows"
 import "core:mem"
 import "core:mem/virtual"
 import "core:io"
@@ -119,6 +120,8 @@ Icon_Image :: glfw.Image
 
 @(private) engineDefAllocator : runtime.Allocator
 
+@(private) windows_hInstance:windows.HINSTANCE
+
 defAllocator :: proc "contextless" () -> runtime.Allocator {
 	return engineDefAllocator
 }
@@ -131,6 +134,10 @@ engineMain :: proc(
 	windowHeight:Maybe(int) = nil,
 	vSync:VSync = .Double,
 ) {
+	when ODIN_OS == .Windows {
+		windows_hInstance = auto_cast windows.GetModuleHandleA(nil)
+	}
+
 	assert(!(windowWidth != nil && windowWidth.? <= 0))
 	assert(!(windowHeight != nil && windowHeight.? <= 0))
 
@@ -391,3 +398,15 @@ when is_android {
 IsInMainThread :: #force_inline proc "contextless" () -> bool {
 	return sync.current_thread_id() == vkThreadId
 }
+
+
+Windows_SetResIcon :: proc "contextless" (icon_resource_number:int) {
+	when ODIN_OS == .Windows {
+		windows.SetClassLongPtrW(
+			glfwGetHwnd(),
+			windows.GCLP_HICON,
+			windows.LONG_PTR(uintptr(windows.LoadIconW(windows_hInstance, auto_cast windows.MAKEINTRESOURCEW(icon_resource_number)))),
+		)
+	}
+}
+	

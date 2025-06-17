@@ -73,7 +73,15 @@ glfwGetCurrentHMONITOR :: proc "contextless" () -> windows.HMONITOR {
     if hWnd == nil do trace.panic_log("glfwGetCurrentHMONITOR : hWnd is nil")
 
     return windows.MonitorFromWindow(hWnd, windows.Monitor_From_Flags.MONITOR_DEFAULTTONEAREST)
-}   
+}
+
+glfwGetHwnd :: proc "contextless" () -> windows.HWND {
+    if wnd == nil do trace.panic_log("glfwGetHwnd : wnd is nil")
+    hWnd := glfw.GetWin32Window(wnd)
+    if hWnd == nil do trace.panic_log("glfwGetHwnd : hWnd is nil")
+
+    return hWnd
+}
 }
 
 glfwSetFullScreenMode :: proc "contextless" (monitor:^MonitorInfo) {
