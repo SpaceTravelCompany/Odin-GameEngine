@@ -402,11 +402,10 @@ IsInMainThread :: #force_inline proc "contextless" () -> bool {
 
 Windows_SetResIcon :: proc "contextless" (icon_resource_number:int) {
 	when ODIN_OS == .Windows {
-		windows.SetClassLongPtrW(
-			glfwGetHwnd(),
-			windows.GCLP_HICON,
-			windows.LONG_PTR(uintptr(windows.LoadIconW(windows_hInstance, auto_cast windows.MAKEINTRESOURCEW(icon_resource_number)))),
-		)
+		hWnd := glfwGetHwnd()
+		icon := windows.LPARAM(uintptr(windows.LoadIconW(windows_hInstance, auto_cast windows.MAKEINTRESOURCEW(icon_resource_number))))
+		windows.SendMessageW(hWnd, windows.WM_SETICON, 1, icon)
+		windows.SendMessageW(hWnd, windows.WM_SETICON, 0, icon)
 	}
 }
 	
