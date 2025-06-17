@@ -42,152 +42,150 @@ main :: proc() {
 	json_data:json.Value
 	ok :bool
 
-	if len(os.args) > 1 && os.args[1] == "install" {
-	} else if len(os.args) > 1 && os.args[1] == "clean" {
-		if json_data, ok = read_build_json() ; !ok {return}
-		defer json.destroy_value(json_data)
-		setting := (json_data.(json.Object)["setting"]).(json.Object)
+	if json_data, ok = read_build_json() ; !ok {return}
+	defer json.destroy_value(json_data)
+	//fmt.println(json_data)
 
-		os.remove(setting["out-path"].(json.String))
+	setting := (json_data.(json.Object)["setting"]).(json.Object)
+
+	is_android :bool = false
+	if "is-android" in setting {
+		is_android = setting["is-android"].(json.Boolean)
+	}
+	log := true
+	if "log" in setting {
+		log = setting["log"].(json.Boolean)
+	}
+	out_path := strings.join({"-out:", setting["out-path"].(json.String)}, "")
+	defer delete(out_path)
+
+	// Sets the optimization mode for compilation.
+	// Available options:
+	// 		-o:none
+	// 		-o:minimal
+	// 		-o:size
+	// 		-o:speed
+	// 		-o:aggressive (use this with caution)
+	// The default is -o:minimal.
+
+
+	os.make_directory("bin")
+	o:string
+	debug:bool = false
+	if strings.compare(setting["build-type"].(json.String), "minimal") == 0 {
+		o = "-o:minimal"
+		debug = true
 	} else {
-		if json_data, ok = read_build_json() ; !ok {return}
-		defer json.destroy_value(json_data)
-		//fmt.println(json_data)
-	
-		setting := (json_data.(json.Object)["setting"]).(json.Object)
-	
-		is_android :bool = false
-		if "is-android" in setting {
-			is_android = setting["is-android"].(json.Boolean)
+		o = strings.join({"-o:", setting["build-type"].(json.String)}, "", context.temp_allocator)
+	}
+	defer free_all(	context.temp_allocator)
+
+	if !findGLSLFileAndRunCmd() do return
+
+	if is_android {
+		android_paths := (json_data.(json.Object)["android-paths"]).(json.Object)
+		os2.make_directory("android")
+		os2.make_directory("android/lib")
+		os2.make_directory("android/lib/lib")
+
+		os2.make_directory("android/lib/lib/arm64-v8a")
+		err := os2.copy_file("android/lib/lib/arm64-v8a/libVkLayer_khronos_validation.so", filepath.join({ODIN_ROOT, "/vendor/vulkan/lib/android/libVkLayer_khronos_validation_arm64.so"}, context.temp_allocator))
+		if err != nil {
+			fmt.panicf("libVkLayer_khronos_validation copy_file: %s", err)
 		}
-		log := true
-		if "log" in setting {
-			log = setting["log"].(json.Boolean)
+		defer os2.remove("android/lib/lib/arm64-v8a/libVkLayer_khronos_validation.so")
+		// os2.make_directory("android/lib/lib/armeabi-v7a")//!only supports arm64 now
+		// os2.make_directory("android/lib/lib/x86_64")
+		// os2.make_directory("android/lib/lib/x86")
+		// os2.make_directory("android/lib/lib/riscv64")
+
+		targets :[]string = {
+			"-target:linux_arm64",
+			"-target:linux_arm32",
+			"-target:linux_amd64",
+			"-target:linux_i386",
+			"-target:linux_riscv64",
 		}
-		out_path := strings.join({"-out:", setting["out-path"].(json.String)}, "")
-		defer delete(out_path)
-
-		// Sets the optimization mode for compilation.
-		// Available options:
-		// 		-o:none
-		// 		-o:minimal
-		// 		-o:size
-		// 		-o:speed
-		// 		-o:aggressive (use this with caution)
-		// The default is -o:minimal.
-
-
-		os.make_directory("bin")
-		o:string
-		debug:bool = false
-		if strings.compare(setting["build-type"].(json.String), "minimal") == 0 {
-			o = "-o:minimal"
-			debug = true
-		} else {
-			o = strings.join({"-o:", setting["build-type"].(json.String)}, "", context.temp_allocator)
+		outSos :[]string = {
+			strings.join({"android/lib/lib/arm64-v8a/lib", setting["main-package"].(json.String), ".so"}, "", context.temp_allocator),
+			strings.join({"android/lib/lib/armeabi-v7a/lib", setting["main-package"].(json.String), ".so"}, "", context.temp_allocator),
+			strings.join({"android/lib/lib/x86_64/lib", setting["main-package"].(json.String), ".so"}, "", context.temp_allocator),
+			strings.join({"android/lib/lib/x86/lib", setting["main-package"].(json.String), ".so"}, "", context.temp_allocator),
+			strings.join({"android/lib/lib/riscv64/lib", setting["main-package"].(json.String), ".so"}, "", context.temp_allocator),
 		}
-		defer free_all(	context.temp_allocator)
 
-		if !findGLSLFileAndRunCmd() do return
+		ndkPath := android_paths["ndk"].(json.String)
+		sdkPath := android_paths["sdk"].(json.String)
 
-		if is_android {
-			android_paths := (json_data.(json.Object)["android-paths"]).(json.Object)
-			os2.make_directory("android")
-			os2.make_directory("android/lib")
-			os2.make_directory("android/lib/lib")
+		ODIN_ANDROID_SDK := strings.join({"ODIN_ANDROID_SDK=", sdkPath}, "", context.temp_allocator)
+		ODIN_ANDROID_NDK := strings.join({"ODIN_ANDROID_NDK=", ndkPath}, "", context.temp_allocator)
+		ODIN_ANDROID_NDK_TOOLCHAIN := strings.join({"ODIN_ANDROID_NDK_TOOLCHAIN=", ndkPath, "/toolchains/llvm/prebuilt/linux-x86_64"}, "", context.temp_allocator)
 
-			os2.make_directory("android/lib/lib/arm64-v8a")
-			err := os2.copy_file("android/lib/lib/arm64-v8a/libVkLayer_khronos_validation.so", filepath.join({ODIN_ROOT, "/vendor/vulkan/lib/android/libVkLayer_khronos_validation_arm64.so"}, context.temp_allocator))
-			if err != nil {
-				fmt.panicf("libVkLayer_khronos_validation copy_file: %s", err)
-			}
-			defer os2.remove("android/lib/lib/arm64-v8a/libVkLayer_khronos_validation.so")
-			// os2.make_directory("android/lib/lib/armeabi-v7a")//!only supports arm64 now
-			// os2.make_directory("android/lib/lib/x86_64")
-			// os2.make_directory("android/lib/lib/x86")
-			// os2.make_directory("android/lib/lib/riscv64")
+		builded := false
 
-			targets :[]string = {
-				"-target:linux_arm64",
-				"-target:linux_arm32",
-				"-target:linux_amd64",
-				"-target:linux_i386",
-				"-target:linux_riscv64",
-			}
-			outSos :[]string = {
-				strings.join({"android/lib/lib/arm64-v8a/lib", setting["main-package"].(json.String), ".so"}, "", context.temp_allocator),
-				strings.join({"android/lib/lib/armeabi-v7a/lib", setting["main-package"].(json.String), ".so"}, "", context.temp_allocator),
-				strings.join({"android/lib/lib/x86_64/lib", setting["main-package"].(json.String), ".so"}, "", context.temp_allocator),
-				strings.join({"android/lib/lib/x86/lib", setting["main-package"].(json.String), ".so"}, "", context.temp_allocator),
-				strings.join({"android/lib/lib/riscv64/lib", setting["main-package"].(json.String), ".so"}, "", context.temp_allocator),
-			}
-
-			ndkPath := android_paths["ndk"].(json.String)
-			sdkPath := android_paths["sdk"].(json.String)
-
-			ODIN_ANDROID_SDK := strings.join({"ODIN_ANDROID_SDK=", sdkPath}, "", context.temp_allocator)
-			ODIN_ANDROID_NDK := strings.join({"ODIN_ANDROID_NDK=", ndkPath}, "", context.temp_allocator)
-			ODIN_ANDROID_NDK_TOOLCHAIN := strings.join({"ODIN_ANDROID_NDK_TOOLCHAIN=", ndkPath, "/toolchains/llvm/prebuilt/linux-x86_64"}, "", context.temp_allocator)
-
-			builded := false
-
-			for target, i in targets {
-				if !runCmd({"odin", "build", 
-				setting["main-package"].(json.String), 
-				"-no-bounds-check" if !debug else ({}),
-				strings.join({"-out:", outSos[i]}, "", context.temp_allocator), 
-				o, 
-				"-debug" if debug else ({}),
-				"-define:__log__=true" if log else ({}),
-				//"-show-system-calls" if debug else ({}),
-				//"-sanitize:address" if debug else ({}),
-				"-build-mode:shared",
-				target,
-				"-subtarget:android",
-				//"-extra-linker-flags:\"-L lib/lib/arm64-v8a -lVkLayer_khronos_validation\"" if debug else ({}),
-				}, {
-					ODIN_ANDROID_SDK,
-					ODIN_ANDROID_NDK,
-					ODIN_ANDROID_NDK_TOOLCHAIN,
-				}) {
-					return
-				}
-
-				//?"$ANDROID_JBR/bin/keytool" -genkey -v -keystore .keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000
-				if !runCmd({"odin", "bundle", "android", "android", "-android-keystore:android/debug.keystore", "-android-keystore-password:\"android\"",
-				}, {
-					ODIN_ANDROID_SDK,
-					ODIN_ANDROID_NDK,
-					ODIN_ANDROID_NDK_TOOLCHAIN,
-				}) {
-					return
-				}
-
-				builded = true
-
-				os2.copy_file(strings.join({setting["out-path"].(json.String), ".apk"}, "", context.temp_allocator),
-				 "test.apk")
-
-				break//!only supports arm64 now
-			}
-
-			if builded {
-				os2.remove("test.apk")
-				os2.remove("test.apk-build")
-				os2.remove("test.apk.idsig")
-			}	
-		} else {
+		for target, i in targets {
 			if !runCmd({"odin", "build", 
 			setting["main-package"].(json.String), 
 			"-no-bounds-check" if !debug else ({}),
-			out_path, 
+			strings.join({"-out:", outSos[i]}, "", context.temp_allocator), 
 			o, 
 			"-debug" if debug else ({}),
 			"-define:__log__=true" if log else ({}),
+			//"-show-system-calls" if debug else ({}),
 			//"-sanitize:address" if debug else ({}),
+			"-build-mode:shared",
+			target,
+			"-subtarget:android",
+			//"-extra-linker-flags:\"-L lib/lib/arm64-v8a -lVkLayer_khronos_validation\"" if debug else ({}),
+			}, {
+				ODIN_ANDROID_SDK,
+				ODIN_ANDROID_NDK,
+				ODIN_ANDROID_NDK_TOOLCHAIN,
 			}) {
 				return
 			}
+
+			//?"$ANDROID_JBR/bin/keytool" -genkey -v -keystore .keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000
+			if !runCmd({"odin", "bundle", "android", "android", "-android-keystore:android/debug.keystore", "-android-keystore-password:\"android\"",
+			}, {
+				ODIN_ANDROID_SDK,
+				ODIN_ANDROID_NDK,
+				ODIN_ANDROID_NDK_TOOLCHAIN,
+			}) {
+				return
+			}
+
+			builded = true
+
+			os2.copy_file(strings.join({setting["out-path"].(json.String), ".apk"}, "", context.temp_allocator),
+				"test.apk")
+
+			break//!only supports arm64 now
+		}
+
+		if builded {
+			os2.remove("test.apk")
+			os2.remove("test.apk-build")
+			os2.remove("test.apk.idsig")
+		}	
+	} else {
+		resource :Maybe(string) = nil
+		if "resource" in setting {
+			resource = strings.join({"-resource:",setting["resource"].(json.String)}, "", context.temp_allocator)
+		}
+		defer if resource != nil do delete(resource.?, context.temp_allocator)
+
+		if !runCmd({"odin", "build", 
+		setting["main-package"].(json.String), 
+		"-no-bounds-check" if !debug else ({}),
+		out_path, 
+		o, 
+		"-debug" if debug else ({}),
+		resource.? if resource != nil else ({}),
+		"-define:__log__=true" if log else ({}),
+		//"-sanitize:address" if debug else ({}),
+		}) {
+			return
 		}
 	}
 }

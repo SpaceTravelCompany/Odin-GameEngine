@@ -290,6 +290,10 @@ enum BuildPath : u8 {
 	BuildPath_Output,           // Output Path for .exe, .dll, .so, etc. Can be overridden with `-out:`.
 	BuildPath_Symbols,          // Output Path for .pdb or .dSym file, can be overridden with `-pdb-name:`.
 
+	BuildPath_Win_SDK_UM_Inc,   // windows_sdk_um_inclde_path
+	BuildPath_Win_SDK_UCRT_Inc, // windows_sdk_ucrt_include_path
+	BuildPath_Win_SDK_SHARED_Inc, // windows_sdk_shared_include_path //edited (xfitgd)
+
 	BuildPathCOUNT,
 };
 
@@ -2131,6 +2135,17 @@ gb_internal bool init_build_paths(String init_filename) {
 
 				if (find_result.windows_sdk_ucrt_library_path.len > 0) {
 					bc->build_paths[BuildPath_Win_SDK_UCRT_Lib] = path_from_string(ha, find_result.windows_sdk_ucrt_library_path);
+				}
+
+				//edited (xfitgd)
+				if (find_result.windows_sdk_shared_include_path.len > 0) {
+					bc->build_paths[BuildPath_Win_SDK_SHARED_Inc] = path_from_string(ha, find_result.windows_sdk_shared_include_path);
+				}
+				if (find_result.windows_sdk_um_include_path.len > 0) {
+					bc->build_paths[BuildPath_Win_SDK_UM_Inc] = path_from_string(ha, find_result.windows_sdk_um_include_path);
+				}
+				if (find_result.windows_sdk_ucrt_include_path.len > 0) {
+					bc->build_paths[BuildPath_Win_SDK_UCRT_Inc] = path_from_string(ha, find_result.windows_sdk_ucrt_include_path);
 				}
 
 				if (find_result.vs_exe_path.len > 0) {

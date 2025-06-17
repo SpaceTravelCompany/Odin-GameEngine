@@ -358,7 +358,15 @@ try_cross_linking:;
 				String res_path = quote_path(heap_allocator(), build_context.build_paths[BuildPath_RES]);
 				String rc_path  = quote_path(heap_allocator(), build_context.build_paths[BuildPath_RC]);
 				defer (gb_free(heap_allocator(), res_path.text));
-				defer (gb_free(heap_allocator(), rc_path.text));
+				defer(gb_free(heap_allocator(), rc_path.text));
+
+				// edited (xfitgd)
+				String ucrt_path = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_Win_SDK_UCRT_Inc]);
+				String um_path = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_Win_SDK_UM_Inc]);
+				String shared_path = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_Win_SDK_SHARED_Inc]);
+				defer(gb_free(heap_allocator(), ucrt_path.text));
+				defer(gb_free(heap_allocator(), um_path.text));
+				defer(gb_free(heap_allocator(), shared_path.text));
 
 				if (build_context.has_resource) {
 					if (build_context.build_paths[BuildPath_RC].basename == "")  {
@@ -367,8 +375,13 @@ try_cross_linking:;
 						debugf("Compiling resource %.*s\n", LIT(res_path));
 
 						result = system_exec_command_line_app("msvc-link",
-							"\"%.*src.exe\" /nologo /fo %.*s %.*s",
+							"\"%.*src.exe\" /i \"%.*s;%.*s;%.*s\" /nologo /fo %.*s %.*s",
 							LIT(windows_sdk_bin_path),
+
+							LIT(ucrt_path),// edited (xfitgd)
+							LIT(um_path),
+							LIT(shared_path),
+		
 							LIT(res_path),
 							LIT(rc_path)
 						);

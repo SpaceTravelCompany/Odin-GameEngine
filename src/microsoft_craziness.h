@@ -54,6 +54,10 @@ struct Find_Result {
 	String windows_sdk_um_library_path;
 	String windows_sdk_ucrt_library_path;
 
+	String windows_sdk_um_include_path;
+	String windows_sdk_ucrt_include_path;
+	String windows_sdk_shared_include_path;//edited (xfitgd)
+
 	String vs_exe_path;
 	String vs_library_path;
 };
@@ -323,24 +327,39 @@ gb_internal void find_windows_kit_paths(Find_Result *result) {
 		Version_Data data_lib = {0};
 		mc_visit_files(windows10_lib, &data_lib, win10_best);
 		defer (mc_free(windows10_lib));
-		defer (mc_free(data_lib.best_name));
+		defer(mc_free(data_lib.best_name));
+
+		String windows10_inc = mc_concat(windows10_root, str_lit("Include\\"));//edited (xfitgd)
+		Version_Data data_inc = { 0 };
+		mc_visit_files(windows10_inc, &data_inc, win10_best);
+		defer(mc_free(windows10_inc));
+		defer(mc_free(data_inc.best_name));
 
 		String windows10_bin = mc_concat(windows10_root, str_lit("bin\\"));
 		Version_Data data_bin = {0};
 		mc_visit_files(windows10_bin, &data_bin, win10_best);
 		defer (mc_free(windows10_bin));
-		defer (mc_free(data_bin.best_name));
+		defer(mc_free(data_bin.best_name));
+
+
+		if (data_inc.best_name.len) {
+			result->windows_sdk_um_include_path = mc_concat(data_inc.best_name, str_lit("\\um\\"));//edited (xfitgd)
+			result->windows_sdk_ucrt_include_path = mc_concat(data_inc.best_name, str_lit("\\ucrt\\"));
+			result->windows_sdk_shared_include_path = mc_concat(data_inc.best_name, str_lit("\\shared\\"));
+		}
 
 		if (data_lib.best_name.len && data_bin.best_name.len) {
 			if (build_context.metrics.arch == TargetArch_amd64) {
 				result->windows_sdk_um_library_path   = mc_concat(data_lib.best_name, str_lit("\\um\\x64\\"));
 				result->windows_sdk_ucrt_library_path = mc_concat(data_lib.best_name, str_lit("\\ucrt\\x64\\"));
-				result->windows_sdk_bin_path          = mc_concat(data_bin.best_name, str_lit("\\x64\\"));
+				result->windows_sdk_bin_path = mc_concat(data_bin.best_name, str_lit("\\x64\\"));
+
 				sdk_found = true;
 			} else if (build_context.metrics.arch == TargetArch_i386) {
 				result->windows_sdk_um_library_path   = mc_concat(data_lib.best_name, str_lit("\\um\\x86\\"));
 				result->windows_sdk_ucrt_library_path = mc_concat(data_lib.best_name, str_lit("\\ucrt\\x86\\"));
-				result->windows_sdk_bin_path          = mc_concat(data_bin.best_name, str_lit("\\x86\\"));
+				result->windows_sdk_bin_path = mc_concat(data_bin.best_name, str_lit("\\x86\\"));
+				
 				sdk_found = true;
 			}
 		}
@@ -589,15 +608,22 @@ gb_internal void find_windows_kit_paths_from_env_vars(Find_Result *result) {
 		dir = mc_concat(dir, dir[dir.len - 1] != '\\' ? str_lit("\\") : str_lit(""));
 		ver = mc_concat(ver, ver[ver.len - 1] != '\\' ? str_lit("\\") : str_lit(""));
 		defer (mc_free(dir));
-		defer (mc_free(ver));
+		defer(mc_free(ver));
+
+
+		result->windows_sdk_um_include_path = mc_concat(dir, str_lit("Include\\"), ver, str_lit("um\\"));
+		result->windows_sdk_ucrt_include_path = mc_concat(dir, str_lit("Include\\"), ver, str_lit("ucrt\\"));
+		result->windows_sdk_shared_include_path = mc_concat(dir, str_lit("Include\\"), ver, str_lit("shared\\"));//edited (xfitgd)
 
 		if (build_context.metrics.arch == TargetArch_amd64) {
 			result->windows_sdk_um_library_path   = mc_concat(dir, str_lit("Lib\\"), ver, str_lit("um\\x64\\"));
 			result->windows_sdk_ucrt_library_path = mc_concat(dir, str_lit("Lib\\"), ver, str_lit("ucrt\\x64\\"));
+
 			sdk_lib_found = true;
 		} else if (build_context.metrics.arch == TargetArch_i386) {
 			result->windows_sdk_um_library_path   = mc_concat(dir, str_lit("Lib\\"), ver, str_lit("um\\x86\\"));
 			result->windows_sdk_ucrt_library_path = mc_concat(dir, str_lit("Lib\\"), ver, str_lit("ucrt\\x86\\"));
+
 			sdk_lib_found = true;
 		}
 	}
