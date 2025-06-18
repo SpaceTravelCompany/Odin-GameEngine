@@ -185,6 +185,9 @@ i32 bundle_android(String original_init_directory) {
 		TEMPORARY_ALLOCATOR_GUARD();
 		gb_string_clear(cmd);
 
+		#ifdef GB_SYSTEM_WINDOWS//edited (xfitgd)
+		cmd = gb_string_appendc(cmd, "cmd.exe /c ");
+		#endif
 		cmd = gb_string_append_length(cmd, android_sdk_build_tools.text, android_sdk_build_tools.len);
 		cmd = gb_string_appendc(cmd, "apksigner");
 		cmd = gb_string_appendc(cmd, " sign");

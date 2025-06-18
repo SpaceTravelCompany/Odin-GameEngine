@@ -136,7 +136,7 @@ if %errorlevel% neq 0 goto end_of_build
 mt -nologo -inputresource:%exe_name%;#1 -manifest misc\odin.manifest -outputresource:%exe_name%;#1 -validate_manifest -identity:"odin, processorArchitecture=amd64, version=%odin_version_full%, type=win32"
 if %errorlevel% neq 0 goto end_of_build
 
-call build_vendor.bat
+rem call build_vendor.bat
 if %errorlevel% neq 0 goto end_of_build
 
 rem If the demo doesn't run for you and your CPU is more than a decade old, try -microarch:native

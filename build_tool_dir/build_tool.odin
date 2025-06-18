@@ -116,11 +116,18 @@ main :: proc() {
 
 		ndkPath := android_paths["ndk"].(json.String)
 		sdkPath := android_paths["sdk"].(json.String)
+		PLATFORM := android_paths["platform-version"].(json.Float)
 
 		ODIN_ANDROID_SDK := strings.join({"ODIN_ANDROID_SDK=", sdkPath}, "", context.temp_allocator)
 		ODIN_ANDROID_NDK := strings.join({"ODIN_ANDROID_NDK=", ndkPath}, "", context.temp_allocator)
-		ODIN_ANDROID_NDK_TOOLCHAIN := strings.join({"ODIN_ANDROID_NDK_TOOLCHAIN=", ndkPath, "/toolchains/llvm/prebuilt/linux-x86_64"}, "", context.temp_allocator)
-
+		when ODIN_OS == .Windows {
+			ODIN_ANDROID_NDK_TOOLCHAIN := strings.join({"ODIN_ANDROID_NDK_TOOLCHAIN=", ndkPath, "/toolchains/llvm/prebuilt/windows-x86_64"}, "", context.temp_allocator)
+		} else when ODIN_OS == .Linux {
+			ODIN_ANDROID_NDK_TOOLCHAIN := strings.join({"ODIN_ANDROID_NDK_TOOLCHAIN=", ndkPath, "/toolchains/llvm/prebuilt/linux-x86_64"}, "", context.temp_allocator)
+		} else {
+			#panic("Unsupported OS for Android build")
+		}
+		
 		builded := false
 
 		for target, i in targets {
@@ -136,6 +143,7 @@ main :: proc() {
 			"-build-mode:shared",
 			target,
 			"-subtarget:android",
+			fmt.aprint("-minimum-os-version:", PLATFORM, sep = "", allocator = context.temp_allocator),
 			//"-extra-linker-flags:\"-L lib/lib/arm64-v8a -lVkLayer_khronos_validation\"" if debug else ({}),
 			}, {
 				ODIN_ANDROID_SDK,
@@ -146,7 +154,7 @@ main :: proc() {
 			}
 
 			//?"$ANDROID_JBR/bin/keytool" -genkey -v -keystore .keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000
-			if !runCmd({"odin", "bundle", "android", "android", "-android-keystore:android/debug.keystore", "-android-keystore-password:\"android\"",
+			if !runCmd({"odin", "bundle", "android", "android", "-android-keystore:android/debug.keystore", "-android-keystore-password:android",
 			}, {
 				ODIN_ANDROID_SDK,
 				ODIN_ANDROID_NDK,
