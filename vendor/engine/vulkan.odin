@@ -111,8 +111,8 @@ vkTexVertShader: vk.ShaderModule
 vkTexFragShader: vk.ShaderModule
 vkAnimateTexVertShader: vk.ShaderModule
 vkAnimateTexFragShader: vk.ShaderModule
-vkCopyScreenVertShader: vk.ShaderModule
-vkCopyScreenFragShader: vk.ShaderModule
+//vkCopyScreenVertShader: vk.ShaderModule
+//vkCopyScreenFragShader: vk.ShaderModule
 
 shapeShaderStages: [2]vk.PipelineShaderStageCreateInfo
 shapeWireShaderStages: [2]vk.PipelineShaderStageCreateInfo
@@ -127,19 +127,19 @@ vkTexDescriptorSetLayout2: vk.DescriptorSetLayout
 vkAnimateTexDescriptorSetLayout: vk.DescriptorSetLayout
 vkCopyScreenDescriptorSetLayout: vk.DescriptorSetLayout
 
-vkCopyScreenDescriptorSet : vk.DescriptorSet
-vkCopyScreenDescriptorPool : vk.DescriptorPool
+//vkCopyScreenDescriptorSet : vk.DescriptorSet
+//vkCopyScreenDescriptorPool : vk.DescriptorPool
 
 
 vkShapePipelineLayout: vk.PipelineLayout
 vkTexPipelineLayout: vk.PipelineLayout
 vkAnimateTexPipelineLayout: vk.PipelineLayout
-vkCopyScreenPipelineLayout: vk.PipelineLayout
+//vkCopyScreenPipelineLayout: vk.PipelineLayout
 
 vkShapePipeline: vk.Pipeline
 vkTexPipeline: vk.Pipeline
 vkAnimateTexPipeline: vk.Pipeline
-vkCopyScreenPipeline: vk.Pipeline
+//vkCopyScreenPipeline: vk.Pipeline
 
 vkCmdPool:vk.CommandPool
 vkCmdBuffer:[MAX_FRAMES_IN_FLIGHT]vk.CommandBuffer
@@ -202,14 +202,14 @@ vkInitShaderModules :: proc() {
 	vkTexFragShader = vk.CreateShaderModule2(vkDevice, #load("shaders/tex.frag.spv"))
 	vkAnimateTexVertShader = vk.CreateShaderModule2(vkDevice, #load("shaders/animate_tex.vert.spv"))
 	vkAnimateTexFragShader = vk.CreateShaderModule2(vkDevice, #load("shaders/animate_tex.frag.spv"))
-	vkCopyScreenVertShader = vk.CreateShaderModule2(vkDevice, #load("shaders/screen_copy.vert.spv"))
-	vkCopyScreenFragShader = vk.CreateShaderModule2(vkDevice, #load("shaders/screen_copy.frag.spv"))
+	//vkCopyScreenVertShader = vk.CreateShaderModule2(vkDevice, #load("shaders/screen_copy.vert.spv"))
+	//vkCopyScreenFragShader = vk.CreateShaderModule2(vkDevice, #load("shaders/screen_copy.frag.spv"))
 
 	shapeShaderStages = vk.CreateShaderStages(vkShapeVertShader, vkShapeFragShader)
 	when vkWIREMODE do shapeWireShaderStages = vk.CreateShaderStages(vkShapeVertShader, vkShapeWireFragShader)
 	texShaderStages = vk.CreateShaderStages(vkTexVertShader, vkTexFragShader)
 	animateTexShaderStages = vk.CreateShaderStages(vkAnimateTexVertShader, vkAnimateTexFragShader)
-	copyScreenShaderStages = vk.CreateShaderStages(vkCopyScreenVertShader, vkCopyScreenFragShader)
+	//copyScreenShaderStages = vk.CreateShaderStages(vkCopyScreenVertShader, vkCopyScreenFragShader)
 }
 
 vkCleanShaderModules :: proc() {
@@ -220,11 +220,13 @@ vkCleanShaderModules :: proc() {
 	vk.DestroyShaderModule(vkDevice, vkTexFragShader, nil)
 	vk.DestroyShaderModule(vkDevice, vkAnimateTexVertShader, nil)
 	vk.DestroyShaderModule(vkDevice, vkAnimateTexFragShader, nil)
-	vk.DestroyShaderModule(vkDevice, vkCopyScreenVertShader, nil)
-	vk.DestroyShaderModule(vkDevice, vkCopyScreenFragShader, nil)
+	//vk.DestroyShaderModule(vkDevice, vkCopyScreenVertShader, nil)
+	//vk.DestroyShaderModule(vkDevice, vkCopyScreenFragShader, nil)
 }
 
 vkInitPipelines :: proc() {
+	//vk.InitVulkanTemplate()
+
 	vkShapeDescriptorSetLayout = vk.DescriptorSetLayoutInit(vkDevice,
 		[]vk.DescriptorSetLayoutBinding {
 			vk.DescriptorSetLayoutBindingInit(0, 1, stageFlags = {.VERTEX}),
@@ -237,13 +239,13 @@ vkInitPipelines :: proc() {
 		[]vk.DescriptorSetLayout{vkShapeDescriptorSetLayout},
 	)
 
-	vkCopyScreenDescriptorSetLayout = vk.DescriptorSetLayoutInit(vkDevice,
-		[]vk.DescriptorSetLayoutBinding {
-			vk.DescriptorSetLayoutBindingInit(0, 1, descriptorType = .INPUT_ATTACHMENT, stageFlags = {.FRAGMENT}),},
-	)
-	vkCopyScreenPipelineLayout = vk.PipelineLayoutInit(vkDevice,
-		[]vk.DescriptorSetLayout{vkCopyScreenDescriptorSetLayout},
-	)
+	// vkCopyScreenDescriptorSetLayout = vk.DescriptorSetLayoutInit(vkDevice,
+	// 	[]vk.DescriptorSetLayoutBinding {
+	// 		vk.DescriptorSetLayoutBindingInit(0, 1, descriptorType = .INPUT_ATTACHMENT, stageFlags = {.FRAGMENT}),},
+	// )
+	// vkCopyScreenPipelineLayout = vk.PipelineLayoutInit(vkDevice,
+	// 	[]vk.DescriptorSetLayout{vkCopyScreenDescriptorSetLayout},
+	// )
 
 	vkTexDescriptorSetLayout = vk.DescriptorSetLayoutInit(vkDevice,
 		[]vk.DescriptorSetLayoutBinding {
@@ -283,7 +285,7 @@ vkInitPipelines :: proc() {
 
 	defaultDepthStencilState := vk.PipelineDepthStencilStateCreateInfoInit()
 
-	pipelines:[4]vk.Pipeline
+	pipelines:[3]vk.Pipeline
 	pipelineCreateInfos:[len(pipelines)]vk.GraphicsPipelineCreateInfo
 
 	shapeVertexInputBindingDescription := [1]vk.VertexInputBindingDescription{{
@@ -315,7 +317,7 @@ vkInitPipelines :: proc() {
 	wireFrame := vk.PipelineRasterizationStateCreateInfoInit(.LINE)
 
 	when vkWIREMODE {
-		pipelineCreateInfos[0] = vkGraphicsPipelineCreateInfoInit(
+		pipelineCreateInfos[0] = vk.GraphicsPipelineCreateInfoInit(
 			stages = shapeWireShaderStages[:],
 			layout = vkShapePipelineLayout,
 			renderPass = vkRenderPass,
@@ -357,15 +359,15 @@ vkInitPipelines :: proc() {
 		pColorBlendState = &vk.DefaultPipelineColorBlendStateCreateInfo,
 		pViewportState = &viewportState,
 	)
-	pipelineCreateInfos[3] = vk.GraphicsPipelineCreateInfoInit(
-		stages = copyScreenShaderStages[:],
-		layout = vkCopyScreenPipelineLayout,
-		renderPass = vkRenderPassCopy,
-		pMultisampleState = &vk.DefaultPipelineMultisampleStateCreateInfo,
-		pDepthStencilState = nil,
-		pColorBlendState = &vkCopyBlending,
-		pViewportState = &viewportState,
-	)
+	// pipelineCreateInfos[3] = vk.GraphicsPipelineCreateInfoInit(
+	// 	stages = copyScreenShaderStages[:],
+	// 	layout = vkCopyScreenPipelineLayout,
+	// 	renderPass = vkRenderPassCopy,
+	// 	pMultisampleState = &vk.DefaultPipelineMultisampleStateCreateInfo,
+	// 	pDepthStencilState = nil,
+	// 	pColorBlendState = &vkCopyBlending,
+	// 	pViewportState = &viewportState,
+	// )
 	res := vk.CreateGraphicsPipelines(vkDevice, 0, len(pipelines), raw_data(pipelineCreateInfos[:]), nil, raw_data(pipelines[:]))
 	if res != .SUCCESS {
 		trace.panic_log(res)
@@ -374,7 +376,7 @@ vkInitPipelines :: proc() {
 	vkShapePipeline = pipelines[0]
 	vkTexPipeline = pipelines[1]
 	vkAnimateTexPipeline = pipelines[2]
-	vkCopyScreenPipeline = pipelines[3]
+	//vkCopyScreenPipeline = pipelines[3]
 }
 
 vkBeginSingleTimeCmd :: proc "contextless" () -> vk.CommandBuffer {
@@ -418,17 +420,17 @@ vkCleanPipelines :: proc() {
 	vk.DestroyDescriptorSetLayout(vkDevice, vkTexDescriptorSetLayout, nil)
 	vk.DestroyDescriptorSetLayout(vkDevice, vkTexDescriptorSetLayout2, nil)
 	vk.DestroyDescriptorSetLayout(vkDevice, vkAnimateTexDescriptorSetLayout, nil)
-	vk.DestroyDescriptorSetLayout(vkDevice, vkCopyScreenDescriptorSetLayout, nil)
+	//vk.DestroyDescriptorSetLayout(vkDevice, vkCopyScreenDescriptorSetLayout, nil)
 
 	vk.DestroyPipelineLayout(vkDevice, vkShapePipelineLayout, nil)
 	vk.DestroyPipelineLayout(vkDevice, vkTexPipelineLayout, nil)
 	vk.DestroyPipelineLayout(vkDevice, vkAnimateTexPipelineLayout, nil)
-	vk.DestroyPipelineLayout(vkDevice, vkCopyScreenPipelineLayout, nil)
+	//vk.DestroyPipelineLayout(vkDevice, vkCopyScreenPipelineLayout, nil)
 
 	vk.DestroyPipeline(vkDevice, vkShapePipeline, nil)
 	vk.DestroyPipeline(vkDevice, vkTexPipeline, nil)
 	vk.DestroyPipeline(vkDevice, vkAnimateTexPipeline, nil)
-	vk.DestroyPipeline(vkDevice, vkCopyScreenPipeline, nil)
+	//vk.DestroyPipeline(vkDevice, vkCopyScreenPipeline, nil)
 }
 
 vkFmts:[]vk.SurfaceFormatKHR

@@ -17,20 +17,96 @@ vkCreateXlibSurfaceKHR: proc "system" (
 VK_STRUCTURE_TYPE_XLIB_SURFACE_CREATE_INFO_KHR :: 1000004000
 
 @(rodata) DefaultDynamicStates := [2]DynamicState{DynamicState.VIEWPORT, DynamicState.SCISSOR}
-DefaultPipelineDynamicStateCreateInfo := PipelineDynamicStateCreateInfo {
-	sType             = StructureType.PIPELINE_DYNAMIC_STATE_CREATE_INFO,
-	dynamicStateCount = 2,
-	pDynamicStates    = &DefaultDynamicStates[0],
+DefaultPipelineDynamicStateCreateInfo : PipelineDynamicStateCreateInfo
+
+@init InitVulkanTemplate :: proc "contextless"() {
+	DefaultPipelineDynamicStateCreateInfo = PipelineDynamicStateCreateInfo {
+		sType             = .PIPELINE_DYNAMIC_STATE_CREATE_INFO,
+		dynamicStateCount = 2,
+		pDynamicStates    = &DefaultDynamicStates[0],
+	}
+	DefaultPipelineColorBlendStateCreateInfo = PipelineColorBlendStateCreateInfo{
+		sType = StructureType.PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
+		pNext = nil,
+		flags = {},
+		logicOpEnable = false,
+		logicOp = LogicOp.COPY, 
+		attachmentCount = auto_cast len(__DefaultPipelineColorBlendAttachmentState),
+		pAttachments = &__DefaultPipelineColorBlendAttachmentState[0],
+		blendConstants = {0,0,0,0},
+	}
+	
 }
 
-@(private="file") __DefaultPipelineColorBlendAttachmentState := [1]PipelineColorBlendAttachmentState{PipelineColorBlendAttachmentStateInit()}
-DefaultPipelineColorBlendStateCreateInfo := PipelineColorBlendStateCreateInfoInit(__DefaultPipelineColorBlendAttachmentState[:1])
+@(private="file") __DefaultPipelineColorBlendAttachmentState := [1]PipelineColorBlendAttachmentState{
+	PipelineColorBlendAttachmentState{
+		blendEnable = true,
+		srcColorBlendFactor = BlendFactor.SRC_ALPHA,
+		dstColorBlendFactor = BlendFactor.ONE_MINUS_SRC_ALPHA,
+		colorBlendOp = BlendOp.ADD,
+		srcAlphaBlendFactor = BlendFactor.ONE,
+		dstAlphaBlendFactor = BlendFactor.ZERO,
+		alphaBlendOp = BlendOp.ADD,
+		colorWriteMask = {.R,.G,.B,.A},
+	},
+}
+DefaultPipelineColorBlendStateCreateInfo : PipelineColorBlendStateCreateInfo
 
-DefaultPipelineMultisampleStateCreateInfo := PipelineMultisampleStateCreateInfoInit()
-DefaultPipelineInputAssemblyStateCreateInfo := PipelineInputAssemblyStateCreateInfoInit()
-DefaultPipelineRasterizationStateCreateInfo := PipelineRasterizationStateCreateInfoInit()
-DefaultPipelineVertexInputStateCreateInfo := PipelineVertexInputStateCreateInfoInit()
-DefaultPipelineDepthStencilStateCreateInfo := PipelineDepthStencilStateCreateInfoInit()
+
+DefaultPipelineMultisampleStateCreateInfo := PipelineMultisampleStateCreateInfo{
+	sType = StructureType.PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
+	rasterizationSamples = {._1},
+	sampleShadingEnable = true,
+	minSampleShading = 1.0,
+	pSampleMask = nil,
+	alphaToCoverageEnable = false,
+	alphaToOneEnable = false,
+	pNext = nil,
+	flags = {},
+}
+DefaultPipelineInputAssemblyStateCreateInfo := PipelineInputAssemblyStateCreateInfo{
+	sType = StructureType.PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
+	pNext = nil,
+	flags = {},
+	topology = PrimitiveTopology.TRIANGLE_LIST,
+	primitiveRestartEnable = false,
+}
+DefaultPipelineRasterizationStateCreateInfo := PipelineRasterizationStateCreateInfo{
+	sType = StructureType.PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+	polygonMode = .FILL,
+	frontFace = .CLOCKWISE,
+	cullMode = {},
+	depthClampEnable = false,
+	rasterizerDiscardEnable = false, 
+	depthBiasEnable = false,
+	depthBiasConstantFactor = 0.0,
+	depthBiasClamp = 0.0,
+	depthBiasSlopeFactor = 0.0,
+	lineWidth = 1.0,
+	pNext = nil,
+	flags = {},
+}
+DefaultPipelineVertexInputStateCreateInfo := PipelineVertexInputStateCreateInfo{
+	sType = StructureType.PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+	vertexBindingDescriptionCount = 0,
+	pVertexBindingDescriptions = nil,
+	vertexAttributeDescriptionCount = 0,
+	pVertexAttributeDescriptions = nil,
+	flags = {},
+	pNext = nil,
+}
+DefaultPipelineDepthStencilStateCreateInfo := PipelineDepthStencilStateCreateInfo{
+	depthTestEnable = true,
+	depthWriteEnable = true,
+	depthBoundsTestEnable = false,
+	depthCompareOp = .LESS_OR_EQUAL,
+	stencilTestEnable = false,
+	front = {},
+	back = {},
+	maxDepthBounds = 1.0,
+	minDepthBounds = 0.0,
+	sType = StructureType.PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+}
 
 
 @(require_results) CreateShaderModule2 :: proc(vkDevice: Device, code: []byte) -> ShaderModule {
@@ -320,10 +396,10 @@ DefaultPipelineDepthStencilStateCreateInfo := PipelineDepthStencilStateCreateInf
 	depthClampEnable:        b32 = false,
 	rasterizerDiscardEnable: b32 = false,
 	depthBiasEnable:         b32 = false,
-	depthBiasConstantFactor: f32 = 0,
-	depthBiasClamp:          f32 = 0,
-	depthBiasSlopeFactor:    f32 = 0,
-	lineWidth:               f32 = 1,
+	depthBiasConstantFactor: f32 = 0.0,
+	depthBiasClamp:          f32 = 0.0,
+	depthBiasSlopeFactor:    f32 = 0.0,
+	lineWidth:               f32 = 1.0,
 	pNext:                   rawptr = nil,
 	flags:                   PipelineRasterizationStateCreateFlags = {},
 ) -> PipelineRasterizationStateCreateInfo {

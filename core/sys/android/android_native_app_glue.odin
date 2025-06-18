@@ -216,6 +216,7 @@ when ODIN_PLATFORM_SUBTARGET == .Android {
         context = runtime.default_context()
         g_android_app = state
         //args__ = argv[:argc]
+        #force_no_inline runtime._startup_runtime()
         intrinsics.__entry_point()
     }
 
