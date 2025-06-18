@@ -1,4 +1,3 @@
-```odin
 #+build linux
 package camerandk
 
@@ -103,5 +102,4 @@ CameraStatus :: enum {
      */
     ERROR_UNSUPPORTED_OPERATION = ERROR_BASE - 14,
 }
-```
 
