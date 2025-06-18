@@ -118,18 +118,18 @@ main :: proc() {
 		sdkPath := android_paths["sdk"].(json.String)
 		PLATFORM := android_paths["platform-version"].(json.Float)
 
-		ODIN_ANDROID_SDK := strings.join({"ODIN_ANDROID_SDK=", sdkPath}, "", context.temp_allocator)
-		ODIN_ANDROID_NDK := strings.join({"ODIN_ANDROID_NDK=", ndkPath}, "", context.temp_allocator)
+		builded := false
+
+		os2.set_env("ODIN_ANDROID_SDK", sdkPath)
+		os2.set_env("ODIN_ANDROID_NDK", ndkPath)
 		when ODIN_OS == .Windows {
-			ODIN_ANDROID_NDK_TOOLCHAIN := strings.join({"ODIN_ANDROID_NDK_TOOLCHAIN=", ndkPath, "/toolchains/llvm/prebuilt/windows-x86_64"}, "", context.temp_allocator)
+			os2.set_env("ODIN_ANDROID_NDK_TOOLCHAIN", strings.join({ndkPath, "/toolchains/llvm/prebuilt/windows-x86_64"}, "", context.temp_allocator))
 		} else when ODIN_OS == .Linux {
-			ODIN_ANDROID_NDK_TOOLCHAIN := strings.join({"ODIN_ANDROID_NDK_TOOLCHAIN=", ndkPath, "/toolchains/llvm/prebuilt/linux-x86_64"}, "", context.temp_allocator)
+			os2.set_env("ODIN_ANDROID_NDK_TOOLCHAIN", strings.join({ndkPath, "/toolchains/llvm/prebuilt/linux-x86_64"}, "", context.temp_allocator))
 		} else {
 			#panic("Unsupported OS for Android build")
 		}
 		
-		builded := false
-
 		for target, i in targets {
 			if !runCmd({"odin", "build", 
 			setting["main-package"].(json.String), 
@@ -145,20 +145,12 @@ main :: proc() {
 			"-subtarget:android",
 			fmt.aprint("-minimum-os-version:", PLATFORM, sep = "", allocator = context.temp_allocator),
 			//"-extra-linker-flags:\"-L lib/lib/arm64-v8a -lVkLayer_khronos_validation\"" if debug else ({}),
-			}, {
-				ODIN_ANDROID_SDK,
-				ODIN_ANDROID_NDK,
-				ODIN_ANDROID_NDK_TOOLCHAIN,
 			}) {
 				return
 			}
 
 			//?"$ANDROID_JBR/bin/keytool" -genkey -v -keystore .keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000
 			if !runCmd({"odin", "bundle", "android", "android", "-android-keystore:android/debug.keystore", "-android-keystore-password:android",
-			}, {
-				ODIN_ANDROID_SDK,
-				ODIN_ANDROID_NDK,
-				ODIN_ANDROID_NDK_TOOLCHAIN,
 			}) {
 				return
 			}
@@ -239,7 +231,7 @@ findGLSLFileAndRunCmd :: proc() -> bool {
 	return true
 }
 
-runCmd :: proc(cmd:[]string, env:[]string = nil) -> bool {
+runCmd :: proc(cmd:[]string) -> bool {
 	r, w, err := os2.pipe()
 	if err != nil do panic("pipe")
 
@@ -248,7 +240,7 @@ runCmd :: proc(cmd:[]string, env:[]string = nil) -> bool {
 		command = cmd,
 		stdout  = w,
 		stderr  = w,
-		env = env,
+		env = nil,
 	})
 	os2.close(w)
 
