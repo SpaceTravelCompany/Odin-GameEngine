@@ -56,8 +56,6 @@ main :: proc() {
 	if "log" in setting {
 		log = setting["log"].(json.Boolean)
 	}
-	out_path := strings.join({"-out:", setting["out-path"].(json.String)}, "")
-	defer delete(out_path)
 
 	// Sets the optimization mode for compilation.
 	// Available options:
@@ -169,6 +167,13 @@ main :: proc() {
 			os2.remove("test.apk.idsig")
 		}	
 	} else {
+		when ODIN_OS == .Windows {
+			out_path := strings.join({"-out:", setting["out-path"].(json.String), ".exe"}, "")
+		} else {
+			out_path := strings.join({"-out:", setting["out-path"].(json.String)}, "")
+		}
+		defer delete(out_path)
+		
 		resource :Maybe(string) = nil
 		if "resource" in setting {
 			resource = strings.join({"-resource:",setting["resource"].(json.String)}, "", context.temp_allocator)
