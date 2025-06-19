@@ -175,8 +175,10 @@ main :: proc() {
 		defer delete(out_path)
 		
 		resource :Maybe(string) = nil
-		if "resource" in setting {
-			resource = strings.join({"-resource:",setting["resource"].(json.String)}, "", context.temp_allocator)
+		when ODIN_OS == .Windows {
+			if "resource" in setting {
+				resource = strings.join({"-resource:",setting["resource"].(json.String)}, "", context.temp_allocator)
+			}
 		}
 		defer if resource != nil do delete(resource.?, context.temp_allocator)
 
