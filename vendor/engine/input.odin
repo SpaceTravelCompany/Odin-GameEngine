@@ -21,6 +21,8 @@ import "core:sys/android"
 @(private) KEY_SIZE :: 512
 @(private) keys : [KEY_SIZE]bool = { 0..<KEY_SIZE = false }
 @(private) isMouseOut:bool
+@(private) mouse_pos:linalg.PointF
+@(private) scrollDt:int
 
 when is_mobile {
     KeyCode :: enum i32 {
@@ -280,13 +282,61 @@ LEFT_MOUSE_BUTTON_IDX :: 0
 MIDDLE_MOUSE_BUTTON_IDX :: 1
 RIGHT_MOUSE_BUTTON_IDX :: 2
 
-KeyDown : proc "contextless" (keycode:KeyCode) = proc "contextless" (keycode:KeyCode) {}
-KeyUp : proc "contextless" (keycode:KeyCode) = proc "contextless" (keycode:KeyCode) {}
-KeyRepeat : proc "contextless" (keycode:KeyCode) = proc "contextless" (keycode:KeyCode) {}
-MouseButtonDown : proc "contextless" (buttonIdx:int) = proc "contextless" (buttonIdx:int) {}
-MouseButtonUp : proc "contextless" (buttonIdx:int) = proc "contextless" (buttonIdx:int) {}
-MouseMove : proc "contextless" (x:f64, y:f64) = proc "contextless" (x:f64, y:f64) {}
-MouseIn : proc "contextless" () = proc "contextless" () {}
-MouseOut : proc "contextless" () = proc "contextless" () {}
+KeyDown : proc (keycode:KeyCode) = proc (keycode:KeyCode) {}
+KeyUp : proc (keycode:KeyCode) = proc (keycode:KeyCode) {}
+KeyRepeat : proc (keycode:KeyCode) = proc (keycode:KeyCode) {}
+MouseButtonDown : proc (buttonIdx:int, x:f32, y:f32) = proc (buttonIdx:int, x:f32, y:f32) {}
+MouseButtonUp : proc (buttonIdx:int, x:f32, y:f32) = proc (buttonIdx:int, x:f32, y:f32) {}
+PointerDown : proc (pointerIdx:int, x:f32, y:f32) = proc (pointerIdx:int, x:f32, y:f32) {}
+PointerUp : proc (pointerIdx:int, x:f32, y:f32) = proc (pointerIdx:int, x:f32, y:f32) {}
+PointerMove : proc (pointerIdx:int, x:f32, y:f32) = proc (pointerIdx:int, x:f32, y:f32) {}
+MouseScroll : proc (dt:int) = proc (dt:int) {}
+MouseMove : proc (x:f32, y:f32) = proc (x:f32, y:f32) {}
+MouseIn : proc () = proc () {}
+MouseOut : proc () = proc () {}
 
 IsMouseOut :: proc "contextless" () -> bool {return isMouseOut}
+MousePos :: #force_inline proc "contextless" () -> linalg.PointF {
+    return mouse_pos
+}
+
+ConvertMousePos :: proc "contextless" (pos:linalg.PointF) -> linalg.PointF {
+    w := f32(WindowWidth()) / 2.0
+    h := f32(WindowHeight()) / 2.0
+    return linalg.PointF{ pos.x - w, -pos.y + h }
+}
+
+GENERAL_INPUT_STATE :: struct {
+    handle:rawptr,
+    leftTrigger:f32,
+    rightTrigger:f32,
+    leftThumb: linalg.PointF,
+    rightThumb: linalg.PointF,
+    buttons:GENERAL_INPUT_BUTTONS,
+}
+
+GENERAL_INPUT_BUTTONS :: struct #packed {
+    a:bool,
+    b:bool,
+    x:bool,
+    y:bool,
+
+    dpadUp:bool,
+    dpadDown:bool,
+    dpadLeft:bool,
+    dpadRight:bool,
+
+    start:bool,
+    back:bool,
+
+    leftThumb:bool,
+    rightThumb:bool,
+
+    leftShoulder:bool,
+    rightShoulder:bool,
+
+    volumeUp:bool,
+    volumeDown:bool,
+}
+
+GeneralInputCallBack : proc (state:GENERAL_INPUT_STATE) = proc (state:GENERAL_INPUT_STATE) {}

@@ -263,6 +263,7 @@ glfwLoop :: proc() {
         if key > KEY_SIZE-1 || key < 0 || !reflect.is_valid_enum_value(KeyCode, key) {
             return
         }
+        context = runtime.default_context()
         switch action {
             case glfw.PRESS:
                 if !keys[key] {
@@ -277,17 +278,22 @@ glfwLoop :: proc() {
         }
     }
     glfwMouseButtonProc :: proc "c" (window: glfw.WindowHandle, button, action, mods: c.int) {
+        context = runtime.default_context()
         switch action {
             case glfw.PRESS:
-                MouseButtonDown(auto_cast button)
+                MouseButtonDown(auto_cast button, mouse_pos.x, mouse_pos.y)
             case glfw.RELEASE:
-                MouseButtonUp(auto_cast button)
+                MouseButtonUp(auto_cast button, mouse_pos.x, mouse_pos.y)
         }
     }
     glfwCursorPosProc :: proc "c" (window: glfw.WindowHandle, xpos,  ypos: f64) {
-        MouseMove(xpos, ypos)
+        context = runtime.default_context()
+        mouse_pos.x = auto_cast xpos
+        mouse_pos.y = auto_cast ypos
+        MouseMove(mouse_pos.x, mouse_pos.y)
     }
     glfwCursorEnterProc :: proc "c" (window: glfw.WindowHandle, entered: c.int) {
+        context = runtime.default_context()
         if b32(entered) {
             isMouseOut = false
             MouseIn()
