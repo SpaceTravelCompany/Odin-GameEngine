@@ -38,6 +38,9 @@ ProcCreateWaylandSurfaceKHR                                          :: #type pr
 ProcCreateWin32SurfaceKHR                                            :: #type proc "system" (instance: Instance, pCreateInfo: ^Win32SurfaceCreateInfoKHR, pAllocator: ^AllocationCallbacks, pSurface: ^SurfaceKHR) -> Result
 ProcCreateXcbSurfaceKHR                                              :: #type proc "system" (instance: Instance, pCreateInfo: ^XcbSurfaceCreateInfoKHR, pAllocator: ^AllocationCallbacks, pSurface: ^SurfaceKHR) -> Result
 ProcCreateXlibSurfaceKHR                                             :: #type proc "system" (instance: Instance, pCreateInfo: ^XlibSurfaceCreateInfoKHR, pAllocator: ^AllocationCallbacks, pSurface: ^SurfaceKHR) -> Result
+when ODIN_PLATFORM_SUBTARGET == .Android {
+ProcCreateAndroidSurfaceKHR :: #type proc "system" (instance: Instance, pCreateInfo: ^AndroidSurfaceCreateInfoKHR, pAllocator: ^AllocationCallbacks, pSurface:^SurfaceKHR) -> Result //edited (xfitgd)
+}
 ProcDebugReportMessageEXT                                            :: #type proc "system" (instance: Instance, flags: DebugReportFlagsEXT, objectType: DebugReportObjectTypeEXT, object: u64, location: int, messageCode: i32, pLayerPrefix: cstring, pMessage: cstring)
 ProcDestroyDebugReportCallbackEXT                                    :: #type proc "system" (instance: Instance, callback: DebugReportCallbackEXT, pAllocator: ^AllocationCallbacks)
 ProcDestroyDebugUtilsMessengerEXT                                    :: #type proc "system" (instance: Instance, messenger: DebugUtilsMessengerEXT, pAllocator: ^AllocationCallbacks)
@@ -752,6 +755,9 @@ CreateWaylandSurfaceKHR:                                          ProcCreateWayl
 CreateWin32SurfaceKHR:                                            ProcCreateWin32SurfaceKHR
 CreateXcbSurfaceKHR:                                              ProcCreateXcbSurfaceKHR
 CreateXlibSurfaceKHR:                                             ProcCreateXlibSurfaceKHR
+when ODIN_PLATFORM_SUBTARGET == .Android {
+CreateAndroidSurfaceKHR:                                             ProcCreateAndroidSurfaceKHR
+}//edited (xfitgd)
 DebugReportMessageEXT:                                            ProcDebugReportMessageEXT
 DestroyDebugReportCallbackEXT:                                    ProcDestroyDebugReportCallbackEXT
 DestroyDebugUtilsMessengerEXT:                                    ProcDestroyDebugUtilsMessengerEXT
@@ -1465,6 +1471,9 @@ load_proc_addresses_custom :: proc(set_proc_address: SetProcAddressType) {
 	set_proc_address(&CreateWin32SurfaceKHR,                                            "vkCreateWin32SurfaceKHR")
 	set_proc_address(&CreateXcbSurfaceKHR,                                              "vkCreateXcbSurfaceKHR")
 	set_proc_address(&CreateXlibSurfaceKHR,                                             "vkCreateXlibSurfaceKHR")
+	when ODIN_PLATFORM_SUBTARGET == .Android {
+		set_proc_address(&CreateAndroidSurfaceKHR,                                             "vkCreateAndroidSurfaceKHR")
+	}//edited (xfitgd)
 	set_proc_address(&DebugReportMessageEXT,                                            "vkDebugReportMessageEXT")
 	set_proc_address(&DestroyDebugReportCallbackEXT,                                    "vkDestroyDebugReportCallbackEXT")
 	set_proc_address(&DestroyDebugUtilsMessengerEXT,                                    "vkDestroyDebugUtilsMessengerEXT")
@@ -3986,6 +3995,9 @@ load_proc_addresses_instance :: proc(instance: Instance) {
 	CreateWin32SurfaceKHR                                            = auto_cast GetInstanceProcAddr(instance, "vkCreateWin32SurfaceKHR")
 	CreateXcbSurfaceKHR                                              = auto_cast GetInstanceProcAddr(instance, "vkCreateXcbSurfaceKHR")
 	CreateXlibSurfaceKHR                                             = auto_cast GetInstanceProcAddr(instance, "vkCreateXlibSurfaceKHR")
+	when ODIN_PLATFORM_SUBTARGET == .Android {
+		CreateAndroidSurfaceKHR = auto_cast GetInstanceProcAddr(instance, "vkCreateAndroidSurfaceKHR")
+	}//edited (xfitgd)
 	DebugReportMessageEXT                                            = auto_cast GetInstanceProcAddr(instance, "vkDebugReportMessageEXT")
 	DestroyDebugReportCallbackEXT                                    = auto_cast GetInstanceProcAddr(instance, "vkDestroyDebugReportCallbackEXT")
 	DestroyDebugUtilsMessengerEXT                                    = auto_cast GetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT")

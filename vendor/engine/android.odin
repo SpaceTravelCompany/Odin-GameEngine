@@ -17,15 +17,6 @@ when is_android {
     @(private="file") app : ^android.android_app
     @(private="file") appInited := false
 
-    VkAndroidSurfaceCreateFlagsKHR :: vk.Flags
-    VkAndroidSurfaceCreateInfoKHR :: struct {
-        sType: vk.StructureType,
-        pNext:rawptr,
-        flags:VkAndroidSurfaceCreateFlagsKHR,
-        window:^android.ANativeWindow,
-    }
-    vkCreateAndroidSurfaceKHR : proc "system" (instance: vk.Instance, pCreateInfo: ^VkAndroidSurfaceCreateInfoKHR, pAllocator: ^vk.AllocationCallbacks, pSurface:^vk.SurfaceKHR) -> vk.Result
-
     //must call start
     __android_SetApp :: proc "contextless" (_app : ^android.android_app) {
         app = _app
@@ -79,15 +70,11 @@ when is_android {
         if vkSurface != 0 {
             vk.DestroySurfaceKHR(vkInstance, vkSurface, nil)
         }
-        if vkCreateAndroidSurfaceKHR == nil {
-            vkCreateAndroidSurfaceKHR = auto_cast vk.GetInstanceProcAddr(vkInstance, "vkCreateAndroidSurfaceKHR")
-        }
-
-        androidSurfaceCreateInfo : VkAndroidSurfaceCreateInfoKHR = {
+        androidSurfaceCreateInfo : vk.AndroidSurfaceCreateInfoKHR = {
             sType = vk.StructureType.ANDROID_SURFACE_CREATE_INFO_KHR,
             window = app.window,
         }
-        res := vkCreateAndroidSurfaceKHR(vkInstance, &androidSurfaceCreateInfo, nil, &vkSurface)
+        res := vk.CreateAndroidSurfaceKHR(vkInstance, &androidSurfaceCreateInfo, nil, &vkSurface)
         if res != .SUCCESS {
             trace.panic_log(res)
         }

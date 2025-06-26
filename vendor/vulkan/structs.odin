@@ -11,6 +11,8 @@ _ :: win32
 import "vendor:x11/xlib"
 _ :: xlib
 
+import "core:sys/android"
+
 when ODIN_OS == .Windows {
 	HINSTANCE           :: win32.HINSTANCE
 	HWND                :: win32.HWND
@@ -9061,6 +9063,15 @@ Win32SurfaceCreateInfoKHR :: struct {
 	flags:     Win32SurfaceCreateFlagsKHR,
 	hinstance: HINSTANCE,
 	hwnd:      HWND,
+}
+
+when ODIN_PLATFORM_SUBTARGET == .Android {
+	AndroidSurfaceCreateInfoKHR :: struct {
+		sType: StructureType,
+		pNext:rawptr,
+		flags:AndroidSurfaceCreateFlagsKHR,
+		window:^android.ANativeWindow,
+	}//edited (xfitgd)
 }
 
 ImportMemoryWin32HandleInfoKHR :: struct {

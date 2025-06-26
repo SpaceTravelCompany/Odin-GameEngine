@@ -7,15 +7,6 @@ import "core:strings"
 import "vendor:x11/xlib"
 
 
-vkCreateXlibSurfaceKHR: proc "system" (
-	_instance: Instance,
-	pCreateInfo: ^XlibSurfaceCreateInfoKHR,
-	pAllocator: ^AllocationCallbacks,
-	pSurface: ^SurfaceKHR,
-) -> Result
-
-VK_STRUCTURE_TYPE_XLIB_SURFACE_CREATE_INFO_KHR :: 1000004000
-
 @(rodata) DefaultDynamicStates := [2]DynamicState{DynamicState.VIEWPORT, DynamicState.SCISSOR}
 DefaultPipelineDynamicStateCreateInfo : PipelineDynamicStateCreateInfo
 

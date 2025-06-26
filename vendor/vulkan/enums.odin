@@ -4724,6 +4724,11 @@ XcbSurfaceCreateFlagsKHR                             :: distinct bit_set[XcbSurf
 XcbSurfaceCreateFlagKHR                              :: enum u32 {}
 XlibSurfaceCreateFlagsKHR                            :: distinct bit_set[XlibSurfaceCreateFlagKHR; Flags]
 XlibSurfaceCreateFlagKHR                             :: enum u32 {}
+when ODIN_PLATFORM_SUBTARGET == .Android {
+AndroidSurfaceCreateFlagsKHR                            :: distinct bit_set[AndroidSurfaceCreateFlagKHR; Flags]//edited (xfitgd)
+AndroidSurfaceCreateFlagKHR                             :: enum u32 {}
+}
+
 AccessFlags2 :: distinct bit_set[AccessFlag2; Flags64]
 AccessFlag2 :: enum Flags64 {
 	INDIRECT_COMMAND_READ                     = 0,
