@@ -348,7 +348,7 @@ glfwLoop :: proc() {
     glfw.SetCharCallback(wnd, glfwCharProc)
     glfw.SetCursorPosCallback(wnd, glfwCursorPosProc)
     glfw.SetCursorEnterCallback(wnd, glfwCursorEnterProc)
-    glfw.SetJoystickCallback(glfwJoystickProc)
+    //glfw.SetJoystickCallback(glfwJoystickProc)
     glfw.SetWindowCloseCallback(wnd, glfwWindowCloseProc)
     glfw.SetWindowFocusCallback(wnd, glfwWindowFocusProc)
     glfw.SetFramebufferSizeCallback(wnd, glfwWindowSizeProc)
