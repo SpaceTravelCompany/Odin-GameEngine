@@ -8,7 +8,7 @@ import "core:image/qoi"
 import "core:image"
 import "core:bytes"
 import "core:os/os2"
-
+import "core:sys/android"
 
 @private qoi_converter_in :: struct {
     img : ^image.Image,
@@ -78,8 +78,8 @@ Qoi_Error :: union #shared_nil {
 qoi_converter_load_file :: proc (self:^qoi_converter, file_path:string, out_fmt:color_fmt, allocator := context.allocator) -> ([]byte, Qoi_Error) {
     imgFileData:[]byte
     when is_android {
-        imgFileReadErr : Android_AssetFileError
-        imgFileData, imgFileReadErr = Android_AssetReadFile(file_path, context.temp_allocator)
+        imgFileReadErr : android.AssetFileError
+        imgFileData, imgFileReadErr = android.asset_read_file(file_path, context.temp_allocator)
         if imgFileReadErr != .None {
             trace.panic_log(imgFileReadErr)
         }

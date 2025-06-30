@@ -219,8 +219,8 @@ when ODIN_PLATFORM_SUBTARGET == .Android {
         #force_no_inline runtime._startup_runtime()
         intrinsics.__entry_point()
     }
+}
 
-    get_android_app :: proc "contextless" () -> ^android_app {
-        return g_android_app
-    }
+get_android_app :: proc "contextless" () -> ^android_app {
+    return g_android_app
 }

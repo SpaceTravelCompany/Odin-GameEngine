@@ -363,38 +363,6 @@ SecondToNanoSecond2 :: #force_inline proc "contextless" (_sec: $T, _milisec: T, 
     return _sec * 1000000000 + _milisec * 1000000 + _usec * 1000 + _nsec
 }
 
-Android_AssetFileError :: enum {
-	None,
-	Err
-}
-
-when is_android {
-	Android_AssetReadFile :: proc(path:string, allocator := context.allocator) -> (data:[]u8, err:Android_AssetFileError = .None) {
-		pathT := strings.clone_to_cstring(path, context.temp_allocator)
-		defer delete(pathT, context.temp_allocator)
-		
-		asset := android.AAssetManager_open(android_GetAssetManager(), pathT, .BUFFER)
-		__size := android.AAsset_getLength64(asset)
-
-		data = mem.make_non_zeroed_slice([]u8, auto_cast __size, allocator)
-
-		__read : type_of(__size) = 0
-		for __read < __size {
-			i := android.AAsset_read(asset, auto_cast &data[__read], auto_cast(__size - __read))
-			if i < 0 {
-				delete(data)
-				err = .Err
-				break
-			} else if i == 0 {
-				break
-			}
-			__read += auto_cast i
-		}
-		android.AAsset_close(asset)
-		return
-	}
-}
-
 IsInMainThread :: #force_inline proc "contextless" () -> bool {
 	return sync.current_thread_id() == vkThreadId
 }

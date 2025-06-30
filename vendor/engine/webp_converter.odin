@@ -194,8 +194,8 @@ WebP_Error :: union #shared_nil {
 webp_converter_load_file :: proc (self:^webp_converter, file_path:string, out_fmt:color_fmt, allocator := context.allocator) -> ([]byte, WebP_Error) {
     imgFileData:[]byte
     when is_android {
-        imgFileReadErr : Android_AssetFileError
-        imgFileData, imgFileReadErr = Android_AssetReadFile(file_path, context.temp_allocator)
+        imgFileReadErr : android.AssetFileError
+        imgFileData, imgFileReadErr = android.asset_read_file(file_path, context.temp_allocator)
         if imgFileReadErr != .None {
             trace.panic_log(imgFileReadErr)
         }
