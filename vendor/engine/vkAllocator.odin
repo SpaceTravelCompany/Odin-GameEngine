@@ -932,6 +932,7 @@ VkBufferResource_Deinit :: proc(self: ^$T) where T == VkBufferResource || T == V
 		self.option.resourceUsage = .CPU
 		self.option.single = false
 	}
+	self.creating = nil //clear creating, because resource is created
 
 	memProp : vk.MemoryPropertyFlags;
 	switch self.option.resourceUsage {
@@ -981,8 +982,6 @@ VkBufferResource_Deinit :: proc(self: ^$T) where T == VkBufferResource || T == V
 
 	self.vkMemBuffer = VkMemBuffer_CreateFromResourceSingle(self.__resource) if self.option.single else
 	VkMemBuffer_CreateFromResource(self.__resource, memProp, &self.idx, 0)
-
-	self.creating = nil //clear creating, because resource is created
 
 	if data != nil {
 		if self.option.resourceUsage != .GPU {
