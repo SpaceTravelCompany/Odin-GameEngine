@@ -66,6 +66,23 @@ color_fmt_bit :: proc "contextless" (fmt: color_fmt) -> int {
 	return 0
 }
 
+default_color_fmt :: proc "contextless" () -> color_fmt {
+    return TextureFmtToColorFmt(vkFmtToTextureFmt(vkFmt.format))
+}
+
+@(require_results) TextureFmtToColorFmt :: proc "contextless" (t:TextureFmt) -> color_fmt {
+	#partial switch t {
+		case .DefaultColor:
+			return TextureFmtToColorFmt(vkFmtToTextureFmt(vkFmt.format))
+		case .R8G8B8A8Unorm:
+			return .RGBA
+		case .B8G8R8A8Unorm:
+			return .BGRA
+	}
+    trace.printlnLog("unsupport format TextureFmtToColorFmt : ", t)
+    return .Unknown
+}
+
 @(require_results) TextureFmt_IsDepth :: proc  "contextless" (t:TextureFmt) -> bool {
 	#partial switch(t) {
 		case .D24UnormS8Uint, .D32SfloatS8Uint, .D16UnormS8Uint, .DefaultDepth:

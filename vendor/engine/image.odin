@@ -4,6 +4,7 @@ import "core:math"
 import "core:mem"
 import "core:slice"
 import "core:sync"
+import "core:debug/trace"
 import "core:math/linalg"
 import "base:intrinsics"
 import "base:runtime"
@@ -38,14 +39,10 @@ TextureArray :: struct {
 }
 
 @private __TextureArrayIn :: distinct __TextureIn
+@private __TileTextureArrayIn :: distinct __TextureArrayIn
 
 TileTextureArray :: struct {
     using _: __TileTextureArrayIn,
-}
-
-@private __TileTextureArrayIn :: struct {
-    using _:__TextureArrayIn,
-    allocPixels:[]byte,
 }
 
 Image :: struct {
@@ -276,7 +273,7 @@ _Super_AnimateImage_Draw :: proc (self:^AnimateImage, cmd:vk.CommandBuffer) {
 }
 
 TileImage_Init :: proc(self:^TileImage, $actualType:typeid, src:^TileTextureArray, pos:linalg.Point3DF, rotation:f32, scale:linalg.PointF = {1,1}, 
-camera:^Camera, projection:^Projection, colorTransform:^ColorTransform = nil, pivot:linalg.PointF = {1,1}, vtable:^IObjectVTable = nil) where intrinsics.type_is_subtype_of(actualType, TileImage) {
+camera:^Camera, projection:^Projection, colorTransform:^ColorTransform = nil, pivot:linalg.PointF = {0, 0}, vtable:^IObjectVTable = nil) where intrinsics.type_is_subtype_of(actualType, TileImage) {
     self.src = src
 
     self.set.bindings = __tileImageUniformPoolBinding[:]
@@ -284,10 +281,17 @@ camera:^Camera, projection:^Projection, colorTransform:^ColorTransform = nil, pi
     self.set.layout = vkAnimateTexDescriptorSetLayout
 
     self.vtable = vtable == nil ? &TileImageVTable : vtable
-    if self.vtable.Draw == nil do self.vtable.Draw = auto_cast TileImage_Draw
-    if self.vtable.Deinit == nil do self.vtable.Deinit = auto_cast TileImage_Deinit
+    if self.vtable.Draw == nil do self.vtable.Draw = auto_cast _Super_TileImage_Draw
+    if self.vtable.Deinit == nil do self.vtable.Deinit = auto_cast _Super_TileImage_Deinit
 
     self.vtable.__GetUniformResources = auto_cast __GetUniformResources_TileImage
+
+
+    VkBufferResource_CreateBuffer(&self.tileUniform, {
+        len = size_of(u32),
+        type = .UNIFORM,
+        resourceUsage = .CPU,
+    }, mem.ptr_to_bytes(&self.tileIdx), true)
 
     IObject_Init(self, actualType, pos, rotation, scale, camera, projection, colorTransform, pivot)
 }
@@ -301,8 +305,8 @@ camera:^Camera, projection:^Projection, colorTransform:^ColorTransform = nil, vt
     self.set.layout = vkAnimateTexDescriptorSetLayout
 
     self.vtable = vtable == nil ? &TileImageVTable : vtable
-    if self.vtable.Draw == nil do self.vtable.Draw = auto_cast TileImage_Draw
-    if self.vtable.Deinit == nil do self.vtable.Deinit = auto_cast TileImage_Deinit
+    if self.vtable.Draw == nil do self.vtable.Draw = auto_cast _Super_TileImage_Draw
+    if self.vtable.Deinit == nil do self.vtable.Deinit = auto_cast _Super_TileImage_Deinit
 
     self.vtable.__GetUniformResources = auto_cast __GetUniformResources_TileImage
 
@@ -310,6 +314,7 @@ camera:^Camera, projection:^Projection, colorTransform:^ColorTransform = nil, vt
 }   
 
 _Super_TileImage_Deinit :: proc(self:^TileImage) {
+    VkBufferResource_Deinit(&self.tileUniform)
     _Super_IObject_Deinit(auto_cast self)
 }
 
@@ -344,6 +349,13 @@ TileImage_UpdateTransformMatrixRaw :: #force_inline proc(self:^TileImage, _mat:l
     IObject_UpdateTransformMatrixRaw(self, _mat)
 }
 
+TileImage_UpdateIdx :: proc(self:^TileImage, idx:u32) {
+    mem.ICheckInit_Check(&self.checkInit)
+    self.tileIdx = idx
+
+    VkBufferResource_CopyUpdate(&self.tileUniform, &self.tileIdx)
+}
+
 _Super_TileImage_Draw :: proc (self:^TileImage, cmd:vk.CommandBuffer) {
     mem.ICheckInit_Check(&self.checkInit)
     mem.ICheckInit_Check(&self.src.checkInit)
@@ -356,13 +368,16 @@ _Super_TileImage_Draw :: proc (self:^TileImage, cmd:vk.CommandBuffer) {
 }
 
 
-Texture_Init :: proc(self:^Texture, #any_int width:int, #any_int height:int, pixels:[]byte, sampler:vk.Sampler = 0, resourceUsage:ResourceUsage = .GPU) {
+Texture_Init :: proc(self:^Texture, #any_int width:int, #any_int height:int, pixels:[]byte, sampler:vk.Sampler = 0, resourceUsage:ResourceUsage = .GPU, inPixelFmt:color_fmt = .RGBA) {
     mem.ICheckInit_Init(&self.checkInit)
     self.sampler = sampler == 0 ? vkLinearSampler : sampler
     self.set.bindings = __singlePoolBinding[:]
     self.set.size = __singleSamplerPoolSizes[:]
     self.set.layout = vkTexDescriptorSetLayout2
     self.set.__set = 0
+
+    allocPixels := mem.make_non_zeroed_slice([]byte, width * height * 4, engineDefAllocator)
+    ColorFmtConvertDefault(pixels, allocPixels, inPixelFmt)
    
     VkBufferResource_CreateTexture(&self.texture, {
         width = auto_cast width,
@@ -375,7 +390,7 @@ Texture_Init :: proc(self:^Texture, #any_int width:int, #any_int height:int, pix
         type = .TEX2D,
         resourceUsage = resourceUsage,
         single = false,
-    }, self.sampler, pixels, false)
+    }, self.sampler, pixels, false, engineDefAllocator)
 
     self.set.__resources[0] = &self.texture
     VkUpdateDescriptorSets(mem.slice_ptr(&self.set, 1))
@@ -475,13 +490,16 @@ Texture_GetSampler :: #force_inline proc "contextless" (self:^Texture) -> vk.Sam
     return self.sampler
 }
 
-TextureArray_Init :: proc(self:^TextureArray, #any_int width:int, #any_int height:int, #any_int count:int, pixels:[]byte, sampler:vk.Sampler = 0) {
+TextureArray_Init :: proc(self:^TextureArray, #any_int width:int, #any_int height:int, #any_int count:int, pixels:[]byte, sampler:vk.Sampler = 0, inPixelFmt:color_fmt = .RGBA) {
     mem.ICheckInit_Init(&self.checkInit)
     self.sampler = sampler == 0 ? vkLinearSampler : sampler
     self.set.bindings = __singlePoolBinding[:]
     self.set.size = __singleSamplerPoolSizes[:]
     self.set.layout = vkTexDescriptorSetLayout2
     self.set.__set = 0
+
+    allocPixels := mem.make_non_zeroed_slice([]byte, count * width * height * 4, engineDefAllocator)
+    ColorFmtConvertDefault(pixels, allocPixels, inPixelFmt)
 
     VkBufferResource_CreateTexture(&self.texture, {
         width = auto_cast width,
@@ -493,7 +511,10 @@ TextureArray_Init :: proc(self:^TextureArray, #any_int width:int, #any_int heigh
         textureUsage = {.IMAGE_RESOURCE},
         type = .TEX2D,
         resourceUsage = .GPU,
-    }, self.sampler, pixels, true)
+    }, self.sampler, allocPixels, false, engineDefAllocator)
+
+    self.set.__resources[0] = &self.texture
+    VkUpdateDescriptorSets(mem.slice_ptr(&self.set, 1))
 }
 
 TextureArray_Deinit :: #force_inline proc(self:^TextureArray) {
@@ -510,30 +531,72 @@ TextureArray_Count :: #force_inline proc "contextless" (self:^TextureArray) -> i
     return auto_cast self.texture.option.len
 }
 
-TileTextureArray_Init :: proc(self:^TileTextureArray, #any_int tile_width:int, #any_int tile_height:int, #any_int width:int, #any_int count:int, pixels:[]byte, sampler:vk.Sampler = 0) {
+ColorFmtConvertDefault :: proc "contextless" (pixels:[]byte, out:[]byte, inPixelFmt:color_fmt = .RGBA) {
+    defcol := default_color_fmt()
+    if defcol == inPixelFmt {
+        mem.copy_non_overlapping(&out[0], &pixels[0], len(pixels))
+    } else if inPixelFmt == .RGBA || inPixelFmt == .BGRA { //convert pixel format
+        for i in 0..<len(pixels)/4 {//TODO SIMD (xfigd)    
+            out[i * 4 + 0] = pixels[i * 4 + 2]
+            out[i * 4 + 1] = pixels[i * 4 + 1]
+            out[i * 4 + 2] = pixels[i * 4 + 0]
+            out[i * 4 + 3] = pixels[i * 4 + 3]
+        }   
+    } else {
+        trace.printlnLog("ColorFmtConvertDefault: Unsupported pixel format: ", inPixelFmt)
+    }
+}
+
+ColorFmtConvertDefaultOverlap :: proc "contextless" (pixels:[]byte, out:[]byte, inPixelFmt:color_fmt = .RGBA) {
+    defcol := default_color_fmt()
+    if defcol == inPixelFmt {
+        mem.copy(&out[0], &pixels[0], len(pixels))
+    } else if inPixelFmt == .RGBA || inPixelFmt == .BGRA { //convert pixel format
+        for i in 0..<len(pixels)/4 {//TODO SIMD (xfigd)
+            temp:[4]byte
+            temp[0] = pixels[i * 4 + 2]
+            temp[1] = pixels[i * 4 + 1]
+            temp[2] = pixels[i * 4 + 0]
+            temp[3] = pixels[i * 4 + 3]
+
+            out[i * 4 + 0] = temp[0]
+            out[i * 4 + 1] = temp[1]
+            out[i * 4 + 2] = temp[2]
+            out[i * 4 + 3] = temp[3]
+        }   
+    } else {
+        trace.printlnLog("ColorFmtConvertDefault: Unsupported pixel format: ", inPixelFmt)
+    }
+}
+
+
+TileTextureArray_Init :: proc(self:^TileTextureArray, #any_int tile_width:int, #any_int tile_height:int, #any_int width:int, #any_int count:int, pixels:[]byte, sampler:vk.Sampler = 0, 
+inPixelFmt:color_fmt = .RGBA) {
     mem.ICheckInit_Init(&self.checkInit)
     self.sampler = sampler == 0 ? vkLinearSampler : sampler
     self.set.bindings = __singlePoolBinding[:]
     self.set.size = __singleSamplerPoolSizes[:]
     self.set.layout = vkTexDescriptorSetLayout2
     self.set.__set = 0
-    self.allocPixels = mem.make_non_zeroed_slice([]byte, count * tile_width * tile_height, engineDefAllocator)
+    bit :: 4//outBit count default 4
+    allocPixels := mem.make_non_zeroed_slice([]byte, count * tile_width * tile_height * bit, engineDefAllocator)
 
     //convert tilemap pixel data format to tile image data format arranged sequentially
     cnt:int
     row := math.floor_div(width, tile_width)
     col := math.floor_div(count, row)
-    bit := TextureFmt_BitSize(.DefaultColor)
+
     for y in 0..<col {
         for x in 0..<row {
             for h in 0..<tile_height {
                 start := cnt * (tile_width * tile_height * bit) + h * tile_width * bit
                 startP := (y * tile_height + h) * (width * bit) + x * tile_width * bit
-                mem.copy_non_overlapping(&self.allocPixels[start], &pixels[startP], tile_width * bit)
+                ColorFmtConvertDefault(pixels[startP:startP + tile_width * bit], allocPixels[start:start + tile_width * bit], inPixelFmt)
             }
             cnt += 1
         }
     }
+  
     VkBufferResource_CreateTexture(&self.texture, {
         width = auto_cast tile_width,
         height = auto_cast tile_height,
@@ -543,7 +606,10 @@ TileTextureArray_Init :: proc(self:^TileTextureArray, #any_int tile_width:int, #
         len = auto_cast count,
         textureUsage = {.IMAGE_RESOURCE},
         type = .TEX2D,
-    }, self.sampler, self.allocPixels, false, engineDefAllocator)
+    }, self.sampler, allocPixels, false, engineDefAllocator)
+
+    self.set.__resources[0] = &self.texture
+    VkUpdateDescriptorSets(mem.slice_ptr(&self.set, 1))
 }
 TileTextureArray_Deinit :: #force_inline proc(self:^TileTextureArray) {
     mem.ICheckInit_Deinit(&self.checkInit)

@@ -88,11 +88,13 @@ VkBaseResource :: struct {
 }
 VkBufferResource :: struct {
     using _:VkBaseResource,
+    creating : ^OpCreateBuffer,
     option:BufferCreateOption,
     __resource:vk.Buffer,
 }
 VkTextureResource :: struct {
     using _:VkBaseResource,
+    creating : ^OpCreateTexture,
     imgView:vk.ImageView,
     sampler:vk.Sampler,
     option:TextureCreateOption,
