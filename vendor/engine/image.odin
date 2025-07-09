@@ -390,7 +390,7 @@ Texture_Init :: proc(self:^Texture, #any_int width:int, #any_int height:int, pix
         type = .TEX2D,
         resourceUsage = resourceUsage,
         single = false,
-    }, self.sampler, pixels, false, engineDefAllocator)
+    }, self.sampler, allocPixels, false, engineDefAllocator)
 
     self.set.__resources[0] = &self.texture
     VkUpdateDescriptorSets(mem.slice_ptr(&self.set, 1))
