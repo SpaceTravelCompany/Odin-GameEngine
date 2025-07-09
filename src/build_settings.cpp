@@ -389,6 +389,13 @@ enum LinkerChoice : i32 {
 	Linker_COUNT,
 };
 
+enum SourceCodeLocationInfo : u8 {
+	SourceCodeLocationInfo_Normal = 0,
+	SourceCodeLocationInfo_Obfuscated = 1,
+	SourceCodeLocationInfo_Filename = 2,
+	SourceCodeLocationInfo_None = 3,
+};
+
 String linker_choices[Linker_COUNT] = {
 	str_lit("default"),
 	str_lit("lld"),
@@ -516,7 +523,7 @@ struct BuildContext {
 
 	bool   dynamic_map_calls;
 
-	bool   obfuscate_source_code_locations;
+	SourceCodeLocationInfo source_code_location_info;
 
 	bool   min_link_libs;
 
