@@ -34,11 +34,7 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 			sync.wait(&t.start_ok)
 		}
 
-		if .Joined in sync.atomic_load(&t.flags) {
-			return nil
-		}
-
-		//xfitgd
+		//edited (xfitgd) : android does not support pthread_cancel, so delete this code now
 		// Enable thread's cancelability.
 		// NOTE(laytan): Darwin does not correctly/fully support all of this, not doing this does
 		// actually make pthread_cancel work in the capacity of my tests, while executing this would
