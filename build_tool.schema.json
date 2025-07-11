@@ -7,6 +7,9 @@
 				"is-android": {
 					"type": "boolean"
 				},
+				"is-console": {
+					"type": "boolean"
+				},
 				"main-package": {
 					"type": "string"
 				},

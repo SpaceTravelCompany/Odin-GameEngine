@@ -26,44 +26,46 @@ when !is_mobile {
 
 
 glfwStart :: proc() {
-    //?default screen idx 0
-    if __windowWidth == nil do __windowWidth = int(monitors[0].rect.size.x / 2)
-	if __windowHeight == nil do __windowHeight = int(monitors[0].rect.size.y / 2)
-	if __windowX == nil do __windowX = int(monitors[0].rect.pos.x + monitors[0].rect.size.x / 4)
-	if __windowY == nil do __windowY = int(monitors[0].rect.pos.y + monitors[0].rect.size.y / 4)
+    when !is_console {
+        //?default screen idx 0
+        if __windowWidth == nil do __windowWidth = int(monitors[0].rect.size.x / 2)
+        if __windowHeight == nil do __windowHeight = int(monitors[0].rect.size.y / 2)
+        if __windowX == nil do __windowX = int(monitors[0].rect.pos.x + monitors[0].rect.size.x / 4)
+        if __windowY == nil do __windowY = int(monitors[0].rect.pos.y + monitors[0].rect.size.y / 4)
 
-    SavePrevWindow()
+        SavePrevWindow()
 
-    //? change use glfw.SetWindowAttrib()
-    if __screenMode ==.Borderless {
-        glfw.WindowHint (glfw.DECORATED, glfw.FALSE)
-        glfw.WindowHint(glfw.FLOATING, glfw.TRUE)
+        //? change use glfw.SetWindowAttrib()
+        if __screenMode ==.Borderless {
+            glfw.WindowHint (glfw.DECORATED, glfw.FALSE)
+            glfw.WindowHint(glfw.FLOATING, glfw.TRUE)
 
-        wnd = glfw.CreateWindow(monitors[__screenIdx].rect.size.x,
-            monitors[__screenIdx].rect.size.y,
-            __windowTitle,
-            nil,
-            nil)
+            wnd = glfw.CreateWindow(monitors[__screenIdx].rect.size.x,
+                monitors[__screenIdx].rect.size.y,
+                __windowTitle,
+                nil,
+                nil)
 
-        glfw.SetWindowPos(wnd, monitors[__screenIdx].rect.pos.x, monitors[__screenIdx].rect.pos.y)
-        glfw.SetWindowSize(wnd, monitors[__screenIdx].rect.size.x, monitors[__screenIdx].rect.size.y)
-    } else if __screenMode == .Fullscreen {
-        wnd = glfw.CreateWindow(monitors[__screenIdx].rect.size.x,
-            monitors[__screenIdx].rect.size.y,
-            __windowTitle,
-            glfwMonitors[__screenIdx],
-            nil)
-    } else {
-        wnd = glfw.CreateWindow(auto_cast __windowWidth.?,
-            auto_cast __windowHeight.?,
-            __windowTitle,
-            nil,
-            nil)
+            glfw.SetWindowPos(wnd, monitors[__screenIdx].rect.pos.x, monitors[__screenIdx].rect.pos.y)
+            glfw.SetWindowSize(wnd, monitors[__screenIdx].rect.size.x, monitors[__screenIdx].rect.size.y)
+        } else if __screenMode == .Fullscreen {
+            wnd = glfw.CreateWindow(monitors[__screenIdx].rect.size.x,
+                monitors[__screenIdx].rect.size.y,
+                __windowTitle,
+                glfwMonitors[__screenIdx],
+                nil)
+        } else {
+            wnd = glfw.CreateWindow(auto_cast __windowWidth.?,
+                auto_cast __windowHeight.?,
+                __windowTitle,
+                nil,
+                nil)
 
-        glfw.SetWindowPos(wnd, auto_cast __windowX.?, auto_cast __windowY.?)
+            glfw.SetWindowPos(wnd, auto_cast __windowX.?, auto_cast __windowY.?)
+        }
+
+        //CreateRenderFuncThread()
     }
-
-    //CreateRenderFuncThread()
 }
 
 when ODIN_OS == .Windows {
@@ -209,7 +211,7 @@ glfwSystemStart :: proc() {
         } else if event == glfw.DISCONNECTED {
             for m, i in glfwMonitors {
                 if m == monitor {
-                    when is_log {
+                    when is_log && !is_console {
                         printf(
                             "XFIT SYSLOG : DEL %s monitor name: %s, x:%d, y:%d, size.x:%d, size.y:%d, refleshrate%d\n",
                             "primary" if monitors[i].isPrimary else "",
@@ -236,8 +238,10 @@ glfwSystemStart :: proc() {
 }
 
 glfwDestroy :: proc() {
-    if wnd != nil do glfw.DestroyWindow(wnd)
-    wnd = nil
+    when !is_console {
+        if wnd != nil do glfw.DestroyWindow(wnd)
+        wnd = nil
+    }
 }
 
 

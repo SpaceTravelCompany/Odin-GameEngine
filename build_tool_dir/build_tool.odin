@@ -175,6 +175,10 @@ main :: proc() {
 		defer delete(out_path)
 		
 		resource :Maybe(string) = nil
+		console := false
+		if "is-console" in setting {
+			console = setting["is-console"].(json.Boolean)
+		}
 		when ODIN_OS == .Windows {
 			if "resource" in setting {
 				resource = strings.join({"-resource:",setting["resource"].(json.String)}, "", context.temp_allocator)
@@ -190,6 +194,8 @@ main :: proc() {
 		"-debug" if debug else ({}),
 		resource.? if resource != nil else ({}),
 		"-define:__log__=true" if log else ({}),
+		"-define:__console__=true" if console else ({}),
+		"-subsystem:console" if console && ODIN_OS == .Windows else ({}),
 		//"-sanitize:address" if debug else ({}),
 		}) {
 			return

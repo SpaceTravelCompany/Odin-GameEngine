@@ -112,6 +112,7 @@ when is_android {
 is_android :: ODIN_PLATFORM_SUBTARGET == .Android
 is_mobile :: is_android
 is_log :: #config(__log__, false)
+is_console :: #config(__console__, false)
 
 Icon_Image :: glfw.Image
 
@@ -148,40 +149,52 @@ engineMain :: proc(
 
 	__windowTitle = windowTitle
 	when is_android {
+		when is_console {
+			trace.panic_log("Console mode is not supported on Android.")
+		}
 		__windowX = 0
 		__windowY = 0
 
 		__android_SetApp(auto_cast android.get_android_app())
 	} else {
-		__windowX = windowX
-		__windowY = windowY
-		__windowWidth = windowWidth
-		__windowHeight = windowHeight
+		when !is_console {
+			__windowX = windowX
+			__windowY = windowY
+			__windowWidth = windowWidth
+			__windowHeight = windowHeight
+		}
 	}
 	__vSync = vSync
 
 	when is_android {
 		androidStart()
 	} else {
-		windowStart()
+		when is_console {
+			Init()
+			Destroy()
+			systemDestroy()
+			systemAfterDestroy()
+		} else {
+			windowStart()
 
-		vkStart()
+			vkStart()
 
-		Init()
+			Init()
 
-		for !exiting {
-			systemLoop()
-		}
+			for !exiting {
+				systemLoop()
+			}
 
-		vkWaitDeviceIdle()
+			vkWaitDeviceIdle()
 
-		Destroy()
+			Destroy()
 
-		vkDestory()
+			vkDestory()
 
-		systemDestroy()
+			systemDestroy()
 
-		systemAfterDestroy()
+			systemAfterDestroy()
+		}	
 	}
 }
 
