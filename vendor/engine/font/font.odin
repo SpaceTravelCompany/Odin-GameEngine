@@ -412,7 +412,8 @@ allocator : runtime.Allocator) -> (rect:linalg.RectF, err:geometry.ShapesError =
             break
         }
     }
-    if area != nil && offset.x + charD.rawShape.rect.pos.x + charD.rawShape.rect.size.x >= area.?.x {
+    ww := charD.rawShape == nil ? charD.advanceX : charD.rawShape.rect.size.x + charD.rawShape.rect.pos.x
+    if area != nil && offset.x + ww >= area.?.x {
         offset.y -= f32(self.face.size.metrics.height) / (64.0 * self.scale) 
         offset.x = 0
         if offset.y <= -area.?.y do return
