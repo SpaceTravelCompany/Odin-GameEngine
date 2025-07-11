@@ -41,7 +41,7 @@ __Rect_Init2 :: #force_inline proc "contextless"(x: $T, y: T, width: T, height: 
 Rect_Init_LTRB :: #force_inline proc "contextless"(left: $T, right: T, top: T, bottom: T) -> Rect_(T) {
 	res: Rect_(T)
 	res.pos = [2]T{left, top}
-	res.size = [2]T{right - left, bottom - top}
+	res.size = [2]T{right - left, top - bottom}
 	return res
 }
 
@@ -110,6 +110,7 @@ Rect_Move :: #force_inline proc "contextless" (_r: Rect_($T), p: [2]T) -> Rect_(
 	for _, i in _r.pos {
 		res.pos[i] = _r.pos[i] + p[i]
 	}
+	res.size = _r.size
 	return res
 }
 

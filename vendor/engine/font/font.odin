@@ -166,7 +166,7 @@ allocator : runtime.Allocator) -> (rect:linalg.RectF, err:geometry.ShapesError =
 
     sync.mutex_lock(&self.mutex)
     for s in _str {
-        if _renderOpt.area != nil && offset.y <= _renderOpt.area.?.y do break
+        if _renderOpt.area != nil && offset.y <= -_renderOpt.area.?.y do break
         if s == '\n' {
             offset.y -= f32(self.face.size.metrics.height) / (64.0 * self.scale) 
             offset.x = 0
@@ -179,6 +179,10 @@ allocator : runtime.Allocator) -> (rect:linalg.RectF, err:geometry.ShapesError =
         maxP = math.max_array(maxP,linalg.PointF{offset.x, offset.y + f32(self.face.size.metrics.height) / (64.0 * self.scale) })
     }
     sync.mutex_unlock(&self.mutex)
+    if len(_vertArr) == 0 {
+        err = .EmptyPolygon
+        return
+    }
 
     size : linalg.PointF = _renderOpt.area != nil ? _renderOpt.area.? : (maxP - minP) * linalg.PointF{1,1}
 
@@ -192,15 +196,15 @@ allocator : runtime.Allocator) -> (rect:linalg.RectF, err:geometry.ShapesError =
         minP = math.min_array(minP, v.pos)
         maxP = math.max_array(maxP, v.pos)
     }
-    rect = linalg.Rect_Init_LTRB(minP.x, maxP.x, minP.y, maxP.y)
+    rect = linalg.Rect_Init_LTRB(minP.x, maxP.x, maxP.y, minP.y)
 
     subX :f32 = rect.pos.x + rect.size.x / 2.0
-    subY :f32 = rect.pos.y + rect.size.y / 2.0
-    for &v in _vertArr^ {
+    subY :f32 = -rect.pos.y + rect.size.y / 2.0//remove rect.pos xy
+    for &v in _vertArr^ {//move to center
         v.pos.x -= subX
-        v.pos.y -= subY
+        v.pos.y += subY
     }
-    rect = linalg.Rect_Move(rect, linalg.PointF{subX, subY})
+    rect = linalg.Rect_Move(rect, linalg.PointF{-subX, subY})
 
     pt = offset * _renderOpt.scale + _renderOpt.offset
     return
@@ -386,6 +390,16 @@ allocator : runtime.Allocator) -> (rect:linalg.RectF, err:geometry.ShapesError =
                 defer if shapeErr != .None {
                     geometry.RawShape_Free(rawP, engine.defAllocator())
                 }
+                if len(rawP.vertices) > 0 {
+                    maxP :linalg.PointF = {min(f32), min(f32)}
+                    minP :linalg.PointF = {max(f32), max(f32)}
+
+                    for v in rawP.vertices {
+                        minP = math.min_array(minP, v.pos)
+                        maxP = math.max_array(maxP, v.pos)
+                    }
+                    rawP.rect = linalg.Rect_Init_LTRB(minP.x, maxP.x, maxP.y, minP.y)
+                }   
 
                 charData = {
                     advanceX = f32(self.face.glyph.advance.x) / (64.0 * self.scale),
@@ -398,7 +412,7 @@ allocator : runtime.Allocator) -> (rect:linalg.RectF, err:geometry.ShapesError =
             break
         }
     }
-    if area != nil && offset.x + charD.advanceX >= area.?.x {
+    if area != nil && offset.x + charD.rawShape.rect.pos.x + charD.rawShape.rect.size.x >= area.?.x {
         offset.y -= f32(self.face.size.metrics.height) / (64.0 * self.scale) 
         offset.x = 0
         if offset.y <= -area.?.y do return

@@ -66,6 +66,8 @@ ShapesError :: enum {
     IsNotPolygon,
     invaildPolygonLineCounts,
     CantPolygonMatchHoles,
+
+    EmptyPolygon,
 }
 
 // Line :: struct {

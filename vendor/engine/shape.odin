@@ -165,3 +165,8 @@ ShapeSrc_Deinit :: proc(self:^ShapeSrc) {
 }
 
 
+ShapeSrc_IsInited :: proc "contextless" (self:^ShapeSrc) -> bool {
+    return mem.ICheckInit_IsInited(&self.vertexBuf.checkInit)
+}
+
+
