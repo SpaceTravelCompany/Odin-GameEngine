@@ -717,12 +717,22 @@ try_cross_linking:;
 					return result;
 				}
 
+				// edited(xfitgd) : windows single quote to double quote
+#ifdef GB_SYSTEM_WINDOWS
+				object_files = gb_string_append_fmt(object_files, "\"%.*s\" ", LIT(android_glue_static_lib));
+#else
 				object_files = gb_string_append_fmt(object_files, "\'%.*s\' ", LIT(android_glue_static_lib));
+#endif
 			}
 
 
 			for (String object_path : gen->output_object_paths) {
+				// edited(xfitgd) : windows single quote to double quote
+#ifdef GB_SYSTEM_WINDOWS
+				object_files = gb_string_append_fmt(object_files, "\"%.*s\" ", LIT(object_path));
+#else
 				object_files = gb_string_append_fmt(object_files, "\'%.*s\' ", LIT(object_path));
+#endif
 			}
 
 			gbString link_settings = gb_string_make_reserve(heap_allocator(), 32);
