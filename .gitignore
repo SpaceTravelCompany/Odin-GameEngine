@@ -304,3 +304,7 @@ build_tool
 *.spv
 
 builtin
+# Clangd stuff
+.cache/
+.clangd
+compile_commands.json
