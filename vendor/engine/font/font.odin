@@ -78,21 +78,25 @@ FontRenderRange :: struct {
 FreetypeErr :: freetype.Error
 
 Font_Init :: proc(_fontData:[]byte, #any_int _faceIdx:int = 0) -> (font : ^Font = nil, err : FreetypeErr = .Ok)  {
-    font_ := mem.new_non_zeroed(FontT)
-    defer if err != .Ok do free(font_)
+    font_ := mem.new_non_zeroed(FontT, engine.defAllocator())
+    defer if err != .Ok do free(font_, engine.defAllocator())
 
     font_.scale = SCALE_DEFAULT
     font_.mutex = {}
 
-    font_.charArray = make_map( map[rune]CharData)
+    font_.charArray = make_map( map[rune]CharData, engine.defAllocator() )
+    defer if err != .Ok do delete(font_.charArray)
 
     if freetypeLib == nil do _Init_FreeType()
 
     err = freetype.new_memory_face(freetypeLib, raw_data(_fontData), auto_cast len(_fontData), auto_cast _faceIdx, &font_.face)
+    if err != .Ok {
+        return
+    }
+
     defer if err != .Ok {
         err = freetype.done_face(font_.face)
-    }
-    if err != .Ok do return
+    }  
 
     err = freetype.set_char_size(font_.face, 0, 16 * 256 * 64, 0, 0)
     if err != .Ok do return
