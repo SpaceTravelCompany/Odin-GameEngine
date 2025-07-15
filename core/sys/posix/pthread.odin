@@ -5,7 +5,7 @@ import "core:c"
 
 when ODIN_OS == .Darwin {
 	foreign import lib "system:System"
-} else when ODIN_PLATFORM_SUBTARGET == .Android {//xfitgd
+} else when ODIN_PLATFORM_SUBTARGET == .Android {//edited (xfitgd)
 	foreign import lib "system:c"
 } else when ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .Linux {
 	foreign import lib "system:pthread"
