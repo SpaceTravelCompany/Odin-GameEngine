@@ -665,12 +665,12 @@ Shapes_ComputePolygon :: proc(poly:^Shapes, allocator := context.allocator) -> (
             }
             start += outPoly2N[i]
         }
-        if len(indList) > 0 {
+        //???! if len(indList) > 0 {
             for _, i in indicesT {
                 indicesT[i] += vLen
             }
             non_zero_append(indList, ..indicesT)
-        }
+        //!}
         return
     }
 
