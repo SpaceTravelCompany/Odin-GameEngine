@@ -3,6 +3,7 @@ package engine
 
 import vk "vendor:vulkan"
 import "core:mem"
+import "base:runtime"
 import "core:debug/trace"
 import "core:container/intrusive/list"
 import "core:math"
@@ -82,19 +83,23 @@ VkUnionResource :: union #no_nil {
     ^VkTextureResource
 }
 VkBaseResource :: struct {
+    data : VkResourceData,
     gUniformIndices : [4]vk.DeviceSize,
     idx:VkResourceRange,//unused uniform buffer
     vkMemBuffer:^VkMemBuffer,
 }
+VkResourceData :: struct {
+    data:[]byte,
+    allocator:Maybe(runtime.Allocator),
+    is_creating_modifing:bool,
+}
 VkBufferResource :: struct {
     using _:VkBaseResource,
-    creating : ^OpCreateBuffer,
     option:BufferCreateOption,
     __resource:vk.Buffer,
 }
 VkTextureResource :: struct {
     using _:VkBaseResource,
-    creating : ^OpCreateTexture,
     imgView:vk.ImageView,
     sampler:vk.Sampler,
     option:TextureCreateOption,

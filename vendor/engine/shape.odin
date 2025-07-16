@@ -140,6 +140,8 @@ ShapeSrc_InitRaw :: proc(self:^ShapeSrc, raw:^geometry.RawShape, flag:ResourceUs
     __IndexBuf_Init(&self.indexBuf, raw.indices, flag)
 
     self.rect = raw.rect
+
+    defer free(raw)
     return
 }
 
@@ -147,6 +149,8 @@ ShapeSrc_UpdateRaw :: proc(self:^ShapeSrc, raw:^geometry.RawShape) {
     rawC := geometry.RawShape_Clone(raw, engineDefAllocator)
     __VertexBuf_Update(&self.vertexBuf, rawC.vertices)
     __IndexBuf_Update(&self.indexBuf, rawC.indices)
+
+    defer free(rawC)
 }
 
 @require_results ShapeSrc_Update :: proc(self:^ShapeSrc, shapes:^geometry.Shapes) -> (err:geometry.ShapesError = .None) {

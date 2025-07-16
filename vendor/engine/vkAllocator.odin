@@ -35,9 +35,7 @@ vkTempArenaAllocator: mem.Allocator
 vkBufTempArenaAllocator: mem.Allocator
 
 OpMapCopy :: struct {
-	data:      []byte,
-	resource:  VkUnionResource,
-	allocator: Maybe(runtime.Allocator),
+	pData:      ^VkResourceData,
 }
 OpCopyBuffer :: struct {
 	src:    ^VkBufferResource,
@@ -49,13 +47,9 @@ OpCopyBufferToTexture :: struct {
 }
 OpCreateBuffer :: struct {
 	src:       ^VkBufferResource,
-	data:      []byte,
-	allocator: Maybe(runtime.Allocator),
 }
 OpCreateTexture :: struct {
 	src:       ^VkTextureResource,
-	data:      []byte,
-	allocator: Maybe(runtime.Allocator),
 }
 OpDestroyBuffer :: struct {
 	src: ^VkBufferResource,
@@ -637,33 +631,24 @@ where T == vk.Buffer || T == vk.Image {
 }
 
 @(private = "file") AppendOp :: proc(node: OpNode) {
-	SrcCreating :: #force_inline proc  "contextless" (node: ^OpNode) {
-		#partial switch &n in node^ {	
-		case OpCreateBuffer:
-			n.src.creating = &n
-		case OpCreateTexture:
-			n.src.creating = &n
-		}
-	}
 	if exiting {
 		#partial switch n in node {
 		case OpMapCopy:
-			if n.allocator != nil do delete(n.data, n.allocator.?)
+			if n.pData.allocator != nil do delete(n.pData.data, n.pData.allocator.?)
 			return
 		case OpCreateBuffer:
-			if n.allocator != nil && n.data != nil do delete(n.data, n.allocator.?)
+			if n.src.data.allocator != nil && n.src.data.data != nil do delete(n.src.data.data, n.src.data.allocator.?)
 			return
 		case OpCreateTexture:
-			if n.allocator != nil && n.data != nil do delete(n.data, n.allocator.?)
+			if n.src.data.allocator != nil && n.src.data.data != nil do delete(n.src.data.data, n.src.data.allocator.?)
 			return
 		}
 	} else {
-		_Handle :: #force_inline proc(n: $T, node: OpNode) -> bool {
-			if n.allocator != nil {
+		_Handle :: #force_inline proc(n: $T, allocator : Maybe(runtime.Allocator)) -> bool {
+			if allocator != nil {
 				sync.atomic_mutex_lock(&gQueueMtx)
-				non_zero_append(&opAllocQueue, node)
-				non_zero_append(&opQueue, node)
-				SrcCreating(&opQueue[len(opQueue) - 1])
+				non_zero_append(&opQueue, n)
+				non_zero_append(&opAllocQueue, n)
 				sync.atomic_mutex_unlock(&gQueueMtx)
 				return true
 			}
@@ -671,27 +656,26 @@ where T == vk.Buffer || T == vk.Image {
 		}
 		#partial switch n in node {
 		case OpMapCopy:
-			if _Handle(n, node) do return
+			if _Handle(n, n.pData.allocator) do return
 		case OpCreateBuffer:
-			if _Handle(n, node) do return
+			if _Handle(n, n.src.data.allocator ) do return
 		case OpCreateTexture:
-			if _Handle(n, node) do return
+			if _Handle(n, n.src.data.allocator ) do return
 		}
 	}
 	sync.atomic_mutex_lock(&gQueueMtx)
 	non_zero_append(&opQueue, node)
-	SrcCreating(&opQueue[len(opQueue) - 1])
 	sync.atomic_mutex_unlock(&gQueueMtx)
 }
 
 @(private = "file") AppendOpSave :: proc(node: OpNode) {
+	non_zero_append(&opSaveQueue, node)
 	#partial switch n in node {
 	case OpMapCopy, OpCreateBuffer, OpCreateTexture:
 		sync.atomic_mutex_lock(&gQueueMtx)
 		non_zero_append(&opAllocQueue, node)
 		sync.atomic_mutex_unlock(&gQueueMtx)
 	}
-	non_zero_append(&opSaveQueue, node)
 }
 
 
@@ -702,6 +686,9 @@ VkBufferResource_CreateBuffer :: proc(
 	isCopy: bool = false,
 	allocator: Maybe(runtime.Allocator) = nil,
 ) {
+	if self.__resource != 0 || self.data.is_creating_modifing  {
+		trace.panic_log("already create buffer")
+	}
 	self.option = option
 	if isCopy {
 		copyData:[]byte
@@ -711,9 +698,15 @@ VkBufferResource_CreateBuffer :: proc(
 			copyData = mem.make_non_zeroed([]byte, len(data), allocator.?)
 		}
 		mem.copy(raw_data(copyData), raw_data(data), len(data))
-		AppendOp(OpCreateBuffer{src = self, data = copyData, allocator = allocator == nil ? engineDefAllocator : allocator.?})
+		self.data.allocator = allocator == nil ? engineDefAllocator : allocator.?
+		self.data.is_creating_modifing = true
+		self.data.data = copyData
+		AppendOp(OpCreateBuffer{src = self})
 	} else {
-		AppendOp(OpCreateBuffer{src = self, data = data, allocator = allocator})
+		self.data.allocator = allocator
+		self.data.is_creating_modifing = true
+		self.data.data = data
+		AppendOp(OpCreateBuffer{src = self})
 	}
 }
 VkBufferResource_CreateTexture :: proc(
@@ -724,6 +717,9 @@ VkBufferResource_CreateTexture :: proc(
 	isCopy: bool = false,
 	allocator: Maybe(runtime.Allocator) = nil,
 ) {
+	if self.__resource != 0 || self.data.is_creating_modifing  {
+		trace.panic_log("already create texture")
+	}
 	self.sampler = sampler
 	self.option = option
 	if isCopy {
@@ -734,20 +730,24 @@ VkBufferResource_CreateTexture :: proc(
 			copyData = mem.make_non_zeroed([]byte, len(data), allocator.?)
 		}
 		mem.copy(raw_data(copyData), raw_data(data), len(data))
-		AppendOp(OpCreateTexture{src = self, data = copyData, allocator = allocator == nil ? engineDefAllocator : allocator.?})
+		self.data.allocator = allocator == nil ? engineDefAllocator : allocator.?
+		self.data.is_creating_modifing = true
+		self.data.data = copyData
+		AppendOp(OpCreateTexture{src = self})
 	} else {
-		AppendOp(OpCreateTexture{src = self, data = data, allocator = allocator})
+		self.data.allocator = allocator
+		self.data.is_creating_modifing = true
+		self.data.data = data
+		AppendOp(OpCreateTexture{src = self})
 	}
 }
 
 @(private = "file") VkBufferResource_CreateBufferNoAsync :: #force_inline proc(
 	self: ^VkBufferResource,
 	option: BufferCreateOption,
-	data: []byte,
-	allocator: Maybe(runtime.Allocator) = nil,
 ) {
 	self.option = option
-	ExecuteCreateBuffer(self, data, allocator)
+	ExecuteCreateBuffer(self)
 }
 
 @(private = "file") VkBufferResource_DestroyBufferNoAsync :: proc(self: ^VkBufferResource) {
@@ -766,30 +766,36 @@ VkBufferResource_CreateTexture :: proc(
 	data: []byte,
 	allocator: Maybe(runtime.Allocator) = nil,
 ) {
+	pData : ^VkResourceData
+	switch &s in self {
+		case ^VkBufferResource:
+			pData = &s.data
+		case ^VkTextureResource:
+			pData = &s.data
+	}
+
 	AppendOp(OpMapCopy{
-		allocator = allocator,
-		data = data,
-		resource = auto_cast self,
+		pData = pData,
 	})
 }
 
-@(private = "file", require_results) VkBufferResource_MapCreating :: proc (
+@(private = "file", require_results) VkBufferResource_MapCreatingModifing :: proc (
 	self: VkUnionResource,
 	data: []byte,
 	allocator: Maybe(runtime.Allocator),
 ) -> bool {
 	inside :: #force_inline proc(v: ^$T, data: []byte, allocator: Maybe(runtime.Allocator)) -> bool {
-		if v.creating != nil {
+		if v.data.is_creating_modifing {
 			if allocator != nil {
-				delete(v.creating.data, allocator.?)
+				delete(v.data.data, v.data.allocator.?)
 			}
-			v.creating.data = data
-			v.creating.allocator = allocator
+			v.data.data = data
+			v.data.allocator = allocator
 			return true
 		}
 		return false
 	}
-	#partial switch &v in self {
+	switch &v in self {
 		case ^VkBufferResource:
 			if inside(v, data, allocator) do return true
 		case ^VkTextureResource:
@@ -802,10 +808,10 @@ VkBufferResource_CreateTexture :: proc(
 VkBufferResource_MapUpdateSlice :: #force_inline proc(
 	self: VkUnionResource,
 	data: $T/[]$E,
-	allocator: Maybe(runtime.Allocator) = nil,
+	allocator: Maybe(runtime.Allocator) = nil,	
 ) {
 	_data := mem.slice_to_bytes(data)
-	if VkBufferResource_MapCreating(self, _data, allocator) do return
+	if VkBufferResource_MapCreatingModifing(self, _data, allocator) do return
 	VkBufferResource_MapCopy(self, _data, allocator)
 }
 //! unlike CopyUpdate, data cannot be a temporary variable.
@@ -815,7 +821,7 @@ VkBufferResource_MapUpdate :: #force_inline proc(
 	allocator: Maybe(runtime.Allocator) = nil,
 ) {
 	_data := mem.ptr_to_bytes(data)
-	if VkBufferResource_MapCreating(self, _data, allocator) do return
+	if VkBufferResource_MapCreatingModifing(self, _data, allocator) do return
 	VkBufferResource_MapCopy(self, _data, allocator)
 }
 
@@ -833,7 +839,7 @@ VkBufferResource_CopyUpdateSlice :: #force_inline proc(
 	}
 	intrinsics.mem_copy_non_overlapping(raw_data(copyData), raw_data(bytes), len(bytes))
 
-	if VkBufferResource_MapCreating(self, copyData, allocator == nil ? engineDefAllocator : allocator.?) do return
+	if VkBufferResource_MapCreatingModifing(self, copyData, allocator == nil ? engineDefAllocator : allocator.?) do return
 	VkBufferResource_MapCopy(self, copyData, allocator == nil ? engineDefAllocator : allocator.?)
 }
 VkBufferResource_CopyUpdate :: #force_inline proc(
@@ -851,7 +857,7 @@ VkBufferResource_CopyUpdate :: #force_inline proc(
 	}
 	intrinsics.mem_copy_non_overlapping(raw_data(copyData), raw_data(bytes), len(bytes))
 
-	if VkBufferResource_MapCreating(self, copyData, allocator == nil ? engineDefAllocator : allocator.?) do return
+	if VkBufferResource_MapCreatingModifing(self, copyData, allocator == nil ? engineDefAllocator : allocator.?) do return
 	VkBufferResource_MapCopy(self, copyData, allocator == nil ? engineDefAllocator : allocator.?)
 }
 
@@ -925,14 +931,12 @@ VkBufferResource_Deinit :: proc(self: ^$T) where T == VkBufferResource || T == V
 
 @(private = "file") ExecuteCreateBuffer :: proc(
 	self: ^VkBufferResource,
-	data: []byte,
-	allocator: Maybe(runtime.Allocator) = nil,
 ) {
 	if self.option.type == .__STAGING {
 		self.option.resourceUsage = .CPU
 		self.option.single = false
 	}
-	self.creating = nil //clear creating, because resource is created
+	self.data.is_creating_modifing = false //clear creating, because resource is created
 
 	memProp : vk.MemoryPropertyFlags;
 	switch self.option.resourceUsage {
@@ -945,7 +949,7 @@ VkBufferResource_Deinit :: proc(self: ^$T) where T == VkBufferResource || T == V
 		case .INDEX: bufUsage = {.INDEX_BUFFER}
 		case .UNIFORM: //bufUsage = {.UNIFORM_BUFFER} no create each obj
 			if self.option.resourceUsage == .GPU do trace.panic_log("UNIFORM BUFFER can't resourceUsage .GPU")
-			BindUniformBuffer(self, data, allocator)
+			BindUniformBuffer(self, self.data.data, self.data.allocator)
 			return
 		case .STORAGE: bufUsage = {.STORAGE_BUFFER}
 		case .__STAGING: bufUsage = {.TRANSFER_SRC}
@@ -961,20 +965,21 @@ VkBufferResource_Deinit :: proc(self: ^$T) where T == VkBufferResource || T == V
 	}
 
 	last:^VkBufferResource
-	if data != nil && self.option.resourceUsage == .GPU {
+	if self.data.data != nil && self.option.resourceUsage == .GPU {
 		bufInfo.usage |= {.TRANSFER_DST}
-		if self.option.len > auto_cast len(data) do trace.panic_log("create_buffer _data not enough size. ", self.option.len, ", ", len(data))
+		if self.option.len > auto_cast len(self.data.data) do trace.panic_log("create_buffer _data not enough size. ", self.option.len, ", ", len(self.data.data))
 		
 		last = new(VkBufferResource, vkBufTempArenaAllocator)
 		last^ = {}
+		last.data = self.data
 		VkBufferResource_CreateBufferNoAsync(last, {
 			len = self.option.len,
 			resourceUsage = .CPU,
 			single = false,
 			type = .__STAGING,
-		}, data, allocator)
+		})
 	} else if self.option.type == .__STAGING {
-		if data == nil do trace.panic_log("staging buffer data can't nil")
+		if self.data.data == nil do trace.panic_log("staging buffer data can't nil")
 	}
 
 	res := vk.CreateBuffer(vkDevice, &bufInfo, nil, &self.__resource)
@@ -983,12 +988,10 @@ VkBufferResource_Deinit :: proc(self: ^$T) where T == VkBufferResource || T == V
 	self.vkMemBuffer = VkMemBuffer_CreateFromResourceSingle(self.__resource) if self.option.single else
 	VkMemBuffer_CreateFromResource(self.__resource, memProp, &self.idx, 0)
 
-	if data != nil {
+	if self.data.data != nil {
 		if self.option.resourceUsage != .GPU {
 			AppendOpSave(OpMapCopy{
-				resource = auto_cast self,
-				data = data,
-				allocator = allocator
+				pData = &self.data,
 			})
 		} else {
 			 //above VkBufferResource_CreateBufferNoAsync call, staging buffer is added and map_copy command is added.
@@ -999,8 +1002,6 @@ VkBufferResource_Deinit :: proc(self: ^$T) where T == VkBufferResource || T == V
 }
 @(private = "file") ExecuteCreateTexture :: proc(
 	self: ^VkTextureResource,
-	data: []byte,
-	allocator: Maybe(runtime.Allocator) = nil,
 ) {
 	memProp : vk.MemoryPropertyFlags;
 	switch self.option.resourceUsage {
@@ -1056,17 +1057,18 @@ VkBufferResource_Deinit :: proc(self: ^$T) where T == VkBufferResource || T == V
 	}
 
 	last:^VkBufferResource
-	if data != nil && self.option.resourceUsage == .GPU {
+	if self.data.data != nil && self.option.resourceUsage == .GPU {
 		imgInfo.usage |= {.TRANSFER_DST}
 		
 		last = new(VkBufferResource, vkBufTempArenaAllocator)
 		last^ = {}
+		last.data = self.data
 		VkBufferResource_CreateBufferNoAsync(last, {
 			len = auto_cast(imgInfo.extent.width * imgInfo.extent.height * imgInfo.extent.depth * imgInfo.arrayLayers * bit),
 			resourceUsage = .CPU,
 			single = false,
 			type = .__STAGING,
-		}, data, allocator)
+		})
 	}
 
 	res := vk.CreateImage(vkDevice, &imgInfo, nil, &self.__resource)
@@ -1095,14 +1097,12 @@ VkBufferResource_Deinit :: proc(self: ^$T) where T == VkBufferResource || T == V
 	res = vk.CreateImageView(vkDevice, &imgViewInfo, nil, &self.imgView)
 	if res != .SUCCESS do trace.panic_log("res = vk.CreateImageView(vkDevice, &imgViewInfo, nil, &self.imgView) : ", res)
 
-	self.creating = nil //clear creating, because resource is created
+	self.data.is_creating_modifing = false //clear creating, because resource is created
 
-	if data != nil {
+	if self.data.data != nil {
 		if self.option.resourceUsage != .GPU {
 			AppendOpSave(OpMapCopy{
-				resource = auto_cast self,
-				data = data,
-				allocator = allocator
+				pData = &self.data,
 			})
 		} else {
 			 //above VkBufferResource_CreateBufferNoAsync call, staging buffer is added and map_copy command is added.
@@ -1277,7 +1277,7 @@ VkUpdateDescriptorSets :: proc(sets: []VkDescriptorSet) {
 	for node in opAllocQueue {
 		#partial switch n in node {
 		case OpMapCopy:
-			if n.allocator != nil do delete(n.data, n.allocator.?)
+			if n.pData.allocator != nil do delete(n.pData.data, n.pData.allocator.?)
 		}
 	}
 	clear(&opAllocQueue)
@@ -1293,14 +1293,15 @@ VkUpdateDescriptorSets :: proc(sets: []VkDescriptorSet) {
 }
 @(private = "file") SaveToMapQueue :: proc(inoutMemBuf: ^^VkMemBuffer) {
 	for &node in opSaveQueue {
-		#partial switch n in node {
+		#partial switch &n in node {
 		case OpMapCopy:
+			res :^VkBaseResource = cast(^VkBaseResource)(n.pData)
 			if inoutMemBuf^ == nil {
-				non_zero_append(&opMapQueue, n)
-				inoutMemBuf^ = ToBaseResource(n.resource).vkMemBuffer
+				non_zero_append(&opMapQueue, node)	
+				inoutMemBuf^ = res.vkMemBuffer
 				node = nil
-			} else if ToBaseResource(n.resource).vkMemBuffer == inoutMemBuf^ {
-				non_zero_append(&opMapQueue, n)
+			} else if res.vkMemBuffer == inoutMemBuf^ {
+				non_zero_append(&opMapQueue, node)
 				node = nil
 			}
 		}
@@ -1318,7 +1319,8 @@ VkUpdateDescriptorSets :: proc(sets: []VkDescriptorSet) {
 		defer delete(overlap)
 
 		out: for i in 0 ..< len(nodes) {
-			idx: ^VkMemBufferNode = auto_cast ToBaseResource((nodes[i].(OpMapCopy)).resource).idx
+			res :^VkBaseResource = cast(^VkBaseResource)(nodes[i].(OpMapCopy).pData)
+			idx: ^VkMemBufferNode = auto_cast res.idx
 			for o in overlap {
 				if idx == o {
 					continue out
@@ -1378,7 +1380,8 @@ VkUpdateDescriptorSets :: proc(sets: []VkDescriptorSet) {
 		}
 	} else {
 		for node in nodes {
-			idx: ^VkMemBufferNode = auto_cast ToBaseResource((node.(OpMapCopy)).resource).idx
+			res :^VkBaseResource = cast(^VkBaseResource)(node.(OpMapCopy).pData)
+			idx: ^VkMemBufferNode = auto_cast res.idx
 			startIdx = min(startIdx, idx.idx * self.cellSize)
 			endIdx = max(endIdx, (idx.idx + idx.size) * self.cellSize)
 		}
@@ -1401,9 +1404,12 @@ VkUpdateDescriptorSets :: proc(sets: []VkDescriptorSet) {
 
 	for &node in nodes {
 		mapCopy := &node.(OpMapCopy)
-		idx: ^VkMemBufferNode = auto_cast ToBaseResource(mapCopy.resource).idx
-		start_ := idx.idx * self.cellSize - self.mapStart + ToBaseResource(mapCopy.resource).gUniformIndices[2]
-		mem.copy_non_overlapping(&self.mapData[start_], raw_data(mapCopy.data), len(mapCopy.data))
+		res :^VkBaseResource = (cast(^VkBaseResource)(mapCopy.pData))
+		idx: ^VkMemBufferNode = auto_cast res.idx
+		start_ := idx.idx * self.cellSize - self.mapStart + res.gUniformIndices[2]
+		mem.copy_non_overlapping(&self.mapData[start_], raw_data(res.data.data), len(res.data.data))
+
+		res.data.is_creating_modifing = false
 	}
 
 	if self.cache {
@@ -1482,9 +1488,9 @@ vkOpExecute :: proc(waitAndDestroy: bool) {
 	for &node in opSaveQueue {
 		#partial switch n in node {
 		case OpCreateBuffer:
-			ExecuteCreateBuffer(n.src, n.data, n.allocator)
+			ExecuteCreateBuffer(n.src)
 		case OpCreateTexture:
-			ExecuteCreateTexture(n.src, n.data, n.allocator)
+			ExecuteCreateTexture(n.src)
 		case Op__RegisterDescriptorPool:
 			ExecuteRegisterDescriptorPool(n.size)
 		case:
@@ -1539,9 +1545,7 @@ vkOpExecute :: proc(waitAndDestroy: bool) {
 				t.uniform.idx = gUniforms[0].idx
 
 				AppendOpSave(OpMapCopy{
-					resource = t.uniform,
-					data = t.data,
-					allocator = t.allocator,
+					pData = &t.uniform.data,
 				})
 				off += t.size
 			}
@@ -1566,9 +1570,7 @@ vkOpExecute :: proc(waitAndDestroy: bool) {
 											t.uniform.idx = g.idx
 
 											AppendOpSave(OpMapCopy{
-												resource = t.uniform,
-												data = t.data,
-												allocator = t.allocator,
+												pData = &t.uniform.data,
 											})
 											inserted = true
 											break out
@@ -1589,9 +1591,7 @@ vkOpExecute :: proc(waitAndDestroy: bool) {
 									t.uniform.idx = g.idx
 
 									AppendOpSave(OpMapCopy{
-										resource = t.uniform,
-										data = t.data,
-										allocator = t.allocator,
+										pData = &t.uniform.data,
 									})
 									g.size += t.size
 									inserted = true
@@ -1611,9 +1611,7 @@ vkOpExecute :: proc(waitAndDestroy: bool) {
 											t.uniform.idx = g.idx
 
 											AppendOpSave(OpMapCopy{
-												resource = t.uniform,
-												data = t.data,
-												allocator = t.allocator,
+												pData = &t.uniform.data,
 											})
 											inserted = true
 											break out
@@ -1633,9 +1631,7 @@ vkOpExecute :: proc(waitAndDestroy: bool) {
 									t.uniform.idx = g.idx
 
 									AppendOpSave(OpMapCopy{
-										resource = t.uniform,
-										data = t.data,
-										allocator = t.allocator,
+										pData = &t.uniform.data,
 									})
 									g.size += t.size
 									inserted = true
@@ -1656,9 +1652,7 @@ vkOpExecute :: proc(waitAndDestroy: bool) {
 						t.uniform.idx = g.idx
 
 						AppendOpSave(OpMapCopy{
-							resource = t.uniform,
-							data = t.data,
-							allocator = t.allocator,
+							pData = &t.uniform.data,
 						})
 						g.size += t.size
 						inserted = true
@@ -1704,9 +1698,7 @@ vkOpExecute :: proc(waitAndDestroy: bool) {
 					t.uniform.vkMemBuffer = gUniforms[len(gUniforms) - 1].memBuffer
 
 					AppendOpSave(OpMapCopy{
-						resource = t.uniform,
-						data = t.data,
-						allocator = t.allocator,
+						pData = &t.uniform.data,
 					})
 					off += t.size
 				}
@@ -1720,9 +1712,9 @@ vkOpExecute :: proc(waitAndDestroy: bool) {
 	for &node in opSaveQueue {
 		#partial switch n in node {
 		case OpDestroyBuffer:
-			non_zero_append(&opDestroyQueue, n)
+			non_zero_append(&opDestroyQueue, node)
 		case OpDestroyTexture:
-			non_zero_append(&opDestroyQueue, n)
+			non_zero_append(&opDestroyQueue, node)
 		case:
 			continue
 		}
