@@ -185,6 +185,10 @@ pop_front :: proc "contextless" (list: ^List) -> ^Node {
 	if link == list.tail {
 		list.tail = link.prev
 	}
+	if list.head == nil {//edited (xfitgd) : always head not nil when list is not empty
+		list.head = list.tail
+		list.tail = nil
+	}
 	return link
 
 }
@@ -212,6 +216,10 @@ pop_back :: proc "contextless" (list: ^List) -> ^Node {
 	}
 	if link == list.tail {
 		list.tail = link.prev
+	}
+	if list.head == nil {//edited (xfitgd) : always head not nil when list is not empty
+		list.head = list.tail
+		list.tail = nil
 	}
 	return link
 }
