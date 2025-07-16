@@ -487,7 +487,7 @@ VkAllocatorError :: enum {
 		list.remove(&self.list, auto_cast prev)
 		free(prev, vkArenaAllocator)
 	}
-	if self.len == 1 || gVkMemIdxCnts[self.allocateInfo.memoryTypeIndex] > VkMaxMemIdxCnt {
+	if gVkMemIdxCnts[self.allocateInfo.memoryTypeIndex] > VkMaxMemIdxCnt {
 		for b in gVkMemBufs {
 			if self != b && self.allocateInfo.memoryTypeIndex == b.allocateInfo.memoryTypeIndex && VkMemBuffer_IsEmpty(b) {
 				gVkMemIdxCnts[b.allocateInfo.memoryTypeIndex] -= 1
@@ -497,9 +497,16 @@ VkAllocatorError :: enum {
 		if VkMemBuffer_IsEmpty(self) {
 			gVkMemIdxCnts[self.allocateInfo.memoryTypeIndex] -= 1
 			VkMemBuffer_Deinit(self)
+			return
 		}
 	}
-
+	if self.list.head == nil {
+		list.push_back(&self.list, auto_cast new(VkMemBufferNode, vkArenaAllocator))
+		((^VkMemBufferNode)(self.list.head)).free = true
+		((^VkMemBufferNode)(self.list.head)).size = self.len
+		((^VkMemBufferNode)(self.list.head)).idx = 0
+		self.cur = self.list.head
+	}
 }
 
 @(private = "file") VkMemBuffer_CreateFromResource :: proc(
@@ -604,8 +611,8 @@ VkAllocatorError :: enum {
 
 		if !_BindBufferNode(memBuf, memBuf.allocateInfo.memoryTypeIndex, vkResource, cellCnt, outIdx, &memBuf) do trace.panic_log("")
 		non_zero_append(&gVkMemBufs, memBuf)
+		gVkMemIdxCnts[memBuf.allocateInfo.memoryTypeIndex] += 1
 	}
-	gVkMemIdxCnts[memBuf.allocateInfo.memoryTypeIndex] += 1
 	return
 }
 
@@ -656,10 +663,13 @@ where T == vk.Buffer || T == vk.Image {
 		}
 		#partial switch n in node {
 		case OpMapCopy:
+			n.pData.is_creating_modifing = true
 			if _Handle(n, n.pData.allocator) do return
 		case OpCreateBuffer:
+			n.src.data.is_creating_modifing = true
 			if _Handle(n, n.src.data.allocator ) do return
 		case OpCreateTexture:
+			n.src.data.is_creating_modifing = true
 			if _Handle(n, n.src.data.allocator ) do return
 		}
 	}
@@ -686,9 +696,6 @@ VkBufferResource_CreateBuffer :: proc(
 	isCopy: bool = false,
 	allocator: Maybe(runtime.Allocator) = nil,
 ) {
-	if self.__resource != 0 || self.data.is_creating_modifing  {
-		trace.panic_log("already create buffer")
-	}
 	self.option = option
 	if isCopy {
 		copyData:[]byte
@@ -699,12 +706,10 @@ VkBufferResource_CreateBuffer :: proc(
 		}
 		mem.copy(raw_data(copyData), raw_data(data), len(data))
 		self.data.allocator = allocator == nil ? engineDefAllocator : allocator.?
-		self.data.is_creating_modifing = true
 		self.data.data = copyData
 		AppendOp(OpCreateBuffer{src = self})
 	} else {
 		self.data.allocator = allocator
-		self.data.is_creating_modifing = true
 		self.data.data = data
 		AppendOp(OpCreateBuffer{src = self})
 	}
@@ -717,9 +722,6 @@ VkBufferResource_CreateTexture :: proc(
 	isCopy: bool = false,
 	allocator: Maybe(runtime.Allocator) = nil,
 ) {
-	if self.__resource != 0 || self.data.is_creating_modifing  {
-		trace.panic_log("already create texture")
-	}
 	self.sampler = sampler
 	self.option = option
 	if isCopy {
@@ -731,12 +733,10 @@ VkBufferResource_CreateTexture :: proc(
 		}
 		mem.copy(raw_data(copyData), raw_data(data), len(data))
 		self.data.allocator = allocator == nil ? engineDefAllocator : allocator.?
-		self.data.is_creating_modifing = true
 		self.data.data = copyData
 		AppendOp(OpCreateTexture{src = self})
 	} else {
 		self.data.allocator = allocator
-		self.data.is_creating_modifing = true
 		self.data.data = data
 		AppendOp(OpCreateTexture{src = self})
 	}
@@ -773,7 +773,8 @@ VkBufferResource_CreateTexture :: proc(
 		case ^VkTextureResource:
 			pData = &s.data
 	}
-
+	pData.allocator = allocator
+	pData.data = data
 	AppendOp(OpMapCopy{
 		pData = pData,
 	})
@@ -1485,6 +1486,18 @@ vkOpExecute :: proc(waitAndDestroy: bool) {
 	sync.atomic_mutex_unlock(&gQueueMtx)
 
 	clear(&opMapQueue)
+	for &node in opSaveQueue {
+		#partial switch n in node {
+			case OpDestroyBuffer:
+				ExecuteDestroyBuffer(n.src)
+			case OpDestroyTexture:
+				ExecuteDestroyTexture(n.src)
+			case:
+				continue
+		}
+		node = nil
+	}
+
 	for &node in opSaveQueue {
 		#partial switch n in node {
 		case OpCreateBuffer:

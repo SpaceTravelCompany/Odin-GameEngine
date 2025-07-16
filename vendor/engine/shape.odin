@@ -160,6 +160,8 @@ ShapeSrc_UpdateRaw :: proc(self:^ShapeSrc, raw:^geometry.RawShape) {
 
     __VertexBuf_Update(&self.vertexBuf, raw.vertices)
     __IndexBuf_Update(&self.indexBuf, raw.indices)
+
+    defer free(raw)
     return
 }
 

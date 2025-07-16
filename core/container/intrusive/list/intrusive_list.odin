@@ -79,6 +79,10 @@ remove :: proc "contextless" (list: ^List, node: ^Node) {
 		if list.tail == node {
 			list.tail = node.prev
 		}
+		if list.head == nil {//edited (xfitgd) : always head not nil when list is not empty
+			list.head = list.tail
+			list.tail = nil
+		}
 	}
 }
 /*
