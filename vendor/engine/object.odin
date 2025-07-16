@@ -226,8 +226,6 @@ IObject_Init :: proc(self:^IObject, $actualType:typeid,
     
     self.mat = SRT_2D_Matrix2(pos, scale, rotation, pivot)
 
-    self.set.__set = 0
-
     VkBufferResource_CreateBuffer(&self.matUniform, {
         len = size_of(linalg.Matrix),
         type = .UNIFORM,
@@ -254,10 +252,6 @@ IObject_Init2 :: proc(self:^IObject, $actualType:typeid,
     self.camera = camera
     self.projection = projection
     self.colorTransform = colorTransform == nil ? &__defColorTransform : colorTransform
-
-    self.set.__set = 0
-
-    self.matUniform.__resource = 0
 
     self.actualType = actualType
 }
@@ -507,26 +501,25 @@ SetRenderClearColor :: proc "contextless" (color:linalg.Point3DwF) {
 }
 
 
-AllocObjectNonZeroed :: #force_inline proc($T:typeid) -> (^T, runtime.Allocator_Error) where intrinsics.type_is_subtype_of(T, IObject) #optional_allocator_error {
-    obj, err := mem.alloc_bytes_non_zeroed(size_of(T),align_of(T), engineDefAllocator)
-    if err != .None do return nil, err
-	return transmute(^T)raw_data(obj), .None
-}
+//!do not use anymore
+// AllocObjectNonZeroed :: #force_inline proc($T:typeid) -> (^T, runtime.Allocator_Error) where intrinsics.type_is_subtype_of(T, IObject) #optional_allocator_error {
+//     obj, err := mem.alloc_bytes_non_zeroed(size_of(T),align_of(T), engineDefAllocator)
+//     if err != .None do return nil, err
+// 	return transmute(^T)raw_data(obj), .None
+// }
 
+// AllocObjectSliceNonZeroed :: #force_inline proc($T:typeid, #any_int count:int) -> ([]T, runtime.Allocator_Error) where intrinsics.type_is_subtype_of(T, IObject) #optional_allocator_error {
+//     arr, err := mem.alloc_bytes_non_zeroed(count * size_of(T), align_of(T), engineDefAllocator)
+//     if err != .None do return nil, err
+//     s := runtime.Raw_Slice{raw_data(arr), count}
+//     return transmute([]T)s, .None
+// }
 
-AllocObjectSliceNonZeroed :: #force_inline proc($T:typeid, #any_int count:int) -> ([]T, runtime.Allocator_Error) where intrinsics.type_is_subtype_of(T, IObject) #optional_allocator_error {
-    arr, err := mem.alloc_bytes_non_zeroed(count * size_of(T), align_of(T), engineDefAllocator)
-    if err != .None do return nil, err
-    s := runtime.Raw_Slice{raw_data(arr), count}
-    return transmute([]T)s, .None
-}
-
-
-AllocObjectDynamicNonZeroed :: #force_inline proc($T:typeid) -> ([dynamic]T, runtime.Allocator_Error) where intrinsics.type_is_subtype_of(T, IObject) #optional_allocator_error {
-    res, err := make_non_zeroed_dynamic_array([dynamic]T, engineDefAllocator)
-    if err != .None do return nil, err
-    return res, .None
-}
+// AllocObjectDynamicNonZeroed :: #force_inline proc($T:typeid) -> ([dynamic]T, runtime.Allocator_Error) where intrinsics.type_is_subtype_of(T, IObject) #optional_allocator_error {
+//     res, err := make_non_zeroed_dynamic_array([dynamic]T, engineDefAllocator)
+//     if err != .None do return nil, err
+//     return res, .None
+// }
 
 AllocObject :: #force_inline proc($T:typeid) -> (^T, runtime.Allocator_Error) where intrinsics.type_is_subtype_of(T, IObject) #optional_allocator_error {
     obj, err := mem.alloc_bytes(size_of(T),align_of(T), engineDefAllocator)
