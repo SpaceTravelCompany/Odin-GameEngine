@@ -65,7 +65,7 @@ Op__UpdateDescriptorSets :: struct {
 }
 //doesn't need to call outside
 Op__RegisterDescriptorPool :: struct {
-	size: []VkDescriptorPoolSize,
+	size: []custom_object_DescriptorPoolSize,
 }
 
 
@@ -127,7 +127,7 @@ vkUniformAlloc :: struct {
 @(private="file") opAllocQueue:[dynamic]OpNode
 @(private="file") opDestroyQueue:[dynamic]OpNode
 @(private="file") gVkUpdateDesciptorSetList:[dynamic]vk.WriteDescriptorSet
-@(private="file") gDesciptorPools:map[[^]VkDescriptorPoolSize][dynamic]VkDescriptorPoolMem
+@(private="file") gDesciptorPools:map[[^]custom_object_DescriptorPoolSize][dynamic]VkDescriptorPoolMem
 @(private="file") gUniforms:[dynamic]vkUniformAlloc
 @(private="file") gTempUniforms:[dynamic]vkTempUniformStruct
 @(private="file") gNonInsertedUniforms:[dynamic]vkTempUniformStruct
@@ -1112,10 +1112,10 @@ VkBufferResource_Deinit :: proc(self: ^$T) where T == VkBufferResource || T == V
 		}
 	}
 }
-@(private = "file") ExecuteRegisterDescriptorPool :: #force_inline proc(size: []VkDescriptorPoolSize) {
+@(private = "file") ExecuteRegisterDescriptorPool :: #force_inline proc(size: []custom_object_DescriptorPoolSize) {
 	//?? no need? execute_register_descriptor_pool
 }
-@(private = "file") __CreateDescriptorPool :: proc(size:[]VkDescriptorPoolSize, out:^VkDescriptorPoolMem) {
+@(private = "file") __CreateDescriptorPool :: proc(size:[]custom_object_DescriptorPoolSize, out:^VkDescriptorPoolMem) {
 	poolSize :[]vk.DescriptorPoolSize = mem.make_non_zeroed([]vk.DescriptorPoolSize, len(size))
 	defer delete(poolSize)
 

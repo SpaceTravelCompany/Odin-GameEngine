@@ -6,26 +6,26 @@ import "core:math/linalg"
 import "base:intrinsics"
 import vk "vendor:vulkan"
 
-@rodata __singleSamplerPoolSizes : [1]VkDescriptorPoolSize = {
+@rodata __singleSamplerPoolSizes : [1]custom_object_DescriptorPoolSize = {
     {
         type = .SAMPLER,
         cnt = 1,
     },
 }
 @rodata __singlePoolBinding : [1]u32 = {0}
-@rodata __singleUniformPoolSizes : [1]VkDescriptorPoolSize = {
+@rodata __singleUniformPoolSizes : [1]custom_object_DescriptorPoolSize = {
     {
         type = .UNIFORM,
         cnt = 1,
     },
 }
-@rodata __singleStoragePoolSizes : [1]VkDescriptorPoolSize = {
+@rodata __singleStoragePoolSizes : [1]custom_object_DescriptorPoolSize = {
     {
         type = .STORAGE,
         cnt = 1,
     },
 }
-@rodata __transformUniformPoolSizes : [2]VkDescriptorPoolSize = {
+@rodata __transformUniformPoolSizes : [2]custom_object_DescriptorPoolSize = {
     {
         type = .UNIFORM,
         cnt = 3,
@@ -36,7 +36,7 @@ import vk "vendor:vulkan"
     },
 }
 @rodata __transformUniformPoolBinding : [2]u32 = {0, 3}
-@rodata __imageUniformPoolSizes : [2]VkDescriptorPoolSize = {
+@rodata __imageUniformPoolSizes : [2]custom_object_DescriptorPoolSize = {
     {
         type = .UNIFORM,
         cnt = 3,
@@ -47,7 +47,7 @@ import vk "vendor:vulkan"
     },
 }
 @rodata __imageUniformPoolBinding : [2]u32 = {0, 3}
-@rodata __animateImageUniformPoolSizes : [2]VkDescriptorPoolSize = {
+@rodata __animateImageUniformPoolSizes : [2]custom_object_DescriptorPoolSize = {
     {
         type = .UNIFORM,
         cnt = 3,
@@ -58,7 +58,7 @@ import vk "vendor:vulkan"
     },
 }
 @rodata __animateImageUniformPoolBinding : [2]u32 = {0, 3}
-@rodata __tileImageUniformPoolSizes : [2]VkDescriptorPoolSize = {
+@rodata __tileImageUniformPoolSizes : [2]custom_object_DescriptorPoolSize = {
     {
         type = .UNIFORM,
         cnt = 3,

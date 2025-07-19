@@ -13,14 +13,7 @@ VkSize :: vk.DeviceSize
 
 VkResourceRange :: rawptr
 
-VkDescriptorType :: enum {
-    SAMPLER,  //vk.DescriptorType.COMBINED_IMAGE_SAMPLER
-    UNIFORM_DYNAMIC,  //vk.DescriptorType.UNIFORM_BUFFER_DYNAMIC
-    UNIFORM,  //vk.DescriptorType.UNIFORM_BUFFER
-    STORAGE,
-    STORAGE_IMAGE,//TODO (xfitgd)
-}
-VkDescriptorPoolSize :: struct {type:VkDescriptorType, cnt:u32}
+
 VkDescriptorPoolMem :: struct {pool:vk.DescriptorPool, cnt:u32}
 
 VK_MAX_RESOURCES_FROM_DESCRIPTOR_SET :: 5
@@ -29,7 +22,7 @@ VkDescriptorSet :: struct {
     layout: vk.DescriptorSetLayout,
     ///created inside update_descriptor_sets call
     __set: vk.DescriptorSet,
-    size: []VkDescriptorPoolSize,
+    size: []custom_object_DescriptorPoolSize,
     bindings: []u32,
     __resources: [VK_MAX_RESOURCES_FROM_DESCRIPTOR_SET]VkUnionResource,
 };
@@ -126,7 +119,7 @@ VkTextureResource :: struct {
     return .D2
 }
 
-@(require_results) DescriptorTypeToVkDescriptorType :: proc "contextless"(t : VkDescriptorType) -> vk.DescriptorType {
+@(require_results) DescriptorTypeToVkDescriptorType :: proc "contextless"(t : custom_object_DescriptorType) -> vk.DescriptorType {
     switch t {
         case .SAMPLER : return .COMBINED_IMAGE_SAMPLER
         case .UNIFORM : return .UNIFORM_BUFFER

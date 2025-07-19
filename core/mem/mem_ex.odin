@@ -140,23 +140,26 @@ ICheckInit :: struct {
 	init: bool,
 }
 
-ICheckInit_Init :: #force_inline proc "contextless" (t: ^ICheckInit) {
-	t.init = true
-}
+
 ICheckInit_IsInited :: #force_inline proc "contextless" (t: ^ICheckInit) -> bool {
 	return t.init
 }
-
-when ODIN_DEBUG {
-	ICheckInit_Check :: #force_inline proc "contextless" (t: ^ICheckInit) {
-		if !t.init do panic_contextless("ICheckInit_Check: uninitialized")
+ICheckInit_Init :: #force_inline proc "contextless" (t: ^ICheckInit) {
+	when ODIN_DEBUG {
+		if t.init {
+			panic_contextless("ICheckInit_Init: already initialized")
+		}
 	}
-	ICheckInit_Deinit :: #force_inline proc "contextless" (t: ^ICheckInit) {
-		if !t.init do panic_contextless("ICheckInit_Check: uninitialized")
-		t.init = false
-	}
-} else {
-	ICheckInit_Check :: #force_inline proc "contextless" (t: ^ICheckInit) {}
-	ICheckInit_Deinit :: #force_inline proc "contextless" (t: ^ICheckInit) {}
+	t.init = true
 }
-
+ICheckInit_Check :: #force_inline proc "contextless" (t: ^ICheckInit) {
+	when ODIN_DEBUG {
+		if !t.init do panic_contextless("ICheckInit_Check: uninitialized")
+	}
+}
+ICheckInit_Deinit :: #force_inline proc "contextless" (t: ^ICheckInit) {
+	when ODIN_DEBUG {
+		if !t.init do panic_contextless("ICheckInit_Check: uninitialized")
+	}
+	t.init = false
+}
