@@ -35,12 +35,12 @@ dt :: #force_inline proc "contextless" () -> f64 { return f64(deltaTime) / 10000
 dt_u64 :: #force_inline proc "contextless" () -> u64 { return deltaTime }
 GetProcessorCoreLen :: #force_inline proc "contextless" () -> int { return processorCoreLen }
 
-Init: proc()
-Update: proc()
-Destroy: proc()
-Size: proc() = proc () {}
-Activate: proc "contextless" () = proc "contextless" () {}
-Close: proc "contextless" () -> bool = proc "contextless" () -> bool{ return true }
+Init: #type proc()
+Update: #type proc()
+Destroy: #type proc()
+Size: #type proc() = proc () {}
+Activate: #type proc "contextless" () = proc "contextless" () {}
+Close: #type proc "contextless" () -> bool = proc "contextless" () -> bool{ return true }
 
 AndroidAPILevel :: enum u32 {
 	Nougat = 24,

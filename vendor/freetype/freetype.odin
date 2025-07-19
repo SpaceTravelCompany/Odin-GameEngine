@@ -630,10 +630,10 @@ Raster_Funcs :: struct {
     raster_done: Raster_DoneFunc,
 }
 Outline_Funcs :: struct {
-    move_to: proc "c" (to: ^Vector, user: rawptr) -> c.int,
-    line_to: proc "c" (to: ^Vector, user: rawptr) -> c.int,
-    conic_to: proc "c" (control: ^Vector, to: ^Vector, user: rawptr) -> c.int,
-    cubic_to: proc "c" (control1, control2, to: ^Vector, user: rawptr) -> c.int,
+    move_to: #type proc "c" (to: ^Vector, user: rawptr) -> c.int,
+    line_to: #type proc "c" (to: ^Vector, user: rawptr) -> c.int,
+    conic_to: #type proc "c" (control: ^Vector, to: ^Vector, user: rawptr) -> c.int,
+    cubic_to: #type proc "c" (control1, control2, to: ^Vector, user: rawptr) -> c.int,
     shift: c.int,
     delta:Pos
 }

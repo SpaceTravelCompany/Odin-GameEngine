@@ -282,18 +282,18 @@ LEFT_MOUSE_BUTTON_IDX :: 0
 MIDDLE_MOUSE_BUTTON_IDX :: 1
 RIGHT_MOUSE_BUTTON_IDX :: 2
 
-KeyDown : proc (keycode:KeyCode) = proc (keycode:KeyCode) {}
-KeyUp : proc (keycode:KeyCode) = proc (keycode:KeyCode) {}
-KeyRepeat : proc (keycode:KeyCode) = proc (keycode:KeyCode) {}
-MouseButtonDown : proc (buttonIdx:int, x:f32, y:f32) = proc (buttonIdx:int, x:f32, y:f32) {}
-MouseButtonUp : proc (buttonIdx:int, x:f32, y:f32) = proc (buttonIdx:int, x:f32, y:f32) {}
-PointerDown : proc (pointerIdx:int, x:f32, y:f32) = proc (pointerIdx:int, x:f32, y:f32) {}
-PointerUp : proc (pointerIdx:int, x:f32, y:f32) = proc (pointerIdx:int, x:f32, y:f32) {}
-PointerMove : proc (pointerIdx:int, x:f32, y:f32) = proc (pointerIdx:int, x:f32, y:f32) {}
-MouseScroll : proc (dt:int) = proc (dt:int) {}
-MouseMove : proc (x:f32, y:f32) = proc (x:f32, y:f32) {}
-MouseIn : proc () = proc () {}
-MouseOut : proc () = proc () {}
+KeyDown : #type proc (keycode:KeyCode) = proc (keycode:KeyCode) {}
+KeyUp : #type proc (keycode:KeyCode) = proc (keycode:KeyCode) {}
+KeyRepeat : #type proc (keycode:KeyCode) = proc (keycode:KeyCode) {}
+MouseButtonDown : #type proc (buttonIdx:int, x:f32, y:f32) = proc (buttonIdx:int, x:f32, y:f32) {}
+MouseButtonUp : #type proc (buttonIdx:int, x:f32, y:f32) = proc (buttonIdx:int, x:f32, y:f32) {}
+PointerDown : #type proc (pointerIdx:int, x:f32, y:f32) = proc (pointerIdx:int, x:f32, y:f32) {}
+PointerUp : #type proc (pointerIdx:int, x:f32, y:f32) = proc (pointerIdx:int, x:f32, y:f32) {}
+PointerMove : #type proc (pointerIdx:int, x:f32, y:f32) = proc (pointerIdx:int, x:f32, y:f32) {}
+MouseScroll : #type proc (dt:int) = proc (dt:int) {}
+MouseMove : #type proc (x:f32, y:f32) = proc (x:f32, y:f32) {}
+MouseIn : #type proc () = proc () {}
+MouseOut : #type proc () = proc () {}
 
 IsMouseOut :: proc "contextless" () -> bool {return isMouseOut}
 MousePos :: #force_inline proc "contextless" () -> linalg.PointF {

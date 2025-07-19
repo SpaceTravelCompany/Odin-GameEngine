@@ -21,7 +21,20 @@ import vk "vendor:vulkan"
 
 ResourceUsage :: enum {GPU,CPU}
 
-@private __IObjectIn :: struct {
+IObjectVTable :: struct {
+     __GetUniformResources: #type proc (self:^IObject) -> []VkUnionResource,
+    Draw: #type proc (self:^IObject, cmd:vk.CommandBuffer),
+    Deinit: #type proc (self:^IObject),
+    Update: #type proc (self:^IObject),
+    Size: #type proc (self:^IObject),
+}
+
+IAnimateObjectVTable :: struct {
+    using _: IObjectVTable,
+    get_frame_cnt: #type proc "contextless" (self:^ianimate_object) -> u32,
+}
+
+IObject :: struct {
     using _: __MatrixIn,
     set:VkDescriptorSet,
     camera: ^Camera,
@@ -31,33 +44,8 @@ ResourceUsage :: enum {GPU,CPU}
     vtable: ^IObjectVTable,
 }
 
-IObjectVTable :: struct {
-    using _: __IObjectVTable,
-    Draw: proc (self:^IObject, cmd:vk.CommandBuffer),
-    Deinit: proc (self:^IObject),
-    Update: proc (self:^IObject),
-    Size: proc (self:^IObject),
-}
-
-IAnimateObjectVTable :: struct {
-    using _: IObjectVTable,
-    get_frame_cnt: proc "contextless" (self:^ianimate_object) -> u32,
-}
-
-@private __IObjectVTable :: struct {
-    __GetUniformResources: proc (self:^IObject) -> []VkUnionResource,
-}
-
-IObject :: struct {
-    using _: __IObjectIn,
-}
-
 
 ColorTransform :: struct {
-    using _: __ColorMatrixIn,
-}
-
-@private __ColorMatrixIn :: struct {
     mat: linalg.Matrix,
     matUniform:VkBufferResource,
     checkInit: mem.ICheckInit,
