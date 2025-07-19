@@ -36,6 +36,7 @@ IObjectVTable :: struct {
     Draw: proc (self:^IObject, cmd:vk.CommandBuffer),
     Deinit: proc (self:^IObject),
     Update: proc (self:^IObject),
+    Size: proc (self:^IObject),
 }
 
 IAnimateObjectVTable :: struct {
@@ -414,6 +415,14 @@ IObject_Update :: proc(self:^IObject) {
     }
     //Update Not Required Default
 }
+
+IObject_Size :: proc(self:^IObject) {
+    if self.vtable != nil && self.vtable.Size != nil {
+        self.vtable.Size(self)
+    }
+    //Size Not Required Default
+}
+
 
 
 SetRenderClearColor :: proc "contextless" (color:linalg.Point3DwF) {

@@ -347,6 +347,11 @@ when is_android {
 		deltaTime = auto_cast delta
 	}
 	Update()
+	if gMainRenderCmdIdx >= 0 {
+		for obj in gRenderCmd[gMainRenderCmdIdx].scene {
+			IObject_Update(obj)
+		}
+	}
 
 	if !Paused_ {
 		vkDrawFrame()

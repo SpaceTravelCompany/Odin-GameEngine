@@ -500,7 +500,7 @@ VkAllocatorError :: enum {
 			return
 		}
 	}
-	if self.list.head == nil {
+	if self.list.head == nil {//?always self.list.head not nil when list is not empty
 		list.push_back(&self.list, auto_cast new(VkMemBufferNode, vkArenaAllocator))
 		((^VkMemBufferNode)(self.list.head)).free = true
 		((^VkMemBufferNode)(self.list.head)).size = self.len

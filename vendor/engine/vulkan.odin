@@ -1279,6 +1279,11 @@ vkRecreateSwapChain :: proc() {
 	RenderCmd_RefreshAll()
 
 	Size()
+	if gMainRenderCmdIdx >= 0 {
+		for obj in gRenderCmd[gMainRenderCmdIdx].scene {
+			IObject_Size(obj)
+		}
+	}
 }
 vkCreateSurface :: vkRecreateSurface
 
