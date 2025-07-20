@@ -277,7 +277,7 @@ odin
 *.bin
 demo.bin
 libLLVM*.so*
-*.a
+# *.a # edited (xfitgd)
 
 # shared collection
 shared/

@@ -51,6 +51,8 @@ custom_object_pipeline :: struct {
     checkInit: mem.ICheckInit,
 
     __pipeline:vk.Pipeline,
+    __pipeline_layout:vk.PipelineLayout,
+    __descriptor_set_layouts:[]vk.DescriptorSetLayout,
     __pool_binding:[]u32,//! auto generate inside, custom_object_allocator
     draw_method:custom_object_draw_method,
     pool_sizes:[dynamic]custom_object_DescriptorPoolSize,
@@ -63,14 +65,32 @@ custom_object :: struct {
 
 custom_object_pipeline_Deinit :: proc(self:^custom_object_pipeline) {
     mem.ICheckInit_Deinit(&self.checkInit)
+    delete(self.pool_sizes)
+    delete(self.__descriptor_set_layouts, custom_object_allocator)
+}
+
+shader_code :: struct {
+    code : shader_code_fmt,
+    entry_point : string,
+    shader_stages : vk.ShaderStageFlags,
+}
+
+shader_code_fmt :: union {
+    []byte,
+    string,
 }
 
 //setting struct field first
-custom_object_pipeline_Init :: proc(self:^custom_object_pipeline) {
+custom_object_pipeline_Init :: proc(self:^custom_object_pipeline, binding:[]vk.DescriptorSetLayoutBinding,
+    vertex_shader:shader_code,
+    pixel_shader:shader_code,
+    geometry_shader:shader_code) {
     mem.ICheckInit_Init(&self.checkInit)
+
+    switch s in vertex_shader.code {
+        case string:
+        case []byte:
+    }
 
     
 }
-
-
-
