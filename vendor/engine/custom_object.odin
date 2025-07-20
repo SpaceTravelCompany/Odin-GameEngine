@@ -3,6 +3,7 @@ package engine
 
 import "core:math"
 import "core:mem"
+import "core:fmt"
 import "core:slice"
 import "core:sync"
 import "core:thread"
@@ -12,9 +13,11 @@ import "base:intrinsics"
 import "base:runtime"
 import vk "vendor:vulkan"
 import "core:mem/virtual"
+import "vendor:shaderc"
 
 @(private = "file") custom_object_allocator:runtime.Allocator
 @(private = "file") __arena: virtual.Arena
+
 @(private="file", init)
 custom_object_allocator_start :: proc() {
     _ = virtual.arena_init_growing(&__arena)
@@ -63,7 +66,7 @@ custom_object :: struct {
     pPipeline:^custom_object_pipeline,
 }
 
-custom_object_pipeline_Deinit :: proc(self:^custom_object_pipeline) {
+custom_object_pipeline_deinit :: proc(self:^custom_object_pipeline) {
     mem.ICheckInit_Deinit(&self.checkInit)
     delete(self.pool_sizes)
     delete(self.__descriptor_set_layouts, custom_object_allocator)
@@ -71,26 +74,109 @@ custom_object_pipeline_Deinit :: proc(self:^custom_object_pipeline) {
 
 shader_code :: struct {
     code : shader_code_fmt,
-    entry_point : string,
-    shader_stages : vk.ShaderStageFlags,
+    entry_point : cstring,
+    input_file_name : cstring,
 }
 
 shader_code_fmt :: union {
     []byte,
-    string,
+    cstring,
+}
+
+shader_lang :: enum {
+    GLSL,
+    HLSL,
 }
 
 //setting struct field first
-custom_object_pipeline_Init :: proc(self:^custom_object_pipeline, binding:[]vk.DescriptorSetLayoutBinding,
-    vertex_shader:shader_code,
-    pixel_shader:shader_code,
-    geometry_shader:shader_code) {
+custom_object_pipeline_init :: proc(self:^custom_object_pipeline, binding:Maybe([]vk.DescriptorSetLayoutBinding),
+    vertex_shader:Maybe(shader_code),
+    pixel_shader:Maybe(shader_code),
+    geometry_shader:Maybe(shader_code),
+    shader_lang:shader_lang = .GLSL,
+    depth_stencil_state:Maybe(vk.PipelineDepthStencilStateCreateInfo) = nil) -> bool {
     mem.ICheckInit_Init(&self.checkInit)
 
-    switch s in vertex_shader.code {
-        case string:
-        case []byte:
+    shaders := [?]Maybe(shader_code){vertex_shader, pixel_shader, geometry_shader}
+    shader_kinds := [?]shaderc.shaderKind{.VertexShader, .FragmentShader, .GeometryShader}
+    shader_vkflags := [?]vk.ShaderStageFlags{{.VERTEX}, {.FRAGMENT}, {.GEOMETRY}}
+    shader_res : [len(shaders)]shaderc.compilationResultT
+    shader_modules : [len(shaders)]vk.ShaderModule
+
+    defer #unroll for i in 0..<len(shader_res) {
+        if shader_res[i] != nil {
+            shaderc.result_release(shader_res[i])
+        }
+    }
+    #unroll for i in 0..<len(shaders) {
+        shader_bytes:[]byte
+        if shaders[i] != nil {
+            switch s in shaders[i].?.code {
+                case cstring:
+                    shader_compiler := shaderc.compiler_initialize()
+                    shader_compiler_options := shaderc.compile_options_initialize()
+                    if shader_lang == .HLSL {
+                        shaderc.compile_options_set_source_language(shader_compiler_options, .Hlsl)
+                    }
+                    defer shaderc.compile_options_release(shader_compiler_options)
+                    defer shaderc.compiler_release(shader_compiler)
+                    
+                    result := shaderc.compile_into_spv(
+                        shader_compiler,
+                        s,
+                        len(s),
+                        shader_kinds[i],
+                        shaders[i].?.input_file_name,
+                        shaders[i].?.entry_point,
+                        shader_compiler_options,
+                    )
+                    if (shaderc.result_get_compilation_status(result) != shaderc.compilationStatus.Success) {
+                        trace.printlnLog(shaderc.result_get_error_message(result))
+                        return false
+                    }
+
+                    lenn := shaderc.result_get_length(result)
+                    bytes := shaderc.result_get_bytes(result)
+                    shader_bytes := transmute([]byte)bytes[:lenn]
+                    shader_res[i] = result
+                case []byte:
+                    shader_bytes = s
+            }
+            shader_modules[i] = vk.CreateShaderModule2(vkDevice, shader_bytes)
+        }
+    }
+    if vertex_shader == nil || pixel_shader == nil {
+        trace.panic_log("custom_object_pipeline_init: vertex_shader and pixel_shader cannot be nil")
+    }
+    shaderCreateInfo : [len(shaders)]vk.PipelineShaderStageCreateInfo
+    shaderCreateInfoLen :int
+    if geometry_shader == nil {
+        tmp := vk.CreateShaderStages(shader_modules[0], shader_modules[1])
+        shaderCreateInfo = {tmp[0], tmp[1], {}}
+        shaderCreateInfoLen = 2
+    } else {
+        tmp := vk.CreateShaderStagesGS(shader_modules[0], shader_modules[1], shader_modules[2])
+        shaderCreateInfo = {tmp[0], tmp[1], tmp[2]}
+        shaderCreateInfoLen = 3
     }
 
-    
+    depth_stencil_state2 := depth_stencil_state == nil ? vk.PipelineDepthStencilStateCreateInfoInit() : depth_stencil_state.?
+    viewportState := vk.PipelineViewportStateCreateInfoInit()
+
+    pipelineCreateInfo := vk.GraphicsPipelineCreateInfoInit(
+        stages = shaderCreateInfo[:shaderCreateInfoLen],
+        layout = vkTexPipelineLayout,
+        renderPass = vkRenderPass,
+        pMultisampleState = &vkPipelineMultisampleStateCreateInfo,
+        pDepthStencilState = &depth_stencil_state2,
+        pColorBlendState = &vk.DefaultPipelineColorBlendStateCreateInfo,
+        pViewportState = &viewportState,
+    )
+
+    res := vk.CreateGraphicsPipelines(vkDevice, 0, 1, &pipelineCreateInfo, nil, &self.__pipeline)
+    if res != .SUCCESS {
+		trace.printlnLog("custom_object_pipeline_init: Failed to create graphics pipeline:", res)
+        return false
+	}
+    return true
 }

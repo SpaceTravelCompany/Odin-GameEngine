@@ -105,6 +105,7 @@ printTraceBuf :: proc(str:^strings.Builder) {
 	} else {
 		//TODO (xfitgd)
 	}
+	fmt.print(str2)
 }
 
 printLog :: proc "contextless" (args: ..any) {
