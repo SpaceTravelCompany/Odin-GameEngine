@@ -21,7 +21,10 @@ import "vendor:shaderc"
 @(private="file", init)
 custom_object_allocator_start :: proc() {
     _ = virtual.arena_init_growing(&__arena)
-	custom_object_allocator = virtual.arena_allocator(&__arena)
+    __allocator := virtual.arena_allocator(&__arena)
+    mtx_allocator : mem.Mutex_Allocator
+	mem.mutex_allocator_init(&mtx_allocator, __allocator)
+    custom_object_allocator = mem.mutex_allocator(&mtx_allocator)
 }
 @(private="file", fini)
 custom_object_allocator_finish :: proc() {
@@ -57,8 +60,9 @@ custom_object_pipeline :: struct {
     __pipeline_layout:vk.PipelineLayout,
     __descriptor_set_layouts:[]vk.DescriptorSetLayout,
     __pool_binding:[]u32,//! auto generate inside, custom_object_allocator
+
     draw_method:custom_object_draw_method,
-    pool_sizes:[dynamic]custom_object_DescriptorPoolSize,
+    pool_sizes:[]custom_object_DescriptorPoolSize,
 }
 
 custom_object :: struct {
@@ -68,8 +72,15 @@ custom_object :: struct {
 
 custom_object_pipeline_deinit :: proc(self:^custom_object_pipeline) {
     mem.ICheckInit_Deinit(&self.checkInit)
-    delete(self.pool_sizes)
+
+    for l in self.__descriptor_set_layouts {
+        vk.DestroyDescriptorSetLayout(vkDevice, l, nil)
+    }
+    vk.DestroyPipelineLayout(vkDevice, self.__pipeline_layout, nil)
+    vk.DestroyPipeline(vkDevice, self.__pipeline, nil)
+    delete(self.pool_sizes, custom_object_allocator)
     delete(self.__descriptor_set_layouts, custom_object_allocator)
+    delete(self.__pool_binding, custom_object_allocator)
 }
 
 shader_code :: struct {
@@ -88,8 +99,12 @@ shader_lang :: enum {
     HLSL,
 }
 
-//setting struct field first
-custom_object_pipeline_init :: proc(self:^custom_object_pipeline, binding:Maybe([]vk.DescriptorSetLayoutBinding),
+custom_object_pipeline_init :: proc(self:^custom_object_pipeline,
+    binding_set_layouts:[][]vk.DescriptorSetLayoutBinding,
+    vertex_input_binding:Maybe([]vk.VertexInputBindingDescription),
+    vertex_input_attribute:Maybe([]vk.VertexInputAttributeDescription),
+    draw_method:custom_object_draw_method,
+    pool_sizes:[]custom_object_DescriptorPoolSize,
     vertex_shader:Maybe(shader_code),
     pixel_shader:Maybe(shader_code),
     geometry_shader:Maybe(shader_code),
@@ -97,12 +112,19 @@ custom_object_pipeline_init :: proc(self:^custom_object_pipeline, binding:Maybe(
     depth_stencil_state:Maybe(vk.PipelineDepthStencilStateCreateInfo) = nil) -> bool {
     mem.ICheckInit_Init(&self.checkInit)
 
+    self.draw_method = draw_method
+    self.pool_sizes = mem.make_non_zeroed_slice([]custom_object_DescriptorPoolSize, len(pool_sizes), custom_object_allocator)
+    mem.copy_non_overlapping(&self.pool_sizes[0], &pool_sizes[0], len(pool_sizes) * size_of(custom_object_DescriptorPoolSize))
+
     shaders := [?]Maybe(shader_code){vertex_shader, pixel_shader, geometry_shader}
     shader_kinds := [?]shaderc.shaderKind{.VertexShader, .FragmentShader, .GeometryShader}
     shader_vkflags := [?]vk.ShaderStageFlags{{.VERTEX}, {.FRAGMENT}, {.GEOMETRY}}
     shader_res : [len(shaders)]shaderc.compilationResultT
     shader_modules : [len(shaders)]vk.ShaderModule
 
+    if vertex_shader == nil || pixel_shader == nil {
+        trace.panic_log("custom_object_pipeline_init: vertex_shader and pixel_shader cannot be nil")
+    }
     defer #unroll for i in 0..<len(shader_res) {
         if shader_res[i] != nil {
             shaderc.result_release(shader_res[i])
@@ -145,9 +167,6 @@ custom_object_pipeline_init :: proc(self:^custom_object_pipeline, binding:Maybe(
             shader_modules[i] = vk.CreateShaderModule2(vkDevice, shader_bytes)
         }
     }
-    if vertex_shader == nil || pixel_shader == nil {
-        trace.panic_log("custom_object_pipeline_init: vertex_shader and pixel_shader cannot be nil")
-    }
     shaderCreateInfo : [len(shaders)]vk.PipelineShaderStageCreateInfo
     shaderCreateInfoLen :int
     if geometry_shader == nil {
@@ -163,14 +182,28 @@ custom_object_pipeline_init :: proc(self:^custom_object_pipeline, binding:Maybe(
     depth_stencil_state2 := depth_stencil_state == nil ? vk.PipelineDepthStencilStateCreateInfoInit() : depth_stencil_state.?
     viewportState := vk.PipelineViewportStateCreateInfoInit()
 
+    self.__descriptor_set_layouts = mem.make_non_zeroed_slice([]vk.DescriptorSetLayout, len(binding_set_layouts), custom_object_allocator)
+    for &l, i in self.__descriptor_set_layouts {
+        l = vk.DescriptorSetLayoutInit(vkDevice, binding_set_layouts[i])
+    }
+    self.__pipeline_layout = vk.PipelineLayoutInit(vkDevice, self.__descriptor_set_layouts)
+
+    vertexInputState:Maybe(vk.PipelineVertexInputStateCreateInfo)
+    if vertex_input_binding != nil && vertex_input_attribute != nil {
+        vertexInputState = vk.PipelineVertexInputStateCreateInfoInit(vertex_input_binding.?, vertex_input_attribute.?)
+    } else {
+        vertexInputState = nil
+    }
+
     pipelineCreateInfo := vk.GraphicsPipelineCreateInfoInit(
         stages = shaderCreateInfo[:shaderCreateInfoLen],
-        layout = vkTexPipelineLayout,
+        layout = self.__pipeline_layout,
         renderPass = vkRenderPass,
         pMultisampleState = &vkPipelineMultisampleStateCreateInfo,
         pDepthStencilState = &depth_stencil_state2,
         pColorBlendState = &vk.DefaultPipelineColorBlendStateCreateInfo,
         pViewportState = &viewportState,
+        pVertexInputState = vertexInputState == nil ? nil : &vertexInputState.?,
     )
 
     res := vk.CreateGraphicsPipelines(vkDevice, 0, 1, &pipelineCreateInfo, nil, &self.__pipeline)
