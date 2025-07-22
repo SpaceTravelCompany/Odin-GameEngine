@@ -382,6 +382,28 @@ caprint :: proc(args: ..any, sep := " ", allocator := context.allocator) -> cstr
 	return cstring(raw_data(s))
 }
 
+// 	Creates a formatted C string, followed by a newline.
+//
+// 	*Allocates Using Provided Allocator*
+//
+// 	Inputs:
+// 	- args: A variadic list of arguments to be formatted.
+// 	- sep: An optional separator string (default is a single space).
+// 	- allocator: (default: context.allocator)
+//
+// 	Returns: A formatted C string.
+//
+@(require_results)
+caprintln :: proc(args: ..any, sep := " ", allocator := context.allocator) -> cstring {//edited(xfitgd)
+	str: strings.Builder
+	strings.builder_init(&str, allocator)
+	sbprint(&str, ..args, sep=sep)
+	strings.write_byte(&str, '\n')
+	strings.write_byte(&str, 0)
+	s := strings.to_string(str)
+	return cstring(raw_data(s))
+}
+
 // Creates a formatted C string
 //
 // *Allocates Using Provided Allocator*

@@ -1,5 +1,6 @@
 package debug_trace
 
+import "core:c"
 import "core:strings"
 import "core:os"
 import "core:fmt"
@@ -69,6 +70,7 @@ printTraceBuf :: proc(str:^strings.Builder) {
 
 @(cold) panic_log :: proc "contextless" (args: ..any, loc := #caller_location) -> ! {
 	context = runtime.default_context()
+	
 	when !is_android {
 		str: strings.Builder
 		strings.builder_init(&str)
@@ -80,8 +82,9 @@ printTraceBuf :: proc(str:^strings.Builder) {
 
 		printTraceBuf(&str)
 
-		printToFile(str.buf[:len(str.buf)])
-		panic(string(str.buf[:len(str.buf)]), loc)
+		strings.write_byte(&str, 0)
+		printToFile(cstring(raw_data(str.buf)))
+		panic(string(str.buf[:len(str.buf)-1]), loc)
 	} else {
 		cstr := fmt.caprint(..args)
 		android.__android_log_write(android.LogPriority.ERROR, ODIN_BUILD_PROJECT_NAME, cstr)
@@ -92,8 +95,8 @@ printTraceBuf :: proc(str:^strings.Builder) {
 	}
 }
 
-@private printToFile :: proc(str:[]byte) {
-	str2 := string(str)
+@private printToFile :: proc(cstr:cstring) {
+	str2 := string(cstr)
 	when !is_android {
 		if len(LOG_FILE_NAME) > 0 {
 			fd, err := os.open(LOG_FILE_NAME, os.O_WRONLY | os.O_CREATE | os.O_APPEND, 0o644)
@@ -105,46 +108,49 @@ printTraceBuf :: proc(str:^strings.Builder) {
 	} else {
 		//TODO (xfitgd)
 	}
-	fmt.print(str2)
+}
+
+@private _print :: proc (cstr:cstring) {
+	when !is_android {
+		os.write(os.stdout, (transmute([^]u8)(cstr))[:len(cstr)])
+	} else {
+		android.__android_log_write(android.LogPriority.INFO, ODIN_BUILD_PROJECT_NAME, cstr)
+	}
 }
 
 printLog :: proc "contextless" (args: ..any) {
 	context = runtime.default_context()
-	str: strings.Builder
-	strings.builder_init(&str)
-	defer strings.builder_destroy(&str)
-	fmt.sbprint(&str, ..args)
+	cstr := fmt.caprint( ..args)
+	defer delete(cstr)
 
-	printToFile(str.buf[:len(str.buf)])
+	printToFile(cstr)
+	_print(cstr)
 }
 
 
 printlnLog :: proc "contextless" (args: ..any) {
 	context = runtime.default_context()
-	str: strings.Builder
-	strings.builder_init(&str)
-	defer strings.builder_destroy(&str)
-	fmt.sbprintln(&str, ..args)
+	cstr := fmt.caprintln( ..args)
+	defer delete(cstr)
 
-	printToFile(str.buf[:len(str.buf)])
+	printToFile(cstr)
+	_print(cstr)
 }
 
 printfLog :: proc "contextless" (_fmt:string ,args: ..any) {
 	context = runtime.default_context()
-	str: strings.Builder
-	strings.builder_init(&str)
-	defer strings.builder_destroy(&str)
-	fmt.sbprintf(&str, _fmt, ..args)
+	cstr := fmt.caprintf( _fmt, ..args)
+	defer delete(cstr)
 
-	printToFile(str.buf[:len(str.buf)])
+	printToFile(cstr)
+	_print(cstr)
 }
 
 printflnLog :: proc "contextless" (_fmt:string ,args: ..any) {
 	context = runtime.default_context()
-	str: strings.Builder
-	strings.builder_init(&str)
-	defer strings.builder_destroy(&str)
-	fmt.sbprintfln(&str, _fmt, ..args)
+	cstr := fmt.caprintfln( _fmt, ..args)
+	defer delete(cstr)
 
-	printToFile(str.buf[:len(str.buf)])
+	printToFile(cstr)
+	_print(cstr)
 }
