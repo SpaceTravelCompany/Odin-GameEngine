@@ -16,7 +16,6 @@ VkResourceRange :: rawptr
 
 VkDescriptorPoolMem :: struct {pool:vk.DescriptorPool, cnt:u32}
 
-VK_MAX_RESOURCES_FROM_DESCRIPTOR_SET :: 5
 
 VkDescriptorSet :: struct {
     layout: vk.DescriptorSetLayout,
@@ -24,7 +23,7 @@ VkDescriptorSet :: struct {
     __set: vk.DescriptorSet,
     size: []custom_object_DescriptorPoolSize,
     bindings: []u32,
-    __resources: [VK_MAX_RESOURCES_FROM_DESCRIPTOR_SET]VkUnionResource,
+    __resources: []VkUnionResource,
 };
 
 TextureType :: enum {

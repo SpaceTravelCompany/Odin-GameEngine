@@ -118,7 +118,7 @@ Icon_Image :: glfw.Image
 
 @(private="file") inited := false
 
-
+@(private = "file") __arena: virtual.Arena
 @(private) engineDefAllocator : runtime.Allocator
 
 @(private) windows_hInstance:windows.HINSTANCE
@@ -142,7 +142,9 @@ engineMain :: proc(
 	assert(!(windowWidth != nil && windowWidth.? <= 0))
 	assert(!(windowHeight != nil && windowHeight.? <= 0))
 
-	engineDefAllocator =  runtime.default_allocator()
+	_ = virtual.arena_init_growing(&__arena)
+	engineDefAllocator =  virtual.arena_allocator(&__arena)
+	
 	systemInit()
 	systemStart()
 	inited = true
@@ -236,6 +238,8 @@ engineMain :: proc(
 }
 @(private) systemAfterDestroy :: proc() {
 	delete(monitors)
+
+	virtual.arena_destroy(&__arena)
 }
 
 @private @thread_local trackAllocator:mem.Tracking_Allocator

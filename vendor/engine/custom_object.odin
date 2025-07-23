@@ -83,10 +83,13 @@ custom_object_pipeline_deinit :: proc(self:^custom_object_pipeline) {
     delete(self.__pool_binding, custom_object_allocator)
 }
 
+shader_optimizationLevel :: shaderc.optimizationLevel
+
 shader_code :: struct {
     code : shader_code_fmt,
     entry_point : cstring,
     input_file_name : cstring,
+    optimize:shader_optimizationLevel,
 }
 
 shader_code_fmt :: union {
@@ -115,6 +118,13 @@ custom_object_pipeline_init :: proc(self:^custom_object_pipeline,
     self.draw_method = draw_method
     self.pool_sizes = mem.make_non_zeroed_slice([]custom_object_DescriptorPoolSize, len(pool_sizes), custom_object_allocator)
     mem.copy_non_overlapping(&self.pool_sizes[0], &pool_sizes[0], len(pool_sizes) * size_of(custom_object_DescriptorPoolSize))
+    self.__pool_binding = mem.make_non_zeroed_slice([]u32, len(pool_sizes), custom_object_allocator)
+    self.__pool_binding[0] = 0
+    pool_idx :u32 = 0
+    for i in 1..<len(self.__pool_binding) {
+        pool_idx += pool_sizes[i - 1].cnt
+        self.__pool_binding[i] = pool_idx
+    }
 
     shaders := [?]Maybe(shader_code){vertex_shader, pixel_shader, geometry_shader}
     shader_kinds := [?]shaderc.shaderKind{.VertexShader, .FragmentShader, .GeometryShader}
@@ -139,6 +149,9 @@ custom_object_pipeline_init :: proc(self:^custom_object_pipeline,
                     shader_compiler_options := shaderc.compile_options_initialize()
                     if shader_lang == .HLSL {
                         shaderc.compile_options_set_source_language(shader_compiler_options, .Hlsl)
+                    }
+                    if shaders[i].?.optimize != .Zero {
+                        shaderc.compile_options_set_optimization_level(shader_compiler_options, shaders[i].?.optimize)
                     }
                     defer shaderc.compile_options_release(shader_compiler_options)
                     defer shaderc.compiler_release(shader_compiler)

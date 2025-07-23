@@ -290,6 +290,9 @@ IObject_Init2 :: proc(self:^IObject, $actualType:typeid,
 
 @private __IObject_UpdateUniform :: #force_inline proc(self:^IObject, resources:[]VkUnionResource) {
     mem.ICheckInit_Check(&self.checkInit)
+
+    //업데이트 하면 vkTempArenaAllocator를 다 지우니 중복 할당해도 됨.
+    self.set.__resources = mem.make_non_zeroed_slice([]VkUnionResource, len(resources), vkTempArenaAllocator)
     mem.copy_non_overlapping(&self.set.__resources[0], &resources[0], len(resources) * size_of(VkUnionResource))
     VkUpdateDescriptorSets(mem.slice_ptr(&self.set, 1))
 }

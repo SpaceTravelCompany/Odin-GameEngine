@@ -392,6 +392,7 @@ Texture_Init :: proc(self:^Texture, #any_int width:int, #any_int height:int, pix
         single = false,
     }, self.sampler, allocPixels, false, engineDefAllocator)
 
+    self.set.__resources = mem.make_non_zeroed_slice([]VkUnionResource, 1, vkTempArenaAllocator)
     self.set.__resources[0] = &self.texture
     VkUpdateDescriptorSets(mem.slice_ptr(&self.set, 1))
 }
@@ -513,6 +514,7 @@ TextureArray_Init :: proc(self:^TextureArray, #any_int width:int, #any_int heigh
         resourceUsage = .GPU,
     }, self.sampler, allocPixels, false, engineDefAllocator)
 
+    self.set.__resources = mem.make_non_zeroed_slice([]VkUnionResource, 1, vkTempArenaAllocator)
     self.set.__resources[0] = &self.texture
     VkUpdateDescriptorSets(mem.slice_ptr(&self.set, 1))
 }
@@ -608,6 +610,7 @@ inPixelFmt:color_fmt = .RGBA) {
         type = .TEX2D,
     }, self.sampler, allocPixels, false, engineDefAllocator)
 
+    self.set.__resources = mem.make_non_zeroed_slice([]VkUnionResource, 1, vkTempArenaAllocator)
     self.set.__resources[0] = &self.texture
     VkUpdateDescriptorSets(mem.slice_ptr(&self.set, 1))
 }

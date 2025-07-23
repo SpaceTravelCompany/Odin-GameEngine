@@ -23,16 +23,10 @@ vkPoolBlock :: 256
 vkUniformSizeBlock :: mem.Megabyte
 vkSupportCacheLocal := false
 vkSupportNonCacheLocal := false
-@(private = "file") __arena: virtual.Arena
 @(private = "file") __tempArena: virtual.Arena
-@(private = "file") __bufTempArena: virtual.Arena
-@(private = "file") __allocArena: virtual.Arena
-@(private = "file") __allocArenaMtx: mem.Mutex_Allocator
 @(private = "file") gQueueMtx: sync.Atomic_Mutex
 @(private = "file") gDestroyQueueMtx: sync.Atomic_Mutex
-vkArenaAllocator: mem.Allocator
 vkTempArenaAllocator: mem.Allocator
-vkBufTempArenaAllocator: mem.Allocator
 
 OpMapCopy :: struct {
 	pData:      ^VkResourceData,
@@ -233,13 +227,9 @@ vkAllocatorInit :: proc() {
 	gVkMemIdxCnts = mem.make_non_zeroed([]int, vkPhysicalMemProp.memoryTypeCount, engineDefAllocator)
 	mem.zero_slice(gVkMemIdxCnts)
 
-	_ = virtual.arena_init_growing(&__arena)
 	_ = virtual.arena_init_growing(&__tempArena)
-	_ = virtual.arena_init_growing(&__bufTempArena)
 
-	vkArenaAllocator = virtual.arena_allocator(&__arena)
 	vkTempArenaAllocator = virtual.arena_allocator(&__tempArena)
-	vkBufTempArenaAllocator = virtual.arena_allocator(&__bufTempArena)
 
 	cmdPoolInfo := vk.CommandPoolCreateInfo {
 		sType            = vk.StructureType.COMMAND_POOL_CREATE_INFO,
@@ -255,17 +245,17 @@ vkAllocatorInit :: proc() {
 	}
 	vk.AllocateCommandBuffers(vkDevice, &cmdAllocInfo, &gCmd)
 
-	opQueue = mem.make_non_zeroed([dynamic]OpNode, vkArenaAllocator)
-	opSaveQueue = mem.make_non_zeroed([dynamic]OpNode, vkArenaAllocator)
-	opMapQueue = mem.make_non_zeroed([dynamic]OpNode, vkArenaAllocator)
-	opAllocQueue = mem.make_non_zeroed([dynamic]OpNode, vkArenaAllocator)
-	opDestroyQueue = mem.make_non_zeroed([dynamic]OpNode, vkArenaAllocator)
-	gVkUpdateDesciptorSetList = mem.make_non_zeroed([dynamic]vk.WriteDescriptorSet, vkArenaAllocator)
+	opQueue = mem.make_non_zeroed([dynamic]OpNode, engineDefAllocator)
+	opSaveQueue = mem.make_non_zeroed([dynamic]OpNode, engineDefAllocator)
+	opMapQueue = mem.make_non_zeroed([dynamic]OpNode, engineDefAllocator)
+	opAllocQueue = mem.make_non_zeroed([dynamic]OpNode, engineDefAllocator)
+	opDestroyQueue = mem.make_non_zeroed([dynamic]OpNode, engineDefAllocator)
+	gVkUpdateDesciptorSetList = mem.make_non_zeroed([dynamic]vk.WriteDescriptorSet, engineDefAllocator)
 
-	gFreeObjects = mem.make_non_zeroed([dynamic]FREE_OBJ, vkArenaAllocator)
-	gUniforms = mem.make_non_zeroed([dynamic]vkUniformAlloc, vkArenaAllocator)
-	gTempUniforms = mem.make_non_zeroed([dynamic]vkTempUniformStruct, vkArenaAllocator)
-	gNonInsertedUniforms = mem.make_non_zeroed([dynamic]vkTempUniformStruct, vkArenaAllocator)
+	gFreeObjects = mem.make_non_zeroed([dynamic]FREE_OBJ, engineDefAllocator)
+	gUniforms = mem.make_non_zeroed([dynamic]vkUniformAlloc, engineDefAllocator)
+	gTempUniforms = mem.make_non_zeroed([dynamic]vkTempUniformStruct, engineDefAllocator)
+	gNonInsertedUniforms = mem.make_non_zeroed([dynamic]vkTempUniformStruct, engineDefAllocator)
 }
 
 vkAllocatorDestroy :: proc() {
@@ -284,10 +274,7 @@ vkAllocatorDestroy :: proc() {
 		}
 	}
 
-	virtual.arena_destroy(&__arena)
 	virtual.arena_destroy(&__tempArena)
-	virtual.arena_destroy(&__bufTempArena)
-	virtual.arena_destroy(&__allocArena)
 
 	delete(gVkMemIdxCnts, engineDefAllocator)
 }
@@ -342,7 +329,7 @@ vkFindMemType :: proc "contextless" (
 	if res != .SUCCESS do return nil
 
 
-	list.push_back(&memBuf.list, auto_cast new(VkMemBufferNode, vkArenaAllocator))
+	list.push_back(&memBuf.list, auto_cast new(VkMemBufferNode, engineDefAllocator))
 	((^VkMemBufferNode)(memBuf.list.head)).free = true
 	((^VkMemBufferNode)(memBuf.list.head)).size = memBuf.len
 	((^VkMemBufferNode)(memBuf.list.head)).idx = 0
@@ -373,7 +360,7 @@ vkFindMemType :: proc "contextless" (
 	vk.FreeMemory(vkDevice, self.deviceMem, nil)
 	if !self.single {
 		for n: ^list.Node = self.list.head; n.next != nil; n = n.next {
-			free(n, vkArenaAllocator)
+			free(n, engineDefAllocator)
 		}
 	}
 }
@@ -386,7 +373,7 @@ vkFindMemType :: proc "contextless" (
 	}
 	if !self.single do gVkMemIdxCnts[self.allocateInfo.memoryTypeIndex] -= 1
 	VkMemBuffer_Deinit2(self)
-	free(self, vkArenaAllocator)
+	free(self, engineDefAllocator)
 }
 
 VkAllocatorError :: enum {
@@ -477,7 +464,7 @@ VkAllocatorError :: enum {
 	if next.free && range_ != next && range_.idx < next.idx {
 		range_.size += next.size
 		list.remove(&self.list, auto_cast next)
-		free(next, vkArenaAllocator)
+		free(next, engineDefAllocator)
 	}
 
 	prev: ^VkMemBufferNode = auto_cast (range_.node.prev if range_.node.prev != nil else self.list.tail)
@@ -485,7 +472,7 @@ VkAllocatorError :: enum {
 		range_.size += prev.size
 		range_.idx -= prev.size
 		list.remove(&self.list, auto_cast prev)
-		free(prev, vkArenaAllocator)
+		free(prev, engineDefAllocator)
 	}
 	if gVkMemIdxCnts[self.allocateInfo.memoryTypeIndex] > VkMaxMemIdxCnt {
 		for b in gVkMemBufs {
@@ -501,7 +488,7 @@ VkAllocatorError :: enum {
 		}
 	}
 	if self.list.head == nil {//?always self.list.head not nil when list is not empty
-		list.push_back(&self.list, auto_cast new(VkMemBufferNode, vkArenaAllocator))
+		list.push_back(&self.list, auto_cast new(VkMemBufferNode, engineDefAllocator))
 		((^VkMemBufferNode)(self.list.head)).free = true
 		((^VkMemBufferNode)(self.list.head)).size = self.len
 		((^VkMemBufferNode)(self.list.head)).idx = 0
@@ -581,7 +568,7 @@ VkAllocatorError :: enum {
 	}
 
 	if memBuf == nil {
-		memBuf = new(VkMemBuffer, vkArenaAllocator)
+		memBuf = new(VkMemBuffer, engineDefAllocator)
 
 		memFlag := vk.MemoryPropertyFlags{.HOST_VISIBLE, .DEVICE_LOCAL}
 		BLKSize := vkMemSpcialBlockLen if memProp_ >= memFlag else vkMemBlockLen
@@ -627,7 +614,7 @@ where T == vk.Buffer || T == vk.Image {
 		vk.GetImageMemoryRequirements(vkDevice, vkResource, &memRequire)
 	}
 
-	memBuf = new(VkMemBuffer, vkArenaAllocator)
+	memBuf = new(VkMemBuffer, engineDefAllocator)
 	outMemBuf :=  VkMemBuffer_InitSingle(memRequire.size, memRequire.memoryTypeBits)
 	memBuf^ = outMemBuf.?
 
@@ -970,7 +957,7 @@ VkBufferResource_Deinit :: proc(self: ^$T) where T == VkBufferResource || T == V
 		bufInfo.usage |= {.TRANSFER_DST}
 		if self.option.len > auto_cast len(self.data.data) do trace.panic_log("create_buffer _data not enough size. ", self.option.len, ", ", len(self.data.data))
 		
-		last = new(VkBufferResource, vkBufTempArenaAllocator)
+		last = new(VkBufferResource, vkTempArenaAllocator)
 		last^ = {}
 		last.data = self.data
 		VkBufferResource_CreateBufferNoAsync(last, {
@@ -1061,7 +1048,7 @@ VkBufferResource_Deinit :: proc(self: ^$T) where T == VkBufferResource || T == V
 	if self.data.data != nil && self.option.resourceUsage == .GPU {
 		imgInfo.usage |= {.TRANSFER_DST}
 		
-		last = new(VkBufferResource, vkBufTempArenaAllocator)
+		last = new(VkBufferResource, vkTempArenaAllocator)
 		last^ = {}
 		last.data = self.data
 		VkBufferResource_CreateBufferNoAsync(last, {
@@ -1142,7 +1129,7 @@ VkUpdateDescriptorSets :: proc(sets: []VkDescriptorSet) {
 		if s.__set == 0 {
 			if raw_data(s.size) in gDesciptorPools {
 			} else {
-				gDesciptorPools[raw_data(s.size)] = mem.make_non_zeroed([dynamic]VkDescriptorPoolMem, vkArenaAllocator)
+				gDesciptorPools[raw_data(s.size)] = mem.make_non_zeroed([dynamic]VkDescriptorPoolMem, engineDefAllocator)
 				non_zero_append(&gDesciptorPools[raw_data(s.size)], VkDescriptorPoolMem{cnt = 0})
 				__CreateDescriptorPool(s.size, &gDesciptorPools[raw_data(s.size)][0])
 			}
@@ -1465,7 +1452,7 @@ vkOpExecuteDestroy :: proc() {
 	clear(&opDestroyQueue)
 
 	sync.atomic_mutex_unlock(&gDestroyQueueMtx)
-	virtual.arena_free_all(&__bufTempArena)
+	virtual.arena_free_all(&__tempArena)
 
 	sync.sema_post(&gWaitOpSem)
 }
@@ -1532,7 +1519,7 @@ vkOpExecute :: proc(waitAndDestroy: bool) {
 			gUniforms[0] = {
 				max_size = max(vkUniformSizeBlock, all_size),
 				size = all_size,
-				uniforms = mem.make_non_zeroed_dynamic_array([dynamic]^VkBufferResource, vkArenaAllocator),	
+				uniforms = mem.make_non_zeroed_dynamic_array([dynamic]^VkBufferResource, engineDefAllocator),	
 			}
 
 			bufInfo : vk.BufferCreateInfo = {
@@ -1685,7 +1672,7 @@ vkOpExecute :: proc(waitAndDestroy: bool) {
 				gUniforms[len(gUniforms) - 1] = {
 					max_size = max(vkUniformSizeBlock, all_size),
 					size = all_size,
-					uniforms = mem.make_non_zeroed_dynamic_array([dynamic]^VkBufferResource, vkArenaAllocator),	
+					uniforms = mem.make_non_zeroed_dynamic_array([dynamic]^VkBufferResource, engineDefAllocator),	
 				}
 
 				bufInfo : vk.BufferCreateInfo = {
@@ -1803,9 +1790,6 @@ vkOpExecute :: proc(waitAndDestroy: bool) {
 		sync.sema_post(&gWaitOpSem)
 	}
 
-	virtual.arena_free_all(&__tempArena)
-
 	clear(&opSaveQueue)
-
 }
 
