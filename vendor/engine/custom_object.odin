@@ -107,6 +107,7 @@ VertexInputBindingDescription :: vk.VertexInputBindingDescription
 VertexInputAttributeDescription :: vk.VertexInputAttributeDescription
 VertexInputRate :: vk.VertexInputRate
 Format :: vk.Format
+DescriptorSetLayoutBindingInit :: vk.DescriptorSetLayoutBindingInit
 
 custom_object_pipeline_init :: proc(self:^custom_object_pipeline,
     binding_set_layouts:[][]DescriptorSetLayoutBinding,
