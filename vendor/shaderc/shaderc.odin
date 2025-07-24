@@ -22,7 +22,7 @@ import "base:library"
 //@(extra_linker_flags = "/NODEFAULTLIB:libcmt") edited (xfitgd) : no need this project 
 
 
-LIB :: library.LIBPATH + "/libvorbisfile" + library.ARCH_end
+LIB :: library.LIBPATH + "/libshaderc_combined" + library.ARCH_end
 foreign import libshaderc {
     LIB,
 }

@@ -23,26 +23,19 @@ ImageCenterPtPos :: enum {
     BottomRight,
 }
 
-@private __TextureIn :: struct {
+Texture :: struct {
     texture:VkTextureResource,
     set:VkDescriptorSet,
     sampler: vk.Sampler,
     checkInit: mem.ICheckInit,
 }
 
-Texture :: struct {
-    using _: __TextureIn,
-}
-
 TextureArray :: struct {
-    using _: __TextureArrayIn,
+    using _: Texture,
 }
-
-@private __TextureArrayIn :: distinct __TextureIn
-@private __TileTextureArrayIn :: distinct __TextureArrayIn
 
 TileTextureArray :: struct {
-    using _: __TileTextureArrayIn,
+    using _: Texture,
 }
 
 Image :: struct {

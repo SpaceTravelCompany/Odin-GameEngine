@@ -14,18 +14,6 @@ VkSize :: vk.DeviceSize
 VkResourceRange :: rawptr
 
 
-VkDescriptorPoolMem :: struct {pool:vk.DescriptorPool, cnt:u32}
-
-
-VkDescriptorSet :: struct {
-    layout: vk.DescriptorSetLayout,
-    ///created inside update_descriptor_sets call
-    __set: vk.DescriptorSet,
-    size: []custom_object_DescriptorPoolSize,
-    bindings: []u32,
-    __resources: []VkUnionResource,
-};
-
 TextureType :: enum {
     TEX2D,
    // TEX3D,
