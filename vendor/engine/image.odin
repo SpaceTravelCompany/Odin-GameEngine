@@ -92,7 +92,7 @@ rotation:f32 = 0.0, scale:linalg.PointF = {1,1}, colorTransform:^ColorTransform 
     if self.vtable.Draw == nil do self.vtable.Draw = auto_cast _Super_Image_Draw
     if self.vtable.Deinit == nil do self.vtable.Deinit = auto_cast _Super_Image_Deinit
 
-    self.vtable.__GetUniformResources = auto_cast __GetUniformResources_Default
+    if self.vtable.GetUniformResources == nil do self.vtable.GetUniformResources = auto_cast GetUniformResources_Default
 
     IObject_Init(self, actualType, pos, rotation, scale, camera, projection, colorTransform, pivot)
 }
@@ -110,7 +110,7 @@ colorTransform:^ColorTransform = nil, vtable:^IObjectVTable = nil) where intrins
     if self.vtable.Draw == nil do self.vtable.Draw = auto_cast _Super_Image_Draw
     if self.vtable.Deinit == nil do self.vtable.Deinit = auto_cast _Super_Image_Deinit
 
-    self.vtable.__GetUniformResources = auto_cast __GetUniformResources_Default
+    if self.vtable.GetUniformResources == nil do self.vtable.GetUniformResources = auto_cast GetUniformResources_Default
 
     IObject_Init2(self, actualType, camera, projection, colorTransform)
 }
@@ -185,7 +185,7 @@ camera:^Camera, projection:^Projection, colorTransform:^ColorTransform = nil, pi
     if self.vtable.Deinit == nil do self.vtable.Deinit = auto_cast _Super_AnimateImage_Deinit
     if ((^IAnimateObjectVTable)(self.vtable)).get_frame_cnt == nil do ((^IAnimateObjectVTable)(self.vtable)).get_frame_cnt = auto_cast _Super_AnimateImage_get_frame_cnt
 
-    self.vtable.__GetUniformResources = auto_cast __GetUniformResources_AnimateImage
+    if self.vtable.GetUniformResources == nil do self.vtable.GetUniformResources = auto_cast GetUniformResources_AnimateImage
 
     IObject_Init(self, actualType, pos, rotation, scale, camera, projection, colorTransform, pivot)
 }
@@ -203,7 +203,7 @@ camera:^Camera, projection:^Projection, colorTransform:^ColorTransform = nil, vt
     if self.vtable.Deinit == nil do self.vtable.Deinit = auto_cast _Super_AnimateImage_Deinit
     if ((^IAnimateObjectVTable)(self.vtable)).get_frame_cnt == nil do ((^IAnimateObjectVTable)(self.vtable)).get_frame_cnt = auto_cast _Super_AnimateImage_get_frame_cnt
 
-    self.vtable.__GetUniformResources = auto_cast __GetUniformResources_AnimateImage
+    if self.vtable.GetUniformResources == nil do self.vtable.GetUniformResources = auto_cast GetUniformResources_AnimateImage
 
     IObject_Init2(self, actualType, camera, projection, colorTransform)
 }   
@@ -277,7 +277,7 @@ camera:^Camera, projection:^Projection, colorTransform:^ColorTransform = nil, pi
     if self.vtable.Draw == nil do self.vtable.Draw = auto_cast _Super_TileImage_Draw
     if self.vtable.Deinit == nil do self.vtable.Deinit = auto_cast _Super_TileImage_Deinit
 
-    self.vtable.__GetUniformResources = auto_cast __GetUniformResources_TileImage
+    if self.vtable.GetUniformResources == nil do self.vtable.GetUniformResources = auto_cast GetUniformResources_TileImage
 
 
     VkBufferResource_CreateBuffer(&self.tileUniform, {
@@ -301,7 +301,7 @@ camera:^Camera, projection:^Projection, colorTransform:^ColorTransform = nil, vt
     if self.vtable.Draw == nil do self.vtable.Draw = auto_cast _Super_TileImage_Draw
     if self.vtable.Deinit == nil do self.vtable.Deinit = auto_cast _Super_TileImage_Deinit
 
-    self.vtable.__GetUniformResources = auto_cast __GetUniformResources_TileImage
+    if self.vtable.GetUniformResources == nil do self.vtable.GetUniformResources = auto_cast GetUniformResources_TileImage
 
     IObject_Init2(self, actualType, camera, projection, colorTransform)
 }   

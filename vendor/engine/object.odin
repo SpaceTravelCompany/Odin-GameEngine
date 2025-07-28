@@ -34,7 +34,7 @@ VkDescriptorSet :: struct {
 ResourceUsage :: enum {GPU,CPU}
 
 IObjectVTable :: struct {
-     __GetUniformResources: #type proc (self:^IObject) -> []VkUnionResource,
+    GetUniformResources: #type proc (self:^IObject) -> []VkUnionResource,
     Draw: #type proc (self:^IObject, cmd:vk.CommandBuffer),
     Deinit: #type proc (self:^IObject),
     Update: #type proc (self:^IObject),
@@ -233,7 +233,7 @@ IObject_Init :: proc(self:^IObject, $actualType:typeid,
         resourceUsage = .CPU,
     }, mem.ptr_to_bytes(&self.mat), true)
 
-    resources := __GetUniformResources(self)
+    resources := GetUniformResources(self)
     defer delete(resources, context.temp_allocator)
     __IObject_UpdateUniform(self, resources)
 
@@ -258,15 +258,15 @@ IObject_Init2 :: proc(self:^IObject, $actualType:typeid,
 }
 
 //!alloc result array in temp_allocator
-@private __GetUniformResources :: proc(self:^IObject) -> []VkUnionResource {
-    if self.vtable != nil && self.vtable.__GetUniformResources != nil {
-        return self.vtable.__GetUniformResources(self)
+@private GetUniformResources :: proc(self:^IObject) -> []VkUnionResource {
+    if self.vtable != nil && self.vtable.GetUniformResources != nil {
+        return self.vtable.GetUniformResources(self)
     } else {
-        trace.panic_log("__GetUniformResources is not implemented")
+        trace.panic_log("GetUniformResources is not implemented")
     }
 }
 
-@private __GetUniformResources_AnimateImage :: #force_inline proc(self:^IObject) -> []VkUnionResource {
+@private GetUniformResources_AnimateImage :: #force_inline proc(self:^IObject) -> []VkUnionResource {
     res := mem.make_non_zeroed([]VkUnionResource, 5, context.temp_allocator)
     res[0] = &self.matUniform
     res[1] = &self.camera.matUniform
@@ -278,7 +278,7 @@ IObject_Init2 :: proc(self:^IObject, $actualType:typeid,
     return res[:]
 }
 
-@private __GetUniformResources_TileImage :: #force_inline proc(self:^IObject) -> []VkUnionResource {
+@private GetUniformResources_TileImage :: #force_inline proc(self:^IObject) -> []VkUnionResource {
     res := mem.make_non_zeroed([]VkUnionResource, 5, context.temp_allocator)
     res[0] = &self.matUniform
     res[1] = &self.camera.matUniform
@@ -290,7 +290,7 @@ IObject_Init2 :: proc(self:^IObject, $actualType:typeid,
     return res[:]
 }
 
-@private __GetUniformResources_Default :: #force_inline proc(self:^IObject) -> []VkUnionResource {
+@private GetUniformResources_Default :: #force_inline proc(self:^IObject) -> []VkUnionResource {
     res := mem.make_non_zeroed([]VkUnionResource, 4, context.temp_allocator)
     res[0] = &self.matUniform
     res[1] = &self.camera.matUniform
@@ -320,7 +320,7 @@ IObject_UpdateTransform :: proc(self:^IObject, pos:linalg.Point3DF, rotation:f32
             resourceUsage = .CPU,
         }, mem.ptr_to_bytes(&self.mat), true)
 
-        resources := __GetUniformResources(self)
+        resources := GetUniformResources(self)
         defer delete(resources, context.temp_allocator)
         __IObject_UpdateUniform(self, resources)
     } else {
@@ -338,7 +338,7 @@ IObject_UpdateTransformMatrixRaw :: proc(self:^IObject, _mat:linalg.Matrix) {
             resourceUsage = .CPU,
         }, mem.ptr_to_bytes(&self.mat), true)
 
-        resources := __GetUniformResources(self)
+        resources := GetUniformResources(self)
         defer delete(resources, context.temp_allocator)
         __IObject_UpdateUniform(self, resources)
     } else {
@@ -356,7 +356,7 @@ IObject_UpdateTransformMatrix :: proc(self:^IObject) {
             resourceUsage = .CPU,
         }, mem.ptr_to_bytes(&self.mat), true)
 
-        resources := __GetUniformResources(self)
+        resources := GetUniformResources(self)
         defer delete(resources, context.temp_allocator)
         __IObject_UpdateUniform(self, resources)
     } else {
@@ -367,17 +367,17 @@ IObject_UpdateTransformMatrix :: proc(self:^IObject) {
 IObject_ChangeColorTransform :: proc(self:^IObject, colorTransform:^ColorTransform) {
     mem.ICheckInit_Check(&self.checkInit)
     self.colorTransform = colorTransform
-    __IObject_UpdateUniform(self, __GetUniformResources(self))
+    __IObject_UpdateUniform(self, GetUniformResources(self))
 }
 IObject_UpdateCamera :: proc(self:^IObject, camera:^Camera) {
     mem.ICheckInit_Check(&self.checkInit)
     self.camera = camera
-    __IObject_UpdateUniform(self, __GetUniformResources(self))
+    __IObject_UpdateUniform(self, GetUniformResources(self))
 }
 IObject_UpdateProjection :: proc(self:^IObject, projection:^Projection) {
     mem.ICheckInit_Check(&self.checkInit)
     self.projection = projection
-    __IObject_UpdateUniform(self, __GetUniformResources(self))
+    __IObject_UpdateUniform(self, GetUniformResources(self))
 }
 IObject_GetColorTransform :: #force_inline proc "contextless" (self:^IObject) -> ^ColorTransform {
     mem.ICheckInit_Check(&self.checkInit)

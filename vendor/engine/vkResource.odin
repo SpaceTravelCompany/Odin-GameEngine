@@ -14,54 +14,6 @@ VkSize :: vk.DeviceSize
 VkResourceRange :: rawptr
 
 
-TextureType :: enum {
-    TEX2D,
-   // TEX3D,
-}
-TextureUsage :: enum {
-    IMAGE_RESOURCE,
-    FRAME_BUFFER,
-    __INPUT_ATTACHMENT,
-    __TRANSIENT_ATTACHMENT,
-    __STORAGE_IMAGE,
-}
-TextureUsages :: bit_set[TextureUsage]
-
-
-TextureCreateOption :: struct {
-    len:u32,
-    width:u32,
-    height:u32,
-    type:TextureType,
-    textureUsage:TextureUsages,
-    resourceUsage:ResourceUsage,
-    format:TextureFmt,
-    samples:u8,
-    single:bool,
-    useGCPUMem:bool,
-}
-
-BufferType :: enum {
-    VERTEX,
-    INDEX,
-    UNIFORM,
-    STORAGE,
-    __STAGING
-}
-
-BufferCreateOption :: struct {
-    len:VkSize,
-    type:BufferType,
-    resourceUsage:ResourceUsage,
-    single:bool,
-    useGCPUMem:bool,
-}
-
-
-VkUnionResource :: union #no_nil {
-    ^VkBufferResource,
-    ^VkTextureResource
-}
 VkBaseResource :: struct {
     data : VkResourceData,
     gUniformIndices : [4]vk.DeviceSize,

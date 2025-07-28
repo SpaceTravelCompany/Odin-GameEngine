@@ -49,7 +49,7 @@ camera:^Camera, projection:^Projection,  rotation:f32 = 0.0, scale:linalg.PointF
     if self.vtable.Draw == nil do self.vtable.Draw = auto_cast _Super_Shape_Draw
     if self.vtable.Deinit == nil do self.vtable.Deinit = auto_cast _Super_Shape_Deinit
 
-    self.vtable.__GetUniformResources = auto_cast __GetUniformResources_Default
+    if self.vtable.GetUniformResources == nil do self.vtable.GetUniformResources = auto_cast GetUniformResources_Default
 
     IObject_Init(self, actualType, pos, rotation, scale, camera, projection, colorTransform, pivot)
 }
@@ -67,7 +67,7 @@ camera:^Camera, projection:^Projection, colorTransform:^ColorTransform = nil, vt
     if self.vtable.Draw == nil do self.vtable.Draw = auto_cast _Super_Shape_Draw
     if self.vtable.Deinit == nil do self.vtable.Deinit = auto_cast _Super_Shape_Deinit
 
-    self.vtable.__GetUniformResources = auto_cast __GetUniformResources_Default
+    if self.vtable.GetUniformResources == nil do self.vtable.GetUniformResources = auto_cast GetUniformResources_Default
 
     IObject_Init2(self, actualType, camera, projection, colorTransform)
 }

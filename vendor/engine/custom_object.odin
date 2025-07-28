@@ -145,6 +145,13 @@ custom_object_pipeline_init :: proc(self:^custom_object_pipeline,
     shader_vkflags := [?]vk.ShaderStageFlags{{.VERTEX}, {.FRAGMENT}, {.GEOMETRY}}
     shader_res : [len(shaders)]shaderc.compilationResultT
     shader_modules : [len(shaders)]vk.ShaderModule
+    defer {
+        for s in shader_modules {
+            if s != 0 {
+                vk.DestroyShaderModule(vkDevice, s, nil)
+            }
+        }
+    }
 
     if vertex_shader == nil || pixel_shader == nil {
         trace.panic_log("custom_object_pipeline_init: vertex_shader and pixel_shader cannot be nil")
@@ -238,6 +245,7 @@ custom_object_pipeline_init :: proc(self:^custom_object_pipeline,
 		trace.printlnLog("custom_object_pipeline_init: Failed to create graphics pipeline:", res)
         return false
 	}
+
     return true
 }
 
@@ -266,11 +274,71 @@ custom_object_init :: proc(self:^custom_object, $actualType:typeid,
 
     self.vtable = vtable == nil ? &custom_object_VTable : vtable
     if self.vtable.Draw == nil do self.vtable.Draw = auto_cast _super_custom_object_draw
-    if self.vtable.Deinit == nil do self.vtable.Deinit = auto_cast _super_custom_object_pipeline_deinit
+    if self.vtable.Deinit == nil do self.vtable.Deinit = auto_cast _super_custom_object_deinit
 
-    self.vtable.__GetUniformResources = auto_cast __GetUniformResources_Default
+    if self.vtable.GetUniformResources == nil do self.vtable.GetUniformResources = auto_cast GetUniformResources_Default
 
     IObject_Init(self, actualType, pos, rotation, scale, camera, projection, colorTransform, pivot)
+}
+
+VkUnionResource :: union #no_nil {
+    ^BufferResource,
+    ^TextureResource
+}
+BufferResource :: VkBufferResource
+TextureResource :: VkTextureResource
+CreateBufferResource :: #force_inline proc(self:^BufferResource, option:BufferCreateOption, data:[]byte, isCopy:bool, allocator:Maybe(runtime.Allocator) = nil) {
+    VkBufferResource_CreateBuffer(self, option, data, isCopy, allocator)
+}
+BufferResource_CopyUpdate :: #force_inline proc(self:^BufferResource, data:^$T, allocator:Maybe(runtime.Allocator) = nil) {
+    VkBufferResource_CopyUpdate(self, data, allocator)
+}
+BufferResource_Deinit :: #force_inline proc(self:^BufferResource) {
+    VkBufferResource_Deinit(self)
+}
+
+
+TextureType :: enum {
+    TEX2D,
+   // TEX3D,
+}
+TextureUsage :: enum {
+    IMAGE_RESOURCE,
+    FRAME_BUFFER,
+    __INPUT_ATTACHMENT,
+    __TRANSIENT_ATTACHMENT,
+    __STORAGE_IMAGE,
+}
+TextureUsages :: bit_set[TextureUsage]
+
+
+TextureCreateOption :: struct {
+    len:u32,
+    width:u32,
+    height:u32,
+    type:TextureType,
+    textureUsage:TextureUsages,
+    resourceUsage:ResourceUsage,
+    format:TextureFmt,
+    samples:u8,
+    single:bool,
+    useGCPUMem:bool,
+}
+
+BufferType :: enum {
+    VERTEX,
+    INDEX,
+    UNIFORM,
+    STORAGE,
+    __STAGING
+}
+
+BufferCreateOption :: struct {
+    len:VkSize,
+    type:BufferType,
+    resourceUsage:ResourceUsage,
+    single:bool,
+    useGCPUMem:bool,
 }
 
 _super_custom_object_deinit :: proc(self:^custom_object) {
