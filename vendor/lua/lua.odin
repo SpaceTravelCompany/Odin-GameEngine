@@ -486,7 +486,8 @@ luaL_getmetatable :: proc (L:^ lua_State,n:cstring)
 	} else when ODIN_OS == .Windows {
 		stdout := windows.GetStdHandle(windows.STD_OUTPUT_HANDLE)
 		wr : windows.DWORD
-		res := windows.WriteFile(stdout, ptr, size, &wr, nil)
+		// TODO(xfitgd) : 64bit writefile
+		res := windows.WriteFile(stdout, ptr, auto_cast size, &wr, nil)
 
 		if !res {
 			trace.panic_log(windows.GetLastError())

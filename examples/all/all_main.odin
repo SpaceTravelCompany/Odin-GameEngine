@@ -155,15 +155,5 @@ package all
 
 main :: proc() {}
 
-@(require) import geometry "vendor:engine/geometry"
 @(require) import poly2tri "core:math/poly2tri"
 @(require) import collision "core:math/collision"
-
-
-//engine
-
-@(require) import engine "vendor:engine"
-@(require) import components "vendor:engine/components"
-@(require) import font "vendor:engine/font"
-@(require) import gui "vendor:engine/gui"
-@(require) import sound "vendor:engine/sound"

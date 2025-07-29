@@ -3,7 +3,7 @@ package all
 
 // @(require) import "vendor:cgltf"
 //@(require) import "vendor:ENet"
-@(require) import "vendor:OpenEXRCore"
+//@(require) import "vendor:OpenEXRCore"
 //@(require) import "vendor:ggpo"
 @(require) import "vendor:OpenGL"
 @(require) import "vendor:glfw"
@@ -48,6 +48,9 @@ package all
 // @(require) import "vendor:stb/truetype"
 // @(require) import "vendor:stb/vorbis"
 
+@(require) import "vendor:shaderc"
+@(require) import "vendor:gltf2"
+
 //engine
 
 @(require) import engine "vendor:engine"
@@ -55,3 +58,4 @@ package all
 @(require) import font "vendor:engine/font"
 @(require) import gui "vendor:engine/gui"
 @(require) import sound "vendor:engine/sound"
+@(require) import geometry "vendor:engine/geometry"
