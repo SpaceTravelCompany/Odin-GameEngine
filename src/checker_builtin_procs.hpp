@@ -61,6 +61,7 @@ enum BuiltinProcId {
 	BuiltinProc_trap,
 	BuiltinProc_debug_trap,
 	BuiltinProc_read_cycle_counter,
+	BuiltinProc_read_cycle_counter_frequency,
 
 	BuiltinProc_count_ones,
 	BuiltinProc_count_zeros,
@@ -225,6 +226,7 @@ BuiltinProc__simd_end,
 	BuiltinProc_x86_cpuid,
 	BuiltinProc_x86_xgetbv,
 
+
 	// Constant type tests
 
 BuiltinProc__type_begin,
@@ -262,6 +264,7 @@ BuiltinProc__type_simple_boolean_begin,
 	BuiltinProc_type_is_sliceable,
 	BuiltinProc_type_is_comparable,
 	BuiltinProc_type_is_simple_compare, // easily compared using memcmp
+	BuiltinProc_type_is_nearly_simple_compare, // easily compared using memcmp (including floats)
 	BuiltinProc_type_is_dereferenceable,
 	BuiltinProc_type_is_valid_map_key,
 	BuiltinProc_type_is_valid_matrix_elements,
@@ -421,6 +424,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("trap"),               0, false, Expr_Expr, BuiltinProcPkg_intrinsics, /*diverging*/true},
 	{STR_LIT("debug_trap"),         0, false, Expr_Stmt, BuiltinProcPkg_intrinsics, /*diverging*/false},
 	{STR_LIT("read_cycle_counter"), 0, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("read_cycle_counter_frequency"), 0, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("count_ones"),           1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("count_zeros"),          1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
@@ -618,6 +622,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("type_is_sliceable"),         1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_comparable"),        1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_simple_compare"),    1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("type_is_nearly_simple_compare"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_dereferenceable"),   1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_valid_map_key"),     1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_valid_matrix_elements"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
