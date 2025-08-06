@@ -390,6 +390,36 @@ Texture_Init :: proc(self:^Texture, #any_int width:int, #any_int height:int, pix
     VkUpdateDescriptorSets(mem.slice_ptr(&self.set, 1))
 }
 
+Texture_InitGrey :: proc(self:^Texture, #any_int width:int, #any_int height:int, pixels:[]byte, sampler:vk.Sampler = 0, resourceUsage:ResourceUsage = .GPU) {
+    mem.ICheckInit_Init(&self.checkInit)
+    self.sampler = sampler == 0 ? vkLinearSampler : sampler
+    self.set.bindings = __singlePoolBinding[:]
+    self.set.size = __singleSamplerPoolSizes[:]
+    self.set.layout = vkTexDescriptorSetLayout2
+    self.set.__set = 0
+
+    allocPixels := mem.make_non_zeroed_slice([]byte, width * height, engineDefAllocator)
+    mem.copy_non_overlapping(&allocPixels[0], &pixels[0], len(pixels))
+   
+    VkBufferResource_CreateTexture(&self.texture, {
+        width = auto_cast width,
+        height = auto_cast height,
+        useGCPUMem = false,
+        format = .R8Unorm,
+        samples = 1,
+        len = 1,
+        textureUsage = {.IMAGE_RESOURCE},
+        type = .TEX2D,
+        resourceUsage = resourceUsage,
+        single = false,
+    }, self.sampler, allocPixels, false, engineDefAllocator)
+
+    self.set.__resources = mem.make_non_zeroed_slice([]VkUnionResource, 1, vkTempArenaAllocator)
+    self.set.__resources[0] = &self.texture
+    VkUpdateDescriptorSets(mem.slice_ptr(&self.set, 1))
+}
+
+
 //sampler nil default //TODO (xfitgd)
 // Texture_InitR8 :: proc(self:^Texture, #any_int width:int, #any_int height:int) {
 //     mem.ICheckInit_Init(&self.checkInit)
