@@ -521,7 +521,7 @@ initSwapChain :: proc() {
 	}
 }
 
-vkCreateSwapChainAndImageViews :: proc() {
+vkCreateSwapChainAndImageViews :: proc() -> bool {
 	vk.GetPhysicalDeviceSurfaceCapabilitiesKHR(vkPhysicalDevice, vkSurface, &vkSurfaceCap)
 
 	if(vkSurfaceCap.currentExtent.width == max(u32)) {
@@ -532,7 +532,7 @@ vkCreateSwapChainAndImageViews :: proc() {
 	vkExtent_rotation = vkExtent
 
 	if vkExtent.width == 0 || vkExtent.height == 0 {
-		return
+		return false
 	}
 	
 	if is_mobile {
@@ -648,7 +648,9 @@ vkCreateSwapChainAndImageViews :: proc() {
 	}
 
 	res := vk.CreateSwapchainKHR(vkDevice, &swapChainCreateInfo, nil, &vkSwapchain)
-	if res != .SUCCESS do trace.panic_log("res = vk.CreateSwapchainKHR(vkDevce, &swapChainCreateInfo, nil, &vkSwapchain) : ", res)
+	if res != .SUCCESS {
+		return false
+	}
 
 	vk.GetSwapchainImagesKHR(vkDevice, vkSwapchain, &__swapImgCnt, nil)
 	swapImgs:= mem.make_non_zeroed([]vk.Image, __swapImgCnt, context.temp_allocator)
@@ -718,6 +720,8 @@ vkCreateSwapChainAndImageViews :: proc() {
 		// res = vk.CreateFramebuffer(vkDevice, &frameBufferCreateInfo, nil, &vkClearFrameBuffers[i])
 		// if res != .SUCCESS do trace.panic_log("res = vk.CreateFramebuffer(vkDevice, &frameBufferCreateInfo, nil, &vkClearFrameBuffers[i]) : ", res)
 	}
+
+	return true
 } 
 
 vkStart :: proc() {
@@ -1247,7 +1251,7 @@ vkWaitPresentIdle :: proc "contextless" () {
 }
 
 vkRecreateSwapChain :: proc() {
-	if vkDevice == nil {
+	if vkDevice == nil || vkSwapchain == 0 {
 		return
 	}
 	sync.mutex_lock(&fullScreenMtx)
@@ -1263,8 +1267,7 @@ vkRecreateSwapChain :: proc() {
 	//vkCleanSyncObject()
 	vkCleanSwapChain()
 
-	vkCreateSwapChainAndImageViews()
-	if vkExtent.width == 0 || vkExtent.height == 0 {
+	if !vkCreateSwapChainAndImageViews() {
 		sync.mutex_unlock(&fullScreenMtx)
 		return
 	}
@@ -1379,6 +1382,7 @@ vkDrawFrame :: proc() {
 
 	vkOpExecute(true)
 
+	if vkSwapchain == 0 do return
 	if vkExtent.width <= 0 || vkExtent.height <= 0 {
 		vkRecreateSwapChain()
 		frame = 0

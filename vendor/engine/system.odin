@@ -398,4 +398,10 @@ Windows_SetResIcon :: proc "contextless" (icon_resource_number:int) {
 		windows.SendMessageW(hWnd, windows.WM_SETICON, 0, icon)
 	}
 }
-	
+
+exit :: proc "contextless" () {
+	when is_mobile {
+	} else {
+		glfwDestroy()
+	}
+}

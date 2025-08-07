@@ -237,13 +237,12 @@ glfwSystemStart :: proc() {
     glfw.SetMonitorCallback(glfwMonitorProc)
 }
 
-glfwDestroy :: proc() {
+glfwDestroy :: proc "contextless" () {
     when !is_console {
-        if wnd != nil do glfw.DestroyWindow(wnd)
-        wnd = nil
+        if wnd != nil do glfw.SetWindowShouldClose(wnd, true)
+        //!glfw.DestroyWindow(wnd) 를 쓰지 않는다 왜냐하면 윈도우만 종료되고 윈도우 루프를 빠져나가지 않는다.
     }
 }
-
 
 glfwSystemDestroy :: proc() {
     delete(glfwMonitors)
@@ -366,7 +365,12 @@ glfwLoop :: proc() {
         RenderLoop()
     }
     exiting = true
+    wnd = nil
    // thread.join(render_th)
+}
+
+glfwGetWindow :: proc "contextless" () -> glfw.WindowHandle {
+    return wnd
 }
 
 }
