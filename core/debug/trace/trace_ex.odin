@@ -14,18 +14,22 @@ import "core:sys/android"
 
 LOG_FILE_NAME: string = "odin_log.log"
 
-@(init, private) init_trace :: proc() {
+@(init, private) init_trace :: proc "contextless" () {
 	when !is_android {
 		sync.mutex_lock(&gTraceMtx)
 		defer sync.mutex_unlock(&gTraceMtx)
+
+		context = runtime.default_context()
 		init(&gTraceCtx)
 	}
 }
 
-@(fini, private) deinit_trace :: proc() {
+@(fini, private) deinit_trace :: proc "contextless" () {
 	when !is_android {
 		sync.mutex_lock(&gTraceMtx)
 		defer sync.mutex_unlock(&gTraceMtx)
+
+		context = runtime.default_context()
 		destroy(&gTraceCtx)
 	}
 }

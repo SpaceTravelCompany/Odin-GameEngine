@@ -146,7 +146,7 @@ glfwVulkanStart :: proc "contextless" () {
 
     when is_log {
         printf(
-            "XFIT SYSLOG : ADD %s monitor name: %s, x:%d, y:%d, size.x:%d, size.y:%d, refleshrate%d\n",
+            "XFIT SYSLOG : ADD %s monitor name: %s, x:%d, y:%d, size.x:%d, size.y:%d, refleshrate:%d\n",
             "primary" if info.isPrimary else "",
             info.name,
             info.rect.pos.x,

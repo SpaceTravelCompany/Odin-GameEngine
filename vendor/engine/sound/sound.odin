@@ -123,10 +123,12 @@ Sound_Deinit :: proc(self:^Sound) {
     sync.sema_post(&gSema)
 }
 
-@(fini, private) g_deinit :: proc() {
+@(fini, private) g_deinit :: proc "contextless" () {
     if !intrinsics.atomic_load_explicit(&started, .Acquire) do return
     intrinsics.atomic_store_explicit(&started, false, .Release)
     sync.sema_post(&gSema)
+    
+    context = runtime.default_context()
     thread.join(gThread)
 
     miniaudio.engine_uninit(&miniaudio_engine)
