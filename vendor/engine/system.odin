@@ -322,10 +322,9 @@ when is_android {
 // 	vkDestory()
 // }
 
-@(private) RenderLoop :: proc() {
+@private CalcFrameTime :: proc(Paused_: bool) {
 	@static start:time.Time
 	@static now:time.Time
-	Paused_ := Paused()
 
 	if !loopStart {
 		loopStart = true
@@ -350,6 +349,13 @@ when is_android {
 		now = n
 		deltaTime = auto_cast delta
 	}
+}
+
+@(private) RenderLoop :: proc() {
+	Paused_ := Paused()
+
+	CalcFrameTime(Paused_)
+	
 	Update()
 	if gMainRenderCmdIdx >= 0 {
 		for obj in gRenderCmd[gMainRenderCmdIdx].scene {

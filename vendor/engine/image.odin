@@ -40,28 +40,16 @@ TileTextureArray :: struct {
 
 Image :: struct {
     using _:IObject,
-    using _: __ImageIn,
-}
-
-@private __ImageIn :: struct {
     src: ^Texture,
 }
 
 AnimateImage :: struct {
     using _:ianimate_object,
-    using _: __AnimateImageIn,
-}
-
-@private __AnimateImageIn :: struct {
     src: ^TextureArray,
 }
 
 TileImage :: struct {
     using object:IObject,
-    using _: __TileImageIn,
-}
-
-__TileImageIn :: struct {
     tileUniform:VkBufferResource,
     tileIdx:u32,
     src: ^TileTextureArray,

@@ -188,8 +188,6 @@ glfwSystemInit :: proc() {
 		//TODO (xfitgd)
 	}
 
-    
-
     when is_log do glfw.SetErrorCallback(glfwErrorCallback)
 }
 
