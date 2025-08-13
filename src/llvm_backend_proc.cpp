@@ -985,6 +985,7 @@ gb_internal lbValue lb_emit_call_internal(lbProcedure *p, lbValue value, lbValue
 gb_internal lbValue lb_lookup_runtime_procedure(lbModule *m, String const &name) {
 	AstPackage *pkg = m->info->runtime_package;
 	Entity *e = scope_lookup_current(pkg->scope, name);
+	GB_ASSERT_MSG(e != nullptr, "Runtime procedure not found: %s", name);
 	return lb_find_procedure_value_from_entity(m, e);
 }
 
@@ -3301,16 +3302,22 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 			}
 			GB_ASSERT(name != nullptr);
 
-			LLVMTypeRef types[1] = {lb_type(p->module, platform_type)};
 			lbValue res = {};
+			res.type = platform_type;
 
-			LLVMValueRef args[3] = {
+			if (id == BuiltinProc_fixed_point_div ||
+			    id == BuiltinProc_fixed_point_div_sat) {
+				res.value = lb_integer_division_intrinsics(p, x.value, y.value, scale.value, platform_type, name);
+			} else {
+				LLVMTypeRef types[1] = {lb_type(p->module, platform_type)};
+
+				LLVMValueRef args[3] = {
 					x.value,
 					y.value,
 					scale.value };
 
-			res.value = lb_call_intrinsic(p, name, args, gb_count_of(args), types, gb_count_of(types));
-			res.type = platform_type;
+				res.value = lb_call_intrinsic(p, name, args, gb_count_of(args), types, gb_count_of(types));
+			}
 			return lb_emit_conv(p, res, tv.type);
 		}
 
@@ -3746,6 +3753,7 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 	case BuiltinProc_objc_register_selector: return lb_handle_objc_register_selector(p, expr);
 	case BuiltinProc_objc_register_class:    return lb_handle_objc_register_class(p, expr);
 	case BuiltinProc_objc_ivar_get:          return lb_handle_objc_ivar_get(p, expr);
+	case BuiltinProc_objc_block:             return lb_handle_objc_block(p, expr);
 
 
 	case BuiltinProc_constant_utf16_cstring:

@@ -565,6 +565,26 @@ gb_internal u64 check_feature_flags(CheckerContext *c, Ast *node) {
 	return 0;
 }
 
+gb_internal u64 check_feature_flags(Entity *e) {
+	if (e == nullptr) {
+		return 0;
+	}
+	AstFile *file = nullptr;
+	if (e->file == nullptr) {
+		file = e->file;
+	}
+	if (file == nullptr) {
+		if (e->decl_info && e->decl_info->decl_node) {
+			file = e->decl_info->decl_node->file();
+		}
+	}
+	if (file != nullptr && file->feature_flags_set) {
+		return file->feature_flags;
+	}
+	return 0;
+}
+
+
 
 enum VettedEntityKind {
 	VettedEntity_Invalid,
@@ -1460,6 +1480,10 @@ gb_internal void destroy_checker_info(CheckerInfo *i) {
 	mpsc_destroy(&i->foreign_decls_to_check);
 
 	map_destroy(&i->objc_msgSend_types);
+	string_set_destroy(&i->obcj_class_name_set);
+	mpsc_destroy(&i->objc_class_implementations);
+	map_destroy(&i->objc_method_implementations);
+
 	string_map_destroy(&i->load_file_cache);
 	string_map_destroy(&i->load_directory_cache);
 	map_destroy(&i->load_directory_map);
@@ -2671,6 +2695,15 @@ gb_internal void generate_minimum_dependency_set_internal(Checker *c, Entity *st
 					is_init = false;
 				}
 
+				u64 feature_flags = check_feature_flags(e);
+				if ((feature_flags & OptInFeatureFlag_GlobalContext) == 0) {
+					if (t->Proc.calling_convention != ProcCC_Contextless) {
+						ERROR_BLOCK();
+						error(e->token, "@(init) procedures must be declared as \"contextless\"");
+						error_line("\tSuggestion: this can be bypassed, for the time being, with '#+feature global-context'");
+					}
+				}
+
 				if ((e->scope->flags & (ScopeFlag_File|ScopeFlag_Pkg)) == 0) {
 					error(e->token, "@(init) procedures must be declared at the file scope");
 					is_init = false;
@@ -2684,6 +2717,7 @@ gb_internal void generate_minimum_dependency_set_internal(Checker *c, Entity *st
 				if (is_blank_ident(e->token)) {
 					error(e->token, "An @(init) procedure must not use a blank identifier as its name");
 				}
+
 
 				if (is_init) {
 					add_dependency_to_set(c, e);
@@ -2700,6 +2734,15 @@ gb_internal void generate_minimum_dependency_set_internal(Checker *c, Entity *st
 					error(e->token, "@(fini) procedures must have a signature type with no parameters nor results, got %s", str);
 					gb_string_free(str);
 					is_fini = false;
+				}
+
+				u64 feature_flags = check_feature_flags(e);
+				if ((feature_flags & OptInFeatureFlag_GlobalContext) == 0) {
+					if (t->Proc.calling_convention != ProcCC_Contextless) {
+						ERROR_BLOCK();
+						error(e->token, "@(fini) procedures must be declared as \"contextless\"");
+						error_line("\tSuggestion: this can be bypassed, for the time being, with '#+feature global-context'");
+					}
 				}
 
 				if ((e->scope->flags & (ScopeFlag_File|ScopeFlag_Pkg)) == 0) {
