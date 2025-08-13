@@ -28,13 +28,13 @@ image_converter_deinit :: proc (self:^$T) where T == webp_converter || T == qoi_
     when T == webp_converter {
         webp_converter_deinit(self)
     } else {
-        if self.__in.img != nil {
-            if self.__in.img.pixels.buf != nil {
-                image.destroy(self.__in.img, self.__in.allocator)
+        if self.img != nil {
+            if self.img.pixels.buf != nil {
+                image.destroy(self.img, self.allocator)
             } else {
-                free(self.__in.img, self.__in.allocator)
+                free(self.img, self.allocator)
             }
-            self.__in.img = nil
+            self.img = nil
         }
     }
 }

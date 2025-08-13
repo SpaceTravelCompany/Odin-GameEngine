@@ -10,32 +10,29 @@ import "core:bytes"
 import "core:os/os2"
 import "core:sys/android"
 
-@private qoi_converter_in :: struct {
+
+qoi_converter :: struct {
     img : ^image.Image,
     allocator:runtime.Allocator,
 }
 
-qoi_converter :: struct {
-    __in : qoi_converter_in,
-}
-
 qoi_converter_width :: proc "contextless" (self:^qoi_converter) -> int {
-    if self.__in.img != nil {
-        return self.__in.img.width
+    if self.img != nil {
+        return self.img.width
     }
     return -1
 }
 
 qoi_converter_height :: proc "contextless" (self:^qoi_converter) -> int {
-    if self.__in.img != nil {
-        return self.__in.img.height
+    if self.img != nil {
+        return self.img.height
     }
     return -1
 }
 
 qoi_converter_size :: proc "contextless" (self:^qoi_converter) -> int {
-    if self.__in.img != nil {
-        return (self.__in.img.depth >> 3) * self.__in.img.width * self.__in.img.height
+    if self.img != nil {
+        return (self.img.depth >> 3) * self.img.width * self.img.height
     }
     return -1
 }
@@ -47,19 +44,19 @@ qoi_converter_load :: proc (self:^qoi_converter, data:[]byte, out_fmt:color_fmt,
 
     err : image.Error = nil
     #partial switch out_fmt {
-        case .RGBA, .RGBA16: self.__in.img, err = qoi.load_from_bytes(data, qoi.Options{.alpha_add_if_missing}, allocator = allocator)
-        case .RGB, .RGB16: self.__in.img, err = qoi.load_from_bytes(data, qoi.Options{.alpha_drop_if_present}, allocator = allocator)
-        case .Unknown: self.__in.img, err = qoi.load_from_bytes(data, allocator = allocator)
+        case .RGBA, .RGBA16: self.img, err = qoi.load_from_bytes(data, qoi.Options{.alpha_add_if_missing}, allocator = allocator)
+        case .RGB, .RGB16: self.img, err = qoi.load_from_bytes(data, qoi.Options{.alpha_drop_if_present}, allocator = allocator)
+        case .Unknown: self.img, err = qoi.load_from_bytes(data, allocator = allocator)
         case : trace.panic_log("unsupport option")
     }
     
-    self.__in.allocator = allocator
+    self.allocator = allocator
 
     if err != nil {
         return nil, err
     }
     
-    out_data := bytes.buffer_to_bytes(&self.__in.img.pixels)
+    out_data := bytes.buffer_to_bytes(&self.img.pixels)
   
     return out_data, err
 }
@@ -99,12 +96,12 @@ qoi_converter_encode :: proc (self:^qoi_converter, data:[]byte, in_fmt:color_fmt
     qoi_converter_deinit(self)
 
     ok:bool
-    self.__in.img = new(image.Image, context.temp_allocator)
+    self.img = new(image.Image, context.temp_allocator)
     defer if !ok {
-        free(self.__in.img, context.temp_allocator)
-        self.__in.img = nil
+        free(self.img, context.temp_allocator)
+        self.img = nil
     } else {
-        self.__in.img.pixels = {}
+        self.img.pixels = {}
     }
 
     s := transmute(runtime.Raw_Slice)data
@@ -112,27 +109,27 @@ qoi_converter_encode :: proc (self:^qoi_converter, data:[]byte, in_fmt:color_fmt
     #partial switch in_fmt {
         case .RGBA: 
             if s.len % 4 != 0 do return nil, .Encode_Size_Mismatch
-            self.__in.img^, ok = image.pixels_to_image((cast([^][4]byte)s.data)[:s.len / 4], width, height)
+            self.img^, ok = image.pixels_to_image((cast([^][4]byte)s.data)[:s.len / 4], width, height)
         case .RGBA16:
             if s.len % 8 != 0 do return nil, .Encode_Size_Mismatch
-            self.__in.img^, ok = image.pixels_to_image((cast([^][4]u16)s.data)[:s.len / 8], width, height)
+            self.img^, ok = image.pixels_to_image((cast([^][4]u16)s.data)[:s.len / 8], width, height)
         case .RGB:
             if s.len % 3 != 0 do return nil, .Encode_Size_Mismatch
-            self.__in.img^, ok = image.pixels_to_image((cast([^][3]byte)s.data)[:s.len / 3], width, height)
+            self.img^, ok = image.pixels_to_image((cast([^][3]byte)s.data)[:s.len / 3], width, height)
         case .RGB16:
             if s.len % 6 != 0 do return nil, .Encode_Size_Mismatch
-            self.__in.img^, ok = image.pixels_to_image((cast([^][3]u16)s.data)[:s.len / 6], width, height)
+            self.img^, ok = image.pixels_to_image((cast([^][3]u16)s.data)[:s.len / 6], width, height)
         case : trace.panic_log("unsupport option")
     }
 
    
     if !ok do return nil, .Encode_Size_Mismatch
     
-    self.__in.allocator = allocator
+    self.allocator = allocator
     
 
     out:bytes.Buffer
-    err : image.Error = qoi.save_to_buffer(&out, self.__in.img, allocator = allocator)
+    err : image.Error = qoi.save_to_buffer(&out, self.img, allocator = allocator)
     if err != nil {
         ok = false
         return nil, err

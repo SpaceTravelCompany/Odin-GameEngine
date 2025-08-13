@@ -13,58 +13,55 @@ import "vendor:webp"
     webp.WebPAnimDecoderOptions,
 }
 
-@private webp_converter_in :: struct {
+webp_converter :: struct {
     anim_dec:^webp.WebPAnimDecoder,
     anim_info:webp.WebPAnimInfo,
     out_fmt:color_fmt,
     config:webp_config,
     allocator:runtime.Allocator,
 }
-webp_converter :: struct {
-    __in : webp_converter_in,
-}
 
 webp_converter_width :: proc "contextless" (self:^webp_converter) -> int {
-    if self.__in.config != nil {
-        switch &t in self.__in.config {
+    if self.config != nil {
+        switch &t in self.config {
         case webp.WebPDecoderConfig:
             return auto_cast t.input.width
         case webp.WebPAnimDecoderOptions:
-            return auto_cast self.__in.anim_info.canvas_width
+            return auto_cast self.anim_info.canvas_width
         }
     }
     return -1
 }
 
 webp_converter_height :: proc "contextless" (self:^webp_converter) -> int {
-    if self.__in.config != nil {
-        switch &t in self.__in.config {
+    if self.config != nil {
+        switch &t in self.config {
         case webp.WebPDecoderConfig:
             return auto_cast t.input.height
         case webp.WebPAnimDecoderOptions:
-            return auto_cast self.__in.anim_info.canvas_height
+            return auto_cast self.anim_info.canvas_height
         }
     }
     return -1
 }
 
 webp_converter_size :: proc "contextless" (self:^webp_converter) -> int {
-    if self.__in.config != nil {
-        switch &t in self.__in.config {
+    if self.config != nil {
+        switch &t in self.config {
         case webp.WebPDecoderConfig:
-            return int(t.input.height * t.input.width) * (color_fmt_bit(self.__in.out_fmt) >> 3)
+            return int(t.input.height * t.input.width) * (color_fmt_bit(self.out_fmt) >> 3)
         case webp.WebPAnimDecoderOptions:
-            return int(self.__in.anim_info.canvas_height * self.__in.anim_info.canvas_width * self.__in.anim_info.frame_count) * (color_fmt_bit(self.__in.out_fmt) >> 3)
+            return int(self.anim_info.canvas_height * self.anim_info.canvas_width * self.anim_info.frame_count) * (color_fmt_bit(self.out_fmt) >> 3)
         }
     }
     return -1
 }
 
 webp_converter_frame_cnt :: proc "contextless" (self:^webp_converter) -> int {
-    if self.__in.config != nil {
-        switch &t in self.__in.config {
+    if self.config != nil {
+        switch &t in self.config {
         case webp.WebPAnimDecoderOptions:
-            return auto_cast self.__in.anim_info.frame_count
+            return auto_cast self.anim_info.frame_count
         case webp.WebPDecoderConfig:
             return 1
         }
@@ -73,14 +70,14 @@ webp_converter_frame_cnt :: proc "contextless" (self:^webp_converter) -> int {
 }
 
 webp_converter_deinit :: proc (self:^webp_converter) {
-    if self.__in.config != nil {
-        switch &t in self.__in.config {
+    if self.config != nil {
+        switch &t in self.config {
         case webp.WebPDecoderConfig:
             webp.WebPFreeDecBuffer(&(t.output))
-            self.__in.config = nil
+            self.config = nil
         case webp.WebPAnimDecoderOptions:
-            webp.WebPAnimDecoderDelete(self.__in.anim_dec)
-            self.__in.config = nil
+            webp.WebPAnimDecoderDelete(self.anim_dec)
+            self.config = nil
         }
     }
 }
@@ -92,14 +89,14 @@ webp_converter_load :: proc (self:^webp_converter, data:[]byte, out_fmt:color_fm
     animOp:^webp.WebPAnimDecoderOptions
 
     anim_load: {   
-        self.__in.config = webp.WebPAnimDecoderOptions{}
-        webp.WebPAnimDecoderOptionsInit(&self.__in.config.(webp.WebPAnimDecoderOptions))
+        self.config = webp.WebPAnimDecoderOptions{}
+        webp.WebPAnimDecoderOptionsInit(&self.config.(webp.WebPAnimDecoderOptions))
 
         wData := webp.WebPData{
             bytes = &data[0],
             size = len(data),
         }
-        animOp = &self.__in.config.(webp.WebPAnimDecoderOptions)
+        animOp = &self.config.(webp.WebPAnimDecoderOptions)
         #partial switch out_fmt {
             case .RGBA : animOp.color_mode = webp.CSP_MODE.RGBA
             case .ARGB : animOp.color_mode = webp.CSP_MODE.ARGB
@@ -109,24 +106,24 @@ webp_converter_load :: proc (self:^webp_converter, data:[]byte, out_fmt:color_fm
             case : trace.panic_log("unsupports decode fmt : ", out_fmt)
         }
 
-        self.__in.anim_dec = webp.WebPAnimDecoderNew(&wData, &self.__in.config.(webp.WebPAnimDecoderOptions))
-        if self.__in.anim_dec == nil {
+        self.anim_dec = webp.WebPAnimDecoderNew(&wData, &self.config.(webp.WebPAnimDecoderOptions))
+        if self.anim_dec == nil {
             errCode = .WebPAnimDecoderNew_Failed
             break anim_load
         }
 
-        webp.WebPAnimDecoderGetInfo(self.__in.anim_dec, &self.__in.anim_info)
+        webp.WebPAnimDecoderGetInfo(self.anim_dec, &self.anim_info)
     }
     
     if errCode != nil {
         //try load static image mode
-        self.__in.config = webp.WebPDecoderConfig{}
-        webp.WebPInitDecoderConfig(&self.__in.config.(webp.WebPDecoderConfig))
-        op := &self.__in.config.(webp.WebPDecoderConfig)
+        self.config = webp.WebPDecoderConfig{}
+        webp.WebPInitDecoderConfig(&self.config.(webp.WebPDecoderConfig))
+        op := &self.config.(webp.WebPDecoderConfig)
         op.options.no_fancy_upsampling = true
         errCode = webp.WebPGetFeatures(&data[0], len(data), &op.input)
         if errCode != webp.VP8StatusCode.OK {
-            self.__in.config = nil
+            self.config = nil
             return nil, errCode
         } else {
             errCode = nil
@@ -137,14 +134,14 @@ webp_converter_load :: proc (self:^webp_converter, data:[]byte, out_fmt:color_fm
         op.output.colorspace = animOp.color_mode
     }
 
-    self.__in.out_fmt = out_fmt
-    self.__in.allocator = allocator
+    self.out_fmt = out_fmt
+    self.allocator = allocator
 
     out_data := mem.make_non_zeroed_slice([]byte, webp_converter_size(self), allocator)
 
-    bit := color_fmt_bit(self.__in.out_fmt) >> 3
+    bit := color_fmt_bit(self.out_fmt) >> 3
 
-    switch &t in self.__in.config {
+    switch &t in self.config {
     case webp.WebPDecoderConfig:
         t.output.u.RGBA.rgba = &out_data[0]
         t.output.u.RGBA.stride = t.input.width * i32(bit)
@@ -161,13 +158,13 @@ webp_converter_load :: proc (self:^webp_converter, data:[]byte, out_fmt:color_fm
     case webp.WebPAnimDecoderOptions:
         idx := 0
 
-        frame_size := int(self.__in.anim_info.canvas_width * self.__in.anim_info.canvas_height) * bit
+        frame_size := int(self.anim_info.canvas_width * self.anim_info.canvas_height) * bit
 
-        for 0 < webp.WebPAnimDecoderHasMoreFrames(self.__in.anim_dec) {
+        for 0 < webp.WebPAnimDecoderHasMoreFrames(self.anim_dec) {
             timestamp : i32
             buf : [^]u8
 
-            if 0 == webp.WebPAnimDecoderGetNext(self.__in.anim_dec, &buf, &timestamp) {
+            if 0 == webp.WebPAnimDecoderGetNext(self.anim_dec, &buf, &timestamp) {
                 delete(out_data, allocator)
                 return nil, .WebPAnimDecoderGetNext_Failed
             }
