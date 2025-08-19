@@ -175,6 +175,12 @@ camera:^Camera, projection:^Projection, colorTransform:^ColorTransform = nil, pi
 
     if self.vtable.GetUniformResources == nil do self.vtable.GetUniformResources = auto_cast GetUniformResources_AnimateImage
 
+    VkBufferResource_CreateBuffer(&self.frameUniform, {
+        len = size_of(u32),
+        type = .UNIFORM,
+        resourceUsage = .CPU,
+    }, mem.ptr_to_bytes(&self.frame), true)
+
     IObject_Init(self, actualType, pos, rotation, scale, camera, projection, colorTransform, pivot)
 }
 
@@ -193,11 +199,18 @@ camera:^Camera, projection:^Projection, colorTransform:^ColorTransform = nil, vt
 
     if self.vtable.GetUniformResources == nil do self.vtable.GetUniformResources = auto_cast GetUniformResources_AnimateImage
 
+    VkBufferResource_CreateBuffer(&self.frameUniform, {
+        len = size_of(u32),
+        type = .UNIFORM,
+        resourceUsage = .CPU,
+    }, mem.ptr_to_bytes(&self.frame), true)
+
     IObject_Init2(self, actualType, camera, projection, colorTransform)
 }   
 
 _Super_AnimateImage_Deinit :: proc(self:^AnimateImage) {
-     _Super_IObject_Deinit(auto_cast self)
+    VkBufferResource_Deinit(&self.frameUniform)
+    _Super_IObject_Deinit(auto_cast self)
 }
 
 

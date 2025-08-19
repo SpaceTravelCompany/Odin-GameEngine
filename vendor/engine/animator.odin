@@ -30,7 +30,7 @@ animate_player_update :: proc (self:^animate_player, _dt:f64) {
                 animate_player_stop(self)
                 return
             }
-            self.__playing_dt -= self.target_fps
+            self.__playing_dt -= 1.0 / self.target_fps
         }
     }
 }
