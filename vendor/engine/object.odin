@@ -290,6 +290,15 @@ IObject_Init2 :: proc(self:^IObject, $actualType:typeid,
     return res[:]
 }
 
+@private GetUniformResources_Shape :: #force_inline proc(self:^IObject) -> []VkUnionResource {
+    res := mem.make_non_zeroed([]VkUnionResource, 3, context.temp_allocator)
+    res[0] = &self.matUniform
+    res[1] = &self.camera.matUniform
+    res[2] = &self.projection.matUniform
+
+    return res[:]
+}
+
 @private GetUniformResources_Default :: #force_inline proc(self:^IObject) -> []VkUnionResource {
     res := mem.make_non_zeroed([]VkUnionResource, 4, context.temp_allocator)
     res[0] = &self.matUniform
@@ -299,6 +308,7 @@ IObject_Init2 :: proc(self:^IObject, $actualType:typeid,
 
     return res[:]
 }
+
 
 @private __IObject_UpdateUniform :: #force_inline proc(self:^IObject, resources:[]VkUnionResource) {
     mem.ICheckInit_Check(&self.checkInit)

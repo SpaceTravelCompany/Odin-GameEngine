@@ -1,17 +1,14 @@
 #version 450
 
-layout(set = 0, binding = 3) uniform UniformBufferObject4 {
-    mat4 mat;
-} colormat;
-
 layout(location = 1) in vec3 inUv;
-layout(location = 2) in vec4 inColor;
 
-layout(location = 0) out vec4 outColor;
+#extension GL_EXT_debug_printf : enable
 
 void main() {
     float res = (pow(inUv.x, 3) - inUv.y * inUv.z);
+
+    //debugPrintfEXT("res %f\n", res);
     if (res <= 0) discard;
 
-    outColor = colormat.mat * vec4(inColor.rgb, inColor.a);
+   // debugPrintfEXT("pos %f %f %f\n", inUv.x, inUv.y, inUv.z);
 }

@@ -52,7 +52,6 @@ vkMSAAFrameTexture: Texture
 // vkClearFrameBuffers: []vk.Framebuffer
 
 vkMSAACount :: 4
-vkWIREMODE :: false
 
 vkFrameBufferImageViews: []vk.ImageView
 
@@ -106,7 +105,8 @@ VK_EXT_full_screen_exclusive_support :: #force_inline proc "contextless" () -> b
 
 vkShapeVertShader: vk.ShaderModule
 vkShapeFragShader: vk.ShaderModule
-vkShapeWireFragShader: vk.ShaderModule
+vkShapeQuadVertShader: vk.ShaderModule
+vkShapeQuadFragShader: vk.ShaderModule
 vkTexVertShader: vk.ShaderModule
 vkTexFragShader: vk.ShaderModule
 vkAnimateTexVertShader: vk.ShaderModule
@@ -115,12 +115,13 @@ vkAnimateTexFragShader: vk.ShaderModule
 //vkCopyScreenFragShader: vk.ShaderModule
 
 shapeShaderStages: [2]vk.PipelineShaderStageCreateInfo
-shapeWireShaderStages: [2]vk.PipelineShaderStageCreateInfo
+shapeQuadShaderStages: [2]vk.PipelineShaderStageCreateInfo
 texShaderStages: [2]vk.PipelineShaderStageCreateInfo
 animateTexShaderStages: [2]vk.PipelineShaderStageCreateInfo
 copyScreenShaderStages: [2]vk.PipelineShaderStageCreateInfo
 
 vkShapeDescriptorSetLayout: vk.DescriptorSetLayout
+vkShapeQuadDescriptorSetLayout: vk.DescriptorSetLayout
 vkTexDescriptorSetLayout: vk.DescriptorSetLayout
 //used animate tex
 vkTexDescriptorSetLayout2: vk.DescriptorSetLayout
@@ -132,11 +133,13 @@ vkCopyScreenDescriptorSetLayout: vk.DescriptorSetLayout
 
 
 vkShapePipelineLayout: vk.PipelineLayout
+vkShapeQuadPipelineLayout: vk.PipelineLayout
 vkTexPipelineLayout: vk.PipelineLayout
 vkAnimateTexPipelineLayout: vk.PipelineLayout
 //vkCopyScreenPipelineLayout: vk.PipelineLayout
 
 vkShapePipeline: vk.Pipeline
+vkShapeQuadPipeline: vk.Pipeline
 vkTexPipeline: vk.Pipeline
 vkAnimateTexPipeline: vk.Pipeline
 //vkCopyScreenPipeline: vk.Pipeline
@@ -197,7 +200,8 @@ vkCopyBlending := vk.PipelineColorBlendStateCreateInfoInit(__vkNoBlendingState[:
 vkInitShaderModules :: proc() {
 	vkShapeVertShader = vk.CreateShaderModule2(vkDevice, #load("shaders/shape.vert.spv"))
 	vkShapeFragShader = vk.CreateShaderModule2(vkDevice, #load("shaders/shape.frag.spv"))
-	when vkWIREMODE do vkShapeWireFragShader = vk.CreateShaderModule2(vkDevice, #load("shaders/shape_wire.frag.spv"))
+	vkShapeQuadVertShader = vk.CreateShaderModule2(vkDevice, #load("shaders/quad_shape.vert.spv"))
+	vkShapeQuadFragShader = vk.CreateShaderModule2(vkDevice, #load("shaders/quad_shape.frag.spv"))
 	vkTexVertShader = vk.CreateShaderModule2(vkDevice, #load("shaders/tex.vert.spv"))
 	vkTexFragShader = vk.CreateShaderModule2(vkDevice, #load("shaders/tex.frag.spv"))
 	vkAnimateTexVertShader = vk.CreateShaderModule2(vkDevice, #load("shaders/animate_tex.vert.spv"))
@@ -206,7 +210,7 @@ vkInitShaderModules :: proc() {
 	//vkCopyScreenFragShader = vk.CreateShaderModule2(vkDevice, #load("shaders/screen_copy.frag.spv"))
 
 	shapeShaderStages = vk.CreateShaderStages(vkShapeVertShader, vkShapeFragShader)
-	when vkWIREMODE do shapeWireShaderStages = vk.CreateShaderStages(vkShapeVertShader, vkShapeWireFragShader)
+	shapeQuadShaderStages = vk.CreateShaderStages(vkShapeQuadVertShader, vkShapeQuadFragShader)
 	texShaderStages = vk.CreateShaderStages(vkTexVertShader, vkTexFragShader)
 	animateTexShaderStages = vk.CreateShaderStages(vkAnimateTexVertShader, vkAnimateTexFragShader)
 	//copyScreenShaderStages = vk.CreateShaderStages(vkCopyScreenVertShader, vkCopyScreenFragShader)
@@ -215,11 +219,12 @@ vkInitShaderModules :: proc() {
 vkCleanShaderModules :: proc() {
 	vk.DestroyShaderModule(vkDevice, vkShapeVertShader, nil)
 	vk.DestroyShaderModule(vkDevice, vkShapeFragShader, nil)
-	when vkWIREMODE do vk.DestroyShaderModule(vkDevice, vkShapeWireFragShader, nil)
 	vk.DestroyShaderModule(vkDevice, vkTexVertShader, nil)
 	vk.DestroyShaderModule(vkDevice, vkTexFragShader, nil)
 	vk.DestroyShaderModule(vkDevice, vkAnimateTexVertShader, nil)
 	vk.DestroyShaderModule(vkDevice, vkAnimateTexFragShader, nil)
+	vk.DestroyShaderModule(vkDevice, vkShapeQuadVertShader, nil)
+	vk.DestroyShaderModule(vkDevice, vkShapeQuadFragShader, nil)
 	//vk.DestroyShaderModule(vkDevice, vkCopyScreenVertShader, nil)
 	//vk.DestroyShaderModule(vkDevice, vkCopyScreenFragShader, nil)
 }
@@ -232,11 +237,19 @@ vkInitPipelines :: proc() {
 			vk.DescriptorSetLayoutBindingInit(0, 1, stageFlags = {.VERTEX}),
 			vk.DescriptorSetLayoutBindingInit(1, 1, stageFlags = {.VERTEX}),
 			vk.DescriptorSetLayoutBindingInit(2, 1, stageFlags = {.VERTEX}),
-			vk.DescriptorSetLayoutBindingInit(3, 1, stageFlags = {.FRAGMENT}),
 		}
 	)
 	vkShapePipelineLayout = vk.PipelineLayoutInit(vkDevice,
 		[]vk.DescriptorSetLayout{vkShapeDescriptorSetLayout},
+	)
+
+	vkShapeQuadDescriptorSetLayout = vk.DescriptorSetLayoutInit(vkDevice,
+		[]vk.DescriptorSetLayoutBinding {
+			vk.DescriptorSetLayoutBindingInit(0, 1, stageFlags = {.FRAGMENT}),
+		}
+	)
+	vkShapeQuadPipelineLayout = vk.PipelineLayoutInit(vkDevice,
+		[]vk.DescriptorSetLayout{vkShapeQuadDescriptorSetLayout},
 	)
 
 	// vkCopyScreenDescriptorSetLayout = vk.DescriptorSetLayoutInit(vkDevice,
@@ -283,9 +296,32 @@ vkInitPipelines :: proc() {
 	//	[]vk.DescriptorSetLayout{vkCopyScreenDescriptorSetLayout},
 	//)
 
-	defaultDepthStencilState := vk.PipelineDepthStencilStateCreateInfoInit()
+	quadStencilOpState := vk.StencilOpStateInit(failOp = .ZERO, passOp = .ZERO, depthFailOp = .ZERO, compareOp = .EQUAL, reference = 0xff, compareMask = 0xff, writeMask = 0xff,)
+	shapeStencilOpState := vk.StencilOpStateInit(failOp = .ZERO, passOp = .INVERT, depthFailOp = .ZERO, compareOp = .ALWAYS, reference = 0xff, compareMask = 0xff, writeMask = 0xff,)
 
-	pipelines:[3]vk.Pipeline
+	nullVertexInputInfo := vk.PipelineVertexInputStateCreateInfo{
+		sType = .PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+		vertexBindingDescriptionCount = 0,
+		pVertexBindingDescriptions = nil,
+		vertexAttributeDescriptionCount = 0,
+		pVertexAttributeDescriptions = nil,
+	}
+
+	defaultDepthStencilState := vk.PipelineDepthStencilStateCreateInfoInit()
+	quadDepthStencilState := vk.PipelineDepthStencilStateCreateInfoInit(stencilTestEnable = true,
+		depthTestEnable = false,
+		depthWriteEnable = false,
+		depthCompareOp = .NEVER,
+		front = quadStencilOpState,
+		back = quadStencilOpState,)
+	shapeDepthStencilState := vk.PipelineDepthStencilStateCreateInfoInit(stencilTestEnable = true,
+		depthTestEnable = true,
+		depthWriteEnable = true,
+		depthCompareOp = .LESS_OR_EQUAL,
+		front = shapeStencilOpState,
+		back = shapeStencilOpState,)
+
+	pipelines:[4]vk.Pipeline
 	pipelineCreateInfos:[len(pipelines)]vk.GraphicsPipelineCreateInfo
 
 	shapeVertexInputBindingDescription := [1]vk.VertexInputBindingDescription{{
@@ -294,7 +330,7 @@ vkInitPipelines :: proc() {
 		inputRate = .VERTEX,
 	}}
 
-	shapeVertexInputAttributeDescription := [3]vk.VertexInputAttributeDescription{{
+	shapeVertexInputAttributeDescription := [2]vk.VertexInputAttributeDescription{{
 		location = 0,
 		binding = 0,
 		format = vk.Format.R32G32_SFLOAT,
@@ -305,43 +341,33 @@ vkInitPipelines :: proc() {
 		binding = 0,
 		format = vk.Format.R32G32B32_SFLOAT,
 		offset = size_of(f32) * 2,
-	},
-	{
-		location = 2,
-		binding = 0,
-		format = vk.Format.R32G32B32A32_SFLOAT,
-		offset = size_of(f32) * (2 + 3),
 	}}
 	viewportState := vk.PipelineViewportStateCreateInfoInit()
 	shapeVertexInputState := vk.PipelineVertexInputStateCreateInfoInit(shapeVertexInputBindingDescription[:], shapeVertexInputAttributeDescription[:])
 	wireFrame := vk.PipelineRasterizationStateCreateInfoInit(.LINE)
 
-	when vkWIREMODE {
-		pipelineCreateInfos[0] = vk.GraphicsPipelineCreateInfoInit(
-			stages = shapeWireShaderStages[:],
-			layout = vkShapePipelineLayout,
-			renderPass = vkRenderPass,
-			pMultisampleState = &vkPipelineMultisampleStateCreateInfo,
-			pDepthStencilState = &defaultDepthStencilState,
-			pColorBlendState = &vk.DefaultPipelineColorBlendStateCreateInfo,
-			pVertexInputState = &shapeVertexInputState,
-			pViewportState = &viewportState,
-			pRasterizationState = &wireFrame,
-		)
-	} else {
-		pipelineCreateInfos[0] = vk.GraphicsPipelineCreateInfoInit(
-			stages = shapeShaderStages[:],
-			layout = vkShapePipelineLayout,
-			renderPass = vkRenderPass,
-			pMultisampleState = &vkPipelineMultisampleStateCreateInfo,
-			pDepthStencilState = &defaultDepthStencilState,
-			pColorBlendState = &vk.DefaultPipelineColorBlendStateCreateInfo,
-			pVertexInputState = &shapeVertexInputState,
-			pViewportState = &viewportState,
-		)
-	}
-
+	pipelineCreateInfos[0] = vk.GraphicsPipelineCreateInfoInit(
+		stages = shapeQuadShaderStages[:],
+		layout = vkShapeQuadPipelineLayout,
+		renderPass = vkRenderPass,
+		pMultisampleState = &vkPipelineMultisampleStateCreateInfo,
+		pDepthStencilState = &quadDepthStencilState,
+		pColorBlendState = &vk.DefaultPipelineColorBlendStateCreateInfo,
+		pVertexInputState = &nullVertexInputInfo,
+		pViewportState = &viewportState,
+	)
 	pipelineCreateInfos[1] = vk.GraphicsPipelineCreateInfoInit(
+		stages = shapeShaderStages[:],
+		layout = vkShapePipelineLayout,
+		renderPass = vkRenderPass,
+		pMultisampleState = &vkPipelineMultisampleStateCreateInfo,
+		pDepthStencilState = &shapeDepthStencilState,
+		pColorBlendState = &vk.DefaultPipelineColorBlendStateCreateInfo,
+		pVertexInputState = &shapeVertexInputState,
+		pViewportState = &viewportState,
+	)
+
+	pipelineCreateInfos[2] = vk.GraphicsPipelineCreateInfoInit(
 		stages = texShaderStages[:],
 		layout = vkTexPipelineLayout,
 		renderPass = vkRenderPass,
@@ -350,7 +376,7 @@ vkInitPipelines :: proc() {
 		pColorBlendState = &vk.DefaultPipelineColorBlendStateCreateInfo,
 		pViewportState = &viewportState,
 	)
-	pipelineCreateInfos[2] = vk.GraphicsPipelineCreateInfoInit(
+	pipelineCreateInfos[3] = vk.GraphicsPipelineCreateInfoInit(
 		stages = animateTexShaderStages[:],
 		layout = vkAnimateTexPipelineLayout,
 		renderPass = vkRenderPass,
@@ -359,7 +385,7 @@ vkInitPipelines :: proc() {
 		pColorBlendState = &vk.DefaultPipelineColorBlendStateCreateInfo,
 		pViewportState = &viewportState,
 	)
-	// pipelineCreateInfos[3] = vk.GraphicsPipelineCreateInfoInit(
+	// pipelineCreateInfos[4] = vk.GraphicsPipelineCreateInfoInit(
 	// 	stages = copyScreenShaderStages[:],
 	// 	layout = vkCopyScreenPipelineLayout,
 	// 	renderPass = vkRenderPassCopy,
@@ -373,10 +399,11 @@ vkInitPipelines :: proc() {
 		trace.panic_log(res)
 	}
 
-	vkShapePipeline = pipelines[0]
-	vkTexPipeline = pipelines[1]
-	vkAnimateTexPipeline = pipelines[2]
-	//vkCopyScreenPipeline = pipelines[3]
+	vkShapeQuadPipeline = pipelines[0]
+	vkShapePipeline = pipelines[1]
+	vkTexPipeline = pipelines[2]
+	vkAnimateTexPipeline = pipelines[3]
+	//vkCopyScreenPipeline = pipelines[4]
 }
 
 vkBeginSingleTimeCmd :: proc "contextless" () -> vk.CommandBuffer {
@@ -417,17 +444,20 @@ vkEndSingleTimeCmd :: proc "contextless" (_cmd:vk.CommandBuffer)  {
 
 vkCleanPipelines :: proc() {
 	vk.DestroyDescriptorSetLayout(vkDevice, vkShapeDescriptorSetLayout, nil)
+	vk.DestroyDescriptorSetLayout(vkDevice, vkShapeQuadDescriptorSetLayout, nil)
 	vk.DestroyDescriptorSetLayout(vkDevice, vkTexDescriptorSetLayout, nil)
 	vk.DestroyDescriptorSetLayout(vkDevice, vkTexDescriptorSetLayout2, nil)
 	vk.DestroyDescriptorSetLayout(vkDevice, vkAnimateTexDescriptorSetLayout, nil)
 	//vk.DestroyDescriptorSetLayout(vkDevice, vkCopyScreenDescriptorSetLayout, nil)
 
 	vk.DestroyPipelineLayout(vkDevice, vkShapePipelineLayout, nil)
+	vk.DestroyPipelineLayout(vkDevice, vkShapeQuadPipelineLayout, nil)
 	vk.DestroyPipelineLayout(vkDevice, vkTexPipelineLayout, nil)
 	vk.DestroyPipelineLayout(vkDevice, vkAnimateTexPipelineLayout, nil)
 	//vk.DestroyPipelineLayout(vkDevice, vkCopyScreenPipelineLayout, nil)
 
 	vk.DestroyPipeline(vkDevice, vkShapePipeline, nil)
+	vk.DestroyPipeline(vkDevice, vkShapeQuadPipeline, nil)
 	vk.DestroyPipeline(vkDevice, vkTexPipeline, nil)
 	vk.DestroyPipeline(vkDevice, vkAnimateTexPipeline, nil)
 	//vk.DestroyPipeline(vkDevice, vkCopyScreenPipeline, nil)
@@ -914,19 +944,10 @@ vkStart :: proc() {
 	}
 	queueCnt: u32 = 1 if vkGraphicsFamilyIndex == vkPresentFamilyIndex else 2
 
-	when vkWIREMODE {
-		physicalDeviceFeatures := vk.PhysicalDeviceFeatures {
-			samplerAnisotropy = true,
-			sampleRateShading = true, //FOR ANTI-ALISING
-			fillModeNonSolid = true,
-			//geometryShader = true,
-		}
-	} else {
-		physicalDeviceFeatures := vk.PhysicalDeviceFeatures {
-			samplerAnisotropy = true,
-			sampleRateShading = true, //FOR ANTI-ALISING
-			//geometryShader = true,
-		}
+	physicalDeviceFeatures := vk.PhysicalDeviceFeatures {
+		samplerAnisotropy = true,
+		sampleRateShading = true, //FOR ANTI-ALISING
+		//geometryShader = true,
 	}
 
 	deviceExtCnt: u32
@@ -1032,6 +1053,8 @@ vkStart :: proc() {
 		initialLayout = .UNDEFINED,
 		finalLayout = .DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
 		samples = vkSampleCountFlags,
+		stencilLoadOp = .CLEAR,
+		stencilStoreOp = .STORE,
 	)
 	// depthAttachmentSampleClear := vk.AttachmentDescriptionInit(
 	// 	format = vkDepthFmt,
@@ -1089,6 +1112,8 @@ vkStart :: proc() {
 		format = vkDepthFmt,
 		loadOp = .CLEAR,
 		storeOp = .STORE,
+		stencilLoadOp = .CLEAR,
+		stencilStoreOp = .STORE,
 		finalLayout = .PRESENT_SRC_KHR,
 	)
 	shapeBackAttachment := vk.AttachmentDescriptionInit(

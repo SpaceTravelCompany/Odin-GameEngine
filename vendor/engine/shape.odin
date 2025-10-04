@@ -8,25 +8,19 @@ import "core:sync"
 import "core:math/linalg"
 import "base:intrinsics"
 import "base:runtime"
-import vk "vendor:vulkan"
-
-@private __ShapeSrcIn :: struct {
-    //?vertexBuf, indexBuf에 checkInit: ICheckInit 있으므로 따로 필요없음
-    vertexBuf:__VertexBuf(geometry.ShapeVertex2D),
-    indexBuf:__IndexBuf,
-}       
+import vk "vendor:vulkan"   
 
 ShapeSrc :: struct {
-    using _:__ShapeSrcIn,
+    //?vertexBuf, indexBuf에 checkInit: ICheckInit 있으므로 따로 필요없음
+    vertexBufs:[]__VertexBuf(geometry.ShapeVertex2D),
+    indexBufs:[]__IndexBuf,
+    colBufs:[]VkBufferResource,
+    sets:[]VkDescriptorSet,
     rect:linalg.RectF,
 }
 
 Shape :: struct {
     using object:IObject,
-    using _:__ShapeIn,
-}
-
-@private __ShapeIn :: struct {
     src: ^ShapeSrc,
 }
 
@@ -37,39 +31,39 @@ Shape :: struct {
 
 
 Shape_Init :: proc(self:^Shape, $actualType:typeid, src:^ShapeSrc, pos:linalg.Point3DF,
-camera:^Camera, projection:^Projection,  rotation:f32 = 0.0, scale:linalg.PointF = {1,1}, colorTransform:^ColorTransform = nil, pivot:linalg.PointF = {0.0, 0.0}, vtable:^IObjectVTable = nil)
+camera:^Camera, projection:^Projection,  rotation:f32 = 0.0, scale:linalg.PointF = {1,1}, pivot:linalg.PointF = {0.0, 0.0}, vtable:^IObjectVTable = nil)
  where intrinsics.type_is_subtype_of(actualType, Shape) {
     self.src = src
 
-    self.set.bindings = __transformUniformPoolBinding[:]
-    self.set.size = __transformUniformPoolSizes[:]
+    self.set.bindings = __shapeUniformPoolBinding[:]
+    self.set.size = __shapeUniformPoolSizes[:]
     self.set.layout = vkShapeDescriptorSetLayout
 
     self.vtable = vtable == nil ? &ShapeVTable : vtable
     if self.vtable.Draw == nil do self.vtable.Draw = auto_cast _Super_Shape_Draw
     if self.vtable.Deinit == nil do self.vtable.Deinit = auto_cast _Super_Shape_Deinit
 
-    if self.vtable.GetUniformResources == nil do self.vtable.GetUniformResources = auto_cast GetUniformResources_Default
+    if self.vtable.GetUniformResources == nil do self.vtable.GetUniformResources = auto_cast GetUniformResources_Shape
 
-    IObject_Init(self, actualType, pos, rotation, scale, camera, projection, colorTransform, pivot)
+    IObject_Init(self, actualType, pos, rotation, scale, camera, projection, nil, pivot)
 }
 
 Shape_Init2 :: proc(self:^Shape, $actualType:typeid, src:^ShapeSrc,
-camera:^Camera, projection:^Projection, colorTransform:^ColorTransform = nil, vtable:^IObjectVTable = nil)
+camera:^Camera, projection:^Projection, vtable:^IObjectVTable = nil)
  where intrinsics.type_is_subtype_of(actualType, Shape) {
     self.src = src
 
-    self.set.bindings = __transformUniformPoolBinding[:]
-    self.set.size = __transformUniformPoolSizes[:]
+    self.set.bindings = __shapeUniformPoolBinding[:]
+    self.set.size = __shapeUniformPoolSizes[:]
     self.set.layout = vkShapeDescriptorSetLayout
 
     self.vtable = vtable == nil ? &ShapeVTable : vtable
     if self.vtable.Draw == nil do self.vtable.Draw = auto_cast _Super_Shape_Draw
     if self.vtable.Deinit == nil do self.vtable.Deinit = auto_cast _Super_Shape_Deinit
 
-    if self.vtable.GetUniformResources == nil do self.vtable.GetUniformResources = auto_cast GetUniformResources_Default
+    if self.vtable.GetUniformResources == nil do self.vtable.GetUniformResources = auto_cast GetUniformResources_Shape
 
-    IObject_Init2(self, actualType, camera, projection, colorTransform)
+    IObject_Init2(self, actualType, camera, projection, nil)
 }
 
 _Super_Shape_Deinit :: proc(self:^Shape) {
@@ -112,23 +106,54 @@ Shape_UpdateProjection :: #force_inline proc(self:^Shape, projection:^Projection
 _Super_Shape_Draw :: proc (self:^Shape, cmd:vk.CommandBuffer) {
     mem.ICheckInit_Check(&self.checkInit)
 
-    vk.CmdBindPipeline(cmd, .GRAPHICS, vkShapePipeline)
-    vk.CmdBindDescriptorSets(cmd, .GRAPHICS, vkShapePipelineLayout, 0, 1, 
-        &([]vk.DescriptorSet{self.set.__set})[0], 0, nil)
+    for i in 0..<len(self.src.vertexBufs) {
+        vk.CmdBindPipeline(cmd, .GRAPHICS, vkShapePipeline)
+        vk.CmdBindDescriptorSets(cmd, .GRAPHICS, vkShapePipelineLayout, 0, 1, &self.set.__set, 0, nil)
+
+        offsets : vk.DeviceSize = 0
+        vk.CmdBindVertexBuffers(cmd, 0, 1, &self.src.vertexBufs[i].buf.__resource, &offsets)
+        vk.CmdBindIndexBuffer(cmd, self.src.indexBufs[i].buf.__resource, offsets, vk.IndexType.UINT32)
+
+        vk.CmdDrawIndexed(cmd, u32(self.src.indexBufs[i].buf.option.len / vk.DeviceSize(size_of(u32))), 1, 0, 0, 0)
 
 
-    offsets: vk.DeviceSize = 0
-    vk.CmdBindVertexBuffers(cmd, 0, 1, &self.src.vertexBuf.buf.__resource, &offsets)
-    vk.CmdBindIndexBuffer(cmd, self.src.indexBuf.buf.__resource, 0, .UINT32)
+        vk.CmdBindPipeline(cmd, .GRAPHICS, vkShapeQuadPipeline)
+        vk.CmdBindDescriptorSets(cmd, .GRAPHICS, vkShapeQuadPipelineLayout, 0, 1, &self.src.sets[i].__set, 0, nil)
 
-    vk.CmdDrawIndexed(cmd, auto_cast (self.src.indexBuf.buf.option.len / size_of(u32)), 1, 0, 0, 0)
+        vk.CmdDraw(cmd, 6, 1, 0, 0)
+    }
 }
 
 ShapeSrc_InitRaw :: proc(self:^ShapeSrc, raw:^geometry.RawShape, flag:ResourceUsage = .GPU, colorFlag:ResourceUsage = .CPU) {
     rawC := geometry.RawShape_Clone(raw, engineDefAllocator)
-    __VertexBuf_Init(&self.vertexBuf, rawC.vertices, flag)
-    __IndexBuf_Init(&self.indexBuf, rawC.indices, flag)
-    self.rect = rawC.rect
+    __ShapeSrc_Init(self, rawC, flag, colorFlag)
+    defer free(rawC)
+}
+
+@private __ShapeSrc_Init :: proc(self:^ShapeSrc, raw:^geometry.RawShape, flag:ResourceUsage = .GPU, colorFlag:ResourceUsage = .CPU) {
+    self.vertexBufs = mem.make_non_zeroed_slice([]__VertexBuf(geometry.ShapeVertex2D), len(raw.vertices), engineDefAllocator)
+    self.indexBufs = mem.make_non_zeroed_slice([]__IndexBuf, len(raw.indices), engineDefAllocator)
+    self.colBufs = mem.make_non_zeroed_slice([]VkBufferResource, len(raw.colors), engineDefAllocator)
+    self.sets = mem.make_non_zeroed_slice([]VkDescriptorSet, len(raw.colors), engineDefAllocator)
+
+    for i in 0..<len(raw.vertices) {
+        __VertexBuf_Init(&self.vertexBufs[i], raw.vertices[i], flag)
+        __IndexBuf_Init(&self.indexBufs[i], raw.indices[i], flag)
+
+        self.sets[i].bindings = __singlePoolBinding[:]
+        self.sets[i].size = __singleUniformPoolSizes[:]
+        self.sets[i].layout = vkShapeQuadDescriptorSetLayout
+        self.sets[i].__resources = mem.make_non_zeroed_slice([]VkUnionResource, 1, vkTempArenaAllocator)
+        self.sets[i].__resources[0] = &self.colBufs[i]
+
+        VkBufferResource_CreateBuffer(&self.colBufs[i], {
+            len = size_of(linalg.Point3DwF),
+            type = .UNIFORM,
+            resourceUsage = colorFlag,
+        }, mem.ptr_to_bytes(&raw.colors[i]), true)
+    }
+    VkUpdateDescriptorSets(self.sets)
+    self.rect = raw.rect
 }
 
 @require_results ShapeSrc_Init :: proc(self:^ShapeSrc, shapes:^geometry.Shapes, flag:ResourceUsage = .GPU, colorFlag:ResourceUsage = .CPU) -> (err:geometry.ShapesError = .None) {
@@ -136,43 +161,34 @@ ShapeSrc_InitRaw :: proc(self:^ShapeSrc, raw:^geometry.RawShape, flag:ResourceUs
     raw, err = geometry.Shapes_ComputePolygon(shapes, engineDefAllocator)
     if err != .None do return
 
-    __VertexBuf_Init(&self.vertexBuf, raw.vertices, flag)
-    __IndexBuf_Init(&self.indexBuf, raw.indices, flag)
-
-    self.rect = raw.rect
+    __ShapeSrc_Init(self, raw, flag, colorFlag)
 
     defer free(raw)
     return
 }
 
-ShapeSrc_UpdateRaw :: proc(self:^ShapeSrc, raw:^geometry.RawShape) {
-    rawC := geometry.RawShape_Clone(raw, engineDefAllocator)
-    __VertexBuf_Update(&self.vertexBuf, rawC.vertices)
-    __IndexBuf_Update(&self.indexBuf, rawC.indices)
-
-    defer free(rawC)
-}
-
-@require_results ShapeSrc_Update :: proc(self:^ShapeSrc, shapes:^geometry.Shapes) -> (err:geometry.ShapesError = .None) {
-    raw : ^geometry.RawShape
-    raw, err = geometry.Shapes_ComputePolygon(shapes, engineDefAllocator)
-    if err != .None do return
-
-    __VertexBuf_Update(&self.vertexBuf, raw.vertices)
-    __IndexBuf_Update(&self.indexBuf, raw.indices)
-
-    defer free(raw)
-    return
+ShapeSrc_ColorUpdate :: proc(self:^ShapeSrc, #any_int start_idx:int, colors:[]linalg.Point3DwF) {
+    for i in start_idx..<start_idx + len(colors) {
+        VkBufferResource_CopyUpdate(&self.colBufs[i], &colors[i], engineDefAllocator)
+    }
 }
 
 ShapeSrc_Deinit :: proc(self:^ShapeSrc) {
-    __VertexBuf_Deinit(&self.vertexBuf)
-    __IndexBuf_Deinit(&self.indexBuf)
+    for i in 0..<len(self.vertexBufs) {
+        __VertexBuf_Deinit(&self.vertexBufs[i])
+        __IndexBuf_Deinit(&self.indexBufs[i])
+        VkBufferResource_Deinit(&self.colBufs[i])
+    }
+    delete(self.vertexBufs, engineDefAllocator)
+    delete(self.indexBufs, engineDefAllocator)
+    delete(self.colBufs, engineDefAllocator)
+    delete(self.sets, engineDefAllocator)
 }
 
 
 ShapeSrc_IsInited :: proc "contextless" (self:^ShapeSrc) -> bool {
-    return mem.ICheckInit_IsInited(&self.vertexBuf.checkInit)
+    if len(self.vertexBufs) == 0 do return false
+    return mem.ICheckInit_IsInited(&self.vertexBufs[0].checkInit)
 }
 
 

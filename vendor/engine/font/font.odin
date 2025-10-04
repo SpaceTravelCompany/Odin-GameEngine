@@ -129,30 +129,70 @@ Font_SetScale :: proc(self:^Font, scale:f32) {
     sync.mutex_unlock(&self_.mutex)
 }
 
-@(private="file") _Font_RenderString2 :: proc(_str:string,
+@(private="file", require_results) _Font_RenderString2 :: proc(_str:string,
 _renderOpt:FontRenderOpt2,
-vertList:^[dynamic]geometry.ShapeVertex2D,
-indList:^[dynamic]u32,
-allocator : runtime.Allocator) -> (rect:linalg.RectF, err:geometry.ShapesError = .None) {
+allocator : runtime.Allocator) -> (res:^geometry.RawShape, err:geometry.ShapesError = .None) {
     i : int = 0
     opt := _renderOpt.opt
     rectT : linalg.RectF
-    rect = linalg.Rect_Init(f32(0.0), 0.0, 0.0, 0.0)
-
+    rect := linalg.Rect_Init(f32(0.0), 0.0, 0.0, 0.0)
+    res = new(geometry.RawShape, allocator)
+    defer if err != .None {
+        free(res, allocator)
+    }
+    gVertList := mem.make_non_zeroed([dynamic][]geometry.ShapeVertex2D, allocator)
+    gIndList := mem.make_non_zeroed([dynamic][]u32, allocator)
+    gColList := mem.make_non_zeroed([dynamic]linalg.Point3DwF, allocator)
+    defer if err != .None {
+        for j in 0..<len(gVertList) {
+            delete(gVertList[j], allocator)
+            delete(gIndList[j], allocator)
+        }
+        delete(gVertList)
+        delete(gIndList)
+        delete(gColList)
+    }
     for r in _renderOpt.ranges {
         opt.scale = _renderOpt.opt.scale * r.scale
         opt.color = r.color
 
+        APPEND :: proc (gVertList:^[dynamic][]geometry.ShapeVertex2D, gIndList:^[dynamic][]u32, gColList:^[dynamic]linalg.Point3DwF,
+        vertList:^[dynamic]geometry.ShapeVertex2D, indList:^[dynamic]u32, color:linalg.Point3DwF) {
+            shrink(vertList)
+            shrink(indList)
+            non_zero_append(gVertList, vertList[:])
+            non_zero_append(gIndList, indList[:])
+            non_zero_append(gColList, color)
+        }
+
+        vertList := mem.make_non_zeroed([dynamic]geometry.ShapeVertex2D, allocator)
+        indList := mem.make_non_zeroed([dynamic]u32, allocator)
+        defer if err != .None {
+            delete(vertList)
+            delete(indList)
+        }
+
         if r.len == 0 || i + auto_cast r.len >= len(_str) {
-            _, rectT = _Font_RenderString(auto_cast r.font, _str[i:], opt, vertList, indList, allocator) or_return
+            _, rectT = _Font_RenderString(auto_cast r.font, _str[i:], opt, &vertList, &indList, allocator) or_return
             rect = linalg.Rect_Or(rect, rectT)
+
+            APPEND(&gVertList, &gIndList, &gColList, &vertList, &indList, opt.color)
             break;
         } else {
-            opt.offset, rectT = _Font_RenderString(auto_cast r.font, _str[i:i + auto_cast r.len], opt, vertList, indList, allocator) or_return
+            opt.offset, rectT = _Font_RenderString(auto_cast r.font, _str[i:i + auto_cast r.len], opt, &vertList, &indList, allocator) or_return
             rect = linalg.Rect_Or(rect, rectT)
+
+            APPEND(&gVertList, &gIndList, &gColList, &vertList, &indList, opt.color)
             i += auto_cast r.len
         }
     }
+    res.rect = rect
+    shrink(&gVertList)
+    shrink(&gIndList)
+    shrink(&gColList)
+    res.vertices = gVertList[:]
+    res.indices = gIndList[:]
+    res.colors = gColList[:]
     return
 }
 
@@ -178,7 +218,7 @@ allocator : runtime.Allocator) -> (rect:linalg.RectF, err:geometry.ShapesError =
         }
         minP = math.min_array(minP, offset)
 
-        _Font_RenderChar(self, s, _vertArr, _indArr, &offset, _renderOpt.area, _renderOpt.scale, _renderOpt.color, allocator) or_return
+        _Font_RenderChar(self, s, _vertArr, _indArr, &offset, _renderOpt.area, _renderOpt.scale, allocator) or_return
         
         maxP = math.max_array(maxP,linalg.PointF{offset.x, offset.y + f32(self.face.size.metrics.height) / (64.0 * self.scale) })
     }
@@ -221,7 +261,6 @@ allocator : runtime.Allocator) -> (rect:linalg.RectF, err:geometry.ShapesError =
     offset:^linalg.PointF,
     area:Maybe(linalg.PointF),
     scale:linalg.PointF,
-    color:linalg.Point3DwF,
     allocator : runtime.Allocator) -> (shapeErr:geometry.ShapesError = .None) {
     ok := _char in self.charArray
     charD : ^CharData
@@ -233,10 +272,7 @@ allocator : runtime.Allocator) -> (rect:linalg.RectF, err:geometry.ShapesError =
         if data.idx > 0 {
             data.polygon.nPolys[data.nPoly] = data.nPolyLen
             data.nPoly += 1
-            data.polygon.nTypes[data.nTypes] = data.nTypesLen
-            data.nTypes += 1
             data.nPolyLen = 0
-            data.nTypesLen = 0
         }
         return 0
     }
@@ -340,21 +376,16 @@ allocator : runtime.Allocator) -> (rect:linalg.RectF, err:geometry.ShapesError =
             }
         
             poly : geometry.Shapes = {
-                nPolys = mem.make_non_zeroed([]u32, self.face.glyph.outline.n_contours),
-                nTypes = mem.make_non_zeroed([]u32, self.face.glyph.outline.n_contours),
-                types = mem.make_non_zeroed([]geometry.CurveType, self.face.glyph.outline.n_points*3),
-                poly = mem.make_non_zeroed([]linalg.PointF, self.face.glyph.outline.n_points*3),
-                colors = mem.make_non_zeroed([]linalg.Point3DwF, self.face.glyph.outline.n_contours),
-            }
-            for &c in poly.colors {
-                c = linalg.Point3DwF{0,0,0,1}//?no matter
+                nPolys = mem.make_non_zeroed([]u32, self.face.glyph.outline.n_contours, context.temp_allocator),//갯수는 후에 RESIZE 처리
+                types = mem.make_non_zeroed([]geometry.CurveType, self.face.glyph.outline.n_points*3, context.temp_allocator),
+                poly = mem.make_non_zeroed([]linalg.PointF, self.face.glyph.outline.n_points*3, context.temp_allocator),
+                colors = mem.make_non_zeroed([]Maybe(linalg.Point3DwF), self.face.glyph.outline.n_contours, context.temp_allocator),
             }
             defer {
-                delete(poly.nPolys, )
-                delete(poly.nTypes, )
-                delete(poly.types, )
-                delete(poly.poly, )
-                delete(poly.colors, )
+                delete(poly.nPolys, context.temp_allocator)
+                delete(poly.types, context.temp_allocator)
+                delete(poly.poly, context.temp_allocator)
+                delete(poly.colors, context.temp_allocator)
             }
             data : FontUserData = {
                 polygon = &poly,
@@ -383,9 +414,13 @@ allocator : runtime.Allocator) -> (rect:linalg.RectF, err:geometry.ShapesError =
                 defer sync.mutex_lock(&self.mutex)
 
                 poly.nPolys[data.nPoly] = data.nPolyLen
-                poly.nTypes[data.nTypes] = data.nTypesLen
-                poly.poly = mem.resize_non_zeroed_slice(poly.poly, data.idx, )
-                poly.types = mem.resize_non_zeroed_slice(poly.types, data.typeIdx, )
+                poly.nPolys = mem.resize_non_zeroed_slice(poly.nPolys, data.nPoly + 1, context.temp_allocator)
+                poly.poly = mem.resize_non_zeroed_slice(poly.poly, data.idx, context.temp_allocator)
+                poly.types = mem.resize_non_zeroed_slice(poly.types, data.typeIdx, context.temp_allocator)
+                poly.colors = mem.resize_non_zeroed_slice(poly.colors, data.nPoly + 1, context.temp_allocator)
+                for &c in poly.colors {
+                    c = linalg.Point3DwF{0,0,0,1}//?no matter
+                }
 
                 rawP : ^geometry.RawShape
                 rawP , shapeErr = geometry.Shapes_ComputePolygon(&poly, engine.defAllocator())//높은 부하 작업 High load operations
@@ -398,12 +433,12 @@ allocator : runtime.Allocator) -> (rect:linalg.RectF, err:geometry.ShapesError =
                     maxP :linalg.PointF = {min(f32), min(f32)}
                     minP :linalg.PointF = {max(f32), max(f32)}
 
-                    for v in rawP.vertices {
+                    for v in rawP.vertices[0] {
                         minP = math.min_array(minP, v.pos)
                         maxP = math.max_array(maxP, v.pos)
                     }
                     rawP.rect = linalg.Rect_Init_LTRB(minP.x, maxP.x, maxP.y, minP.y)
-                }   
+                }
 
                 charData = {
                     advanceX = f32(self.face.glyph.advance.x) / (64.0 * self.scale),
@@ -424,26 +459,33 @@ allocator : runtime.Allocator) -> (rect:linalg.RectF, err:geometry.ShapesError =
     }
     if charD.rawShape != nil {
         vlen := len(_vertArr^)
-
-        non_zero_resize_dynamic_array(_vertArr, vlen + len(charD.rawShape.vertices))
-        runtime.mem_copy_non_overlapping(&_vertArr^[vlen], &charD.rawShape.vertices[0], len(charD.rawShape.vertices) * size_of(geometry.ShapeVertex2D))
-
+        vslen := vlen
         i := vlen
+
+        for &vs in charD.rawShape.vertices { 
+            non_zero_resize_dynamic_array(_vertArr, vlen + len(vs))
+            runtime.mem_copy_non_overlapping(&_vertArr^[vlen], &vs[0], len(vs) * size_of(geometry.ShapeVertex2D))
+
+            vlen += len(vs)
+        }
+
         for ;i < len(_vertArr^);i += 1 {
             _vertArr^[i].pos += offset^
             _vertArr^[i].pos *= scale
-            if _vertArr^[i].color.a > 0.0 {
-                _vertArr^[i].color = color
-            }
         }
 
         ilen := len(_indArr^)
-        non_zero_resize_dynamic_array(_indArr, ilen + len(charD.rawShape.indices))
-        runtime.mem_copy_non_overlapping(&_indArr^[ilen], &charD.rawShape.indices[0], len(charD.rawShape.indices) * size_of(u32))
-
         i = ilen
+
+        for &is in charD.rawShape.indices {
+            non_zero_resize_dynamic_array(_indArr, ilen + len(is))
+            runtime.mem_copy_non_overlapping(&_indArr^[ilen], &is[0], len(is) * size_of(u32))
+
+            ilen += len(is)
+        }
+       
         for ;i < len(_indArr^);i += 1 {
-            _indArr^[i] += auto_cast vlen
+            _indArr^[i] += auto_cast vslen
         }
     }
     offset.x += charD.advanceX
@@ -452,17 +494,7 @@ allocator : runtime.Allocator) -> (rect:linalg.RectF, err:geometry.ShapesError =
 }
 
 Font_RenderString2 :: proc(_str:string, _renderOpt:FontRenderOpt2, allocator := context.allocator) -> (res:^geometry.RawShape, err:geometry.ShapesError = .None)  {
-    vertList := make([dynamic]geometry.ShapeVertex2D, allocator)
-    indList := make([dynamic]u32, allocator)
-
-    _Font_RenderString2(_str, _renderOpt, &vertList, &indList, allocator) or_return
-    shrink(&vertList)
-    shrink(&indList)
-    res = new (geometry.RawShape, allocator)
-    res^ = {
-        vertices = vertList[:],
-        indices = indList[:],
-    }
+    res = _Font_RenderString2(_str, _renderOpt, allocator) or_return
     return
 }
 
@@ -475,10 +507,12 @@ Font_RenderString :: proc(self:^Font, _str:string, _renderOpt:FontRenderOpt, all
     shrink(&vertList)
     shrink(&indList)
     res = new (geometry.RawShape, allocator)
-    res^ = {
-        vertices = vertList[:],
-        indices = indList[:],
-        rect = rect,
-    }
+    res.vertices = make([][]geometry.ShapeVertex2D, 1, allocator)
+    res.vertices[0] = vertList[:]
+    res.indices = make([][]u32, 1, allocator)
+    res.indices[0] = indList[:]
+    res.colors = make([]linalg.Point3DwF, 1, allocator)
+    res.colors[0] = _renderOpt.color
+    res.rect = rect
     return
 }
