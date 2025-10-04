@@ -2787,3 +2787,292 @@ gb_internal LLVMAtomicOrdering llvm_atomic_ordering_from_odin(Ast *expr) {
 	ExactValue value = type_and_value_of_expr(expr).value;
 	return llvm_atomic_ordering_from_odin(value);
 }
+
+
+
+struct lbDiagParaPolyEntry {
+	Entity *entity;
+	String  canonical_name;
+	isize   count;
+	isize   total_code_size;
+};
+
+gb_internal isize lb_total_code_size(lbProcedure *p) {
+	isize instruction_count = 0;
+
+	LLVMBasicBlockRef first = LLVMGetFirstBasicBlock(p->value);
+
+	for (LLVMBasicBlockRef block = first; block != nullptr; block = LLVMGetNextBasicBlock(block)) {
+		for (LLVMValueRef instr = LLVMGetFirstInstruction(block); instr != nullptr; instr = LLVMGetNextInstruction(instr)) {
+			instruction_count += 1;
+		}
+	}
+	return instruction_count;
+
+}
+
+gb_internal void lb_do_para_poly_diagnostics(lbGenerator *gen) {
+	PtrMap<Entity * /* Parent */, lbDiagParaPolyEntry> procs = {};
+	map_init(&procs);
+	defer (map_destroy(&procs));
+
+	for (auto &entry : gen->modules) {
+		lbModule *m = entry.value;
+		for (lbProcedure *p : m->generated_procedures) {
+			Entity *e = p->entity;
+			if (e == nullptr) {
+				continue;
+			}
+			if (p->builder == nullptr) {
+				continue;
+			}
+
+			DeclInfo *d = e->decl_info;
+			Entity *para_poly_parent = d->para_poly_original;
+			if (para_poly_parent == nullptr) {
+				continue;
+			}
+
+			lbDiagParaPolyEntry *entry = map_get(&procs, para_poly_parent);
+			if (entry == nullptr) {
+				lbDiagParaPolyEntry entry = {};
+				entry.entity = para_poly_parent;
+				entry.count = 0;
+
+
+				gbString w = string_canonical_entity_name(permanent_allocator(), entry.entity);
+				String name = make_string_c(w);
+
+				for (isize i = 0; i < name.len; i++) {
+					String s = substring(name, i, name.len);
+					if (string_starts_with(s, str_lit(":proc"))) {
+						name = substring(name, 0, i);
+						break;
+					}
+				}
+
+				entry.canonical_name = name;
+
+				map_set(&procs, para_poly_parent, entry);
+			}
+			entry = map_get(&procs, para_poly_parent);
+			GB_ASSERT(entry != nullptr);
+			entry->count += 1;
+			entry->total_code_size += lb_total_code_size(p);
+		}
+	}
+
+
+	auto entries = array_make<lbDiagParaPolyEntry>(heap_allocator(), 0, procs.count);
+	defer (array_free(&entries));
+
+	for (auto &entry : procs) {
+		array_add(&entries, entry.value);
+	}
+
+	array_sort(entries, [](void const *a, void const *b) -> int {
+		lbDiagParaPolyEntry *x = cast(lbDiagParaPolyEntry *)a;
+		lbDiagParaPolyEntry *y = cast(lbDiagParaPolyEntry *)b;
+		if (x->total_code_size > y->total_code_size) {
+			return -1;
+		}
+		if (x->total_code_size < y->total_code_size) {
+			return +1;
+		}
+		return string_compare(x->canonical_name, y->canonical_name);
+	});
+
+
+	gb_printf("Parametric Polymorphic Procedure Diagnostics\n");
+	gb_printf("------------------------------------------------------------------------------------------\n");
+
+	gb_printf("Sorted by Total Instruction Count Descending (Top 100)\n\n");
+	gb_printf("Total Instruction Count | Instantiation Count | Average Instruction Count | Procedure Name\n");
+
+	isize max_count = 100;
+	for (auto &entry : entries) {
+		isize   code_size = entry.total_code_size;
+		isize   count     = entry.count;
+		String  name      = entry.canonical_name;
+
+		f64 average = cast(f64)code_size / cast(f64)gb_max(count, 1);
+
+		gb_printf("%23td | %19td | %25.2f | %.*s\n", code_size, count, average, LIT(name));
+		if (max_count-- <= 0) {
+			break;
+		}
+	}
+
+	gb_printf("------------------------------------------------------------------------------------------\n");
+
+	array_sort(entries, [](void const *a, void const *b) -> int {
+		lbDiagParaPolyEntry *x = cast(lbDiagParaPolyEntry *)a;
+		lbDiagParaPolyEntry *y = cast(lbDiagParaPolyEntry *)b;
+		if (x->count > y->count) {
+			return -1;
+		}
+		if (x->count < y->count) {
+			return +1;
+		}
+
+		return string_compare(x->canonical_name, y->canonical_name);
+	});
+
+	gb_printf("Sorted by Total Instantiation Count Descending (Top 100)\n\n");
+	gb_printf("Instantiation Count | Total Instruction Count | Average Instruction Count | Procedure Name\n");
+
+	max_count = 100;
+	for (auto &entry : entries) {
+		isize   code_size = entry.total_code_size;
+		isize   count     = entry.count;
+		String  name      = entry.canonical_name;
+
+
+		f64 average = cast(f64)code_size / cast(f64)gb_max(count, 1);
+
+		gb_printf("%19td | %23td | %25.2f | %.*s\n", count, code_size, average, LIT(name));
+		if (max_count-- <= 0) {
+			break;
+		}
+	}
+
+	gb_printf("------------------------------------------------------------------------------------------\n");
+
+
+	array_sort(entries, [](void const *a, void const *b) -> int {
+		lbDiagParaPolyEntry *x = cast(lbDiagParaPolyEntry *)a;
+		lbDiagParaPolyEntry *y = cast(lbDiagParaPolyEntry *)b;
+		if (x->count < y->count) {
+			return -1;
+		}
+		if (x->count > y->count) {
+			return +1;
+		}
+
+		if (x->total_code_size > y->total_code_size) {
+			return -1;
+		}
+		if (x->total_code_size < y->total_code_size) {
+			return +1;
+		}
+
+		return string_compare(x->canonical_name, y->canonical_name);
+	});
+
+	gb_printf("Single Instanced Parametric Polymorphic Procedures\n\n");
+	gb_printf("Instruction Count | Procedure Name\n");
+	for (auto &entry : entries) {
+		isize   code_size = entry.total_code_size;
+		isize   count     = entry.count;
+		String  name      = entry.canonical_name;
+		if (count != 1) {
+			break;
+		}
+
+		gb_printf("%17td | %.*s\n", code_size, LIT(name));
+	}
+
+}
+
+struct lbDiagModuleEntry {
+	lbModule *m;
+	String name;
+	isize global_internal_count;
+	isize global_external_count;
+	isize proc_internal_count;
+	isize proc_external_count;
+	isize total_instruction_count;
+};
+
+gb_internal void lb_do_module_diagnostics(lbGenerator *gen) {
+	Array<lbDiagModuleEntry> modules = {};
+	array_init(&modules, heap_allocator());
+	defer (array_free(&modules));
+
+	for (auto &em : gen->modules) {
+		lbModule *m = em.value;
+
+		{
+			lbDiagModuleEntry entry = {};
+			entry.m = m;
+			entry.name = make_string_c(m->module_name);
+			array_add(&modules, entry);
+		}
+		lbDiagModuleEntry &entry = modules[modules.count-1];
+
+		for (LLVMValueRef p = LLVMGetFirstFunction(m->mod); p != nullptr; p = LLVMGetNextFunction(p)) {
+			LLVMBasicBlockRef block = LLVMGetFirstBasicBlock(p);
+			if (block == nullptr) {
+				entry.proc_external_count += 1;
+			} else {
+				entry.proc_internal_count += 1;
+
+				for (; block != nullptr; block = LLVMGetNextBasicBlock(block)) {
+					for (LLVMValueRef i = LLVMGetFirstInstruction(block); i != nullptr; i = LLVMGetNextInstruction(i)) {
+						entry.total_instruction_count += 1;
+					}
+				}
+			}
+		}
+
+		for (LLVMValueRef g = LLVMGetFirstGlobal(m->mod); g != nullptr; g = LLVMGetNextGlobal(g)) {
+			LLVMLinkage linkage = LLVMGetLinkage(g);
+			if (linkage == LLVMExternalLinkage) {
+				entry.global_external_count += 1;
+			} else {
+				entry.global_internal_count += 1;
+			}
+		}
+	}
+
+	array_sort(modules, [](void const *a, void const *b) -> int {
+		lbDiagModuleEntry *x = cast(lbDiagModuleEntry *)a;
+		lbDiagModuleEntry *y = cast(lbDiagModuleEntry *)b;
+
+		if (x->total_instruction_count > y->total_instruction_count) {
+			return -1;
+		}
+		if (x->total_instruction_count < y->total_instruction_count) {
+			return +1;
+		}
+
+		return string_compare(x->name, y->name);
+	});
+
+	gb_printf("Module Diagnostics\n\n");
+	gb_printf("Total Instructions | Global Internals | Global Externals | Proc Internals | Proc Externals | Files | Instructions/File | Instructions/Proc | Module Name\n");
+	gb_printf("-------------------+------------------+------------------+----------------+----------------+-------+-------------------+-------------------+------------\n");
+	for (auto &entry : modules) {
+		isize file_count = 1;
+		if (entry.m->file != nullptr) {
+			file_count = 1;
+		} else if (entry.m->pkg) {
+			file_count = entry.m->pkg->files.count;
+		}
+
+		f64 instructions_per_file = cast(f64)entry.total_instruction_count / gb_max(1.0, cast(f64)file_count);
+		f64 instructions_per_proc = cast(f64)entry.total_instruction_count / gb_max(1.0, cast(f64)entry.proc_internal_count);
+
+		gb_printf("%18td | %16td | %16td | %14td | %14td | %5td | %17.1f | %17.1f | %s \n",
+		          entry.total_instruction_count,
+		          entry.global_internal_count,
+		          entry.global_external_count,
+		          entry.proc_internal_count,
+		          entry.proc_external_count,
+		          file_count,
+		          instructions_per_file,
+		          instructions_per_proc,
+		          entry.m->module_name);
+	}
+
+
+}
+
+gb_internal void lb_do_build_diagnostics(lbGenerator *gen) {
+	lb_do_para_poly_diagnostics(gen);
+	gb_printf("------------------------------------------------------------------------------------------\n");
+	gb_printf("------------------------------------------------------------------------------------------\n\n");
+	lb_do_module_diagnostics(gen);
+	gb_printf("------------------------------------------------------------------------------------------\n");
+	gb_printf("------------------------------------------------------------------------------------------\n\n");
+}

@@ -84,7 +84,7 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 	String link_name = {};
 
 	if (ignore_body) {
-		lbModule *other_module = lb_module_of_entity(m->gen, entity);
+		lbModule *other_module = lb_module_of_entity(m->gen, entity, m);
 		link_name = lb_get_entity_name(other_module, entity);
 	} else {
 		link_name = lb_get_entity_name(m, entity);
@@ -98,7 +98,6 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 			return string_map_must_get(&m->procedures, key);
 		}
 	}
-
 
 	lbProcedure *p = gb_alloc_item(permanent_allocator(), lbProcedure);
 
@@ -798,9 +797,8 @@ gb_internal void lb_end_procedure_body(lbProcedure *p) {
 gb_internal void lb_build_nested_proc(lbProcedure *p, AstProcLit *pd, Entity *e) {
 	GB_ASSERT(pd->body != nullptr);
 	lbModule *m = p->module;
-	auto *min_dep_set = &m->info->minimum_dependency_set;
 
-	if (ptr_set_exists(min_dep_set, e) == false) {
+	if (e->min_dep_count.load(std::memory_order_relaxed) == 0) {
 		// NOTE(bill): Nothing depends upon it so doesn't need to be built
 		return;
 	}
@@ -836,7 +834,7 @@ gb_internal void lb_build_nested_proc(lbProcedure *p, AstProcLit *pd, Entity *e)
 
 	lb_add_entity(m, e, value);
 	array_add(&p->children, nested_proc);
-	array_add(&m->procedures_to_generate, nested_proc);
+	mpsc_enqueue(&m->procedures_to_generate, nested_proc);
 }
 
 
@@ -923,13 +921,14 @@ gb_internal lbValue lb_emit_call_internal(lbProcedure *p, lbValue value, lbValue
 				    arg_type != param_type) {
 					LLVMTypeKind arg_kind = LLVMGetTypeKind(arg_type);
 					LLVMTypeKind param_kind = LLVMGetTypeKind(param_type);
-					if (arg_kind == param_kind &&
-					    arg_kind == LLVMPointerTypeKind) {
-						// NOTE(bill): LLVM's newer `ptr` only type system seems to fail at times
-						// I don't know why...
-						args[i] = LLVMBuildPointerCast(p->builder, args[i], param_type, "");
-						arg_type = param_type;
-						continue;
+					if (arg_kind == param_kind) {
+						if (arg_kind == LLVMPointerTypeKind) {
+							// NOTE(bill): LLVM's newer `ptr` only type system seems to fail at times
+							// I don't know why...
+							args[i] = LLVMBuildPointerCast(p->builder, args[i], param_type, "");
+							arg_type = param_type;
+							continue;
+						}
 					}
 				}
 
@@ -2212,7 +2211,7 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 				GB_ASSERT(e != nullptr);
 
 				if (e->parent_proc_decl != nullptr && e->parent_proc_decl->entity != nullptr) {
-					procedure = e->parent_proc_decl->entity->token.string;
+					procedure = e->parent_proc_decl->entity.load()->token.string;
 				} else {
 					procedure = str_lit("");
 				}
@@ -2239,7 +2238,7 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 				elements[i] = element;
 			}
 
-			LLVMValueRef backing_array = llvm_const_array(lb_type(m, t_load_directory_file), elements, count);
+			LLVMValueRef backing_array = llvm_const_array(m, lb_type(m, t_load_directory_file), elements, count);
 
 			Type *array_type = alloc_type_array(t_load_directory_file, count);
 			lbAddr backing_array_addr = lb_add_global_generated_from_procedure(p, array_type, {backing_array, array_type});

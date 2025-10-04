@@ -1655,6 +1655,13 @@ Output:
 write_float :: proc(buf: []byte, f: f64, fmt: byte, prec, bit_size: int) -> string {
 	return string(generic_ftoa(buf, f, fmt, prec, bit_size))
 }
+// Accepts '0'..='9', otherwise returns ok = false
+digit_to_int :: proc(r: rune) -> (value: int, ok: bool) {
+	if '0' <= r && r <= '9' {
+		return int(r - '0'), true
+	}
+	return -1, false
+}
 /*
 Writes a quoted string representation of the input string to a given byte slice and returns the result as a string
 

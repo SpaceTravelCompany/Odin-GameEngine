@@ -162,8 +162,6 @@ gb_internal void override_entity_in_scope(Entity *original_entity, Entity *new_e
 	if (found_scope == nullptr) {
 		return;
 	}
-	rw_mutex_lock(&found_scope->mutex);
-	defer (rw_mutex_unlock(&found_scope->mutex));
 
 	// IMPORTANT NOTE(bill, 2021-04-10): Overriding behaviour was flawed in that the
 	// original entity was still used check checked, but the checking was only
@@ -172,7 +170,9 @@ gb_internal void override_entity_in_scope(Entity *original_entity, Entity *new_e
 	// Therefore two things can be done: the type can be assigned to state that it
 	// has been "evaluated" and the variant data can be copied across
 
+	rw_mutex_lock(&found_scope->mutex);
 	string_map_set(&found_scope->elements, original_name, new_entity);
+	rw_mutex_unlock(&found_scope->mutex);
 
 	original_entity->flags |= EntityFlag_Overridden;
 	original_entity->type = new_entity->type;
@@ -851,6 +851,50 @@ gb_internal bool signature_parameter_similar_enough(Type *x, Type *y) {
 		}
 	}
 
+	Type *x_base = base_type(x);
+	Type *y_base = base_type(y);
+
+	if (x_base == y_base) {
+		return true;
+	}
+
+	if (x_base->kind == y_base->kind &&
+	    x_base->kind == Type_Struct) {
+		i64 xs = type_size_of(x_base);
+		i64 ys = type_size_of(y_base);
+
+		i64 xa = type_align_of(x_base);
+		i64 ya = type_align_of(y_base);
+
+
+		if (x_base->Struct.is_raw_union == y_base->Struct.is_raw_union &&
+		    xs == ys && xa == ya) {
+		    	if (xs > 16) {
+		    		// @@ABI NOTE(bill): Just allow anything over 16-bytes to be allowed, because on all current ABIs
+		    		// it will be passed by point
+		    		// NOTE(bill): this must be changed when ABI changes
+		    		return true;
+		    	}
+		    	if (x_base->Struct.is_raw_union) {
+		    		return true;
+		    	}
+		    	if (x->Struct.fields.count == y->Struct.fields.count) {
+		    		for (isize i = 0; i < x->Struct.fields.count; i++) {
+		    			Entity *a = x->Struct.fields[i];
+		    			Entity *b = y->Struct.fields[i];
+		    			bool similar = signature_parameter_similar_enough(a->type, b->type);
+		    			if (!similar) {
+		    				// NOTE(bill): If the fields are not similar enough, then stop.
+		    				goto end;
+		    			}
+		    		}
+		    	}
+		    	// HACK NOTE(bill): Allow this for the time begin until it actually becomes a practical problem
+			return true;
+		}
+	}
+
+end:;
 	return are_types_identical(x, y);
 }
 
@@ -948,7 +992,7 @@ gb_internal Entity *init_entity_foreign_library(CheckerContext *ctx, Entity *e) 
 		error(ident, "foreign library names must be an identifier");
 	} else {
 		String name = ident->Ident.token.string;
-		Entity *found = scope_lookup(ctx->scope, name);
+		Entity *found = scope_lookup(ctx->scope, name, ident->Ident.hash);
 
 		if (found == nullptr) {
 			if (is_blank_ident(name)) {
@@ -1549,7 +1593,7 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 				      "\tother at %s",
 				      LIT(name), token_pos_to_string(pos));
 			} else if (name == "main") {
-				if (d->entity->pkg->kind != Package_Runtime) {
+				if (d->entity.load()->pkg->kind != Package_Runtime) {
 					error(d->proc_lit, "The link name 'main' is reserved for internal use");
 				}
 			} else {
@@ -1565,7 +1609,7 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 	}
 }
 
-gb_internal void check_global_variable_decl(CheckerContext *ctx, Entity *&e, Ast *type_expr, Ast *init_expr) {
+gb_internal void check_global_variable_decl(CheckerContext *ctx, Entity *e, Ast *type_expr, Ast *init_expr) {
 	GB_ASSERT(e->type == nullptr);
 	GB_ASSERT(e->kind == Entity_Variable);
 
@@ -1686,7 +1730,28 @@ gb_internal void check_global_variable_decl(CheckerContext *ctx, Entity *&e, Ast
 	check_expr_with_type_hint(ctx, &o, init_expr, e->type);
 	check_init_variable(ctx, e, &o, str_lit("variable declaration"));
 	if (e->Variable.is_rodata && o.mode != Addressing_Constant) {
+		ERROR_BLOCK();
 		error(o.expr, "Variables declared with @(rodata) must have constant initialization");
+		Ast *expr = unparen_expr(o.expr);
+		if (is_type_struct(e->type) && expr && expr->kind == Ast_CompoundLit) {
+			ast_node(cl, CompoundLit, expr);
+			for (Ast *elem_ : cl->elems) {
+				Ast *elem = elem_;
+				if (elem->kind == Ast_FieldValue) {
+					elem = elem->FieldValue.value;
+				}
+				elem = unparen_expr(elem);
+
+				Entity *e = entity_of_node(elem);
+				if (elem->tav.mode != Addressing_Constant && e == nullptr && elem->kind != Ast_ProcLit) {
+					Token tok = ast_token(elem);
+					TokenPos pos = tok.pos;
+					gbString s = type_to_string(type_of_expr(elem));
+					error_line("%s Element is not constant, which is required for @(rodata), of type %s\n", token_pos_to_string(pos), s);
+					gb_string_free(s);
+				}
+			}
+		}
 	}
 
 	check_rtti_type_disallowed(e->token, e->type, "A variable declaration is using a type, %s, which has been disallowed");
@@ -1915,7 +1980,7 @@ gb_internal void add_deps_from_child_to_parent(DeclInfo *decl) {
 			rw_mutex_shared_lock(&decl->deps_mutex);
 			rw_mutex_lock(&decl->parent->deps_mutex);
 
-			for (Entity *e : decl->deps) {
+			FOR_PTR_SET(e, decl->deps) {
 				ptr_set_add(&decl->parent->deps, e);
 			}
 
@@ -1967,8 +2032,8 @@ gb_internal bool check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *de
 	ctx->curr_proc_sig  = type;
 	ctx->curr_proc_calling_convention = type->Proc.calling_convention;
 
-	if (decl->parent && decl->entity && decl->parent->entity) {
-		decl->entity->parent_proc_decl = decl->parent;
+	if (decl->parent && decl->entity.load() && decl->parent->entity) {
+		decl->entity.load()->parent_proc_decl = decl->parent;
 	}
 
 	if (ctx->pkg->name != "runtime") {
@@ -1981,9 +2046,9 @@ gb_internal bool check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *de
 
 	ast_node(bs, BlockStmt, body);
 
+	TEMPORARY_ALLOCATOR_GUARD();
 	Array<ProcUsingVar> using_entities = {};
-	using_entities.allocator = heap_allocator();
-	defer (array_free(&using_entities));
+	using_entities.allocator = temporary_allocator();
 
 	{
 		if (type->Proc.param_count > 0) {
@@ -2072,7 +2137,7 @@ gb_internal bool check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *de
 		GB_ASSERT(decl->proc_checked_state != ProcCheckedState_Checked);
 		if (decl->defer_use_checked) {
 			GB_ASSERT(is_type_polymorphic(type, true));
-			error(token, "Defer Use Checked: %.*s", LIT(decl->entity->token.string));
+			error(token, "Defer Use Checked: %.*s", LIT(decl->entity.load()->token.string));
 			GB_ASSERT(decl->defer_use_checked == false);
 		}
 
