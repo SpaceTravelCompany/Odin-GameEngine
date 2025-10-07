@@ -41,7 +41,7 @@
 					"type": "string"
 				},
 				"platform-version": {
-					"type": "integer"
+					"type": "string"
 				}
 			},
 			"required": ["ndk", "sdk", "build-tools-version", "platform-version"]

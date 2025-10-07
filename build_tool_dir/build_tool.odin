@@ -114,7 +114,7 @@ main :: proc() {
 
 		ndkPath := android_paths["ndk"].(json.String)
 		sdkPath := android_paths["sdk"].(json.String)
-		PLATFORM := android_paths["platform-version"].(json.Float)
+		PLATFORM := android_paths["platform-version"].(json.String)
 
 		builded := false
 

@@ -93,7 +93,7 @@ printTraceBuf :: proc(str:^strings.Builder) {
 		cstr := fmt.caprint(..args)
 		android.__android_log_write(android.LogPriority.ERROR, ODIN_BUILD_PROJECT_NAME, cstr)
 
-		printToFile((transmute([^]byte)cstr)[:len(cstr)])
+		printToFile(cstr)
 
 		intrinsics.trap()
 	}
