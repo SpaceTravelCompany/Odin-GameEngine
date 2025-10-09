@@ -180,12 +180,62 @@ glfwSystemInit :: proc() {
         }
        
         processorCoreLen = auto_cast os._unix_get_nprocs()
+        if processorCoreLen == 0 do trace.panic_log("processorCoreLen can't zero")
         when is_log {
             println("XFIT SYSLOG processorCoreLen : ", processorCoreLen)
         }
-        if processorCoreLen == 0 do trace.panic_log("processorCoreLen can't zero")
 	} else when ODIN_OS == .Windows {
-		//TODO (xfitgd)
+        systemInfo:windows.SYSTEM_INFO
+		windows.GetSystemInfo(&systemInfo)
+        processorCoreLen = auto_cast systemInfo.dwNumberOfProcessors
+        if processorCoreLen == 0 do trace.panic_log("processorCoreLen can't zero")
+
+        osVersionInfo:windows.OSVERSIONINFOEXW
+        osVersionInfo.dwOSVersionInfoSize = size_of(osVersionInfo)
+        _ = windows.RtlGetVersion(&osVersionInfo)
+
+        windowsPlatform.buildNumber = osVersionInfo.dwBuildNumber
+        windowsPlatform.servicePack = auto_cast osVersionInfo.wServicePackMajor
+        serverOS := osVersionInfo.wProductType != 1 // not VER_NT_WORKSTATION
+        if !serverOS && osVersionInfo.dwBuildNumber >= 22000 {
+            windowsPlatform.version = .Windows11
+        } else if serverOS && osVersionInfo.dwBuildNumber >= 20348 {
+            windowsPlatform.version = .WindowsServer2022
+        } else if serverOS && osVersionInfo.dwBuildNumber >= 17763 {
+            windowsPlatform.version = .WindowsServer2019
+        } else if osVersionInfo.dwMajorVersion == 6 && osVersionInfo.dwMinorVersion == 1 {
+            if serverOS {
+                windowsPlatform.version = .WindowsServer2008R2
+            } else {
+                windowsPlatform.version = .Windows7
+            }
+        } else if osVersionInfo.dwMajorVersion == 6 && osVersionInfo.dwMinorVersion == 2 {
+            if serverOS {
+                windowsPlatform.version = .WindowsServer2012
+            } else {
+                windowsPlatform.version = .Windows8
+            }
+        } else if osVersionInfo.dwMajorVersion == 6 && osVersionInfo.dwMinorVersion == 3 {
+            if serverOS {
+                windowsPlatform.version = .WindowsServer2012R2
+            } else {
+                windowsPlatform.version = .Windows8Point1
+            }
+        } else if osVersionInfo.dwMajorVersion == 10 && osVersionInfo.dwMinorVersion == 0 {
+            if serverOS {
+                windowsPlatform.version = .WindowsServer2016
+            } else {
+                windowsPlatform.version = .Windows10
+            }
+        } else {
+            windowsPlatform.version = .Unknown
+            printCustomAndroid("WARN : unknown windows version\n", logPriority = .WARN)
+        }
+
+         when is_log {
+            println("XFIT SYSLOG processorCoreLen : ", processorCoreLen)
+            println("XFIT SYSLOG windowsPlatform : ", windowsPlatform)
+        }
 	}
 
     when is_log do glfw.SetErrorCallback(glfwErrorCallback)

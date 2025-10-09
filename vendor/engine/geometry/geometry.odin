@@ -477,64 +477,77 @@ Shapes_ComputePolygon :: proc(poly:^Shapes, allocator := context.allocator) -> (
             vertSubList:[dynamic]ShapeVertex2D = mem.make_non_zeroed_dynamic_array([dynamic]ShapeVertex2D, allocator)
             indSubList:[dynamic]u32 = mem.make_non_zeroed_dynamic_array([dynamic]u32, allocator)
 
-            err, idx, typeIdx = Shapes_ComputePolygon_In(&vertSubList, &indSubList, poly, i, idx, typeIdx, allocator)
+            err, idx, typeIdx = Shapes_ComputePolygon_In(&vertSubList, &indSubList, poly, i, idx, typeIdx, false, allocator)
             if err != .None {
-                for v in vertList {
-                    delete(v, allocator)
-                }
-                for i in indList {
-                    delete(i, allocator)
-                }
+                for v in vertList do delete(v, allocator)
+                for i in indList do delete(i, allocator)
                 delete(vertSubList)
                 delete(indSubList)
                 return
             }
-            polyPrevColor :: proc "contextless" (poly:^Shapes, i:int) -> (Maybe(linalg.Point3DwF), int) {
-                if i == 0 {
-                    return nil, 0
-                } else {
-                    j := i - 1
-                    for j != -1 && poly.colors[j] == nil {
-                        j -= 1
-                    }
-                    if j == -1 do return nil, 0
-                    return poly.colors[j].?, j
-                }
-            }
-            prevColor, prevColorIdx := polyPrevColor(poly, i)
-            if prevColor == nil || poly.colors[prevColorIdx].? != poly.colors[i].? {
-                shrink(&vertSubList)
-                shrink(&indSubList)
-                non_zero_append(&vertList, vertSubList[:])
-                non_zero_append(&indList, indSubList[:])
-                non_zero_append(&colList, poly.colors[i].?)
-            } else {
-                newVerts := mem.make_non_zeroed([]ShapeVertex2D, len(vertList[len(vertList) - 1]) + len(vertSubList), allocator)
-                newIns := mem.make_non_zeroed([]u32, len(indList[len(indList) - 1]) + len(indSubList), allocator)
+            Shape_APPEND(&vertSubList, &indSubList, &vertList, &indList, &colList, poly, i, false, allocator)
+        }
+        if poly.strokeColors != nil && poly.strokeColors[i] != nil && poly.thickness[i] > 0.0 {
+            //TODO (xfitgd) Shapes_ComputePolygon_Stroke_In
 
-                runtime.mem_copy_non_overlapping(&newVerts[0], &vertList[len(vertList) - 1][0], len(vertList[len(vertList) - 1]) * size_of(ShapeVertex2D))
-                runtime.mem_copy_non_overlapping(&newVerts[len(vertList[len(vertList) - 1])], &vertSubList[0], len(vertSubList) * size_of(ShapeVertex2D))
-                runtime.mem_copy_non_overlapping(&newIns[0], &indList[len(indList) - 1][0], len(indList[len(indList) - 1]) * size_of(u32))
-                runtime.mem_copy_non_overlapping(&newIns[len(indList[len(indList) - 1])], &indSubList[0], len(indSubList) * size_of(u32))
+            vertSubList:[dynamic]ShapeVertex2D = mem.make_non_zeroed_dynamic_array([dynamic]ShapeVertex2D, allocator)
+            indSubList:[dynamic]u32 = mem.make_non_zeroed_dynamic_array([dynamic]u32, allocator)
 
+            err, idx, typeIdx = Shapes_ComputePolygon_In(&vertSubList, &indSubList, poly, i, idx, typeIdx, true, allocator)
+            if err != .None {
+                for v in vertList do delete(v, allocator)
+                for i in indList do delete(i, allocator)
                 delete(vertSubList)
                 delete(indSubList)
-                delete(vertList[len(vertList) - 1], allocator)
-                delete(indList[len(indList) - 1], allocator)
-
-                resize(&vertList, len(vertList) - 1)
-                resize(&indList, len(indList) - 1)
-                non_zero_append(&vertList, newVerts)
-                non_zero_append(&indList, newIns)
+                return
             }
+            Shape_APPEND(&vertSubList, &indSubList, &vertList, &indList, &colList, poly, i, true, allocator)
         }
-        // if poly.strokeColors != nil && poly.strokeColors[i] != nil && poly.thickness[i] > 0.0 {
-        //     //TODO (xfitgd) Shapes_ComputePolygon_Stroke_In
-        //     non_zero_append(&colList, poly.strokeColors[i].?)
-        // }
     }
 
-    Shapes_ComputePolygon_In :: proc(vertSubList:^[dynamic]ShapeVertex2D, indSubList:^[dynamic]u32, poly:^Shapes, startPoly:int, startIdx:u32, startTypeIdx:u32, allocator := context.allocator) ->
+    Shape_APPEND :: proc(vertSubList:^[dynamic]ShapeVertex2D, indSubList:^[dynamic]u32, vertList:^[dynamic][]ShapeVertex2D, indList:^[dynamic][]u32, colList:^[dynamic]linalg.Point3DwF,
+        poly:^Shapes, i:int, isStroke:bool, allocator := context.allocator) {
+        polyPrevColor :: proc "contextless" (polyColors:^[]Maybe(linalg.Point3DwF), i:int) -> (Maybe(linalg.Point3DwF), int) {
+            if i == 0 {
+                return nil, 0
+            } else {
+                j := i - 1
+                for j != -1 && polyColors[j] == nil do j -= 1
+                if j == -1 do return nil, 0
+                return polyColors[j].?, j
+            }
+        }
+        pColors := isStroke ? &poly.strokeColors : &poly.colors
+
+        prevColor, prevColorIdx := polyPrevColor(pColors, i)
+        if prevColor == nil || pColors[prevColorIdx].? != pColors[i].? {
+            shrink(vertSubList)
+            shrink(indSubList)
+            non_zero_append(vertList, vertSubList[:])
+            non_zero_append(indList, indSubList[:])
+            non_zero_append(colList, pColors[i].?)
+        } else {
+            newVerts := mem.make_non_zeroed([]ShapeVertex2D, len(vertList[len(vertList) - 1]) + len(vertSubList), allocator)
+            newIns := mem.make_non_zeroed([]u32, len(indList[len(indList) - 1]) + len(indSubList), allocator)
+
+            runtime.mem_copy_non_overlapping(&newVerts[0], &vertList[len(vertList) - 1][0], len(vertList[len(vertList) - 1]) * size_of(ShapeVertex2D))
+            runtime.mem_copy_non_overlapping(&newVerts[len(vertList[len(vertList) - 1])], &vertSubList[0], len(vertSubList) * size_of(ShapeVertex2D))
+            runtime.mem_copy_non_overlapping(&newIns[0], &indList[len(indList) - 1][0], len(indList[len(indList) - 1]) * size_of(u32))
+            runtime.mem_copy_non_overlapping(&newIns[len(indList[len(indList) - 1])], &indSubList[0], len(indSubList) * size_of(u32))
+
+            delete(vertSubList^)
+            delete(indSubList^)
+            delete(vertList[len(vertList) - 1], allocator)
+            delete(indList[len(indList) - 1], allocator)
+
+            resize(vertList, len(vertList) - 1)
+            resize(indList, len(indList) - 1)
+            non_zero_append(vertList, newVerts)
+            non_zero_append(indList, newIns)
+        }
+    }
+
+    Shapes_ComputePolygon_In :: proc(vertSubList:^[dynamic]ShapeVertex2D, indSubList:^[dynamic]u32, poly:^Shapes, startPoly:int, startIdx:u32, startTypeIdx:u32, isStroke:bool, allocator := context.allocator) ->
     (err:ShapesError = .None, idx:u32, typeIdx:u32) {
         count :u32= 0
         typeIdx = startTypeIdx
@@ -570,24 +583,16 @@ Shapes_ComputePolygon :: proc(poly:^Shapes, allocator := context.allocator) -> (
             non_zero_append(indSubList, u32(len(vertSubList) - 1) + idx)
             
             if t == .Quadratic {
-                if typeFirstIdx + 1 >= n - 1 {
-                    i += 1
-                } else {
-                    i += 2
-                }
+                if typeFirstIdx + 1 >= n - 1 do i += 1
+                else do i += 2
                 typeFirstIdx += 2              
             } else if t == .Line {
                 if typeFirstIdx >= n - 1 {
-                } else {
-                    i += 1
-                }
+                } else {i += 1}
                 typeFirstIdx += 1
             } else {
-                if typeFirstIdx + 2 >= n - 1 {
-                    i += 2
-                } else {
-                    i += 3
-                }
+                if typeFirstIdx + 2 >= n - 1 do i += 2
+                else do i += 3
                 typeFirstIdx += 3
             }
             typeLen += 1

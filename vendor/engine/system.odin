@@ -296,7 +296,31 @@ when is_android {
 	printf :: fmt.printf
 	print :: fmt.print
 
-	printCustomAndroid :: proc(args: ..any, logPriority:any = "", sep := " ") -> int {
+	/**
+	* Android log priority values, in increasing order of priority.
+	*/
+	LogPriority :: enum i32 {
+	/** For internal use only.  */
+	UNKNOWN = 0,
+	/** The default priority, for internal use only.  */
+	DEFAULT, /* only for SetMinPriority() */
+	/** Verbose logging. Should typically be disabled for a release apk. */
+	VERBOSE,
+	/** Debug logging. Should typically be disabled for a release apk. */
+	DEBUG,
+	/** Informational logging. Should typically be disabled for a release apk. */
+	INFO,
+	/** Warning logging. For use with recoverable failures. */
+	WARN,
+	/** Error logging. For use with unrecoverable failures. */
+	ERROR,
+	/** Fatal logging. For use when aborting. */
+	FATAL,
+	/** For internal use only.  */
+	SILENT, /* only for SetMinPriority(); must be last */
+	}
+
+	printCustomAndroid :: proc(args: ..any, logPriority:LogPriority = .INFO, sep := " ") -> int {
 		_ = logPriority
 		return print(..args, sep = sep)
 	}
