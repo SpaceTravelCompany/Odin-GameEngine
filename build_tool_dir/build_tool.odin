@@ -115,6 +115,7 @@ main :: proc() {
 		ndkPath := android_paths["ndk"].(json.String)
 		sdkPath := android_paths["sdk"].(json.String)
 		PLATFORM := android_paths["platform-version"].(json.String)
+		//!use build-tools version same as platform version
 
 		builded := false
 
@@ -141,6 +142,7 @@ main :: proc() {
 			"-build-mode:shared",
 			target,
 			"-subtarget:android",
+			"-show-debug-messages",//!for debug
 			fmt.aprint("-minimum-os-version:", PLATFORM, sep = "", allocator = context.temp_allocator),
 			//"-extra-linker-flags:\"-L lib/lib/arm64-v8a -lVkLayer_khronos_validation\"" if debug else ({}),
 			}) {
@@ -192,6 +194,7 @@ main :: proc() {
 		out_path, 
 		o, 
 		"-debug" if debug else ({}),
+		"-show-debug-messages",//!for debug
 		resource.? if resource != nil else ({}),
 		"-define:__log__=true" if log else ({}),
 		"-define:__console__=true" if console else ({}),

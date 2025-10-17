@@ -7,9 +7,8 @@
         "build-type" : "minimal"
     },
     "android-paths" : {
-        "ndk" : "/usr/local/Android/ndk/29.0.13113456",
+        "ndk" : "/usr/local/Android/ndk/29.0.14206865",
         "sdk" : "/usr/local/Android",
-        "build-tools-version" : "36.0.0",
         "platform-version" : "35"
     }
 }

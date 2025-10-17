@@ -37,14 +37,11 @@
 				"sdk": {
 					"type": "string"
 				},
-				"build-tools-version": {
-					"type": "string"
-				},
 				"platform-version": {
 					"type": "string"
 				}
 			},
-			"required": ["ndk", "sdk", "build-tools-version", "platform-version"]
+			"required": ["ndk", "sdk", "platform-version"]
 		}
 	},
 	"required": ["setting"]
