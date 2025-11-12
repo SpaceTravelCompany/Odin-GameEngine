@@ -9,6 +9,27 @@ import "core:math/linalg"
 import "base:runtime"
 import "base:intrinsics"
 
+// 스트로크 스타일 정의
+StrokeCap :: enum {
+    Butt,    // 평평한 끝
+    Round,   // 둥근 끝
+    Square,  // 사각형 끝
+}
+
+StrokeJoin :: enum {
+    Miter,   // 뾰족한 연결
+    Round,   // 둥근 연결
+    Bevel,   // 베벨 연결
+}
+
+StrokeStyle :: struct {
+    width: f32,
+    cap: StrokeCap,
+    join: StrokeJoin,
+    miterLimit: f32,  // Miter join에서 사용
+}
+
+
 
 ShapeVertex2D :: struct #align(1) {
     pos: linalg.PointF,
@@ -32,14 +53,6 @@ CurveType :: enum {
     Quadratic,
 }
 
-// LineError :: enum {
-//     None,
-//     IsPointNotLine,
-//     IsNotCurve,
-//     InvaildLine,
-//     OutOfIdx,    
-// }
-
 ShapesError :: enum {
     None,
 
@@ -52,29 +65,6 @@ ShapesError :: enum {
 
     EmptyPolygon,
 }
-
-// Line :: struct {
-//     start:PointF,
-//     control0:PointF,
-//     control1:PointF,
-//     type:CurveType,
-// }
-
-// Line_LineInit :: #force_inline proc "contextless" (start:PointF) -> Line {
-//     return {
-//         start = start,
-//         type = .Line
-//     }
-// }
-// Line_QuadraticInit :: #force_inline proc "contextless" (start:PointF, control:PointF) -> Line {
-//     return {
-//         start = start,
-//         control0 = control,
-//         control1 = control,
-//         type = .Quadratic
-//     }
-// }
-
 
 Shapes :: struct {
     poly:[]linalg.PointF,//len(poly) == all sum nPolys
@@ -469,15 +459,27 @@ Shapes_ComputePolygon :: proc(poly:^Shapes, allocator := context.allocator) -> (
         free(res, allocator)
         res = nil
     }
+    
+    polyPrevColor :: proc "contextless" (polyColors:^[]Maybe(linalg.Point3DwF), i:int) -> (Maybe(linalg.Point3DwF), int) {
+        if i == 0 {
+            return nil, 0
+        } else {
+            j := i - 1
+            for j != -1 && polyColors[j] == nil do j -= 1
+            if j == -1 do return nil, 0
+            return polyColors[j].?, j
+        }
+    }
 
     idx :u32 = 0
     typeIdx :u32 = 0
     for i in 0..<len(poly.nPolys) {
-        if poly.colors[i] != nil {
+        pTypeIdx := typeIdx
+        if poly.colors != nil && poly.colors[i] != nil {
             vertSubList:[dynamic]ShapeVertex2D = mem.make_non_zeroed_dynamic_array([dynamic]ShapeVertex2D, allocator)
             indSubList:[dynamic]u32 = mem.make_non_zeroed_dynamic_array([dynamic]u32, allocator)
 
-            err, idx, typeIdx = Shapes_ComputePolygon_In(&vertSubList, &indSubList, poly, i, idx, typeIdx, false, allocator)
+            err, idx, typeIdx = Shapes_ComputePolygon_In(&vertSubList, &indSubList, poly, i, idx, typeIdx,  allocator)
             if err != .None {
                 for v in vertList do delete(v, allocator)
                 for i in indList do delete(i, allocator)
@@ -487,67 +489,204 @@ Shapes_ComputePolygon :: proc(poly:^Shapes, allocator := context.allocator) -> (
             }
             Shape_APPEND(&vertSubList, &indSubList, &vertList, &indList, &colList, poly, i, false, allocator)
         }
-        if poly.strokeColors != nil && poly.strokeColors[i] != nil && poly.thickness[i] > 0.0 {
-            //TODO (xfitgd) Shapes_ComputePolygon_Stroke_In
+        if poly.strokeColors != nil && poly.strokeColors[i] != nil && poly.thickness[i] > 0.0 {  
+            start_ :u32= 0
+            for e in 0..<i {
+                start_ += u32(poly.nPolys[e])
+            }
+            polyOri := linalg.GetPolygonOrientation(poly.poly[start_:start_ + poly.nPolys[i]])
+            err, _, typeIdx = strokeCompute(poly, start_, i, idx, pTypeIdx, &vertList, &indList, &colList, polyOri, allocator)
+            if err != .None do return
 
-            vertSubList:[dynamic]ShapeVertex2D = mem.make_non_zeroed_dynamic_array([dynamic]ShapeVertex2D, allocator)
-            indSubList:[dynamic]u32 = mem.make_non_zeroed_dynamic_array([dynamic]u32, allocator)
+            strokeCompute :: proc(poly:^Shapes, start_:u32, i:int, _idx:u32, pTypeIdx:u32,
+                vertList:^[dynamic][]ShapeVertex2D, indList:^[dynamic][]u32, colList:^[dynamic]linalg.Point3DwF,
+                polyOri:linalg.PolyOrientation,
+                allocator := context.allocator) -> (err:ShapesError = .None, idx:u32, typeIdx:u32) {
+                vertSubList:[dynamic]ShapeVertex2D = mem.make_non_zeroed_dynamic_array([dynamic]ShapeVertex2D, allocator)
+                indSubList:[dynamic]u32 = mem.make_non_zeroed_dynamic_array([dynamic]u32, allocator)
+                polyT := mem.new_non_zeroed(Shapes, context.temp_allocator)
+                polyT2 := mem.new_non_zeroed(Shapes, context.temp_allocator)
 
-            err, idx, typeIdx = Shapes_ComputePolygon_In(&vertSubList, &indSubList, poly, i, idx, typeIdx, true, allocator)
-            if err != .None {
-                for v in vertList do delete(v, allocator)
-                for i in indList do delete(i, allocator)
-                delete(vertSubList)
-                delete(indSubList)
+                polyT2.nPolys = mem.make_non_zeroed([]u32, 1, context.temp_allocator)
+                polyT2.nPolys[0] = poly.nPolys[i] 
+                polyT.nPolys = mem.make_non_zeroed([]u32, 1, context.temp_allocator)
+                polyT.nPolys[0] = poly.nPolys[i] 
+
+                polyT.poly = mem.make_non_zeroed([]linalg.PointF,  polyT.nPolys[0], context.temp_allocator)
+                polyT2.poly = mem.make_non_zeroed([]linalg.PointF,  polyT2.nPolys[0], context.temp_allocator)
+
+                Thickness_Point :: proc "contextless" (prevPoint:linalg.PointF, point:linalg.PointF, nextPoint:linalg.PointF, thickness:f32) -> [4]linalg.PointF {
+                    c := abs(thickness)
+
+                    a2:f32
+                    xx:f32
+                    
+                    ap1 : linalg.PointF
+                    ap2 : linalg.PointF
+
+                    dx := point.x - prevPoint.x
+                    dy := point.y - prevPoint.y
+
+                    dyDir :f32 = dy > 0.0 ? 1.0 : -1.0
+                    dxDir :f32 = dx > 0.0 ? -1.0 : 1.0
+                    thicknessDir :f32 = thickness > 0.0 ? 1.0 : -1.0
+
+                    if dx == 0.0 {    
+                        ap1 = linalg.PointF{c * dyDir * thicknessDir, 0}
+                    } else if dy == 0.0 {
+                        ap1 = linalg.PointF{0, c * dxDir * thicknessDir}
+                    } else {
+                        a2 = -1.0 / (dy / dx)
+                        xx = math.sqrt((c * c) / (a2*a2 + 1.0))
+                        ap1 = linalg.PointF{xx * thicknessDir, a2 * xx * thicknessDir}
+                    }
+
+                    dx = nextPoint.x - point.x
+                    dy = nextPoint.y - point.y
+                    dyDir = dy > 0.0 ? 1.0 : -1.0
+                    dxDir = dx > 0.0 ? -1.0 : 1.0
+                    if dx == 0.0 {
+                        ap2 = linalg.PointF{c * dyDir * thicknessDir, 0}
+                    } else if dy == 0.0 {
+                        ap2 = linalg.PointF{0, c * dxDir * thicknessDir}
+                    } else {
+                        a2 = -1.0 / (dy / dx)
+                        xx = math.sqrt((c * c) / (a2*a2 + 1.0))
+                        ap2 = linalg.PointF{xx * thicknessDir, a2 * xx * thicknessDir}
+                    }
+
+                    return {prevPoint + ap1, point + ap1, point + ap2, nextPoint + ap2}
+                }
+                
+                for e in 0..<poly.nPolys[i] {
+                    prevPoint := e == 0                  ? poly.poly[start_ + poly.nPolys[i] - 1] : poly.poly[start_ + e - 1]
+                    nextPoint := e == poly.nPolys[i] - 1 ? poly.poly[start_]                      : poly.poly[start_ + e + 1]
+
+                    pts1:[4]linalg.PointF = Thickness_Point(prevPoint, poly.poly[start_ + e], nextPoint, polyOri == .Clockwise ? -poly.thickness[i] : poly.thickness[i])
+                    pts2:[4]linalg.PointF = Thickness_Point(prevPoint, poly.poly[start_ + e], nextPoint, polyOri == .Clockwise ? poly.thickness[i] : -poly.thickness[i])
+
+                    checkOut, check, checkPt := linalg.LinesIntersect2(pts1[0], pts1[1], pts1[2], pts1[3])
+                    if check {
+                        polyT.poly[e] = checkPt
+                    } else if checkOut {
+                        polyT.poly[e] = checkPt
+                    } else {
+                        polyT.poly[e] = pts1[2]
+                    }
+
+                    checkOut, check, checkPt = linalg.LinesIntersect2(pts2[0], pts2[1], pts2[2], pts2[3])
+                    if check {
+                        polyT2.poly[e] = checkPt
+                    } else if checkOut {
+                        polyT2.poly[e] = checkPt
+                    } else {
+                        polyT2.poly[e] = pts2[2]
+                    }
+                }
+                
+                typeI := pTypeIdx
+                typeFirstIdx :u32 = 0
+                for typeFirstIdx < poly.nPolys[i] {
+                    t := poly.types[typeI]
+                    
+                    if t == .Quadratic {
+                        typeFirstIdx += 2              
+                    } else if t == .Line {
+                        typeFirstIdx += 1
+                    } else {
+                        typeFirstIdx += 3
+                    }
+                    typeI += 1
+                }
+                typeLen := typeI - pTypeIdx
+                polyT.types = mem.make_non_zeroed([]CurveType, typeLen, context.temp_allocator)
+                mem.copy_non_overlapping(&polyT.types[0], &poly.types[pTypeIdx], int(typeLen) * size_of(CurveType))
+
+                polyT.strokeColors = mem.make_non_zeroed([]Maybe(linalg.Point3DwF), 1, context.temp_allocator)
+                polyT.strokeColors[0] = poly.strokeColors[i]
+
+                polyT2.types = mem.make_non_zeroed([]CurveType, typeLen, context.temp_allocator)
+                mem.copy_non_overlapping(&polyT2.types[0], &poly.types[pTypeIdx], int(typeLen) * size_of(CurveType))
+
+                polyT2.strokeColors = mem.make_non_zeroed([]Maybe(linalg.Point3DwF), 1, context.temp_allocator)
+                polyT2.strokeColors[0] = poly.strokeColors[i]
+
+                defer {
+                    delete(polyT.nPolys, context.temp_allocator)
+                    delete(polyT.poly, context.temp_allocator)
+                    delete(polyT.types, context.temp_allocator)
+                    delete(polyT.strokeColors, context.temp_allocator)
+                    free(polyT, context.temp_allocator)
+
+                    delete(polyT2.nPolys, context.temp_allocator)
+                    delete(polyT2.poly, context.temp_allocator)
+                    delete(polyT2.types, context.temp_allocator)
+                    delete(polyT2.strokeColors, context.temp_allocator)
+                    free(polyT2, context.temp_allocator)
+                }
+
+                err, idx, _ = Shapes_ComputePolygon_In(&vertSubList, &indSubList, polyT, 0, _idx, 0, allocator)
+                if err != .None {
+                    for v in vertList do delete(v, allocator)
+                    for i in indList do delete(i, allocator)
+                    delete(vertSubList)
+                    delete(indSubList)
+                    return
+                }
+                //resPrevColor, resPrevColorIdx := polyPrevColor(&poly.strokeColors, i)
+                Shape_APPEND(&vertSubList, &indSubList, vertList, indList, colList, polyT, 
+                    0, true, allocator)
+
+                clear(&vertSubList)
+                clear(&indSubList)
+                err, idx, _ = Shapes_ComputePolygon_In(&vertSubList, &indSubList, polyT2, 0, 0, 0, allocator)
+                if err != .None {
+                    for v in vertList do delete(v, allocator)
+                    for i in indList do delete(i, allocator)
+                    delete(vertSubList)
+                    delete(indSubList)
+                    return
+                }
+                Shape_APPEND(&vertSubList, &indSubList, vertList, indList, colList, polyT2, 0, true, allocator)
+
+                typeIdx = typeI
                 return
             }
-            Shape_APPEND(&vertSubList, &indSubList, &vertList, &indList, &colList, poly, i, true, allocator)
         }
     }
 
     Shape_APPEND :: proc(vertSubList:^[dynamic]ShapeVertex2D, indSubList:^[dynamic]u32, vertList:^[dynamic][]ShapeVertex2D, indList:^[dynamic][]u32, colList:^[dynamic]linalg.Point3DwF,
         poly:^Shapes, i:int, isStroke:bool, allocator := context.allocator) {
-        polyPrevColor :: proc "contextless" (polyColors:^[]Maybe(linalg.Point3DwF), i:int) -> (Maybe(linalg.Point3DwF), int) {
-            if i == 0 {
-                return nil, 0
-            } else {
-                j := i - 1
-                for j != -1 && polyColors[j] == nil do j -= 1
-                if j == -1 do return nil, 0
-                return polyColors[j].?, j
-            }
-        }
+       
         pColors := isStroke ? &poly.strokeColors : &poly.colors
 
-        prevColor, prevColorIdx := polyPrevColor(pColors, i)
-        if prevColor == nil || pColors[prevColorIdx].? != pColors[i].? {
+        //prevColor, prevColorIdx := polyPrevColor(pColors, i == -1 ? 0 : i)
+        //if i != -1 && (prevColor == nil || pColors[prevColorIdx].? != pColors[i].?) {
             shrink(vertSubList)
             shrink(indSubList)
             non_zero_append(vertList, vertSubList[:])
             non_zero_append(indList, indSubList[:])
             non_zero_append(colList, pColors[i].?)
-        } else {
-            newVerts := mem.make_non_zeroed([]ShapeVertex2D, len(vertList[len(vertList) - 1]) + len(vertSubList), allocator)
-            newIns := mem.make_non_zeroed([]u32, len(indList[len(indList) - 1]) + len(indSubList), allocator)
+        // } else {
+        //     newVerts := mem.make_non_zeroed([]ShapeVertex2D, len(vertList[len(vertList) - 1]) + len(vertSubList), allocator)
+        //     newIns := mem.make_non_zeroed([]u32, len(indList[len(indList) - 1]) + len(indSubList), allocator)
 
-            runtime.mem_copy_non_overlapping(&newVerts[0], &vertList[len(vertList) - 1][0], len(vertList[len(vertList) - 1]) * size_of(ShapeVertex2D))
-            runtime.mem_copy_non_overlapping(&newVerts[len(vertList[len(vertList) - 1])], &vertSubList[0], len(vertSubList) * size_of(ShapeVertex2D))
-            runtime.mem_copy_non_overlapping(&newIns[0], &indList[len(indList) - 1][0], len(indList[len(indList) - 1]) * size_of(u32))
-            runtime.mem_copy_non_overlapping(&newIns[len(indList[len(indList) - 1])], &indSubList[0], len(indSubList) * size_of(u32))
+        //     runtime.mem_copy_non_overlapping(&newVerts[0], &vertList[len(vertList) - 1][0], len(vertList[len(vertList) - 1]) * size_of(ShapeVertex2D))
+        //     runtime.mem_copy_non_overlapping(&newVerts[len(vertList[len(vertList) - 1])], &vertSubList[0], len(vertSubList) * size_of(ShapeVertex2D))
+        //     runtime.mem_copy_non_overlapping(&newIns[0], &indList[len(indList) - 1][0], len(indList[len(indList) - 1]) * size_of(u32))
+        //     runtime.mem_copy_non_overlapping(&newIns[len(indList[len(indList) - 1])], &indSubList[0], len(indSubList) * size_of(u32))
 
-            delete(vertSubList^)
-            delete(indSubList^)
-            delete(vertList[len(vertList) - 1], allocator)
-            delete(indList[len(indList) - 1], allocator)
+        //     delete(vertSubList^)
+        //     delete(indSubList^)
+        //     delete(vertList[len(vertList) - 1], allocator)
+        //     delete(indList[len(indList) - 1], allocator)
 
-            resize(vertList, len(vertList) - 1)
-            resize(indList, len(indList) - 1)
-            non_zero_append(vertList, newVerts)
-            non_zero_append(indList, newIns)
-        }
+        //     vertList[len(vertList) - 1] = newVerts
+        //     indList[len(indList) - 1] = newIns
+        // }
     }
 
-    Shapes_ComputePolygon_In :: proc(vertSubList:^[dynamic]ShapeVertex2D, indSubList:^[dynamic]u32, poly:^Shapes, startPoly:int, startIdx:u32, startTypeIdx:u32, isStroke:bool, allocator := context.allocator) ->
+    Shapes_ComputePolygon_In :: proc(vertSubList:^[dynamic]ShapeVertex2D, indSubList:^[dynamic]u32, poly:^Shapes, startPoly:int, startIdx:u32, startTypeIdx:u32, allocator := context.allocator) ->
     (err:ShapesError = .None, idx:u32, typeIdx:u32) {
         count :u32= 0
         typeIdx = startTypeIdx
@@ -571,7 +710,7 @@ Shapes_ComputePolygon :: proc(poly:^Shapes, allocator := context.allocator) -> (
         for typeFirstIdx < n {
             t := poly.types[typeLen]
 
-            non_zero_append(vertSubList, ShapeVertex2D{pos =poly.poly[i], uvw = linalg.Point3DF{1.0, 0.0, 0.0},})
+            non_zero_append(vertSubList, ShapeVertex2D{pos = poly.poly[i], uvw = linalg.Point3DF{1.0, 0.0, 0.0},})
             last_vert := &vertSubList[len(vertSubList) - 1]
             if vertSubList[0].pos.x > last_vert.pos.x do vertSubList[0].pos.x = last_vert.pos.x
             if vertSubList[0].pos.y < last_vert.pos.y do vertSubList[0].pos.y = last_vert.pos.y

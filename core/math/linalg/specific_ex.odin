@@ -274,7 +274,6 @@ LinesIntersect2 :: proc "contextless" (a1 : [2]$T, a2 : [2]T, b1: [2]T, b2 : [2]
 	ub := ((a2.x - a1.x) * (a1.y - b1.y) - (a2.y - a1.y) * (a1.x - b1.x)) / den
 
 	return true, ua >= 0.0 && ub >= 0.0 && ua <= 1.0 && ub <= 1.0, [2]T{a1.x + ua * (a2.x - a1.x), a1.y + ua * (a2.y - a1.y)}
-
 }
 
 

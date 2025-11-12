@@ -379,13 +379,14 @@ allocator : runtime.Allocator) -> (res:^geometry.RawShape, err:geometry.ShapesEr
                 nPolys = mem.make_non_zeroed([]u32, self.face.glyph.outline.n_contours, context.temp_allocator),//갯수는 후에 RESIZE 처리
                 types = mem.make_non_zeroed([]geometry.CurveType, self.face.glyph.outline.n_points*3, context.temp_allocator),
                 poly = mem.make_non_zeroed([]linalg.PointF, self.face.glyph.outline.n_points*3, context.temp_allocator),
-                colors = mem.make_non_zeroed([]Maybe(linalg.Point3DwF), self.face.glyph.outline.n_contours, context.temp_allocator),
+                strokeColors = mem.make_non_zeroed([]Maybe(linalg.Point3DwF), self.face.glyph.outline.n_contours, context.temp_allocator),
+                thickness = mem.make_non_zeroed([]f32, self.face.glyph.outline.n_contours, context.temp_allocator),
             }
             defer {
                 delete(poly.nPolys, context.temp_allocator)
                 delete(poly.types, context.temp_allocator)
                 delete(poly.poly, context.temp_allocator)
-                delete(poly.colors, context.temp_allocator)
+                delete(poly.strokeColors, context.temp_allocator)
             }
             data : FontUserData = {
                 polygon = &poly,
@@ -417,9 +418,13 @@ allocator : runtime.Allocator) -> (res:^geometry.RawShape, err:geometry.ShapesEr
                 poly.nPolys = mem.resize_non_zeroed_slice(poly.nPolys, data.nPoly + 1, context.temp_allocator)
                 poly.poly = mem.resize_non_zeroed_slice(poly.poly, data.idx, context.temp_allocator)
                 poly.types = mem.resize_non_zeroed_slice(poly.types, data.typeIdx, context.temp_allocator)
-                poly.colors = mem.resize_non_zeroed_slice(poly.colors, data.nPoly + 1, context.temp_allocator)
-                for &c in poly.colors {
+                poly.strokeColors = mem.resize_non_zeroed_slice(poly.strokeColors, data.nPoly + 1, context.temp_allocator)
+                poly.thickness = mem.resize_non_zeroed_slice(poly.thickness, data.nPoly + 1, context.temp_allocator)
+                for &c in poly.strokeColors {
                     c = linalg.Point3DwF{0,0,0,1}//?no matter
+                }
+                for &t in poly.thickness {
+                    t = 0.02
                 }
 
                 rawP : ^geometry.RawShape
