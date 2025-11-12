@@ -923,6 +923,22 @@ gb_internal AstPackage *get_core_package(CheckerInfo *info, String name) {
 	return *found;
 }
 
+
+gb_internal AstPackage *try_get_core_package(CheckerInfo *info, String name) {
+	if (name == "runtime") {
+		return get_runtime_package(info);
+	}
+
+	gbAllocator a = heap_allocator();
+	String path = get_fullpath_core_collection(a, name, nullptr);
+	defer (gb_free(a, path.text));
+	auto found = string_map_get(&info->packages, path);
+	if (found == nullptr) {
+		return nullptr;
+	}
+	return *found;
+}
+
 gb_internal void add_package_dependency(CheckerContext *c, char const *package_name, char const *name, bool required=false) {
 	String n = make_string_c(name);
 	AstPackage *p = get_core_package(&c->checker->info, make_string_c(package_name));
@@ -5093,26 +5109,22 @@ gb_internal void add_import_dependency_node(Checker *c, Ast *decl, PtrMap<AstPac
 			error(token, "Unable to find package: %.*s", LIT(path));
 			exit_with_errors();
 		}
-		AstPackage *pkg = *found;
-		GB_ASSERT(pkg->scope != nullptr);
+		AstPackage *child_pkg = *found;
+		GB_ASSERT(child_pkg->scope != nullptr);
 
-		id->package = pkg;
+		id->package = child_pkg;
 
-		ImportGraphNode **found_node = nullptr;
-		ImportGraphNode *m = nullptr;
-		ImportGraphNode *n = nullptr;
-
-		found_node = map_get(M, pkg);
+		ImportGraphNode **found_node = map_get(M, child_pkg);
 		GB_ASSERT(found_node != nullptr);
-		m = *found_node;
+		ImportGraphNode *child = *found_node;
 
 		found_node = map_get(M, parent_pkg);
 		GB_ASSERT(found_node != nullptr);
-		n = *found_node;
+		ImportGraphNode *parent = *found_node;
 
-		import_graph_node_set_add(&n->succ, m);
-		import_graph_node_set_add(&m->pred, n);
-		ptr_set_add(&m->scope->imported, n->scope);
+		import_graph_node_set_add(&parent->succ, child);
+		import_graph_node_set_add(&child->pred, parent);
+		ptr_set_add(&parent->scope->imported, child->scope);
 	case_end;
 
 	case_ast_node(ws, WhenStmt, decl);

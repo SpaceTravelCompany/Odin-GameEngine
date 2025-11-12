@@ -981,9 +981,12 @@ gb_internal lbStructFieldRemapping lb_get_struct_remapping(lbModule *m, Type *t)
 
 	mutex_lock(&m->types_mutex);
 
-	auto *field_remapping = map_get(&m->struct_field_remapping, cast(void *)struct_type);
+	// NOTE(jakub): It's very important to check the type pointer first,
+	// because two disctinct but similar structs can end up with the same LLVMTypeRef after interning.
+	// (For example struct{u16,u8} looks identical to LLVM as struct{u16,u8,u8} once padding fields are inserted.)
+	auto *field_remapping = map_get(&m->struct_field_remapping, cast(void *)t);
 	if (field_remapping == nullptr) {
-		field_remapping = map_get(&m->struct_field_remapping, cast(void *)t);
+		field_remapping = map_get(&m->struct_field_remapping, cast(void *)struct_type);
 	}
 
 	mutex_unlock(&m->types_mutex);
@@ -1002,6 +1005,7 @@ gb_internal i32 lb_convert_struct_index(lbModule *m, Type *t, i32 index) {
 		switch (index) {
 		case 0: return 0; // data
 		case 1: return 2; // id
+		default: GB_PANIC("index > 1");
 		}
 	} else if (build_context.ptr_size != build_context.int_size) {
 		switch (t->kind) {
@@ -1200,6 +1204,7 @@ gb_internal lbValue lb_emit_struct_ep(lbProcedure *p, lbValue s, i32 index) {
 		switch (index) {
 		case 0: result_type = t_rawptr; break;
 		case 1: result_type = t_typeid; break;
+		default: GB_PANIC("index > 1");
 		}
 	} else if (is_type_dynamic_array(t)) {
 		switch (index) {
@@ -2102,10 +2107,8 @@ gb_internal LLVMValueRef llvm_get_inline_asm(LLVMTypeRef func_type, String const
 		cast(char *)str.text, cast(size_t)str.len,
 		cast(char *)clobbers.text, cast(size_t)clobbers.len,
 		has_side_effects, is_align_stack,
-		dialect
-	#if LLVM_VERSION_MAJOR >= 13
-		, /*CanThrow*/false
-	#endif
+		dialect,
+		/*CanThrow*/false
 	);
 }
 

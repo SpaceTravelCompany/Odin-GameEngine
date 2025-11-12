@@ -13,6 +13,7 @@ gb_global BuiltinTypeIsProc *builtin_type_is_procs[BuiltinProc__type_simple_bool
 	nullptr, // BuiltinProc__type_simple_boolean_begin
 
 	is_type_boolean,
+	is_type_bit_field,
 	is_type_integer,
 	is_type_rune,
 	is_type_float,
@@ -20,8 +21,11 @@ gb_global BuiltinTypeIsProc *builtin_type_is_procs[BuiltinProc__type_simple_bool
 	is_type_quaternion,
 	is_type_string,
 	is_type_string16,
+	is_type_cstring,
+	is_type_cstring16,
 	is_type_typeid,
 	is_type_any,
+
 	is_type_endian_platform,
 	is_type_endian_little,
 	is_type_endian_big,
@@ -32,8 +36,8 @@ gb_global BuiltinTypeIsProc *builtin_type_is_procs[BuiltinProc__type_simple_bool
 	is_type_indexable,
 	is_type_sliceable,
 	is_type_comparable,
-	is_type_simple_compare,
-	is_type_nearly_simple_compare,
+	is_type_simple_compare, // easily compared using memcmp
+	is_type_nearly_simple_compare, // easily compared using memcmp (including floats)
 	is_type_dereferenceable,
 	is_type_valid_for_keys,
 	is_type_valid_for_matrix_elems,
@@ -45,16 +49,15 @@ gb_global BuiltinTypeIsProc *builtin_type_is_procs[BuiltinProc__type_simple_bool
 	is_type_enumerated_array,
 	is_type_slice,
 	is_type_dynamic_array,
-
 	is_type_map,
 	is_type_struct,
 	is_type_union,
 	is_type_enum,
 	is_type_proc,
 	is_type_bit_set,
-	is_type_bit_field,
 	is_type_simd_vector,
 	is_type_matrix,
+	is_type_raw_union,
 
 	is_type_polymorphic_record_specialized,
 	is_type_polymorphic_record_unspecialized,
@@ -4765,6 +4768,42 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		break;
 	}
 
+	case BuiltinProc_constant_floor:
+	case BuiltinProc_constant_trunc:
+	case BuiltinProc_constant_ceil:
+	case BuiltinProc_constant_round:
+	{
+		Operand o = {};
+		check_expr(c, &o, ce->args[0]);
+
+		if (!is_type_integer_or_float(o.type) && (o.mode != Addressing_Constant)) {
+			error(ce->args[0], "Expected a constant number for '%.*s'", LIT(builtin_name));
+			return false;
+		}
+		operand->mode = Addressing_Constant;
+		operand->type = o.type;
+
+		ExactValue value = o.value;
+		if (value.kind == ExactValue_Integer) {
+			// do nothing
+		} else if (value.kind == ExactValue_Float) {
+			f64 f = value.value_float;
+			switch (id) {
+			case BuiltinProc_constant_floor: f = floor(f); break;
+			case BuiltinProc_constant_trunc: f = trunc(f); break;
+			case BuiltinProc_constant_ceil:  f = ceil(f);  break;
+			case BuiltinProc_constant_round: f = round(f); break;
+			default:
+				GB_PANIC("Unhandled built-in: %.*s", LIT(builtin_name));
+				break;
+			}
+			value = exact_value_float(f);
+		}
+
+		operand->value = value;
+		break;
+	}
+
 	case BuiltinProc_soa_struct: {
 		Operand x = {};
 		Operand y = {};
@@ -4879,6 +4918,138 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		add_type_info_type(c, soa_struct);
 
 		operand->type = soa_struct;
+		break;
+	}
+
+	case BuiltinProc_concatenate: {
+		Operand lhs = {};
+
+		check_expr_with_type_hint(c, &lhs, ce->args[0], type_hint);
+		if (lhs.mode == Addressing_Invalid) {
+			return false;
+		}
+		if (lhs.mode != Addressing_Constant) {
+			error(lhs.expr, "'%.*s' expects a constant array or slice", LIT(builtin_name));
+			return false;
+		}
+		operand->type = lhs.type;
+		operand->mode = Addressing_Value;
+
+		if (!is_type_slice(lhs.type) && !is_type_array(lhs.type)) {
+			gbString a = type_to_string(lhs.type);
+			error(lhs.expr, "'%.*s' expects a constant array or slice, got %s", LIT(builtin_name), a);
+			gb_string_free(a);
+			return false;
+		}
+		if (lhs.value.kind != ExactValue_Compound) {
+			gbString a = exact_value_to_string(lhs.value);
+			error(lhs.expr, "Expected a compound literal value for '%.*s', got '%s'", LIT(builtin_name), a);
+			gb_string_free(a);
+			return false;
+		}
+
+		ast_node(lhs_cl, CompoundLit, lhs.value.value_compound);
+
+		for (Ast *elem : lhs_cl->elems) {
+			if (elem->kind == Ast_FieldValue) {
+				error(elem, "'%.*s' does not allow the use of 'field = value' to be concatenated together", LIT(builtin_name));
+				return false;
+			}
+		}
+
+		Type *elem_type = base_any_array_type(lhs.type);
+
+		for (isize i = 1; i < ce->args.count; i++) {
+			Operand extra = {};
+			if (is_type_slice(lhs.type)) {
+				check_expr_with_type_hint(c, &extra, ce->args[i], lhs.type);
+			} else {
+				check_expr(c, &extra, ce->args[i]);
+			}
+			if (extra.mode == Addressing_Invalid) {
+				return false;
+			}
+			if (extra.mode != Addressing_Constant) {
+				error(extra.expr, "'%.*s' expects a constant array or slice", LIT(builtin_name));
+				return false;
+			}
+
+			if (is_type_slice(lhs.type)) {
+				if (!are_types_identical(lhs.type, extra.type)) {
+					gbString a = type_to_string(lhs.type);
+					gbString b = type_to_string(extra.type);
+					error(extra.expr, "'%.*s' expects constant values of the same slice type, got '%s' vs '%s'", LIT(builtin_name), a, b);
+					gb_string_free(b);
+					gb_string_free(a);
+					return false;
+				}
+			} else if (is_type_array(lhs.type)) {
+				if (!is_type_array(extra.type)) {
+					gbString a = type_to_string(extra.type);
+					error(extra.expr, "'%.*s' expects a constant array or slice, got %s", LIT(builtin_name), a);
+					gb_string_free(a);
+					return false;
+				}
+				Type *extra_elem_type = base_array_type(extra.type);
+				if (!are_types_identical(elem_type, extra_elem_type)) {
+					gbString a = type_to_string(elem_type);
+					gbString b = type_to_string(extra_elem_type);
+					error(extra.expr, "'%.*s' expects constant values of the same element-type, got '%s' vs '%s'", LIT(builtin_name), a, b);
+					gb_string_free(b);
+					gb_string_free(a);
+					return false;
+				}
+			} else {
+				GB_PANIC("Unhandled type: %s", type_to_string(lhs.type));
+			}
+
+			if (extra.value.kind != ExactValue_Compound) {
+				gbString a = exact_value_to_string(extra.value);
+				error(extra.expr, "Expected a compound literal value for '%.*s', got '%s'", LIT(builtin_name), a);
+				gb_string_free(a);
+				return false;
+			}
+
+			ast_node(extra_cl, CompoundLit, extra.value.value_compound);
+
+
+			for (Ast *elem : extra_cl->elems) {
+				if (elem->kind == Ast_FieldValue) {
+					error(elem, "'%.*s' does not allow the use of 'field = value' to be concatenated together", LIT(builtin_name));
+					return false;
+				}
+			}
+		}
+
+		isize count_needed = 0;
+
+		for (Ast *arg : ce->args) {
+			ExactValue value = arg->tav.value;
+			GB_ASSERT(value.kind == ExactValue_Compound);
+			ast_node(cl, CompoundLit, value.value_compound);
+			count_needed += cl->elems.count;
+		}
+
+		Array<Ast *> new_elems = {};
+		array_init(&new_elems, permanent_allocator(), 0, count_needed);
+
+		for (Ast *arg : ce->args) {
+			ExactValue value = arg->tav.value;
+			GB_ASSERT(value.kind == ExactValue_Compound);
+			ast_node(cl, CompoundLit, value.value_compound);
+			array_add_elems(&new_elems, cl->elems.data, cl->elems.count);
+		}
+
+		Ast *new_compound_lit = ast_compound_lit(lhs.expr->file(), nullptr, new_elems, ast_token(lhs.expr), ast_end_token(ce->args[ce->args.count-1]));
+
+		operand->mode  = Addressing_Constant;
+		operand->value = exact_value_compound(new_compound_lit);
+
+		if (is_type_slice(lhs.type)) {
+			operand->type = lhs.type;
+		} else {
+			operand->type = alloc_type_array(elem_type, new_elems.count);
+		}
 		break;
 	}
 
@@ -6417,6 +6588,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 
 	case BuiltinProc_type_is_boolean:
+	case BuiltinProc_type_is_bit_field:
 	case BuiltinProc_type_is_integer:
 	case BuiltinProc_type_is_rune:
 	case BuiltinProc_type_is_float:
@@ -6424,6 +6596,8 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 	case BuiltinProc_type_is_quaternion:
 	case BuiltinProc_type_is_string:
 	case BuiltinProc_type_is_string16:
+	case BuiltinProc_type_is_cstring:
+	case BuiltinProc_type_is_cstring16:
 	case BuiltinProc_type_is_typeid:
 	case BuiltinProc_type_is_any:
 	case BuiltinProc_type_is_endian_platform:
@@ -6436,8 +6610,8 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 	case BuiltinProc_type_is_indexable:
 	case BuiltinProc_type_is_sliceable:
 	case BuiltinProc_type_is_comparable:
-	case BuiltinProc_type_is_simple_compare:
-	case BuiltinProc_type_is_nearly_simple_compare:
+	case BuiltinProc_type_is_simple_compare: // easily compared using memcmp
+	case BuiltinProc_type_is_nearly_simple_compare: // easily compared using memcmp (including floats)
 	case BuiltinProc_type_is_dereferenceable:
 	case BuiltinProc_type_is_valid_map_key:
 	case BuiltinProc_type_is_valid_matrix_elements:
@@ -6454,9 +6628,9 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 	case BuiltinProc_type_is_enum:
 	case BuiltinProc_type_is_proc:
 	case BuiltinProc_type_is_bit_set:
-	case BuiltinProc_type_is_bit_field:
 	case BuiltinProc_type_is_simd_vector:
 	case BuiltinProc_type_is_matrix:
+	case BuiltinProc_type_is_raw_union:
 	case BuiltinProc_type_is_specialized_polymorphic_record:
 	case BuiltinProc_type_is_unspecialized_polymorphic_record:
 	case BuiltinProc_type_has_nil:
@@ -6519,7 +6693,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			check_expr(c, &x, ce->args[1]);
 
 			if (!is_type_string(x.type) || x.mode != Addressing_Constant || x.value.kind != ExactValue_String) {
-				error(ce->args[1], "Expected a const string for field argument");
+				error(ce->args[1], "Expected a constant string for field argument");
 				return false;
 			}
 
@@ -6599,7 +6773,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			check_expr(c, &x, ce->args[1]);
 
 			if (!is_type_string(x.type) || x.mode != Addressing_Constant || x.value.kind != ExactValue_String) {
-				error(ce->args[1], "Expected a const string for field argument");
+				error(ce->args[1], "Expected a constant string for field argument");
 				return false;
 			}
 
@@ -6736,9 +6910,13 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			
 			// NOTE(jakubtomsu): forces calculation of variant_block_size
 			type_size_of(u);
-			// NOTE(Jeroen): A tag offset of zero is perfectly fine if all members of the union are empty structs.
-			//               What matters is that the tag size is > 0.
-			GB_ASSERT(u->Union.tag_size > 0);
+			if (u->Union.tag_size == 0) {
+				GB_ASSERT(is_type_union_maybe_pointer(u));
+			} else {
+				// NOTE(Jeroen): A tag offset of zero is perfectly fine if all members of the union are empty structs.
+				//               What matters is that the tag size is > 0.
+				GB_ASSERT(u->Union.tag_size > 0);
+			}
 			
 			operand->mode = Addressing_Constant;
 			operand->type = t_untyped_integer;
@@ -7232,7 +7410,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			check_expr(c, &x, ce->args[1]);
 
 			if (!is_type_string(x.type) || x.mode != Addressing_Constant || x.value.kind != ExactValue_String) {
-				error(ce->args[1], "Expected a const string for field argument");
+				error(ce->args[1], "Expected a constant string for field argument");
 				return false;
 			}
 

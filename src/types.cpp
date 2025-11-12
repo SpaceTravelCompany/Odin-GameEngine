@@ -2,6 +2,9 @@ struct Ast;
 struct Scope;
 struct Entity;
 
+// NOTE(Jeroen): Minimum alignment for #load(file, <type>) slices
+#define MINIMUM_SLICE_ALIGNMENT 16
+
 enum BasicKind {
 	Basic_Invalid,
 
@@ -159,6 +162,7 @@ struct TypeStruct {
 	bool            are_offsets_set             : 1;
 	bool            is_packed                   : 1;
 	bool            is_raw_union                : 1;
+	bool            is_all_or_none              : 1;
 	bool            is_poly_specialized         : 1;
 
 	std::atomic<bool> are_offsets_being_processed;
@@ -410,7 +414,7 @@ gb_internal u32 type_info_flags_of_type(Type *type) {
 		flags |= TypeInfoFlag_Comparable;
 	}
 	if (is_type_simple_compare(type)) {
-		flags |= TypeInfoFlag_Comparable;
+		flags |= TypeInfoFlag_Comparable|TypeInfoFlag_Simple_Compare;
 	}
 	return flags;
 }
@@ -1293,6 +1297,15 @@ gb_internal bool is_type_rune(Type *t) {
 	}
 	return false;
 }
+gb_internal bool is_type_integer_or_float(Type *t) {
+	t = base_type(t);
+	if (t == nullptr) { return false; }
+	if (t->kind == Type_Basic) {
+		return (t->Basic.flags & (BasicFlag_Integer|BasicFlag_Float)) != 0;
+	}
+	return false;
+}
+
 gb_internal bool is_type_numeric(Type *t) {
 	t = base_type(t);
 	if (t == nullptr) { return false; }
@@ -1725,7 +1738,7 @@ gb_internal bool is_type_u8_ptr(Type *t) {
 	t = base_type(t);
 	if (t == nullptr) { return false; }
 	if (t->kind == Type_Pointer) {
-		return is_type_u8(t->Slice.elem);
+		return is_type_u8(t->Pointer.elem);
 	}
 	return false;
 }
@@ -1766,7 +1779,7 @@ gb_internal bool is_type_u16_ptr(Type *t) {
 	t = base_type(t);
 	if (t == nullptr) { return false; }
 	if (t->kind == Type_Pointer) {
-		return is_type_u16(t->Slice.elem);
+		return is_type_u16(t->Pointer.elem);
 	}
 	return false;
 }
@@ -3072,9 +3085,10 @@ gb_internal bool are_types_identical_internal(Type *x, Type *y, bool check_tuple
 		break;
 
 	case Type_Struct:
-		if (x->Struct.is_raw_union == y->Struct.is_raw_union &&
-		    x->Struct.fields.count == y->Struct.fields.count &&
-		    x->Struct.is_packed    == y->Struct.is_packed &&
+		if (x->Struct.is_raw_union   == y->Struct.is_raw_union &&
+		    x->Struct.fields.count   == y->Struct.fields.count &&
+		    x->Struct.is_packed      == y->Struct.is_packed &&
+		    x->Struct.is_all_or_none == y->Struct.is_all_or_none &&
 		    x->Struct.soa_kind == y->Struct.soa_kind &&
 		    x->Struct.soa_count == y->Struct.soa_count &&
 		    are_types_identical(x->Struct.soa_elem, y->Struct.soa_elem)) {
@@ -4565,6 +4579,8 @@ gb_internal i64 type_offset_of(Type *t, i64 index, Type **field_type_) {
 			case 1:
 				if (field_type_) *field_type_ = t_typeid;
 				return 8; // id
+			default:
+				GB_PANIC("index > 1");
 			}
 		}
 		break;
@@ -4642,6 +4658,7 @@ gb_internal i64 type_offset_of_from_selection(Type *type, Selection sel) {
 					switch (index) {
 					case 0: t = t_rawptr; break;
 					case 1: t = t_typeid; break;
+					default: GB_PANIC("index > 1");
 					}
 				}
 				break;
@@ -4907,7 +4924,7 @@ gb_internal Type *type_internal_index(Type *t, isize index) {
 	case Type_Slice:
 		{
 			GB_ASSERT(index == 0 || index == 1);
-			return index == 0 ? t_rawptr : t_typeid;
+			return index == 0 ? t_rawptr : t_int;
 		}
 	case Type_DynamicArray:
 		{

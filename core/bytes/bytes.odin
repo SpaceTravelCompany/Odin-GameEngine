@@ -1,3 +1,4 @@
+// Procedures for manipulation of `[]byte` slices.
 package bytes
 
 import "base:intrinsics"

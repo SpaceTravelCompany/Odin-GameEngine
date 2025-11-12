@@ -138,10 +138,13 @@ type_is_rune       :: proc($T: typeid) -> bool ---
 type_is_float      :: proc($T: typeid) -> bool ---
 type_is_complex    :: proc($T: typeid) -> bool ---
 type_is_quaternion :: proc($T: typeid) -> bool ---
-type_is_string     :: proc($T: typeid) -> bool ---
 type_is_typeid     :: proc($T: typeid) -> bool ---
 type_is_any        :: proc($T: typeid) -> bool ---
+type_is_string     :: proc($T: typeid) -> bool ---
 type_is_string16   :: proc($T: typeid) -> bool ---
+type_is_cstring    :: proc($T: typeid) -> bool ---
+type_is_cstring16  :: proc($T: typeid) -> bool ---
+
 
 type_is_endian_platform       :: proc($T: typeid) -> bool ---
 type_is_endian_little         :: proc($T: typeid) -> bool ---
@@ -154,6 +157,7 @@ type_is_indexable             :: proc($T: typeid) -> bool ---
 type_is_sliceable             :: proc($T: typeid) -> bool ---
 type_is_comparable            :: proc($T: typeid) -> bool ---
 type_is_simple_compare        :: proc($T: typeid) -> bool --- // easily compared using memcmp (== and !=)
+type_is_nearly_simple_compare :: proc($T: typeid) -> bool --- // easily compared using memcmp (including floats)
 type_is_dereferenceable       :: proc($T: typeid) -> bool ---
 type_is_valid_map_key         :: proc($T: typeid) -> bool ---
 type_is_valid_matrix_elements :: proc($T: typeid) -> bool ---
@@ -239,6 +243,11 @@ type_canonical_name :: proc($T: typeid) -> string ---
 constant_utf16_cstring :: proc($literal: string) -> [^]u16 ---
 
 constant_log2 :: proc($v: $T) -> T where type_is_integer(T) ---
+
+constant_floor :: proc($v: $T) -> T where type_is_integer(T) || type_is_float(T) ---
+constant_trunc :: proc($v: $T) -> T where type_is_integer(T) || type_is_float(T) ---
+constant_ceil  :: proc($v: $T) -> T where type_is_integer(T) || type_is_float(T) ---
+constant_round :: proc($v: $T) -> T where type_is_integer(T) || type_is_float(T) ---
 
 // SIMD related
 simd_add  :: proc(a, b: #simd[N]T) -> #simd[N]T ---
@@ -343,6 +352,9 @@ simd_lanes_rotate_right :: proc(a: #simd[N]T, $offset: int) -> #simd[N]T ---
 // if all listed features are supported.
 has_target_feature :: proc($test: $T) -> bool where type_is_string(T) || type_is_proc(T) ---
 
+
+// Utility Calls
+concatentate :: proc(x, y: $T, z: ..T) -> T where type_is_array(T) || type_is_slice(T) ---
 
 // Returns the value of the procedure where `x` must be a call expression
 procedure_of :: proc(x: $T) -> T where type_is_proc(T) ---

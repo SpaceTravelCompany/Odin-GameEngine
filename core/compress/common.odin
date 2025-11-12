@@ -1,14 +1,13 @@
+// A collection of utilities to aid with other `compress`ion packages.
+package compress
+
 /*
 	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
-	Made available under Odin's BSD-3 license.
+	Made available under Odin's license.
 
 	List of contributors:
 		Jeroen van Rijn: Initial implementation, optimization.
 */
-
-
-// package compress is a collection of utilities to aid with other compression packages
-package compress
 
 import "core:io"
 import "core:bytes"

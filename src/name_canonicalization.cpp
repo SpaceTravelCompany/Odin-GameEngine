@@ -417,7 +417,7 @@ gb_internal gbString string_canonical_entity_name(gbAllocator allocator, Entity 
 
 gb_internal void write_canonical_parent_prefix(TypeWriter *w, Entity *e) {
 	GB_ASSERT(e != nullptr);
-	if (e->kind == Entity_Procedure || e->kind == Entity_TypeName) {
+	if (e->kind == Entity_Procedure || e->kind == Entity_TypeName || e->kind == Entity_Variable) {
 		if (e->kind == Entity_Procedure && (e->Procedure.is_export || e->Procedure.is_foreign)) {
 			// no prefix
 			return;
@@ -527,6 +527,11 @@ gb_internal void write_canonical_entity_name(TypeWriter *w, Entity *e) {
 		} else if (s->flags & (ScopeFlag_Builtin)) {
 			goto write_base_name;
 		}
+
+		if (e->kind == Entity_TypeName) {
+			goto write_base_name;
+		}
+
 		gb_printf_err("%s WEIRD ENTITY TYPE %s %u %p\n", token_pos_to_string(e->token.pos), type_to_string(e->type), s->flags, s->decl_info);
 
 		auto const print_scope_flags = [](Scope *s) {
@@ -543,7 +548,7 @@ gb_internal void write_canonical_entity_name(TypeWriter *w, Entity *e) {
 		};
 
 		print_scope_flags(s);
-		GB_PANIC("weird entity %.*s", LIT(e->token.string));
+		GB_PANIC("weird entity %.*s (%.*s)", LIT(e->token.string), LIT(entity_strings[e->kind]));
 	}
 	if (e->pkg != nullptr) {
 		type_writer_append(w, e->pkg->name.text, e->pkg->name.len);
@@ -744,8 +749,9 @@ gb_internal void write_type_to_canonical_string(TypeWriter *w, Type *type) {
 			write_canonical_params(w, type->Struct.polymorphic_params);
 		}
 
-		if (type->Struct.is_packed)    type_writer_appendc(w, "#packed");
-		if (type->Struct.is_raw_union) type_writer_appendc(w, "#raw_union");
+		if (type->Struct.is_packed)      type_writer_appendc(w, "#packed");
+		if (type->Struct.is_raw_union)   type_writer_appendc(w, "#raw_union");
+		if (type->Struct.is_all_or_none) type_writer_appendc(w, "#all_or_none");
 		if (type->Struct.custom_min_field_align != 0) type_writer_append_fmt(w, "#min_field_align(%lld)", cast(long long)type->Struct.custom_min_field_align);
 		if (type->Struct.custom_max_field_align != 0) type_writer_append_fmt(w, "#max_field_align(%lld)", cast(long long)type->Struct.custom_max_field_align);
 		if (type->Struct.custom_align != 0)           type_writer_append_fmt(w, "#align(%lld)",           cast(long long)type->Struct.custom_align);
@@ -755,6 +761,14 @@ gb_internal void write_type_to_canonical_string(TypeWriter *w, Type *type) {
 			GB_ASSERT(f->kind == Entity_Variable);
 			if (i > 0) {
 				type_writer_appendc(w, CANONICAL_FIELD_SEPARATOR);
+			}
+
+			if (f->flags & EntityFlags_IsSubtype) {
+				type_writer_appendc(w, "#subtype ");
+			}
+
+			if (f->flags & EntityFlag_Using) {
+				type_writer_appendc(w, "using ");
 			}
 			type_writer_append(w, f->token.string.text, f->token.string.len);
 			type_writer_appendc(w, CANONICAL_TYPE_SEPARATOR);

@@ -1,4 +1,4 @@
-// Procedures to manipulate UTF-8 encoded strings
+// A `string` builder, as well as procedures to manipulate `UTF-8` encoded strings.
 package strings
 
 import "base:intrinsics"
@@ -2932,7 +2932,6 @@ Output:
 	abc1    abc2    abc3
 
 */
-
 expand_tabs :: proc(s: string, tab_size: int, allocator := context.allocator) -> (res: string, err: mem.Allocator_Error) #optional_allocator_error {
 	if tab_size <= 0 {
 		panic("tab size must be positive")

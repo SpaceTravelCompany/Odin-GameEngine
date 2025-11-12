@@ -37,12 +37,10 @@ gb_internal String get_default_microarchitecture() {
 		// x86-64-v2: (close to Nehalem) CMPXCHG16B, LAHF-SAHF, POPCNT, SSE3, SSE4.1, SSE4.2, SSSE3
 		// x86-64-v3: (close to Haswell) AVX, AVX2, BMI1, BMI2, F16C, FMA, LZCNT, MOVBE, XSAVE
 		// x86-64-v4: AVX512F, AVX512BW, AVX512CD, AVX512DQ, AVX512VL
-		if (ODIN_LLVM_MINIMUM_VERSION_12) {
-			if (build_context.metrics.os == TargetOs_freestanding) {
-				default_march = str_lit("x86-64");
-			} else {
-				default_march = str_lit("x86-64-v2");
-			}
+		if (build_context.metrics.os == TargetOs_freestanding) {
+			default_march = str_lit("x86-64");
+		} else {
+			default_march = str_lit("x86-64-v2");
 		}
 	} else if (build_context.metrics.arch == TargetArch_riscv64) {
 		default_march = str_lit("generic-rv64");
@@ -2092,6 +2090,7 @@ gb_internal void lb_create_startup_runtime_generate_body(lbModule *m, lbProcedur
 			name = gb_string_append_length(name, ename.text, ename.len);
 
 			lbProcedure *dummy = lb_create_dummy_procedure(m, make_string_c(name), dummy_type);
+			dummy->is_startup = true;
 			LLVMSetVisibility(dummy->value, LLVMHiddenVisibility);
 			LLVMSetLinkage(dummy->value, LLVMWeakAnyLinkage);
 
@@ -2555,6 +2554,8 @@ gb_internal WORKER_TASK_PROC(lb_generate_missing_procedures_to_check_worker_proc
 }
 
 gb_internal void lb_generate_missing_procedures(lbGenerator *gen, bool do_threading) {
+	isize retry_count = 0;
+retry:;
 	if (do_threading) {
 		for (auto const &entry : gen->modules) {
 			lbModule *m = entry.value;
@@ -2572,6 +2573,14 @@ gb_internal void lb_generate_missing_procedures(lbGenerator *gen, bool do_thread
 
 	for (auto const &entry : gen->modules) {
 		lbModule *m = entry.value;
+		if (m->missing_procedures_to_check.count != 0) {
+			if (retry_count > gen->modules.count) {
+				GB_ASSERT(m->missing_procedures_to_check.count == 0);
+			}
+
+			retry_count += 1;
+			goto retry;
+		}
 		GB_ASSERT(m->missing_procedures_to_check.count == 0);
 		GB_ASSERT(m->procedures_to_generate.count == 0);
 	}
@@ -2892,7 +2901,18 @@ gb_internal lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *star
 		args[0] = lb_addr_load(p, all_tests_slice);
 		lbValue result = lb_emit_call(p, runner, args);
 
-		lbValue exit_runner = lb_find_package_value(m, str_lit("os"), str_lit("exit"));
+		lbValue exit_runner = {};
+		{
+			AstPackage *pkg = get_runtime_package(m->info);
+
+			String name = str_lit("exit");
+			Entity *e = scope_lookup_current(pkg->scope, name);
+			if (e == nullptr) {
+				compiler_error("Could not find type declaration for '%.*s.%.*s'\n", LIT(pkg->name), LIT(name));
+			}
+			exit_runner = lb_find_value_from_entity(m, e);
+		}
+
 		auto exit_args = array_make<lbValue>(temporary_allocator(), 1);
 		exit_args[0] = lb_emit_select(p, result, lb_const_int(m, t_int, 0), lb_const_int(m, t_int, 1));
 		lb_emit_call(p, exit_runner, exit_args, ProcInlining_none);
@@ -3038,8 +3058,14 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 	LLVMCodeModel code_mode = LLVMCodeModelDefault;
 	if (is_arch_wasm()) {
 		code_mode = LLVMCodeModelJITDefault;
+		debugf("LLVM code mode: LLVMCodeModelJITDefault\n");
 	} else if (is_arch_x86() && build_context.metrics.os == TargetOs_freestanding) {
 		code_mode = LLVMCodeModelKernel;
+		debugf("LLVM code mode: LLVMCodeModelKernel\n");
+	}
+
+	if (code_mode == LLVMCodeModelDefault) {
+		debugf("LLVM code mode: LLVMCodeModelDefault\n");
 	}
 
 	String llvm_cpu = get_final_microarchitecture();
@@ -3055,7 +3081,10 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 		}
 		first = false;
 
-		llvm_features = gb_string_appendc(llvm_features, "+");
+		if (*str.text != '+' && *str.text != '-') {
+			llvm_features = gb_string_appendc(llvm_features, "+");
+		}
+
 		llvm_features = gb_string_append_length(llvm_features, str.text, str.len);
 	}
 

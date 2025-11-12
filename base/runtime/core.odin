@@ -15,7 +15,7 @@
 //
 // IMPORTANT NOTE(bill): `type_info_of` cannot be used within a
 // #shared_global_scope due to  the internals of the compiler.
-// This could change at a later date if the all these data structures are
+// This could change at a later date if all these data structures are
 // implemented within the compiler rather than in this "preload" file
 //
 #+no-instrumentation
@@ -118,10 +118,10 @@ Type_Info_Parameters :: struct { // Only used for procedures parameters and resu
 
 Type_Info_Struct_Flags :: distinct bit_set[Type_Info_Struct_Flag; u8]
 Type_Info_Struct_Flag :: enum u8 {
-	packed    = 0,
-	raw_union = 1,
-	_         = 2,
-	align     = 3,
+	packed      = 0,
+	raw_union   = 1,
+	all_or_none = 2,
+	align       = 3,
 }
 
 Type_Info_Struct :: struct {
