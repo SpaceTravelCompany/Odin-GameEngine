@@ -63,7 +63,7 @@ epsilon :: proc "contextless" ($T:typeid) -> T where intrinsics.type_is_float(T)
 	return T(F64_EPSILON)
 }
 
-epsilonEqual :: proc "contextless" (a:$T, b:T) -> bool where intrinsics.type_is_float(T) {
+epsilon_equal :: proc "contextless" (a:$T, b:T) -> bool where intrinsics.type_is_float(T) {
 	return abs(a - b) < epsilon(T)
 }
 
