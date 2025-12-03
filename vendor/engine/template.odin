@@ -18,5 +18,3 @@ import vk "vendor:vulkan"
 @rodata __animateImageUniformPoolBinding : [2]u32 = {0, 3}
 @rodata __tileImageUniformPoolSizes : [2]custom_object_DescriptorPoolSize = {{type = .UNIFORM, cnt = 3}, {type = .UNIFORM, cnt = 2}}
 @rodata __tileImageUniformPoolBinding : [2]u32 = {0, 3}
-@rodata __shapeUniformPoolSizes : [1]custom_object_DescriptorPoolSize = {{type = .UNIFORM, cnt = 3}}
-@rodata __shapeUniformPoolBinding : [1]u32 = {0}

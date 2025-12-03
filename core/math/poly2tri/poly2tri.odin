@@ -944,7 +944,6 @@ TrianguateSinglePolygon :: proc(poly:[]linalg.PointF, baseIdx:[]u32, holes:[][]l
         if a.y < b.y { return .Less }
         if a.y == b.y { 
             if a.x < b.x { return .Less }
-            return .Equal
         }
         return .Greater
     })

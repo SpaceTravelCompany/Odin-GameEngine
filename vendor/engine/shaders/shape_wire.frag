@@ -10,8 +10,8 @@ layout(location = 2) in vec4 inColor;
 layout(location = 0) out vec4 outColor;
 
 void main() {
-    float res = (pow(inUv.x, 3) - inUv.y * inUv.z);
-    if (res <= 0) discard;
+    // float res = (pow(inUv.x, 3) - inUv.y * inUv.z);
+    // if (res <= 0) discard;
 
     outColor = colormat.mat * vec4(inColor.rgb, inColor.a);
 }
