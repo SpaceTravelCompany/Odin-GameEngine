@@ -276,6 +276,25 @@ LinesIntersect2 :: proc "contextless" (a1 : [2]$T, a2 : [2]T, b1: [2]T, b2 : [2]
 	return true, ua >= 0.0 && ub >= 0.0 && ua <= 1.0 && ub <= 1.0, [2]T{a1.x + ua * (a2.x - a1.x), a1.y + ua * (a2.y - a1.y)}
 }
 
+//https://stackoverflow.com/a/73061541 잘못된? 부분 약간 수정
+LineExtendPoint :: proc "contextless" (prev:[2]$T, cur:[2]T, next:[2]T, thickness:T, ccw:PolyOrientation) -> [2]T where intrinsics.type_is_float(T) {
+	vn : [2]T = next - cur
+	vnn : [2]T = normalize(vn)
+	nnnX := vnn.y
+	nnnY := -vnn.x
+
+	ccw_ : T = (ccw == .Clockwise ? -1 : 1)
+	vp : [2]T = cur - prev
+	vpn: [2]T = normalize(vp)
+	npnX := vpn.y 
+	npnY := -vpn.x 
+
+	bis := [2]T{(nnnX + npnX) * ccw_, (nnnY + npnY) * ccw_}
+	bisn : [2]T = normalize(bis)
+	bislen := thickness / intrinsics.sqrt((1 + nnnX * npnX + nnnY * npnY) / 2)
+
+	return {cur.x + bislen * bisn.x, cur.y + bislen * bisn.y}
+}
 
 NearestPointBetweenPointAndLine :: proc "contextless" (p:[2]$T, l0:[2]T, l1:[2]T) -> [2]T where intrinsics.type_is_float(T) {
 	AB := l1 - l0

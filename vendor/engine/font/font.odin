@@ -31,10 +31,14 @@ Font :: struct {}
 
 @(private="file") SCALE_DEFAULT : f32 : 256
 
+@(private) FONT_KEY :: struct #packed {
+    char:rune,
+    thickness:f32,//0 -> no stroke, > 0 -> stroke, < 0 -> stroke and fill
+}
+
 @(private) FontT :: struct {
     face:freetype.Face,
-    charArray : map[rune]CharData,
-   
+    charArray : map[FONT_KEY]CharData,
 
     mutex:sync.Mutex,
 
@@ -46,7 +50,9 @@ FontRenderOpt :: struct {
     offset:linalg.PointF,
     pivot:linalg.PointF,
     area:Maybe(linalg.PointF),
-    color:linalg.Point3DwF,
+    color:Maybe(linalg.Point3DwF),
+    strokeColor:linalg.Point3DwF,//if thickness == 0, ignore
+    thickness:f32,//if 0, no stroke
     flag:engine.ResourceUsage,
 }
 
@@ -84,7 +90,7 @@ Font_Init :: proc(_fontData:[]byte, #any_int _faceIdx:int = 0) -> (font : ^Font 
     font_.scale = SCALE_DEFAULT
     font_.mutex = {}
 
-    font_.charArray = make_map( map[rune]CharData, engine.defAllocator() )
+    font_.charArray = make_map( map[FONT_KEY]CharData, engine.defAllocator() )
     defer if err != .Ok do delete(font_.charArray)
 
     if freetypeLib == nil do _Init_FreeType()
@@ -178,7 +184,12 @@ allocator : runtime.Allocator) -> (rect:linalg.RectF, err:geometry.ShapesError =
         }
         minP = math.min_array(minP, offset)
 
-        _Font_RenderChar(self, s, _vertArr, _indArr, &offset, _renderOpt.area, _renderOpt.scale, _renderOpt.color, allocator) or_return
+        if _renderOpt.color == nil && _renderOpt.thickness == 0.0 {
+            err = .EmptyColor
+            return
+        }
+        _Font_RenderChar(self, s, _vertArr, _indArr, &offset, _renderOpt.area, _renderOpt.scale,
+             _renderOpt.color, _renderOpt.strokeColor, _renderOpt.thickness, allocator) or_return
         
         maxP = math.max_array(maxP,linalg.PointF{offset.x, offset.y + f32(self.face.size.metrics.height) / (64.0 * self.scale) })
     }
@@ -221,9 +232,11 @@ allocator : runtime.Allocator) -> (rect:linalg.RectF, err:geometry.ShapesError =
     offset:^linalg.PointF,
     area:Maybe(linalg.PointF),
     scale:linalg.PointF,
-    color:linalg.Point3DwF,
+    color:Maybe(linalg.Point3DwF),
+    strokeColor:linalg.Point3DwF,
+    thickness:f32,
     allocator : runtime.Allocator) -> (shapeErr:geometry.ShapesError = .None) {
-    ok := _char in self.charArray
+    ok := FONT_KEY{_char, thickness} in self.charArray
     charD : ^CharData
 
     FTMoveTo :: proc "c" (to: ^freetype.Vector, user: rawptr) -> c.int {
@@ -303,17 +316,19 @@ allocator : runtime.Allocator) -> (rect:linalg.RectF, err:geometry.ShapesError =
         cubic_to = FTCubicTo,
     }
 
+    thickness2 := color != nil ? -thickness : thickness
+
     if ok {
-        charD = &self.charArray[_char]
+        charD = &self.charArray[FONT_KEY{_char, thickness2}]
     } else {
         ch := _char
         for {
             fIdx := freetype.get_char_index(self.face, auto_cast ch)
             if fIdx == 0 {
                 if ch == '□' do trace.panic_log("not found □")
-                ok = '□' in self.charArray
+                ok = FONT_KEY{'□', thickness2} in self.charArray
                 if ok {
-                    charD = &self.charArray['□']
+                    charD = &self.charArray[FONT_KEY{'□', thickness2}]
                     break
                 }
                 ch = '□'
@@ -326,11 +341,11 @@ allocator : runtime.Allocator) -> (rect:linalg.RectF, err:geometry.ShapesError =
             if self.face.glyph.outline.n_points == 0 {
                 charData : CharData = {
                     advanceX = f32(self.face.glyph.advance.x) / (64.0 * SCALE_DEFAULT),
-                    rawShape = nil
+                    rawShape = nil,
                 }
-                self.charArray[ch] = charData
+                self.charArray[FONT_KEY{ch, thickness2}] = charData
 
-                charD = &self.charArray[ch]
+                charD = &self.charArray[FONT_KEY{ch, thickness2}]
                 break
             }
     
@@ -344,18 +359,29 @@ allocator : runtime.Allocator) -> (rect:linalg.RectF, err:geometry.ShapesError =
                 nTypes = mem.make_non_zeroed([]u32, self.face.glyph.outline.n_contours, context.temp_allocator),
                 types = mem.make_non_zeroed([]geometry.CurveType, self.face.glyph.outline.n_points * 3, context.temp_allocator),
                 poly = mem.make_non_zeroed([]linalg.PointF, self.face.glyph.outline.n_points * 3, context.temp_allocator),
-                colors = mem.make_non_zeroed([]linalg.Point3DwF, self.face.glyph.outline.n_contours, context.temp_allocator),
             }
-            for &c in poly.colors {
-                c = linalg.Point3DwF{0,0,0,1}//?no matter
+            if thickness > 0.0 {
+                poly.strokeColors = mem.make_non_zeroed([]linalg.Point3DwF, self.face.glyph.outline.n_contours, context.temp_allocator)
+                poly.thickness = mem.make_non_zeroed([]f32, self.face.glyph.outline.n_contours, context.temp_allocator)
             }
+            if color != nil {
+                poly.colors = mem.make_non_zeroed([]linalg.Point3DwF, self.face.glyph.outline.n_contours, context.temp_allocator)
+            }
+
             defer {
                 delete(poly.nPolys, context.temp_allocator)
                 delete(poly.nTypes, context.temp_allocator)
                 delete(poly.types, context.temp_allocator)
                 delete(poly.poly, context.temp_allocator)
-                delete(poly.colors, context.temp_allocator)
+                if poly.strokeColors != nil {
+                    delete(poly.strokeColors, context.temp_allocator)
+                    delete(poly.thickness, context.temp_allocator)
+                }
+                if poly.colors != nil {
+                    delete(poly.colors, context.temp_allocator)
+                }
             }
+
             data : FontUserData = {
                 polygon = &poly,
                 idx = 0,
@@ -374,22 +400,34 @@ allocator : runtime.Allocator) -> (rect:linalg.RectF, err:geometry.ShapesError =
                     advanceX = f32(self.face.glyph.advance.x) / (64.0 * self.scale),
                     rawShape = nil
                 }
-                self.charArray[ch] = charData
+                self.charArray[FONT_KEY{ch, thickness2}] = charData
             
-                charD = &self.charArray[ch]
+                charD = &self.charArray[FONT_KEY{ch, thickness2}]
                 break
             } else {
-                sync.mutex_unlock(&self.mutex)
+                sync.mutex_unlock(&self.mutex)// else 부분은 mutex 해제 후 작업 후 다시 잠금
                 defer sync.mutex_lock(&self.mutex)
-
+               
                 poly.nPolys[data.nPoly] = data.nPolyLen
                 poly.nTypes[data.nTypes] = data.nTypesLen
                 poly.poly = mem.resize_non_zeroed_slice(poly.poly, data.idx, context.temp_allocator)
                 poly.types = mem.resize_non_zeroed_slice(poly.types, data.typeIdx, context.temp_allocator)
-
-                // for &t in poly.thickness {
-                //     t = 0.02
-                // }
+                if thickness > 0.0 {
+                    poly.strokeColors = mem.resize_non_zeroed_slice(poly.strokeColors, data.nPoly + 1, context.temp_allocator)
+                    poly.thickness = mem.resize_non_zeroed_slice(poly.thickness, data.nPoly + 1, context.temp_allocator)
+                     for &c in poly.strokeColors {
+                        c = linalg.Point3DwF{0,0,0,1}//?no matter
+                    }
+                    for &t in poly.thickness {
+                        t = thickness
+                    }
+                }
+                if color != nil {
+                    poly.colors = mem.resize_non_zeroed_slice(poly.colors, data.nPoly + 1, context.temp_allocator)
+                    for &c in poly.colors {
+                        c = linalg.Point3DwF{0,0,0,2}//?no matter but stroke 와 구분한다.
+                    }
+                }
 
                 rawP : ^geometry.RawShape
                 rawP , shapeErr = geometry.Shapes_ComputePolygon(&poly, engine.defAllocator())//높은 부하 작업 High load operations
@@ -411,12 +449,12 @@ allocator : runtime.Allocator) -> (rect:linalg.RectF, err:geometry.ShapesError =
 
                 charData = {
                     advanceX = f32(self.face.glyph.advance.x) / (64.0 * self.scale),
-                    rawShape = rawP
+                    rawShape = rawP,
                 }
             }
-            self.charArray[ch] = charData
+            self.charArray[FONT_KEY{ch, thickness2}] = charData
             
-            charD = &self.charArray[ch]
+            charD = &self.charArray[FONT_KEY{ch, thickness2}]
             break
         }
     }
@@ -436,8 +474,10 @@ allocator : runtime.Allocator) -> (rect:linalg.RectF, err:geometry.ShapesError =
         for ;i < len(_vertArr^);i += 1 {
             _vertArr^[i].pos += offset^
             _vertArr^[i].pos *= scale
-            if _vertArr^[i].color.a > 0.0 {
-                _vertArr^[i].color = color
+            if _vertArr^[i].color.a == 1.0 {
+                _vertArr^[i].color = strokeColor
+            } else if _vertArr^[i].color.a == 2.0 {
+                _vertArr^[i].color = color.?
             }
         }
 
@@ -455,7 +495,7 @@ allocator : runtime.Allocator) -> (rect:linalg.RectF, err:geometry.ShapesError =
     return
 }
 
-Font_RenderString2 :: proc(_str:string, _renderOpt:FontRenderOpt2, allocator := context.allocator) -> (res:^geometry.RawShape, err:geometry.ShapesError = .None)  {
+Font_RenderString2 :: proc(_str:string, _renderOpt:FontRenderOpt2, allocator := context.allocator) -> (res:^geometry.RawShape, err:geometry.ShapesError = nil)  {
     vertList := make([dynamic]geometry.ShapeVertex2D, allocator)
     indList := make([dynamic]u32, allocator)
 
@@ -471,7 +511,7 @@ Font_RenderString2 :: proc(_str:string, _renderOpt:FontRenderOpt2, allocator := 
 }
 
 
-Font_RenderString :: proc(self:^Font, _str:string, _renderOpt:FontRenderOpt, allocator := context.allocator) -> (res:^geometry.RawShape, err:geometry.ShapesError = .None) {
+Font_RenderString :: proc(self:^Font, _str:string, _renderOpt:FontRenderOpt, allocator := context.allocator) -> (res:^geometry.RawShape, err:geometry.ShapesError = nil) {
     vertList := make([dynamic]geometry.ShapeVertex2D, allocator)
     indList := make([dynamic]u32, allocator)
 

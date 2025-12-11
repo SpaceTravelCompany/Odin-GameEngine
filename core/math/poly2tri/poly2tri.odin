@@ -12,6 +12,7 @@ import "base:intrinsics"
 
 Trianguate_Error :: enum {
     None,
+
     Edge_P1_Equal_P2,
     Triangle_MarkNeighbor2_target_not_a_neighbor,
     Triangle_PointCW_point_not_in_triangle,
@@ -27,6 +28,9 @@ Trianguate_Error :: enum {
     FlipScanEdgeEvent_nil_neighbor_across,
     FlipScanEdgeEvent_nil_opposing_point,
     FlipScanEdgeEvent_nil_on_either_of_points,
+    FlipEdgeEvent_nil_Triangle,
+    FlipEdgeEvent_nil_Neighbor_Across,
+
     nil_node,
 }
 
@@ -131,7 +135,7 @@ Trianguate_Error :: enum {
     return
 }
 
-@(private = "file") Triangle_MarkNeighbor2 :: proc "contextless"(self, target: ^Triangle, p1, p2: ^PointE) {
+@(private = "file") Triangle_MarkNeighbor2 :: proc "contextless"(self, target: ^Triangle, p1, p2: ^PointE) -> (err:Trianguate_Error = .None) {
     if (p1 == self.pts[2] && p2 == self.pts[1]) || (p1 == self.pts[1] && p2 == self.pts[2]) {
         self.neighbors[0] = target
     } else if (p1 == self.pts[0] && p2 == self.pts[2]) || (p1 == self.pts[2] && p2 == self.pts[0]) {
@@ -139,21 +143,24 @@ Trianguate_Error :: enum {
     } else if (p1 == self.pts[0] && p2 == self.pts[1]) || (p1 == self.pts[1] && p2 == self.pts[0]) {
         self.neighbors[2] = target
     } else {
-        trace.panic_log("Triangle_MarkNeighbor2: target not a neighbor")
+        err = .Triangle_MarkNeighbor2_target_not_a_neighbor
+        return
     }
+    return
 }
 
-@(private = "file") Triangle_MarkNeighbor :: proc "contextless" (self, target: ^Triangle) {
+@(private = "file") Triangle_MarkNeighbor :: proc "contextless" (self, target: ^Triangle) -> (err:Trianguate_Error = .None) {
     if Triangle_Contains2(target, self.pts[1], self.pts[2]) {
         self.neighbors[0] = target
-        Triangle_MarkNeighbor2(target, self, self.pts[1], self.pts[2])
+        Triangle_MarkNeighbor2(target, self, self.pts[1], self.pts[2]) or_return
     } else if Triangle_Contains2(target, self.pts[0], self.pts[2]) {
         self.neighbors[1] = target
-        Triangle_MarkNeighbor2(target, self, self.pts[0], self.pts[2])
+        Triangle_MarkNeighbor2(target, self, self.pts[0], self.pts[2]) or_return
     } else if Triangle_Contains2(target, self.pts[0], self.pts[1]) {
         self.neighbors[2] = target
-        Triangle_MarkNeighbor2(target, self, self.pts[0], self.pts[1])
+        Triangle_MarkNeighbor2(target, self, self.pts[0], self.pts[1]) or_return
     }
+    return
 }
 
 @(private = "file") Triangle_MarkConstrainedEdge :: proc "contextless" (self: ^Triangle, p, q: ^PointE) {
@@ -356,7 +363,7 @@ Trianguate_Error :: enum {
     return det > 0
 }
 
-@(private = "file") Triangle_Legalize :: proc "contextless" (t: ^Triangle, opoint, npoint: ^PointE) {
+@(private = "file") Triangle_Legalize :: proc "contextless" (t: ^Triangle, opoint, npoint: ^PointE) -> (err:Trianguate_Error = .None) {
     if opoint == t.pts[0] {
         t.pts[1] = t.pts[0]
         t.pts[0] = t.pts[2]
@@ -370,8 +377,10 @@ Trianguate_Error :: enum {
         t.pts[2] = t.pts[1]
         t.pts[1] = npoint
     } else {
-        trace.panic_log("Triangle_Legalize: opoint not in triangle")
+        err = .Triangle_Legalize_opoint_not_in_triangle
+        return
     }
+    return
 }
 
 @(private = "file") Triangle_ClearNeighbors :: proc "contextless" (t: ^Triangle) {
@@ -380,7 +389,7 @@ Trianguate_Error :: enum {
     t.neighbors[2] = nil
 }
 
-@(private = "file") RotateTrianglePair :: proc "contextless" (t: ^Triangle, p: ^PointE, ot: ^Triangle, op: ^PointE) -> bool {
+@(private = "file") RotateTrianglePair :: proc "contextless" (t: ^Triangle, p: ^PointE, ot: ^Triangle, op: ^PointE) -> (res:bool, err:Trianguate_Error = .None) {
     n1, n2, n3, n4: ^Triangle
 
     n1 = Triangle_NeighborCCW(t, p)
@@ -398,8 +407,8 @@ Trianguate_Error :: enum {
     de3 := Triangle_GetDelaunayEdgeCCW(ot, op)
     de4 := Triangle_GetDelaunayEdgeCW(ot, op)
     
-    Triangle_Legalize(t, p, op)
-    Triangle_Legalize(ot, op, p)
+    Triangle_Legalize(t, p, op) or_return
+    Triangle_Legalize(ot, op, p) or_return
 
     Triangle_SetDelaunayEdgeCCW(ot, p, de1)
     Triangle_SetDelaunayEdgeCW(t, p, de2)
@@ -413,13 +422,13 @@ Trianguate_Error :: enum {
     
     Triangle_ClearNeighbors(t)
     Triangle_ClearNeighbors(ot)
-    if n1 != nil do Triangle_MarkNeighbor(ot, n1)
-    if n2 != nil do Triangle_MarkNeighbor(t, n2)
-    if n3 != nil do Triangle_MarkNeighbor(t, n3)
-    if n4 != nil do Triangle_MarkNeighbor(ot, n4)
-    Triangle_MarkNeighbor(t, ot)
+    if n1 != nil do Triangle_MarkNeighbor(ot, n1) or_return
+    if n2 != nil do Triangle_MarkNeighbor(t, n2) or_return
+    if n3 != nil do Triangle_MarkNeighbor(t, n3) or_return
+    if n4 != nil do Triangle_MarkNeighbor(ot, n4) or_return
+    Triangle_MarkNeighbor(t, ot) or_return
     
-    return true
+    return true, .None
 }
 
 @(private = "file") AdvancingFront_FindSearchNode :: proc "contextless" (front: ^AdvancingFront, x: f32) -> ^Node {
@@ -428,7 +437,7 @@ Trianguate_Error :: enum {
     return front.search
 }
 
-@(private = "file") AdvancingFront_LocatePoint :: proc "contextless" (front: ^AdvancingFront, point: ^PointE) -> ^Node {
+@(private = "file") AdvancingFront_LocatePoint :: proc "contextless" (front: ^AdvancingFront, point: ^PointE) -> (res:^Node, err:Trianguate_Error = .None) {
     px := point.x
     node := AdvancingFront_FindSearchNode(front, px)
     nx := node.point.x
@@ -440,7 +449,8 @@ Trianguate_Error :: enum {
             } else if point == node.next.point {
                 node = node.next
             } else {
-                trace.panic_log("AdvancingFront_LocatePoint: point not found")
+                err = .AdvancingFront_LocatePoint_point_not_found
+                return
             }
         }
     } else if px < nx {
@@ -458,13 +468,15 @@ Trianguate_Error :: enum {
     }
     
     if node != nil do front.search = node
-    return node
+    
+    res = node
+    return
 }
 
 @(require_results, private = "file") MapTriangleToNodes :: proc "contextless" (ctx: ^TriangleCtx, t: ^Triangle) -> (err:Trianguate_Error = .None) {
     for i in 0..<3 {
         if t.neighbors[i] == nil {
-            n := AdvancingFront_LocatePoint(&ctx.front, Triangle_PointCW(t, t.pts[i]) or_return)
+            n := AdvancingFront_LocatePoint(&ctx.front, Triangle_PointCW(t, t.pts[i]) or_return) or_return
             if n != nil {
                 n.triangle = t
             }
@@ -498,7 +510,7 @@ Trianguate_Error :: enum {
                 t.delaunayEdge[i] = true
                 ot.delaunayEdge[oi] = true
 
-                RotateTrianglePair(t, p, ot, op)
+                RotateTrianglePair(t, p, ot, op) or_return
 
                 notLegalized := Legalize(ctx, t) or_return
                 notLegalized = !notLegalized
@@ -687,7 +699,8 @@ Trianguate_Error :: enum {
 @(require_results, private = "file") EdgeEvent2 :: proc "contextless" (ctx: ^TriangleCtx, ep, eq: ^PointE, triangle: ^Triangle, point: ^PointE) -> (err:Trianguate_Error = .None) {
     triangle_ := triangle
     if triangle_ == nil {
-        trace.panic_log("EdgeEvent2 - null triangle")
+        err = .EdgeEvent2_nil_triangle
+        return
     }
     
     if IsEdgeSideOfTriangle(triangle_, ep, eq) do return
@@ -738,15 +751,21 @@ Trianguate_Error :: enum {
 
 @(private = "file") FlipEdgeEvent :: proc "contextless" (ctx: ^TriangleCtx, ep, eq: ^PointE, t: ^Triangle, p: ^PointE) -> (err:Trianguate_Error = .None) {
     t_ := t
-    if t_ == nil do trace.panic_log("FlipEdgeEvent - null triangle")
+    if t_ == nil {
+        err = .FlipEdgeEvent_nil_triangle
+        return
+    }
     
     ot := Triangle_NeighborAcross(t_, p)
-    if ot == nil do trace.panic_log("FlipEdgeEvent - null neighbor across")
+    if ot == nil {
+        err = .FlipEdgeEvent_nil_Neighbor_Across
+        return
+    }
     
     op := Triangle_OppositePoint(ot, t_, p) or_return
   
     if InScanArea(p, Triangle_PointCCW(t_, p) or_return, Triangle_PointCW(t_, p) or_return, op) {
-        RotateTrianglePair(t_, p, ot, op)
+        RotateTrianglePair(t_, p, ot, op) or_return
         MapTriangleToNodes(ctx, t_) or_return
         MapTriangleToNodes(ctx, ot) or_return
   
@@ -967,12 +986,13 @@ TrianguateSinglePolygon :: proc(poly:[]linalg.PointF, baseIdx:[]u32, holes:[][]l
     for i in 1..<len(ctx.pts) {
         node := AdvancingFront_LocateNode(&ctx.front, ctx.pts[i].x)
         if node == nil || node.point == nil || node.next == nil || node.next.point == nil {
-            trace.panic_log("nil Node")
+            err = .nil_node
+            return
         }
 
         non_zero_append(&ctx.maps, new_clone(Triangle{pts = [3]^PointE{ctx.pts[i], node.point, node.next.point}}, context.temp_allocator))
         tri := ctx.maps[len(ctx.maps) - 1]
-        Triangle_MarkNeighbor(tri, node.triangle)
+        Triangle_MarkNeighbor(tri, node.triangle) or_return
         
         ctx.nodes[i-1] = Node_InitPts(ctx.pts[i])
         ctx.nodes[i-1].next = node.next
@@ -1039,8 +1059,8 @@ TrianguateSinglePolygon :: proc(poly:[]linalg.PointF, baseIdx:[]u32, holes:[][]l
 
     non_zero_append(&ctx.maps, triangle)
 
-    Triangle_MarkNeighbor(triangle, node.prev.triangle)
-    Triangle_MarkNeighbor(triangle, node.triangle)
+    Triangle_MarkNeighbor(triangle, node.prev.triangle) or_return
+    Triangle_MarkNeighbor(triangle, node.triangle) or_return
     
 
     node.prev.next = node.next

@@ -819,6 +819,8 @@ delete :: proc{
 	delete_soa_dynamic_array,
 }
 
+//TODO (xfitgd) - add #optional_allocator_error to new, make procedures
+
 /*
 Allocate a new object.
 
@@ -831,7 +833,7 @@ new :: proc(
 	$T: typeid,
 	allocator := context.allocator,
 	loc := #caller_location,
-) -> (^T, Allocator_Error) {
+) -> (^T, Allocator_Error) #optional_allocator_error {
 	return new_aligned(T, align_of(T), allocator, loc)
 }
 
@@ -849,7 +851,7 @@ new_aligned :: proc(
 	alignment: int,
 	allocator := context.allocator,
 	loc := #caller_location,
-) -> (t: ^T, err: Allocator_Error) {
+) -> (t: ^T, err: Allocator_Error) #optional_allocator_error {
 	return runtime.new_aligned(T, alignment, allocator, loc)
 }
 
@@ -866,7 +868,7 @@ new_clone :: proc(
 	data: $T,
 	allocator := context.allocator,
 	loc := #caller_location,
-) -> (t: ^T, err: Allocator_Error) {
+) -> (t: ^T, err: Allocator_Error) #optional_allocator_error {
 	return runtime.new_clone(data, allocator, loc)
 }
 
@@ -884,7 +886,7 @@ make_aligned :: proc(
 	alignment: int,
 	allocator := context.allocator,
 	loc := #caller_location,
-) -> (slice: T, err: Allocator_Error) {
+) -> (slice: T, err: Allocator_Error) #optional_allocator_error {
 	return runtime.make_aligned(T, len, alignment, allocator, loc)
 }
 
@@ -928,7 +930,7 @@ make_slice :: proc(
 	#any_int len: int,
 	allocator := context.allocator,
 	loc := #caller_location,
-) -> (T, Allocator_Error) {
+) -> (T, Allocator_Error) #optional_allocator_error {
 	return runtime.make_slice(T, len, allocator, loc)
 }
 
@@ -943,7 +945,7 @@ make_dynamic_array :: proc(
 	$T: typeid/[dynamic]$E,
 	allocator := context.allocator,
 	loc := #caller_location,
-) -> (T, Allocator_Error) {
+) -> (T, Allocator_Error) #optional_allocator_error {
 	return runtime.make_dynamic_array(T, allocator, loc)
 }
 
@@ -959,7 +961,7 @@ make_dynamic_array_len :: proc(
 	#any_int len: int,
 	allocator := context.allocator,
 	loc := #caller_location,
-) -> (T, Allocator_Error) {
+) -> (T, Allocator_Error) #optional_allocator_error {
 	return runtime.make_dynamic_array_len(T, len, allocator, loc)
 }
 
@@ -977,7 +979,7 @@ make_dynamic_array_len_cap :: proc(
 	#any_int cap: int,
 	allocator := context.allocator,
 	loc := #caller_location,
-) -> (array: T, err: Allocator_Error) {
+) -> (array: T, err: Allocator_Error) #optional_allocator_error {
 	return runtime.make_dynamic_array_len_cap(T, len, cap, allocator, loc)
 }
 
@@ -1010,7 +1012,7 @@ make_map_cap :: proc(
 	#any_int cap: int,
 	allocator := context.allocator,
 	loc := #caller_location,
-) -> (m: T, err: Allocator_Error) {
+) -> (m: T, err: Allocator_Error) #optional_allocator_error {
 	return runtime.make_map_cap(T, cap, allocator, loc)
 }
 
@@ -1026,7 +1028,7 @@ make_multi_pointer :: proc(
 	#any_int len: int,
 	allocator := context.allocator,
 	loc := #caller_location
-) -> (mp: T, err: Allocator_Error) {
+) -> (mp: T, err: Allocator_Error) #optional_allocator_error {
 	return runtime.make_multi_pointer(T, len, allocator, loc)
 }
 
@@ -1042,7 +1044,7 @@ make_soa_slice :: proc(
 	#any_int len: int,
 	allocator := context.allocator,
 	loc := #caller_location
-) -> (array: T, err: Allocator_Error) {
+) -> (array: T, err: Allocator_Error) #optional_allocator_error {
 	return runtime.make_soa_slice(T, len, allocator, loc)
 }
 
@@ -1057,7 +1059,7 @@ make_soa_dynamic_array :: proc(
 	$T: typeid/#soa[dynamic]$E,
 	allocator := context.allocator,
 	loc := #caller_location
-) -> (array: T, err: Allocator_Error) {
+) -> (array: T, err: Allocator_Error) #optional_allocator_error {
 	return runtime.make_soa_dynamic_array(T, allocator, loc)
 }
 
@@ -1073,7 +1075,7 @@ make_soa_dynamic_array_len :: proc(
 	#any_int len: int,
 	allocator := context.allocator,
 	loc := #caller_location
-) -> (array: T, err: Allocator_Error) {
+) -> (array: T, err: Allocator_Error) #optional_allocator_error {
 	return runtime.make_soa_dynamic_array_len(T, len, allocator, loc)
 }
 
@@ -1091,7 +1093,7 @@ make_soa_dynamic_array_len_cap :: proc(
 	#any_int cap: int,
 	allocator := context.allocator,
 	loc := #caller_location
-) -> (array: T, err: Allocator_Error) {
+) -> (array: T, err: Allocator_Error) #optional_allocator_error {
 	return runtime.make_soa_dynamic_array_len_cap(T, len, cap, allocator, loc)
 }
 
