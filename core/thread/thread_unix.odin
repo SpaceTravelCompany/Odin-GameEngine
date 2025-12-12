@@ -30,14 +30,14 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 
 		//edited (xfitgd) : android does not support pthread_cancel, so delete this code now
 		// Enable thread's cancelability.
-		err := posix.pthread_setcancelstate(.ENABLE, nil)
-		assert_contextless(err == nil)
+		// err := posix.pthread_setcancelstate(.ENABLE, nil)
+		// assert_contextless(err == nil)
 
-		// NOTE(laytan): .ASYNCHRONOUS should make `pthread_cancel` cancel immediately
-		// instead of waiting for a cancellation point.
-		// This does not seem to work on at least Darwin and NetBSD though.
-		err = posix.pthread_setcanceltype(.ASYNCHRONOUS, nil)
-		assert_contextless(err == nil)
+		// // NOTE(laytan): .ASYNCHRONOUS should make `pthread_cancel` cancel immediately
+		// // instead of waiting for a cancellation point.
+		// // This does not seem to work on at least Darwin and NetBSD though.
+		// err = posix.pthread_setcanceltype(.ASYNCHRONOUS, nil)
+		// assert_contextless(err == nil)
 
 		{
 			init_context := t.init_context
