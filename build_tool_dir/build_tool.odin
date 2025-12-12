@@ -198,7 +198,7 @@ main :: proc() {
 		resource.? if resource != nil else ({}),
 		"-define:__log__=true" if log else ({}),
 		"-define:__console__=true" if console else ({}),
-		"-subsystem:console" if console && ODIN_OS == .Windows else ({}),
+		"-subsystem:console" if console && ODIN_OS == .Windows else "-subsystem:windows",
 		//"-sanitize:address" if debug else ({}),
 		}) {
 			return

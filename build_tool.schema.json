@@ -17,7 +17,16 @@
 					"type": "string"
 				},
 				"build-type": {
-					"type": "string"
+					"type": "string",
+					"enum": [
+						"minimal",
+						"speed",
+						"size",
+						"none",
+						"aggressive"
+					],
+					"default": "minimal",
+					"description": "빌드 최적화 타입"
 				},
 				"log": {
 					"type": "boolean"
