@@ -134,7 +134,8 @@ internal_int_kronecker :: proc(a, p: ^Int, allocator := context.allocator) -> (k
 	a1, p1, r := &Int{}, &Int{}, &Int{}
 	defer internal_destroy(a1, p1, r)
 
-	table := []int{0, 1, 0, -1, 0, -1, 0, 1}
+	@(static, rodata)
+	table := [?]int{0, 1, 0, -1, 0, -1, 0, 1}
 
 	if internal_int_is_zero(p) {
 		if a.used == 1 && a.digit[0] == 1 {
@@ -1207,7 +1208,7 @@ internal_random_prime :: proc(a: ^Int, size_in_bits: int, trials: int, flags := 
 	/*
 		Automatically choose the number of Rabin-Miller trials?
 	*/
-	if trials == -1 {
+	if trials < 0 {
 		trials = number_of_rabin_miller_trials(size_in_bits)
 	}
 
