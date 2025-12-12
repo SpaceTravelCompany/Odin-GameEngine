@@ -87,11 +87,14 @@ main :: proc() {
 		os2.make_directory("android/lib/lib")
 
 		os2.make_directory("android/lib/lib/arm64-v8a")
-		err := os2.copy_file("android/lib/lib/arm64-v8a/libVkLayer_khronos_validation.so", filepath.join({ODIN_ROOT, "/vendor/vulkan/lib/android/libVkLayer_khronos_validation_arm64.so"}, context.temp_allocator))
-		if err != nil {
-			fmt.panicf("libVkLayer_khronos_validation copy_file: %s", err)
+
+		if debug {
+			err := os2.copy_file("android/lib/lib/arm64-v8a/libVkLayer_khronos_validation.so", filepath.join({ODIN_ROOT, "/vendor/vulkan/lib/android/libVkLayer_khronos_validation_arm64.so"}, context.temp_allocator))
+			if err != nil {
+				fmt.panicf("libVkLayer_khronos_validation copy_file: %s", err)
+			}
+			defer os2.remove("android/lib/lib/arm64-v8a/libVkLayer_khronos_validation.so")
 		}
-		defer os2.remove("android/lib/lib/arm64-v8a/libVkLayer_khronos_validation.so")
 		// os2.make_directory("android/lib/lib/armeabi-v7a")//!only supports arm64 now
 		// os2.make_directory("android/lib/lib/x86_64")
 		// os2.make_directory("android/lib/lib/x86")
