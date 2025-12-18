@@ -2,9 +2,12 @@ package engine
 
 import "base:intrinsics"
 import "core:fmt"
+import "core:c/libc"
+import "core:c"
 import "core:math"
 import "core:math/linalg"
 import "core:os"
+import "core:os/os2"
 import "core:sys/windows"
 import "core:mem"
 import "core:mem/virtual"
@@ -147,6 +150,7 @@ engineMain :: proc(
 	
 	systemInit()
 	systemStart()
+
 	inited = true
 
 	__windowTitle = windowTitle
@@ -433,5 +437,17 @@ exit :: proc "contextless" () {
 	when is_mobile {
 	} else {
 		glfwDestroy()
+	}
+}
+
+
+//only for windows
+start_console :: proc() {
+	when ODIN_OS == .Windows {
+		windows.AllocConsole()
+		// 새로운 콘솔을 할당 했으므로 stdin, stdout, stderr를 다시 설정
+		os.stdin = os.get_std_handle(uint(windows.STD_INPUT_HANDLE))
+		os.stdout = os.get_std_handle(uint(windows.STD_OUTPUT_HANDLE))
+		os.stderr = os.get_std_handle(uint(windows.STD_ERROR_HANDLE))
 	}
 }

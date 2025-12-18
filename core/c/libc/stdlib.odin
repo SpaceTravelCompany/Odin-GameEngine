@@ -1,5 +1,7 @@
 package libc
 
+import "core:c"
+
 // 7.22 General utilities
 
 when ODIN_OS == .Windows {
@@ -24,6 +26,12 @@ when ODIN_OS == .Windows {
 
 	MB_CUR_MAX :: #force_inline proc() -> size_t {
 		return size_t(___mb_cur_max_func())
+	}
+
+	@(default_calling_convention="c")
+	foreign libc {
+		_open_osfhandle :: proc(os_handle: c.intptr_t, flags: c.int) -> c.int ---
+		_fdopen         :: proc(fd: c.int, mode: cstring) -> ^FILE ---
 	}
 }
 

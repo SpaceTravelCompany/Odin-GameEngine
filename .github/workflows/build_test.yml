@@ -14,7 +14,7 @@ jobs:
       
       - name: Build Odin (Windows)
         shell: cmd
-        run: ./build.bat
+        run: ./build.bat release
       
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
@@ -34,7 +34,7 @@ jobs:
       - name: Build
         run: |
           chmod +x build_odin.sh
-          LLVM_CONFIG=llvm-config-17 ./build_odin.sh debug
+          LLVM_CONFIG=llvm-config-17 ./build_odin.sh release
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
