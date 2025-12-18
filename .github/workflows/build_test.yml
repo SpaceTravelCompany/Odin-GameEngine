@@ -1,4 +1,4 @@
-name: Simple CI
+name: BuildTest
 
 on:
   workflow_dispatch:
@@ -13,7 +13,7 @@ on:
           - release
 
 jobs:
-  test:
+  build_test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
