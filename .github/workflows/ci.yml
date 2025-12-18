@@ -1,10 +1,16 @@
 name: Simple CI
 
 on:
-  push:
-    branches: [ master ]
-  pull_request:
-    branches: [ master ]
+  workflow_dispatch:
+    inputs:
+      build_mode:
+        description: 'Build mode (debug/release)'
+        required: true
+        default: 'debug'
+        type: choice
+        options:
+          - debug
+          - release
 
 jobs:
   test:
@@ -20,4 +26,4 @@ jobs:
       - name: Build
         run: |
           chmod +x build_odin.sh
-          LLVM_CONFIG=llvm-config-17 ./build_odin.sh debug
+          LLVM_CONFIG=llvm-config-17 ./build_odin.sh ${{ inputs.build_mode }}
