@@ -14,9 +14,7 @@ jobs:
       
       - name: Build Odin (Windows)
         shell: cmd
-        run:  |
-          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat
-          ./build.bat
+        run: ./build.bat
       
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
