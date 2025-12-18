@@ -1,0 +1,23 @@
+name: Simple CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y llvm-17 clang-17
+      
+      - name: Build
+        run: |
+          chmod +x build_odin.sh
+          LLVM_CONFIG=llvm-config-17 ./build_odin.sh debug
