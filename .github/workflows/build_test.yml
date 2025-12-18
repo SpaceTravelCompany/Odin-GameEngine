@@ -13,7 +13,23 @@ on:
           - release
 
 jobs:
-  build_test:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup MSVC
+        uses: microsoft/setup-msbuild@v1.1
+      
+      - name: Build Odin (Windows)
+        run: build.bat ${{ inputs.build_mode }}
+      
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: odin-windows
+          path: odin.exe
+  build-linux:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
