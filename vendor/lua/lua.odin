@@ -1,4 +1,4 @@
-package lua;
+package lua
 
 import "base:runtime"
 import "core:os"
