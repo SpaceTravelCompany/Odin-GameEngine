@@ -11,7 +11,12 @@ when COMMONMARK_SHARED {
 	#panic("Shared linking for vendor:commonmark is not supported yet")
 }
 
-LIB :: library.LIBPATH + "/libcmark" + library.ARCH_end
+when ODIN_OS == .Linux && !library.is_mobile {
+	LIB :: "system:cmark"
+} else {
+	LIB :: library.LIBPATH + "/libcmark" + library.ARCH_end
+}
+
 
 foreign import lib {
 	LIB,

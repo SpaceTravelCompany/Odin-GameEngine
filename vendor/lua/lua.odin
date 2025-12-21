@@ -475,7 +475,14 @@ luaL_getmetatable :: proc (L:^ lua_State,n:cstring)
 
 @(export, link_name="lua_writestring") lua_writestring :: proc "c" (ptr : rawptr, size : c.size_t) -> c.size_t {
 	when  ODIN_PLATFORM_SUBTARGET == .Android {
-		return auto_cast android.__android_log_write(android.LogPriority.INFO, ODIN_BUILD_PROJECT_NAME, cstr)
+		context = runtime.default_context()
+		tmp := mem.make_non_zeroed([]u8, size + 1, context.temp_allocator)
+		defer delete(tmp, context.temp_allocator)
+
+		mem.copy_non_overlapping(&tmp[0], ptr, auto_cast size)
+		tmp[size] = 0
+
+		return auto_cast android.__android_log_write(android.LogPriority.INFO, ODIN_BUILD_PROJECT_NAME, cstring(&tmp[0]))
 	} else when ODIN_OS == .Linux {
 		res, err := linux.write(linux.STDOUT_FILENO, ([^]u8)(ptr)[0:size])
 
