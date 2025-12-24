@@ -8,9 +8,9 @@ import "../vorbis"
 import "../ogg"
 
 foreign import lib {
-    "../vorbisfile/" + vorbisfile.LIB,
-    "../vorbis/" + vorbis.LIB,
-    "../ogg/" + ogg.LIB,
+    vorbisfile.LIB,
+    vorbis.LIB,
+    ogg.LIB,
 	LIB,
 }
 

@@ -17,14 +17,14 @@ when ODIN_ARCH == .amd64 {
 
 when !is_mobile {
 	when ODIN_OS == .Windows {
-		LIBPATH :: "lib/windows"
+		LIBPATH :: "/lib/windows"
 	} else when ODIN_OS == .Darwin {
 		//TODO
 	} else {
-		LIBPATH :: "lib/linux"
+		LIBPATH :: "/lib/linux"
     }
 } else {
 	when is_android {
-        LIBPATH :: "lib/android"
+        LIBPATH :: "/lib/android"
 	}
 }

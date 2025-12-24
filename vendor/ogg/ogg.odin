@@ -3,7 +3,7 @@ package ogg
 import "base:library"
 import "core:c"
 
-LIB :: library.LIBPATH + "/libogg" + library.ARCH_end
+LIB :: #directory + library.LIBPATH + "/libogg" + library.ARCH_end
 foreign import lib {
 	LIB,
 }

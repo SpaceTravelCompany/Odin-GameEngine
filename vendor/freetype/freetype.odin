@@ -2,24 +2,22 @@ package freetype
 
 import "core:c"
 import "base:library"
+import "vendor:compress/brotli"
+import "vendor:compress/bzip2"
 
 FREETYPE_SHARED :: #config(FREETYPE_SHARED, false)
 when FREETYPE_SHARED {
 	#panic("Shared linking for freetype is not supported yet")
 }
 
-LIB :: library.LIBPATH + "/libfreetype" + library.ARCH_end
-BROTLI_COMMON_LIB :: "../compress/brotli/" + library.LIBPATH + "/libbrotlicommon" + library.ARCH_end
-BROTLI_DEC_LIB :: "../compress/brotli/" + library.LIBPATH + "/libbrotlidec" + library.ARCH_end
-BROTLI_ENC_LIB :: "../compress/brotli/" + library.LIBPATH + "/libbrotlienc" + library.ARCH_end
-BZIP2_LIB :: "../compress/bzip2/" + library.LIBPATH + "/libbz2" + library.ARCH_end
+LIB :: #directory + library.LIBPATH + "/libfreetype" + library.ARCH_end
 
 foreign import freetype {
     LIB,
-    BROTLI_DEC_LIB,
-    BROTLI_ENC_LIB,
-    BROTLI_COMMON_LIB,
-    BZIP2_LIB,
+    brotli.BROTLI_DEC_LIB,
+    brotli.BROTLI_ENC_LIB,
+    brotli.BROTLI_COMMON_LIB,
+    bzip2.BZIP2_LIB,
 }
 
 Library       :: distinct rawptr

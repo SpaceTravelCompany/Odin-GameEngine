@@ -8,8 +8,8 @@ import "../ogg"
 import "../opus"
 
 foreign import lib {
-    "../opusfile/" + opusfile.LIBOPUSFILE,
-    "../opus/" + opus.LIBOPUS,
+    opusfile.LIBOPUSFILE,
+    opus.LIBOPUS,
 	LIB,
 }
 

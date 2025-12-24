@@ -1,10 +1,12 @@
 //  Bindings for [[LZ4 ; https://github.com/lz4/lz4]].
-package vendor_compress_lz4
+package lz4
 
-//TODO LIB Update
-when ODIN_OS == .Windows {
-	@(extra_linker_flags="/NODEFAULTLIB:libcmt")
-	foreign import lib { "lib/liblz4_static.lib", "system:ucrt.lib" }
+import "base:library"
+
+LZ4_LIB :: library.LIBPATH + "/liblz4" + library.ARCH_end
+
+foreign import lib {
+	LZ4_LIB,
 }
 
 import "core:c"
