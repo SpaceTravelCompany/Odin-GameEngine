@@ -607,6 +607,7 @@ struct BuildContext {
 
 
 	int    ODIN_ANDROID_API_LEVEL;
+	int    ODIN_ANDROID_NDK_API_LEVEL;// edited (xfitgd)
 
 	String ODIN_ANDROID_SDK;
 
@@ -1648,11 +1649,87 @@ gb_internal void init_android_values(bool with_sdk) {
 	bc->ODIN_ANDROID_NDK_TOOLCHAIN_LIB = concatenate_strings(permanent_allocator(), bc->ODIN_ANDROID_NDK_TOOLCHAIN, str_lit("sysroot/usr/lib/aarch64-linux-android/"));
 
 	char buf[32] = {};
-	gb_snprintf(buf, gb_size_of(buf), "%d/", bc->ODIN_ANDROID_API_LEVEL);
-	bc->ODIN_ANDROID_NDK_TOOLCHAIN_LIB_LEVEL = concatenate_strings(permanent_allocator(), bc->ODIN_ANDROID_NDK_TOOLCHAIN_LIB, make_string_c(buf));
+	bc->ODIN_ANDROID_NDK_API_LEVEL = bc->ODIN_ANDROID_API_LEVEL;
+	// Check if the API level directory exists, if not find the closest one edited (xfitgd)
+	{
+		Array<FileInfo> dir_list = {};
+		ReadDirectoryError rd_err = read_directory(bc->ODIN_ANDROID_NDK_TOOLCHAIN_LIB, &dir_list);
+		if (rd_err == ReadDirectory_None) {
+			defer (array_free(&dir_list));
+			
+			auto possible_valid_dirs = array_make<FileInfo>(heap_allocator(), 0, dir_list.count);
+			defer (array_free(&possible_valid_dirs));
+			
+			for (FileInfo fi : dir_list) if (fi.is_dir) {
+				bool all_numbers = true;
+				for (isize i = 0; i < fi.name.len; i++) {
+					u8 c = fi.name[i];
+					if ('0' <= c && c <= '9') {
+						// true
+					} else if (i == 0) {
+						all_numbers = false;
+					} else if (c == '.') {
+						break;
+					} else {
+						all_numbers = false;
+					}
+				}
+				
+				if (all_numbers) {
+					array_add(&possible_valid_dirs, fi);
+				}
+			}
+			
+			if (possible_valid_dirs.count == 0) {
+				gb_printf_err("Unable to find any Android API Level in %.*s\n", LIT(bc->ODIN_ANDROID_NDK_TOOLCHAIN_LIB));
+			} else {
+				int *dir_numbers = temporary_alloc_array<int>(possible_valid_dirs.count);
+				
+				char name_buf[1024] = {};
+				for_array(i, possible_valid_dirs) {
+					FileInfo fi = possible_valid_dirs[i];
+					isize n = gb_min(gb_size_of(name_buf)-1, fi.name.len);
+					memcpy(name_buf, fi.name.text, n);
+					name_buf[n] = 0;
+					
+					dir_numbers[i] = atoi(name_buf);
+				}
+				
+				// Check for exact match first
+				bool found_exact = false;
+				for (isize i = 0; i < possible_valid_dirs.count; i++) {
+					if (dir_numbers[i] == bc->ODIN_ANDROID_NDK_API_LEVEL) {
+						found_exact = true;
+						break;
+					}
+				}
+				
+				// If exact match not found, find the closest one
+				if (!found_exact) {
+					isize closest_number_idx = -1;
+					int min_diff = 999999;
+					for (isize i = 0; i < possible_valid_dirs.count; i++) {
+						int diff = (dir_numbers[i] > bc->ODIN_ANDROID_NDK_API_LEVEL) ? 
+						           (dir_numbers[i] - bc->ODIN_ANDROID_NDK_API_LEVEL) : 
+						           (bc->ODIN_ANDROID_NDK_API_LEVEL - dir_numbers[i]);
+						if (diff < min_diff) {
+							min_diff = diff;
+							closest_number_idx = i;
+						}
+					}
+					
+					if (closest_number_idx >= 0) {
+						bc->ODIN_ANDROID_NDK_API_LEVEL = dir_numbers[closest_number_idx];
+						gb_printf("Warning: NDK Lib API level directory not found, using closest available: %d\n", bc->ODIN_ANDROID_NDK_API_LEVEL);
+					}
+				}
+			}
+		}
+	}
+    gb_snprintf(buf, gb_size_of(buf), "%d/", bc->ODIN_ANDROID_NDK_API_LEVEL);
 
+    bc->ODIN_ANDROID_NDK_TOOLCHAIN_LIB_LEVEL = concatenate_strings(permanent_allocator(), bc->ODIN_ANDROID_NDK_TOOLCHAIN_LIB, make_string_c(buf));
 	bc->ODIN_ANDROID_NDK_TOOLCHAIN_SYSROOT = concatenate_strings(permanent_allocator(), bc->ODIN_ANDROID_NDK_TOOLCHAIN, str_lit("sysroot/"));
-
 
 	if (with_sdk) {
 		if (bc->ODIN_ANDROID_SDK.len == 0)  {
