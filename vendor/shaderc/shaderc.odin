@@ -24,9 +24,15 @@ import "base:library"
 
 LIB :: library.LIBPATH + "/libshaderc_combined" + library.ARCH_end
 
-@(extra_linker_flags = "-lstdc++ -std=c++17")
-foreign import libshaderc {
-    LIB,
+when ODIN_OS == .Windows {
+    foreign import libshaderc {
+        LIB,
+    }
+} else {
+    @(extra_linker_flags = "-lstdc++ -std=c++17")
+    foreign import libshaderc {
+        LIB,
+    }
 }
 
 @(default_calling_convention = "c")
