@@ -1720,7 +1720,7 @@ gb_internal void init_android_values(bool with_sdk) {
 					
 					if (closest_number_idx >= 0) {
 						bc->ODIN_ANDROID_NDK_API_LEVEL = dir_numbers[closest_number_idx];
-						gb_printf("Warning: NDK Lib API level directory not found, using closest available: %d\n", bc->ODIN_ANDROID_NDK_API_LEVEL);
+						debugf("NDK Lib API level directory not found, using closest available: %d\n", bc->ODIN_ANDROID_NDK_API_LEVEL);
 					}
 				}
 			}
