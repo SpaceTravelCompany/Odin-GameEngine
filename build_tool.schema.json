@@ -26,13 +26,14 @@
 						"aggressive"
 					],
 					"default": "minimal",
-					"description": "빌드 최적화 타입"
+					"description": "Build optimization type"
 				},
 				"log": {
 					"type": "boolean"
 				},
 				"resource": {
-					"type": "string"
+					"type": "string",
+					"description": "Windows resource file path"
 				}
 			},
 			"required": ["main-package", "out-path", "build-type"]
@@ -47,7 +48,8 @@
 					"type": "string"
 				},
 				"platform-version": {
-					"type": "string"
+					"type": "string",
+					"description": "!Must be same as the Build Tool Version"
 				}
 			},
 			"required": ["ndk", "sdk", "platform-version"]
