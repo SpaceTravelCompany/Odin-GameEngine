@@ -1,4 +1,11 @@
-#+build js, wasi
+//#+build js, wasi // edited (xfitgd) : disable js target temporarily
+#+build !linux
+#+build !darwin
+#+build !freebsd
+#+build !openbsd
+#+build !netbsd
+#+build !haiku
+#+build !windows
 package thread
 
 import "base:intrinsics"

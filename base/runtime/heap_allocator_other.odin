@@ -1,4 +1,5 @@
-#+build js, wasi, freestanding, essence
+//#+build js, wasi, freestanding, essence // edited (xfitgd) : disable js target temporarily
+#+build freestanding, essence
 #+private
 package runtime
 
