@@ -74,7 +74,7 @@ Which_File_Type :: enum {
 	Sun_Rast, // Sun Raster Graphic
 	TGA, // Targa Truevision
 	TIFF, // Tagged Image File Format
-	WebP,
+	WebP, // WebP Image Format edited (xfitgd)
 	XBM, // X BitMap
 }
 

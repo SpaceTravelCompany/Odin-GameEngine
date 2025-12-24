@@ -1,4 +1,4 @@
-#+build !js
+//#+build !js // edited (xfitgd) : disable js target temporarily
 package qoi
 
 import "core:os"
