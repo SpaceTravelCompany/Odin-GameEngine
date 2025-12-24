@@ -3,7 +3,7 @@ package lz4
 
 import "base:library"
 
-LZ4_LIB :: library.LIBPATH + "/liblz4" + library.ARCH_end
+LZ4_LIB :: #directory + library.LIBPATH + "/liblz4" + library.ARCH_end
 
 foreign import lib {
 	LZ4_LIB,
