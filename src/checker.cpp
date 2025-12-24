@@ -3580,7 +3580,7 @@ gb_internal DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 		return true;
 	} else if (name == "test") {
 		if (value != nullptr) {
-			error(value, "'%.*s' expects no parameter, or a string literal containing \"file\" or \"package\"", LIT(name));
+			error(value, "Expected no value for '%.*s'", LIT(name));
 		}
 		ac->test = true;
 		return true;
@@ -3628,13 +3628,13 @@ gb_internal DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 		return true;
 	} else if (name == "init") {
 		if (value != nullptr) {
-			error(value, "'%.*s' expects no parameter, or a string literal containing \"file\" or \"package\"", LIT(name));
+			error(value, "Expected no value for '%.*s'", LIT(name));
 		}
 		ac->init = true;
 		return true;
 	} else if (name == "fini") {
 		if (value != nullptr) {
-			error(value, "'%.*s' expects no parameter, or a string literal containing \"file\" or \"package\"", LIT(name));
+			error(value, "Expected no value for '%.*s'", LIT(name));
 		}
 		ac->fini = true;
 		return true;
