@@ -4,8 +4,6 @@ package runtime
 bounds_trap :: proc "contextless" () -> ! {
 	when ODIN_OS == .Windows {
 		windows_trap_array_bounds()
-	} else when ODIN_OS == .Orca {
-		abort_ext("", "", 0, "bounds trap")
 	} else {
 		trap()
 	}
@@ -15,8 +13,6 @@ bounds_trap :: proc "contextless" () -> ! {
 type_assertion_trap :: proc "contextless" () -> ! {
 	when ODIN_OS == .Windows {
 		windows_trap_type_assertion()
-	} else when ODIN_OS == .Orca {
-		abort_ext("", "", 0, "type assertion trap")
 	} else {
 		trap()
 	}

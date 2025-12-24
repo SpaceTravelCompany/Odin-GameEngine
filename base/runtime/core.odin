@@ -496,7 +496,6 @@ Raw_Quaternion256_Vector_Scalar :: struct {vector: [3]f64, scalar: f64}
 		Haiku,
 		WASI,
 		JS,
-		Orca,
 		Freestanding,
 	}
 */
@@ -565,7 +564,6 @@ ALL_ODIN_OS_TYPES :: Odin_OS_Types{
 	.Haiku,
 	.WASI,
 	.JS,
-	.Orca,
 	.Freestanding,
 }
 
@@ -784,7 +782,7 @@ default_assertion_contextless_failure_proc :: proc "contextless" (prefix, messag
 	when ODIN_OS == .Freestanding {
 		// Do nothing
 	} else {
-		when ODIN_OS != .Orca && !ODIN_DISABLE_ASSERT {
+		when !ODIN_DISABLE_ASSERT {
 			print_caller_location(loc)
 			print_string(" ")
 		}
@@ -793,18 +791,7 @@ default_assertion_contextless_failure_proc :: proc "contextless" (prefix, messag
 			print_string(": ")
 			print_string(message)
 		}
-
-		when ODIN_OS == .Orca {
-			assert_fail(
-				cstring(raw_data(loc.file_path)),
-				cstring(raw_data(loc.procedure)),
-				loc.line,
-				"",
-				cstring(raw_data(orca_stderr_buffer[:orca_stderr_buffer_idx])),
-			)
-		} else {
-			print_byte('\n')
-		}
+		print_byte('\n')
 	}
 	trap()
 }

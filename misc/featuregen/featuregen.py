@@ -8,8 +8,8 @@ archs = [
 	("i386",      "linux_i386",    "i386-pc-linux-gnu",   [], []),
 	("arm32",     "linux_arm32",   "arm-linux-gnu",       [], []),
 	("arm64",     "linux_arm64",   "aarch64-linux-elf",   [], []),
-	("wasm32",    "js_wasm32",     "wasm32-js-js",        [], []),
-	("wasm64p32", "js_wasm64p32",  "wasm32-js-js",        [], []),
+	#("wasm32",    "js_wasm32",     "wasm32-js-js",        [], []),
+	#("wasm64p32", "js_wasm64p32",  "wasm32-js-js",        [], []), # edited (xfitgd) : disable wasm targets temporarily
 	("riscv64",   "linux_riscv64", "riscv64-linux-gnu",   [], []),
 ];
 

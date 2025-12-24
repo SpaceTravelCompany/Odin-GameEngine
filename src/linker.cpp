@@ -95,22 +95,6 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 			}
 		}
 
-		if (build_context.metrics.os == TargetOs_orca) {
-			gbString orca_sdk_path = gb_string_make(temporary_allocator(), "");
-			if (!system_exec_command_line_app_output("orca sdk-path", &orca_sdk_path)) {
-				gb_printf_err("executing `orca sdk-path` failed, make sure Orca is installed and added to your path\n");
-				return 1;
-			}
-			if (gb_string_length(orca_sdk_path) == 0) {
-				gb_printf_err("executing `orca sdk-path` did not produce output\n");
-				return 1;
-			}
-			inputs = gb_string_append_fmt(inputs, " \"%s/orca-libc/lib/crt1.o\" \"%s/orca-libc/lib/libc.a\"", orca_sdk_path, orca_sdk_path);
-
-			extra_orca_flags = gb_string_append_fmt(extra_orca_flags, " -L \"%s/bin\" -lorca_wasm --export-dynamic", orca_sdk_path);
-		}
-
-
 	#if defined(GB_SYSTEM_WINDOWS)
 		result = system_exec_command_line_app("wasm-ld",
 			"\"%.*s\\bin\\wasm-ld\" %s -o \"%.*s\" %.*s %.*s %s %s",

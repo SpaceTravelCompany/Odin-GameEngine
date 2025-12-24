@@ -396,7 +396,7 @@ caprint :: proc(args: ..any, sep := " ", allocator := context.allocator) -> cstr
 // 	Returns: A formatted C string.
 //
 @(require_results)
-caprintln :: proc(args: ..any, sep := " ", allocator := context.allocator) -> cstring {//edited(xfitgd)
+caprintln :: proc(args: ..any, sep := " ", allocator := context.allocator) -> cstring {//edited (xfitgd)
 	str: strings.Builder
 	strings.builder_init(&str, allocator)
 	sbprint(&str, ..args, sep=sep)

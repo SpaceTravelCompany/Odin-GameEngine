@@ -148,7 +148,6 @@ package all
 @(require) import "core:time/timezone"
 @(require) import "core:flags"
 
-@(require) import "core:sys/orca"
 @(require) import "core:sys/info"
 
 @(require) import "core:unicode"

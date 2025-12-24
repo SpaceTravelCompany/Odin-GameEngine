@@ -24,7 +24,6 @@ enum TargetOsKind : u16 {
 	
 	TargetOs_wasi,
 	TargetOs_js,
-	TargetOs_orca,
 
 	TargetOs_freestanding,
 
@@ -44,7 +43,6 @@ gb_global String target_os_names[TargetOs_COUNT] = {
 
 	str_lit("wasi"),
 	str_lit("js"),
-	str_lit("orca"),
 
 	str_lit("freestanding"),
 };
@@ -224,7 +222,6 @@ enum CommandKind : u64 {
 	Command_bundle_android = 1<<8,
 	Command_bundle_macos   = 1<<9,
 	Command_bundle_ios     = 1<<10,
-	Command_bundle_orca    = 1<<11,
 
 	Command__does_check = Command_run|Command_build|Command_check|Command_doc|Command_test|Command_strip_semicolon,
 	Command__does_build = Command_run|Command_build|Command_test,
@@ -243,7 +240,6 @@ gb_global char const *odin_command_strings[32] = {
 	"bundle android",
 	"bundle macos",
 	"bundle ios",
-	"bundle orca",
 };
 
 
@@ -796,14 +792,6 @@ gb_global TargetMetrics target_wasi_wasm32 = {
 };
 
 
-gb_global TargetMetrics target_orca_wasm32 = {
-	TargetOs_orca,
-	TargetArch_wasm32,
-	4, 4, 8, 16,
-	str_lit("wasm32-wasi-js"),
-};
-
-
 gb_global TargetMetrics target_freestanding_wasm64p32 = {
 	TargetOs_freestanding,
 	TargetArch_wasm64p32,
@@ -895,9 +883,8 @@ gb_global NamedTargetMetrics named_targets[] = {
 	{ str_lit("haiku_amd64"),         &target_haiku_amd64    },
 
 	{ str_lit("freestanding_wasm32"), &target_freestanding_wasm32 },
-	{ str_lit("wasi_wasm32"),         &target_wasi_wasm32 },
-	{ str_lit("js_wasm32"),           &target_js_wasm32 },
-	{ str_lit("orca_wasm32"),         &target_orca_wasm32 },
+	//{ str_lit("wasi_wasm32"),         &target_wasi_wasm32 },
+	//{ str_lit("js_wasm32"),           &target_js_wasm32 }, //edited (xfitgd) : disable wasm targets temporarily
 
 	{ str_lit("freestanding_wasm64p32"), &target_freestanding_wasm64p32 },
 	{ str_lit("js_wasm64p32"),           &target_js_wasm64p32 },
@@ -1944,10 +1931,8 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 		// if (bc->metrics.arch == TargetArch_wasm64) {
 		// 	link_flags = gb_string_appendc(link_flags, "-mwasm64 ");
 		// }
-		if (bc->metrics.os != TargetOs_orca) {
-			link_flags = gb_string_appendc(link_flags, "--allow-undefined ");
-		}
-		if (bc->no_entry_point || bc->metrics.os == TargetOs_orca) {
+		link_flags = gb_string_appendc(link_flags, "--allow-undefined ");
+		if (bc->no_entry_point) {
 			link_flags = gb_string_appendc(link_flags, "--no-entry ");
 		}
 

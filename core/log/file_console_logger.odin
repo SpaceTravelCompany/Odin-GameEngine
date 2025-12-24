@@ -1,5 +1,4 @@
 #+build !freestanding
-#+build !orca
 package log
 
 import "base:runtime"
