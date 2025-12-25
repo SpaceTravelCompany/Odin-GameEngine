@@ -13,7 +13,7 @@ when GLFW_SHARED {
 is_android :: ODIN_PLATFORM_SUBTARGET == .Android
 is_mobile :: is_android
 
-LIBGLFW3 :: #directory + "/../" + library.LIBPATH + "/libglfw3" + library.ARCH_end
+LIBGLFW3 :: "/../" + library.LIBPATH + "/libglfw3" + library.ARCH_end
 
 when !is_mobile {
 when ODIN_OS == .Windows {

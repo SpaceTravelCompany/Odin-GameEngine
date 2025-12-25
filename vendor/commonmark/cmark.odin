@@ -14,7 +14,7 @@ when COMMONMARK_SHARED {
 when ODIN_OS == .Linux && !library.is_mobile {
 	LIB :: "system:cmark"
 } else {
-	LIB :: #directory + library.LIBPATH + "/libcmark" + library.ARCH_end
+	LIB :: library.LIBPATH + "/libcmark" + library.ARCH_end
 }
 
 

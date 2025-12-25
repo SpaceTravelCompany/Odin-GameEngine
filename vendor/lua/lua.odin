@@ -11,7 +11,7 @@ import "base:library"
 import "core:sys/android"
 
 
-LIB :: #directory + library.LIBPATH + "/liblua" + library.ARCH_end
+LIB :: library.LIBPATH + "/liblua" + library.ARCH_end
 
 foreign import lua { LIB }
 

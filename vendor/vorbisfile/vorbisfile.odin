@@ -6,7 +6,7 @@ import "base:library"
 import "../ogg"
 import "../vorbis"
 
-LIB :: #directory + library.LIBPATH + "/libvorbisfile" + library.ARCH_end
+LIB :: library.LIBPATH + "/libvorbisfile" + library.ARCH_end
 foreign import lib { LIB }
 
 @private _ov_header_fseek_wrap :: proc "c" (f:^libc.FILE, off:ogg.ogg_int64_t, whence:c.int) -> c.int {

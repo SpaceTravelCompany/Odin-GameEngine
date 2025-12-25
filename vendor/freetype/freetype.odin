@@ -10,14 +10,14 @@ when FREETYPE_SHARED {
 	#panic("Shared linking for freetype is not supported yet")
 }
 
-LIB :: #directory + library.LIBPATH + "/libfreetype" + library.ARCH_end
+LIB :: library.LIBPATH + "/libfreetype" + library.ARCH_end
 
 foreign import freetype {
     LIB,
-    brotli.BROTLI_DEC_LIB,
-    brotli.BROTLI_ENC_LIB,
-    brotli.BROTLI_COMMON_LIB,
-    bzip2.BZIP2_LIB,
+    "../compress/brotli" + brotli.BROTLI_DEC_LIB,
+    "../compress/brotli" + brotli.BROTLI_ENC_LIB,
+    "../compress/brotli" + brotli.BROTLI_COMMON_LIB,
+    "../compress/bzip2" + bzip2.BZIP2_LIB,
 }
 
 Library       :: distinct rawptr

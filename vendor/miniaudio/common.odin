@@ -9,7 +9,7 @@ when MINIAUDIO_SHARED {
 	#panic("Shared linking for miniaudio is not supported yet")
 }
 
-LIB :: #directory + library.LIBPATH + "/libminiaudio" + library.ARCH_end
+LIB :: library.LIBPATH + "/libminiaudio" + library.ARCH_end
 
 foreign import lib {
 	LIB,

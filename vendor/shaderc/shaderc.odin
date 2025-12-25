@@ -22,7 +22,9 @@ import "base:library"
 //@(extra_linker_flags = "/NODEFAULTLIB:libcmt") edited (xfitgd) : no need this project 
 
 
-LIB :: #directory + library.LIBPATH + "/libshaderc_combined" + library.ARCH_end
+LIB :: library.LIBPATH + "/libshaderc_combined" + library.ARCH_end
+
+@(extra_linker_flags = "-lstdc++ -std=c++17")
 foreign import libshaderc {
     LIB,
 }
