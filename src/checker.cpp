@@ -5861,26 +5861,26 @@ gb_internal void check_import_entities(Checker *c) {
 
 		AstPackage *pkg = n->pkg;
 
-		if (n->dep_count > 0) {
-			TEMPORARY_ALLOCATOR_GUARD();
+		// if (n->dep_count > 0) {
+		// 	TEMPORARY_ALLOCATOR_GUARD();
 
-			PtrSet<AstPackage *> visited = {};
-			defer (ptr_set_destroy(&visited));
+		// 	PtrSet<AstPackage *> visited = {};
+		// 	defer (ptr_set_destroy(&visited));
 
-			auto path = find_import_path(c, pkg, pkg, &visited, temporary_allocator());
+		// 	auto path = find_import_path(c, pkg, pkg, &visited, temporary_allocator());
 
-			if (path.count > 1) {
-				ImportPathItem item = path[path.count-1];
-				String pkg_name = item.pkg->name;
-				error(item.decl, "Cyclic importation of '%.*s'", LIT(pkg_name));
-				for (isize i = 0; i < path.count; i++) {
-					error(item.decl, "'%.*s' refers to", LIT(pkg_name));
-					item = path[i];
-					pkg_name = item.pkg->name;
-				}
-				error(item.decl, "'%.*s'", LIT(pkg_name));
-			}
-		}
+		// 	if (path.count > 1) {
+		// 		ImportPathItem item = path[path.count-1];
+		// 		String pkg_name = item.pkg->name;
+		// 		error(item.decl, "Cyclic importation of '%.*s'", LIT(pkg_name));
+		// 		for (isize i = 0; i < path.count; i++) {
+		// 			error(item.decl, "'%.*s' refers to", LIT(pkg_name));
+		// 			item = path[i];
+		// 			pkg_name = item.pkg->name;
+		// 		}
+		// 		error(item.decl, "'%.*s'", LIT(pkg_name));
+		// 	}
+		// } // edited (xfitgd) : allow cyclic imports
 
 		FOR_PTR_SET(p, n->pred) {
 			p->dep_count = gb_max(p->dep_count-1, 0);

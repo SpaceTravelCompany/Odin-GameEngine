@@ -2,6 +2,7 @@ package components
 
 import "../"
 import vk "vendor:vulkan"
+import graphics_api "../graphics_api"
 import "core:math/linalg"
 import "core:mem"
 
@@ -130,7 +131,7 @@ _Super_ImageButton_Deinit :: proc(self:^ImageButton) {
     engine._Super_IObject_Deinit(auto_cast self)
 }
 
-_Super_ImageButton_Draw :: proc (self:^ImageButton, cmd:vk.CommandBuffer) {
+_Super_ImageButton_Draw :: proc (self:^ImageButton, cmd:graphics_api.CommandBuffer) {
     mem.ICheckInit_Check(&self.checkInit)
     texture :^engine.Texture
 

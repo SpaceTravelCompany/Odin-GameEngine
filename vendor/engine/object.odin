@@ -10,32 +10,16 @@ import "core:math/linalg"
 import "base:intrinsics"
 import "base:runtime"
 import vk "vendor:vulkan"
-
-VkDescriptorPoolMem :: struct {pool:vk.DescriptorPool, cnt:u32}
-
-VkDescriptorSet :: struct {
-    layout: vk.DescriptorSetLayout,
-    ///created inside update_descriptor_sets call
-    __set: vk.DescriptorSet,
-    size: []custom_object_DescriptorPoolSize,
-    bindings: []u32,
-    __resources: []VkUnionResource,
-};
+import graphics_api "./graphics_api"
 
 
-@private Graphics_Create :: proc() {
-    ColorTransform_InitMatrixRaw(&__defColorTransform)
-}
 
-@private Graphics_Clean :: proc() {
-    ColorTransform_Deinit(&__defColorTransform)
-}
+ColorTransform :: graphics_api.ColorTransform
 
-ResourceUsage :: enum {GPU,CPU}
 
 IObjectVTable :: struct {
-    GetUniformResources: #type proc (self:^IObject) -> []VkUnionResource,
-    Draw: #type proc (self:^IObject, cmd:vk.CommandBuffer),
+    GetUniformResources: #type proc (self:^IObject) -> []graphics_api.UnionResource,
+    Draw: #type proc (self:^IObject, cmd:graphics_api.CommandBuffer),
     Deinit: #type proc (self:^IObject),
     Update: #type proc (self:^IObject),
     Size: #type proc (self:^IObject),
@@ -48,7 +32,7 @@ IAnimateObjectVTable :: struct {
 
 IObject :: struct {
     using _: __MatrixIn,
-    set:VkDescriptorSet,
+    set:graphics_api.DescriptorSet,
     camera: ^Camera,
     projection: ^Projection,
     colorTransform: ^ColorTransform,
@@ -56,46 +40,15 @@ IObject :: struct {
     vtable: ^IObjectVTable,
 }
 
-
-ColorTransform :: struct {
-    mat: linalg.Matrix,
-    matUniform:VkBufferResource,
-    checkInit: mem.ICheckInit,
-}
-
-@private __defColorTransform : ColorTransform
-
 __MatrixIn :: struct {
     mat: linalg.Matrix,
-    matUniform:VkBufferResource,
+    matUniform:graphics_api.BufferResource,
     checkInit: mem.ICheckInit,
 }
 
-
-ColorTransform_InitMatrixRaw :: proc(self:^ColorTransform, mat:linalg.Matrix = {1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1}) {
-    self.mat = mat
-    __ColorTransform_Init(self)
-}
-
-@private __ColorTransform_Init :: #force_inline proc(self:^ColorTransform) {
-    mem.ICheckInit_Init(&self.checkInit)
-    VkBufferResource_CreateBuffer(&self.matUniform, {
-        len = size_of(linalg.Matrix),
-        type = .UNIFORM,
-        resourceUsage = .CPU,
-    }, mem.ptr_to_bytes(&self.mat), true)
-}
-
-ColorTransform_Deinit :: proc(self:^ColorTransform) {
-    mem.ICheckInit_Deinit(&self.checkInit)
-    VkBufferResource_Deinit(&self.matUniform)
-}
-
-ColorTransform_UpdateMatrixRaw :: proc(self:^ColorTransform, _mat:linalg.Matrix) {
-    mem.ICheckInit_Check(&self.checkInit)
-    self.mat = _mat
-    VkBufferResource_CopyUpdate(&self.matUniform, &self.mat)
-}
+ColorTransform_InitMatrixRaw :: graphics_api.ColorTransform_InitMatrixRaw
+ColorTransform_Deinit :: graphics_api.ColorTransform_Deinit
+ColorTransform_UpdateMatrixRaw :: graphics_api.ColorTransform_UpdateMatrixRaw
 
 
 @(require_results)
@@ -223,11 +176,11 @@ IObject_Init :: proc(self:^IObject, $actualType:typeid,
     mem.ICheckInit_Init(&self.checkInit)
     self.camera = camera
     self.projection = projection
-    self.colorTransform = colorTransform == nil ? &__defColorTransform : colorTransform
+    self.colorTransform = colorTransform == nil ? &graphics_api.__defColorTransform : colorTransform
     
     self.mat = SRT_2D_Matrix2(pos, scale, rotation, pivot)
 
-    VkBufferResource_CreateBuffer(&self.matUniform, {
+    graphics_api.BufferResource_CreateBuffer(&self.matUniform, {
         len = size_of(linalg.Matrix),
         type = .UNIFORM,
         resourceUsage = .CPU,
@@ -242,7 +195,7 @@ IObject_Init :: proc(self:^IObject, $actualType:typeid,
 
 _Super_IObject_Deinit :: #force_inline proc (self:^IObject) {
     mem.ICheckInit_Deinit(&self.checkInit)
-    VkBufferResource_Deinit(&self.matUniform)
+    graphics_api.BufferResource_Deinit(&self.matUniform)
 }
 
 IObject_Init2 :: proc(self:^IObject, $actualType:typeid,
@@ -252,13 +205,13 @@ IObject_Init2 :: proc(self:^IObject, $actualType:typeid,
     mem.ICheckInit_Init(&self.checkInit)
     self.camera = camera
     self.projection = projection
-    self.colorTransform = colorTransform == nil ? &__defColorTransform : colorTransform
+    self.colorTransform = colorTransform == nil ? &graphics_api.__defColorTransform : colorTransform
 
     self.actualType = actualType
 }
 
 //!alloc result array in temp_allocator
-@private GetUniformResources :: proc(self:^IObject) -> []VkUnionResource {
+@private GetUniformResources :: proc(self:^IObject) -> []graphics_api.UnionResource {
     if self.vtable != nil && self.vtable.GetUniformResources != nil {
         return self.vtable.GetUniformResources(self)
     } else {
@@ -266,8 +219,8 @@ IObject_Init2 :: proc(self:^IObject, $actualType:typeid,
     }
 }
 
-@private GetUniformResources_AnimateImage :: #force_inline proc(self:^IObject) -> []VkUnionResource {
-    res := mem.make_non_zeroed([]VkUnionResource, 5, context.temp_allocator)
+@private GetUniformResources_AnimateImage :: #force_inline proc(self:^IObject) -> []graphics_api.UnionResource {
+    res := mem.make_non_zeroed([]graphics_api.UnionResource, 5, context.temp_allocator)
     res[0] = &self.matUniform
     res[1] = &self.camera.matUniform
     res[2] = &self.projection.matUniform
@@ -278,8 +231,8 @@ IObject_Init2 :: proc(self:^IObject, $actualType:typeid,
     return res[:]
 }
 
-@private GetUniformResources_TileImage :: #force_inline proc(self:^IObject) -> []VkUnionResource {
-    res := mem.make_non_zeroed([]VkUnionResource, 5, context.temp_allocator)
+@private GetUniformResources_TileImage :: #force_inline proc(self:^IObject) -> []graphics_api.UnionResource {
+    res := mem.make_non_zeroed([]graphics_api.UnionResource, 5, context.temp_allocator)
     res[0] = &self.matUniform
     res[1] = &self.camera.matUniform
     res[2] = &self.projection.matUniform
@@ -290,8 +243,8 @@ IObject_Init2 :: proc(self:^IObject, $actualType:typeid,
     return res[:]
 }
 
-@private GetUniformResources_Default :: #force_inline proc(self:^IObject) -> []VkUnionResource {
-    res := mem.make_non_zeroed([]VkUnionResource, 4, context.temp_allocator)
+@private GetUniformResources_Default :: #force_inline proc(self:^IObject) -> []graphics_api.UnionResource {
+    res := mem.make_non_zeroed([]graphics_api.UnionResource, 4, context.temp_allocator)
     res[0] = &self.matUniform
     res[1] = &self.camera.matUniform
     res[2] = &self.projection.matUniform
@@ -301,13 +254,13 @@ IObject_Init2 :: proc(self:^IObject, $actualType:typeid,
 }
 
 
-@private __IObject_UpdateUniform :: #force_inline proc(self:^IObject, resources:[]VkUnionResource) {
+@private __IObject_UpdateUniform :: proc(self:^IObject, resources:[]graphics_api.UnionResource) {
     mem.ICheckInit_Check(&self.checkInit)
 
-    //업데이트 하면 vkTempArenaAllocator를 다 지우니 중복 할당해도 됨.
-    self.set.__resources = mem.make_non_zeroed_slice([]VkUnionResource, len(resources), vkTempArenaAllocator)
-    mem.copy_non_overlapping(&self.set.__resources[0], &resources[0], len(resources) * size_of(VkUnionResource))
-    VkUpdateDescriptorSets(mem.slice_ptr(&self.set, 1))
+    //업데이트 하면 tempArenaAllocator를 다 지우니 중복 할당해도 됨.
+    self.set.__resources = mem.make_non_zeroed_slice([]graphics_api.UnionResource, len(resources), graphics_api.tempArenaAllocator)
+    mem.copy_non_overlapping(&self.set.__resources[0], &resources[0], len(resources) * size_of(graphics_api.UnionResource))
+    graphics_api.UpdateDescriptorSets(mem.slice_ptr(&self.set, 1))
 }
 
 IObject_UpdateTransform :: proc(self:^IObject, pos:linalg.Point3DF, rotation:f32 = 0.0, scale:linalg.PointF = {1.0,1.0}, pivot:linalg.PointF = {0.0,0.0}) {
@@ -315,7 +268,7 @@ IObject_UpdateTransform :: proc(self:^IObject, pos:linalg.Point3DF, rotation:f32
     self.mat = SRT_2D_Matrix2(pos, scale, rotation, pivot)
 
     if self.matUniform.__resource == 0 {
-        VkBufferResource_CreateBuffer(&self.matUniform, {
+        graphics_api.BufferResource_CreateBuffer(&self.matUniform, {
             len = size_of(linalg.Matrix),
             type = .UNIFORM,
             resourceUsage = .CPU,
@@ -325,7 +278,7 @@ IObject_UpdateTransform :: proc(self:^IObject, pos:linalg.Point3DF, rotation:f32
         defer delete(resources, context.temp_allocator)
         __IObject_UpdateUniform(self, resources)
     } else {
-        VkBufferResource_CopyUpdate(&self.matUniform, &self.mat)
+        graphics_api.BufferResource_CopyUpdate(&self.matUniform, &self.mat)
     }
 }
 IObject_UpdateTransformMatrixRaw :: proc(self:^IObject, _mat:linalg.Matrix) {
@@ -333,7 +286,7 @@ IObject_UpdateTransformMatrixRaw :: proc(self:^IObject, _mat:linalg.Matrix) {
     self.mat = _mat
     
     if self.matUniform.__resource == 0 {
-        VkBufferResource_CreateBuffer(&self.matUniform, {
+        graphics_api.BufferResource_CreateBuffer(&self.matUniform, {
             len = size_of(linalg.Matrix),
             type = .UNIFORM,
             resourceUsage = .CPU,
@@ -343,7 +296,7 @@ IObject_UpdateTransformMatrixRaw :: proc(self:^IObject, _mat:linalg.Matrix) {
         defer delete(resources, context.temp_allocator)
         __IObject_UpdateUniform(self, resources)
     } else {
-        VkBufferResource_CopyUpdate(&self.matUniform, &self.mat)
+        graphics_api.BufferResource_CopyUpdate(&self.matUniform, &self.mat)
     }
 }
 
@@ -351,7 +304,7 @@ IObject_UpdateTransformMatrix :: proc(self:^IObject) {
     mem.ICheckInit_Check(&self.checkInit)
     
     if self.matUniform.__resource == 0 {
-        VkBufferResource_CreateBuffer(&self.matUniform, {
+        graphics_api.BufferResource_CreateBuffer(&self.matUniform, {
             len = size_of(linalg.Matrix),
             type = .UNIFORM,
             resourceUsage = .CPU,
@@ -361,7 +314,7 @@ IObject_UpdateTransformMatrix :: proc(self:^IObject) {
         defer delete(resources, context.temp_allocator)
         __IObject_UpdateUniform(self, resources)
     } else {
-        VkBufferResource_CopyUpdate(&self.matUniform, &self.mat)
+        graphics_api.BufferResource_CopyUpdate(&self.matUniform, &self.mat)
     }
 }
 
@@ -397,7 +350,7 @@ IObject_GetActualType :: #force_inline proc "contextless" (self:^IObject) -> typ
     return self.actualType
 }
 
-IObject_Draw :: proc (self:^IObject, cmd:vk.CommandBuffer) {
+IObject_Draw :: proc (self:^IObject, cmd:graphics_api.CommandBuffer) {
     if self.vtable != nil && self.vtable.Draw != nil {
         self.vtable.Draw(self, cmd)
     } else {
@@ -430,125 +383,125 @@ IObject_Size :: proc(self:^IObject) {
 
 
 SetRenderClearColor :: proc "contextless" (color:linalg.Point3DwF) {
-    gClearColor = color
+    graphics_api.gClearColor = color
 }
 
 //AUTO DELETE USE engineDefAllocator
 @private __VertexBuf_Init :: proc (self:^__VertexBuf($NodeType), array:[]NodeType, _flag:ResourceUsage, _useGPUMem := false) {
     mem.ICheckInit_Init(&self.checkInit)
     if len(array) == 0 do trace.panic_log("VertexBuf_Init: array is empty")
-    VkBufferResource_CreateBuffer(&self.buf, {
+    graphics_api.BufferResource_CreateBuffer(&self.buf, {
         len = vk.DeviceSize(len(array) * size_of(NodeType)),
         type = .VERTEX,
         resourceUsage = _flag,
         single = false,
         useGCPUMem = _useGPUMem,
-    }, mem.slice_to_bytes(array), false, engineDefAllocator)
+    }, mem.slice_to_bytes(array), false, graphics_api.engineDefAllocator)
 }
 
 @private __VertexBuf_Deinit :: proc (self:^__VertexBuf($NodeType)) {
     mem.ICheckInit_Deinit(&self.checkInit)
 
-    VkBufferResource_Deinit(&self.buf)
+    graphics_api.BufferResource_Deinit(&self.buf)
 }
 
 @private __VertexBuf_Update :: proc (self:^__VertexBuf($NodeType), array:[]NodeType) {
-    VkBufferResource_MapUpdateSlice(&self.buf, array, engineDefAllocator)
+    graphics_api.BufferResource_MapUpdateSlice(&self.buf, array, graphics_api.engineDefAllocator)
 }
 
 //AUTO DELETE USE engineDefAllocator
 @private __StorageBuf_Init :: proc (self:^__StorageBuf($NodeType), array:[]NodeType, _flag:ResourceUsage, _useGPUMem := false) {
     mem.ICheckInit_Init(&self.checkInit)
     if len(array) == 0 do trace.panic_log("StorageBuf_Init: array is empty")
-    VkBufferResource_CreateBuffer(&self.buf, {
+    graphics_api.BufferResource_CreateBuffer(&self.buf, {
         len = vk.DeviceSize(len(array) * size_of(NodeType)),
         type = .STORAGE,
         resourceUsage = _flag,
         single = false,
         useGCPUMem = _useGPUMem,
-    }, mem.slice_to_bytes(array), false, engineDefAllocator)
+    }, mem.slice_to_bytes(array), false, graphics_api.engineDefAllocator)
 }
 
 @private __StorageBuf_Deinit :: proc (self:^__StorageBuf($NodeType)) {
     mem.ICheckInit_Deinit(&self.checkInit)
 
-    VkBufferResource_Deinit(&self.buf)
+    graphics_api.BufferResource_Deinit(&self.buf)
 }
 
 @private __StorageBuf_Update :: proc (self:^__StorageBuf($NodeType), array:[]NodeType) {
-    VkBufferResource_MapUpdateSlice(&self.buf, array, engineDefAllocator)
+    VkBufferResource_MapUpdateSlice(&self.buf, array, graphics_api.engineDefAllocator)
 }
 
 //AUTO DELETE USE engineDefAllocator
 @private __IndexBuf_Init :: proc (self:^__IndexBuf, array:[]u32, _flag:ResourceUsage, _useGPUMem := false) {
     mem.ICheckInit_Init(&self.checkInit)
     if len(array) == 0 do trace.panic_log("IndexBuf_Init: array is empty")
-    VkBufferResource_CreateBuffer(&self.buf, {
+    graphics_api.BufferResource_CreateBuffer(&self.buf, {
         len = vk.DeviceSize(len(array) * size_of(u32)),
         type = .INDEX,
         resourceUsage = _flag,
         useGCPUMem = _useGPUMem,
-    }, mem.slice_to_bytes(array), false, engineDefAllocator)
+    }, mem.slice_to_bytes(array), false, graphics_api.engineDefAllocator)
 }
 
 
 @private __IndexBuf_Deinit :: proc (self:^__IndexBuf) {
     mem.ICheckInit_Deinit(&self.checkInit)
 
-    VkBufferResource_Deinit(&self.buf)
+    graphics_api.BufferResource_Deinit(&self.buf)
 }
 
 @private __IndexBuf_Update :: #force_inline proc (self:^__IndexBuf, array:[]u32) {
-    VkBufferResource_MapUpdateSlice(&self.buf, array, engineDefAllocator)
+    graphics_api.BufferResource_MapUpdateSlice(&self.buf, array, graphics_api.engineDefAllocator)
 }
 
 @private __VertexBuf :: struct($NodeType:typeid) {
-    buf:VkBufferResource,
+    buf:graphics_api.BufferResource,
     checkInit: mem.ICheckInit,
 }
 
 @private __IndexBuf :: distinct __VertexBuf(u32)
 @private __StorageBuf :: struct($NodeType:typeid) {
-    buf:VkBufferResource,
+    buf:graphics_api.BufferResource,
     checkInit: ICheckInit,
 }
 
 
 //!do not use anymore
 // AllocObjectNonZeroed :: #force_inline proc($T:typeid) -> (^T, runtime.Allocator_Error) where intrinsics.type_is_subtype_of(T, IObject) #optional_allocator_error {
-//     obj, err := mem.alloc_bytes_non_zeroed(size_of(T),align_of(T), engineDefAllocator)
+//     obj, err := mem.alloc_bytes_non_zeroed(size_of(T),align_of(T), graphics_api.engineDefAllocator)
 //     if err != .None do return nil, err
 // 	return transmute(^T)raw_data(obj), .None
 // }
 
 // AllocObjectSliceNonZeroed :: #force_inline proc($T:typeid, #any_int count:int) -> ([]T, runtime.Allocator_Error) where intrinsics.type_is_subtype_of(T, IObject) #optional_allocator_error {
-//     arr, err := mem.alloc_bytes_non_zeroed(count * size_of(T), align_of(T), engineDefAllocator)
+//     arr, err := mem.alloc_bytes_non_zeroed(count * size_of(T), align_of(T), graphics_api.engineDefAllocator)
 //     if err != .None do return nil, err
 //     s := runtime.Raw_Slice{raw_data(arr), count}
 //     return transmute([]T)s, .None
 // }
 
 // AllocObjectDynamicNonZeroed :: #force_inline proc($T:typeid) -> ([dynamic]T, runtime.Allocator_Error) where intrinsics.type_is_subtype_of(T, IObject) #optional_allocator_error {
-//     res, err := make_non_zeroed_dynamic_array([dynamic]T, engineDefAllocator)
+//     res, err := make_non_zeroed_dynamic_array([dynamic]T, graphics_api.engineDefAllocator)
 //     if err != .None do return nil, err
 //     return res, .None
 // }
 
 AllocObject :: #force_inline proc($T:typeid) -> (^T, runtime.Allocator_Error) where intrinsics.type_is_subtype_of(T, IObject) #optional_allocator_error {
-    obj, err := mem.alloc_bytes(size_of(T),align_of(T), engineDefAllocator)
+    obj, err := mem.alloc_bytes(size_of(T),align_of(T), graphics_api.engineDefAllocator)
     if err != .None do return nil, err
 	return transmute(^T)raw_data(obj), .None
 }
 
 AllocObjectSlice :: #force_inline proc($T:typeid, #any_int count:int) -> ([]T, runtime.Allocator_Error) where intrinsics.type_is_subtype_of(T, IObject) #optional_allocator_error {
-    arr, err := mem.alloc_bytes(count * size_of(T), align_of(T), engineDefAllocator)
+    arr, err := mem.alloc_bytes(count * size_of(T), align_of(T), graphics_api.engineDefAllocator)
     if err != .None do return nil, err
     s := runtime.Raw_Slice{raw_data(arr), count}
     return transmute([]T)s, .None
 }
 
 AllocObjectDynamic :: #force_inline proc($T:typeid) -> ([dynamic]T, runtime.Allocator_Error) where intrinsics.type_is_subtype_of(T, IObject) #optional_allocator_error {
-    res, err := make([dynamic]T, engineDefAllocator)
+    res, err := make([dynamic]T, graphics_api.engineDefAllocator)
     if err != .None do return nil, err
     return res, .None
 }
@@ -590,9 +543,9 @@ FreeObjectDynamic :: #force_inline proc(arr:$T/[dynamic]$E) where intrinsics.typ
 }
 
 GraphicsWaitAllOps :: #force_inline proc () {
-    if IsInMainThread() {
-        vkOpExecute(true)
+    if graphics_api.is_main_thread() {
+        graphics_api.graphics_execute_ops(true)
     } else {
-        vkWaitAllOp()
+        graphics_api.graphics_wait_all_ops()
     }
 }

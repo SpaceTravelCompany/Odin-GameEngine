@@ -8,7 +8,8 @@ import "core:sync"
 import "core:math/linalg"
 import "base:intrinsics"
 import "base:runtime"
-import vk "vendor:vulkan"   
+import vk "vendor:vulkan"
+import graphics_api "./graphics_api"   
 
 ShapeSrc :: struct {
     //?vertexBuf, indexBuf에 checkInit: ICheckInit 있으므로 따로 필요없음
@@ -51,9 +52,9 @@ camera:^Camera, projection:^Projection, colorTransform:^ColorTransform = nil, vt
  where intrinsics.type_is_subtype_of(actualType, Shape) {
     self.src = src
 
-    self.set.bindings = __transformUniformPoolBinding[:]
-    self.set.size = __transformUniformPoolSizes[:]
-    self.set.layout = vkShapeDescriptorSetLayout
+    self.set.bindings = graphics_api.__transformUniformPoolBinding[:]
+    self.set.size = graphics_api.__transformUniformPoolSizes[:]
+    self.set.layout = graphics_api.ShapeDescriptorSetLayout
 
     self.vtable = vtable == nil ? &ShapeVTable : vtable
     if self.vtable.Draw == nil do self.vtable.Draw = auto_cast _Super_Shape_Draw
@@ -101,30 +102,30 @@ Shape_UpdateProjection :: #force_inline proc(self:^Shape, projection:^Projection
     IObject_UpdateProjection(self, projection)
 }
 
-_Super_Shape_Draw :: proc (self:^Shape, cmd:vk.CommandBuffer) {
+_Super_Shape_Draw :: proc (self:^Shape, cmd:graphics_api.CommandBuffer) {
     mem.ICheckInit_Check(&self.checkInit)
 
-    vk.CmdBindPipeline(cmd, .GRAPHICS, vkShapePipeline)
-    vk.CmdBindDescriptorSets(cmd, .GRAPHICS, vkShapePipelineLayout, 0, 1, 
+    graphics_api.graphics_cmd_bind_pipeline(cmd, .GRAPHICS, graphics_api.ShapePipeline)
+    graphics_api.graphics_cmd_bind_descriptor_sets(cmd, .GRAPHICS, graphics_api.ShapePipelineLayout, 0, 1,
         &([]vk.DescriptorSet{self.set.__set})[0], 0, nil)
 
     offsets: vk.DeviceSize = 0
-    vk.CmdBindVertexBuffers(cmd, 0, 1, &self.src.vertexBuf.buf.__resource, &offsets)
-    vk.CmdBindIndexBuffer(cmd, self.src.indexBuf.buf.__resource, 0, .UINT32)
+    graphics_api.graphics_cmd_bind_vertex_buffers(cmd, 0, 1, &self.src.vertexBuf.buf.__resource, &offsets)
+    graphics_api.graphics_cmd_bind_index_buffer(cmd, self.src.indexBuf.buf.__resource, 0, .UINT32)
 
-    vk.CmdDrawIndexed(cmd, auto_cast (self.src.indexBuf.buf.option.len / size_of(u32)), 1, 0, 0, 0)
+    graphics_api.graphics_cmd_draw_indexed(cmd, auto_cast (self.src.indexBuf.buf.option.len / size_of(u32)), 1, 0, 0, 0)
 }
 
-ShapeSrc_InitRaw :: proc(self:^ShapeSrc, raw:^geometry.RawShape, flag:ResourceUsage = .GPU, colorFlag:ResourceUsage = .CPU) {
-    rawC := geometry.RawShape_Clone(raw, engineDefAllocator)
+ShapeSrc_InitRaw :: proc(self:^ShapeSrc, raw:^geometry.RawShape, flag:graphics_api.ResourceUsage = .GPU, colorFlag:graphics_api.ResourceUsage = .CPU) {
+    rawC := geometry.RawShape_Clone(raw, graphics_api.engineDefAllocator)
     __VertexBuf_Init(&self.vertexBuf, rawC.vertices, flag)
     __IndexBuf_Init(&self.indexBuf, rawC.indices, flag)
     self.rect = rawC.rect
 }
 
-@require_results ShapeSrc_Init :: proc(self:^ShapeSrc, shapes:^geometry.Shapes, flag:ResourceUsage = .GPU, colorFlag:ResourceUsage = .CPU) -> (err:geometry.ShapesError = .None) {
+@require_results ShapeSrc_Init :: proc(self:^ShapeSrc, shapes:^geometry.Shapes, flag:graphics_api.ResourceUsage = .GPU, colorFlag:graphics_api.ResourceUsage = .CPU) -> (err:geometry.ShapesError = .None) {
     raw : ^geometry.RawShape
-    raw, err = geometry.Shapes_ComputePolygon(shapes, engineDefAllocator)
+    raw, err = geometry.Shapes_ComputePolygon(shapes, graphics_api.engineDefAllocator)
     if err != .None do return
 
     __VertexBuf_Init(&self.vertexBuf, raw.vertices, flag)
@@ -137,7 +138,7 @@ ShapeSrc_InitRaw :: proc(self:^ShapeSrc, raw:^geometry.RawShape, flag:ResourceUs
 }
 
 ShapeSrc_UpdateRaw :: proc(self:^ShapeSrc, raw:^geometry.RawShape) {
-    rawC := geometry.RawShape_Clone(raw, engineDefAllocator)
+    rawC := geometry.RawShape_Clone(raw, graphics_api.engineDefAllocator)
     __VertexBuf_Update(&self.vertexBuf, rawC.vertices)
     __IndexBuf_Update(&self.indexBuf, rawC.indices)
 
@@ -146,7 +147,7 @@ ShapeSrc_UpdateRaw :: proc(self:^ShapeSrc, raw:^geometry.RawShape) {
 
 @require_results ShapeSrc_Update :: proc(self:^ShapeSrc, shapes:^geometry.Shapes) -> (err:geometry.ShapesError = .None) {
     raw : ^geometry.RawShape
-    raw, err = geometry.Shapes_ComputePolygon(shapes, engineDefAllocator)
+    raw, err = geometry.Shapes_ComputePolygon(shapes, graphics_api.engineDefAllocator)
     if err != .None do return
 
     __VertexBuf_Update(&self.vertexBuf, raw.vertices)

@@ -5,148 +5,101 @@ import "core:debug/trace"
 import "core:math/linalg"
 import "core:sys/windows"
 
-@(private) __windowWidth: Maybe(int)
-@(private) __windowHeight: Maybe(int)
-@(private) __windowX: Maybe(int)
-@(private) __windowY: Maybe(int)
+import graphics_api "./graphics_api"
 
-@(private) prevWindowX: int
-@(private) prevWindowY: int
-@(private) prevWindowWidth: int
-@(private) prevWindowHeight: int
 
-@(private) __screenIdx: int = 0
-@(private) __screenMode: ScreenMode
-@(private) __windowTitle: cstring
-@(private) __screenOrientation:ScreenOrientation = .Unknown
-
-@(private) monitorsMtx:sync.Mutex
-@(private) monitors: [dynamic]MonitorInfo
-@(private) primaryMonitor: ^MonitorInfo
-@(private) currentMonitor: ^MonitorInfo = nil
-
-@(private) __isFullScreenEx := false
-@(private) __vSync:VSync
-@(private) monitorLocked:bool = false
-
-@(private) paused := false
-@(private) activated := false
-@(private) sizeUpdated := false
-
-@(private) fullScreenMtx : sync.Mutex
-
-VSync :: enum {Double, Triple, None}
-
-ScreenMode :: enum {Window, Borderless, Fullscreen}
-
-ScreenOrientation :: enum {
-	Unknown,
-	Landscape90,
-	Landscape270,
-	Vertical180,
-	Vertical360,
-}
-
-MonitorInfo :: struct {
-	rect:       linalg.RectI,
-	refreshRate: u32,
-	name:       string,
-	isPrimary:  bool,
-}
+VSync :: graphics_api.VSync
+ScreenMode :: graphics_api.ScreenMode
+ScreenOrientation :: graphics_api.ScreenOrientation
+MonitorInfo :: graphics_api.MonitorInfo
 
 Paused :: proc "contextless" () -> bool {
-	return paused
+	return graphics_api.paused
 }
 
 Activated :: proc "contextless" () -> bool {
-	return activated
+	return graphics_api.activated
 }
 
-@private SavePrevWindow :: proc "contextless" () {
-	prevWindowX = __windowX.?
-    prevWindowY = __windowY.?
-    prevWindowWidth = __windowWidth.?
-    prevWindowHeight = __windowHeight.?
-}
 
 SetFullScreenMode :: proc "contextless" (monitor:^MonitorInfo) {
 	when !is_mobile {
-		sync.mutex_lock(&fullScreenMtx)
-		defer sync.mutex_unlock(&fullScreenMtx)
-		SavePrevWindow()
-		glfwSetFullScreenMode(monitor)
-		__screenMode = .Fullscreen
+		sync.mutex_lock(&graphics_api.fullScreenMtx)
+		defer sync.mutex_unlock(&graphics_api.fullScreenMtx)
+		graphics_api.SavePrevWindow()
+		graphics_api.glfwSetFullScreenMode(monitor)
+		graphics_api.__screenMode = .Fullscreen
 	}
 }
 SetBorderlessScreenMode :: proc "contextless" (monitor:^MonitorInfo) {
 	when !is_mobile {
-		sync.mutex_lock(&fullScreenMtx)
-		defer sync.mutex_unlock(&fullScreenMtx)
-		SavePrevWindow()
-		glfwSetBorderlessScreenMode(monitor)
-		__screenMode = .Borderless
+		sync.mutex_lock(&graphics_api.fullScreenMtx)
+		defer sync.mutex_unlock(&graphics_api.fullScreenMtx)
+		graphics_api.SavePrevWindow()
+		graphics_api.glfwSetBorderlessScreenMode(monitor)
+		graphics_api.__screenMode = .Borderless
 	}
 }
 SetWindowMode :: proc "contextless" () {
 	when !is_mobile {
-		sync.mutex_lock(&fullScreenMtx)
-		defer sync.mutex_unlock(&fullScreenMtx)
-		SavePrevWindow()
-		glfwSetWindowMode()
-		__screenMode = .Window
+		sync.mutex_lock(&graphics_api.fullScreenMtx)
+		defer sync.mutex_unlock(&graphics_api.fullScreenMtx)
+		graphics_api.SavePrevWindow()
+		graphics_api.glfwSetWindowMode()
+		graphics_api.__screenMode = .Window
 	}
 }
 MonitorLock :: proc "contextless" () {
-	sync.mutex_lock(&monitorsMtx)
-	if monitorLocked do trace.panic_log("already monitorLocked locked")
-	monitorLocked = true
+	sync.mutex_lock(&graphics_api.monitorsMtx)
+	if graphics_api.monitorLocked do trace.panic_log("already monitorLocked locked")
+	graphics_api.monitorLocked = true
 }
 MonitorUnlock :: proc "contextless" () {
-	if !monitorLocked do trace.panic_log("already monitorLocked unlocked")
-	monitorLocked = false
-	sync.mutex_unlock(&monitorsMtx)
+	if !graphics_api.monitorLocked do trace.panic_log("already monitorLocked unlocked")
+	graphics_api.monitorLocked = false
+	sync.mutex_unlock(&graphics_api.monitorsMtx)
 }
 
 GetMonitors :: proc "contextless" () -> []MonitorInfo {
-	if !monitorLocked do trace.panic_log("call inside monitorLock")
-	return monitors[:len(monitors)]
+	if !graphics_api.monitorLocked do trace.panic_log("call inside monitorLock")
+	return graphics_api.monitors[:len(graphics_api.monitors)]
 }
 
 GetCurrentMonitor :: proc "contextless" () -> ^MonitorInfo {
-	if !monitorLocked do trace.panic_log("call inside monitorLock")
-	return currentMonitor
+	if !graphics_api.monitorLocked do trace.panic_log("call inside monitorLock")
+	return graphics_api.currentMonitor
 }
 
 GetMonitorFromWindow :: proc "contextless" () -> ^MonitorInfo #no_bounds_check {
-	if !monitorLocked do trace.panic_log("call inside monitorLock")
-	for &value in monitors {
-		if linalg.Rect_PointIn(value.rect, [2]i32{auto_cast __windowX.?, auto_cast __windowY.?}) do return &value
+	if !graphics_api.monitorLocked do trace.panic_log("call inside monitorLock")
+	for &value in graphics_api.monitors {
+		if linalg.Rect_PointIn(value.rect, [2]i32{auto_cast graphics_api.__windowX.?, auto_cast graphics_api.__windowY.?}) do return &value
 	}
-	return primaryMonitor
+	return graphics_api.primaryMonitor
 }
 
 WindowWidth :: proc "contextless" () -> int {
-	return __windowWidth.?
+	return graphics_api.__windowWidth.?
 }
 WindowHeight :: proc "contextless" () -> int {
-	return __windowHeight.?
+	return graphics_api.__windowHeight.?
 }
 WindowX :: proc "contextless" () -> int {
-	return __windowX.?
+	return graphics_api.__windowX.?
 }
 WindowY :: proc "contextless" () -> int {
-	return __windowY.?
+	return graphics_api.__windowY.?
 }
 SetVSync :: proc "contextless" (vSync:VSync) {
-	__vSync = vSync
-	sizeUpdated = true
+	graphics_api.__vSync = vSync
+	graphics_api.sizeUpdated = true
 }
 GetVSync :: proc "contextless" () -> VSync {
-	return __vSync
+	return graphics_api.__vSync
 }
 
 SetWindowIcon :: #force_inline proc "contextless" (icons:[]Icon_Image) {
 	when !is_mobile {
-	    glfwSetWindowIcon(auto_cast icons)
+	    graphics_api.glfwSetWindowIcon(auto_cast icons)
 	}
 }

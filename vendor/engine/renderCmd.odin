@@ -5,21 +5,22 @@ import "core:debug/trace"
 import "core:sync"
 import vk "vendor:vulkan"
 
+import graphics_api "./graphics_api"
 
+MAX_FRAMES_IN_FLIGHT :: 2
 RenderCmd :: struct {}
 
-@(private) __RenderCmd :: struct {
+__RenderCmd :: struct {
     scene: [dynamic]^IObject,
     sceneT: [dynamic]^IObject,
     refresh:[MAX_FRAMES_IN_FLIGHT]bool,
-    cmds:[MAX_FRAMES_IN_FLIGHT][]vk.CommandBuffer,
+    cmds:[MAX_FRAMES_IN_FLIGHT][]graphics_api.CommandBuffer,
     objLock:sync.RW_Mutex
 }
 
-@private gRenderCmd : [dynamic]^__RenderCmd
-@private gMainRenderCmdIdx : int = -1
-
-@private gRenderCmdMtx : sync.Mutex
+__gRenderCmd : [dynamic]^__RenderCmd
+__gMainRenderCmdIdx : int = -1
+__gRenderCmdMtx : sync.Mutex
 
 RenderCmd_Init :: proc() -> ^RenderCmd {
     cmd := new(__RenderCmd)
@@ -27,52 +28,45 @@ RenderCmd_Init :: proc() -> ^RenderCmd {
     cmd.sceneT = mem.make_non_zeroed([dynamic]^IObject)
     for i in 0..<MAX_FRAMES_IN_FLIGHT {
         cmd.refresh[i] = false
-        cmd.cmds[i] = mem.make_non_zeroed([]vk.CommandBuffer, __swapImgCnt)
-        allocInfo := vk.CommandBufferAllocateInfo{
-            sType = vk.StructureType.COMMAND_BUFFER_ALLOCATE_INFO,
-            commandPool = vkCmdPool,
-            level = vk.CommandBufferLevel.PRIMARY,
-            commandBufferCount = __swapImgCnt,
-        }
-        res := vk.AllocateCommandBuffers(vkDevice, &allocInfo, &cmd.cmds[i][0])
-        if res != .SUCCESS do trace.panic_log("res = vk.AllocateCommandBuffers(vkDevice, &allocInfo, &cmd.cmds[i][0]) : ", res)
+        cmd.cmds[i] = mem.make_non_zeroed([]graphics_api.CommandBuffer, graphics_api.swapImgCnt)
+        graphics_api.allocate_command_buffers(&cmd.cmds[i][0], graphics_api.swapImgCnt)
     }
     cmd.objLock = sync.RW_Mutex{}
 
-    sync.mutex_lock(&gRenderCmdMtx)
-    non_zero_append(&gRenderCmd, cmd)
-    sync.mutex_unlock(&gRenderCmdMtx)
+    sync.mutex_lock(&__gRenderCmdMtx)
+    non_zero_append(&__gRenderCmd, cmd)
+    sync.mutex_unlock(&__gRenderCmdMtx)
     return (^RenderCmd)(cmd)
 }
 
 RenderCmd_Deinit :: proc(cmd: ^RenderCmd) {
     cmd_ :^__RenderCmd = (^__RenderCmd)(cmd)
     for i in 0..<MAX_FRAMES_IN_FLIGHT {
-        vk.FreeCommandBuffers(vkDevice, vkCmdPool, __swapImgCnt, &cmd_.cmds[i][0])
+        graphics_api.free_command_buffers(&cmd_.cmds[i][0], graphics_api.swapImgCnt)
         delete(cmd_.cmds[i])
     }
     delete(cmd_.scene)
     delete(cmd_.sceneT)
 
-    sync.mutex_lock(&gRenderCmdMtx)
-    for cmd, i in gRenderCmd {
+    sync.mutex_lock(&__gRenderCmdMtx)
+    for cmd, i in __gRenderCmd {
         if cmd == cmd_ {
-            ordered_remove(&gRenderCmd, i)
-            if i == gMainRenderCmdIdx do gMainRenderCmdIdx = -1
+            ordered_remove(&__gRenderCmd, i)
+            if i == __gMainRenderCmdIdx do __gMainRenderCmdIdx = -1
             break
         }
     }
-    sync.mutex_unlock(&gRenderCmdMtx)
+    sync.mutex_unlock(&__gRenderCmdMtx)
     free(cmd)
 }
 
 RenderCmd_Show :: proc (_cmd: ^RenderCmd) -> bool {
-    sync.mutex_lock(&gRenderCmdMtx)
-    defer sync.mutex_unlock(&gRenderCmdMtx)
-    for cmd, i in gRenderCmd {
+    sync.mutex_lock(&__gRenderCmdMtx)
+    defer sync.mutex_unlock(&__gRenderCmdMtx)
+    for cmd, i in __gRenderCmd {
         if cmd == (^__RenderCmd)(_cmd) {
             RenderCmd_Refresh(_cmd)
-            gMainRenderCmdIdx = i
+            __gMainRenderCmdIdx = i
             return true
         }
     }
@@ -185,31 +179,31 @@ RenderCmd_GetObjects :: proc(cmd: ^RenderCmd) -> []^IObject {
     return cmd_.sceneT[:]
 }
 
-@private RenderCmd_Refresh :: proc "contextless" (cmd: ^RenderCmd) {
+RenderCmd_Refresh :: proc "contextless" (cmd: ^RenderCmd) {
     cmd_ :^__RenderCmd = (^__RenderCmd)(cmd)
     for &b in cmd_.refresh {
         b = true
     }
 }
 
-@private RenderCmd_RefreshAll :: proc "contextless" () {
-    sync.mutex_lock(&gRenderCmdMtx)
-    defer sync.mutex_unlock(&gRenderCmdMtx)
-    for cmd in gRenderCmd {
+RenderCmd_RefreshAll :: proc "contextless" () {
+    sync.mutex_lock(&__gRenderCmdMtx)
+    defer sync.mutex_unlock(&__gRenderCmdMtx)
+    for cmd in __gRenderCmd {
         for &b in cmd.refresh {
             b = true
         }
     }
 }
 
-@private RenderCmd_Clean :: proc () {
-    sync.mutex_lock(&gRenderCmdMtx)
-    defer sync.mutex_unlock(&gRenderCmdMtx)
-    delete(gRenderCmd)
+__RenderCmd_Clean :: proc () {
+    sync.mutex_lock(&__gRenderCmdMtx)
+    defer sync.mutex_unlock(&__gRenderCmdMtx)
+    delete(__gRenderCmd)
 }
 
-@private RenderCmd_Create :: proc () {
-    sync.mutex_lock(&gRenderCmdMtx)
-    defer sync.mutex_unlock(&gRenderCmdMtx)
-    gRenderCmd = mem.make_non_zeroed([dynamic]^__RenderCmd)
+__RenderCmd_Create :: proc () {
+    sync.mutex_lock(&__gRenderCmdMtx)
+    defer sync.mutex_unlock(&__gRenderCmdMtx)
+    __gRenderCmd = mem.make_non_zeroed([dynamic]^__RenderCmd)
 }

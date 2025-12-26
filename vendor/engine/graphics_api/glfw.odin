@@ -1,5 +1,4 @@
-#+private
-package engine
+package graphics_api
 
 import "vendor:glfw"
 import "core:reflect"
@@ -16,17 +15,20 @@ import "core:bytes"
 import "core:thread"
 import "base:runtime"
 import "base:intrinsics"
+import "base:library"
 import vk "vendor:vulkan"
 import "core:fmt"
 
-when !is_mobile {
+import "../"
+
+when !library.is_mobile {
 
 @(private="file") wnd:glfw.WindowHandle = nil
 @(private="file") glfwMonitors:[dynamic]glfw.MonitorHandle
 
 
 glfwStart :: proc() {
-    when !is_console {
+    when !engine.is_console {
         //?default screen idx 0
         if __windowWidth == nil do __windowWidth = int(monitors[0].rect.size.x / 2)
         if __windowHeight == nil do __windowHeight = int(monitors[0].rect.size.y / 2)
@@ -99,8 +101,8 @@ glfwSetFullScreenMode :: proc "contextless" (monitor:^MonitorInfo) {
     }
 }
 
-glfwSetWindowIcon :: #force_inline  proc "contextless" (icons:[]Icon_Image) {
-    glfw.SetWindowIcon(wnd, auto_cast icons)
+glfwSetWindowIcon :: #force_inline  proc "contextless" (icons:[]glfw.Image) {
+    glfw.SetWindowIcon(wnd, icons)
 }
 
 glfwSetBorderlessScreenMode :: proc "contextless" (monitor:^MonitorInfo) {
@@ -119,12 +121,7 @@ glfwSetWindowMode :: proc "contextless" () {
        glfw.DONT_CARE)
 }
 
-glfwVulkanStart :: proc "contextless" () {
-    if vkSurface != 0 do vk.DestroySurfaceKHR(vkInstance, vkSurface, nil)
 
-    res := glfw.CreateWindowSurface(vkInstance, wnd, nil, &vkSurface)
-    if (res != .SUCCESS) do trace.panic_log("glfwVulkanStart : ", res)
-}
 
 @(private="file") glfwInitMonitors :: proc() {
     glfwMonitors = mem.make_non_zeroed([dynamic]glfw.MonitorHandle)
@@ -145,7 +142,7 @@ glfwVulkanStart :: proc "contextless" () {
     info.refreshRate = auto_cast vidMode.refresh_rate
 
     when is_log {
-        printf(
+        fmt.printf(
             "XFIT SYSLOG : ADD %s monitor name: %s, x:%d, y:%d, size.x:%d, size.y:%d, refleshrate:%d\n",
             "primary" if info.isPrimary else "",
             info.name,
@@ -159,6 +156,13 @@ glfwVulkanStart :: proc "contextless" () {
 
     non_zero_append(&monitors, info)
     non_zero_append(&glfwMonitors, m)
+}
+
+glfwVulkanStart :: proc "contextless" () {
+    if vkSurface != 0 do vk.DestroySurfaceKHR(vkInstance, vkSurface, nil)
+
+    res := glfw.CreateWindowSurface(vkInstance, wnd, nil, &vkSurface)
+    if (res != .SUCCESS) do trace.panic_log("glfwVulkanStart : ", res)
 }
 
 glfwSystemInit :: proc() {
@@ -176,13 +180,13 @@ glfwSystemInit :: proc() {
         linuxPlatform.release = strings.clone_from_ptr(&name.release[0], bytes.index_byte(name.release[:], 0))
         linuxPlatform.version = strings.clone_from_ptr(&name.version[0], bytes.index_byte(name.version[:], 0))
         when is_log {
-            println("XFIT SYSLOG : ", linuxPlatform)
+            fmt.println("XFIT SYSLOG : ", linuxPlatform)
         }
        
         processorCoreLen = auto_cast os._unix_get_nprocs()
         if processorCoreLen == 0 do trace.panic_log("processorCoreLen can't zero")
         when is_log {
-            println("XFIT SYSLOG processorCoreLen : ", processorCoreLen)
+            fmt.println("XFIT SYSLOG processorCoreLen : ", processorCoreLen)
         }
 	} else when ODIN_OS == .Windows {
         systemInfo:windows.SYSTEM_INFO
@@ -229,12 +233,12 @@ glfwSystemInit :: proc() {
             }
         } else {
             windowsPlatform.version = .Unknown
-            printCustomAndroid("WARN : unknown windows version\n", logPriority = .WARN)
+            fmt.printCustomAndroid("WARN : unknown windows version\n", logPriority = .WARN)
         }
 
          when is_log {
-            println("XFIT SYSLOG processorCoreLen : ", processorCoreLen)
-            println("XFIT SYSLOG windowsPlatform : ", windowsPlatform)
+            fmt.println("XFIT SYSLOG processorCoreLen : ", processorCoreLen)
+            fmt.println("XFIT SYSLOG windowsPlatform : ", windowsPlatform)
         }
 	}
 
@@ -244,7 +248,7 @@ glfwSystemInit :: proc() {
 glfwErrorCallback :: proc "c" (error: c.int, description: cstring) {
     when is_log {
         context = runtime.default_context()
-        println("XFIT SYSLOG : glfw", error, description)
+        fmt.println("XFIT SYSLOG : glfw", error, description)
     }
 }
 
@@ -259,8 +263,8 @@ glfwSystemStart :: proc() {
         } else if event == glfw.DISCONNECTED {
             for m, i in glfwMonitors {
                 if m == monitor {
-                    when is_log && !is_console {
-                        printf(
+                    when is_log && !engine.is_console {
+                        fmt.println(
                             "XFIT SYSLOG : DEL %s monitor name: %s, x:%d, y:%d, size.x:%d, size.y:%d, refleshrate%d\n",
                             "primary" if monitors[i].isPrimary else "",
                             monitors[i].name,
@@ -286,7 +290,7 @@ glfwSystemStart :: proc() {
 }
 
 glfwDestroy :: proc "contextless" () {
-    when !is_console {
+    when !engine.is_console {
         if wnd != nil do glfw.SetWindowShouldClose(wnd, true)
         //!glfw.DestroyWindow(wnd) 를 쓰지 않는다 왜냐하면 윈도우만 종료되고 윈도우 루프를 빠져나가지 않는다.
     }
@@ -311,7 +315,7 @@ glfwSystemDestroy :: proc() {
 glfwLoop :: proc() {
     glfwKeyProc :: proc "c" (window: glfw.WindowHandle, key, scancode, action, mods: c.int) {
         //glfw.KEY_SPACE
-        if key > KEY_SIZE-1 || key < 0 || !reflect.is_valid_enum_value(KeyCode, key) {
+        if key > KEY_SIZE-1 || key < 0 || !reflect.is_valid_enum_value(engine.KeyCode, key) {
             return
         }
         context = runtime.default_context()
@@ -319,38 +323,38 @@ glfwLoop :: proc() {
             case glfw.PRESS:
                 if !keys[key] {
                     keys[key] = true
-                    KeyDown(KeyCode(key))
+                    engine.KeyDown(engine.KeyCode(key))
                 }
             case glfw.RELEASE:
                 keys[key] = false
-                KeyUp(KeyCode(key))
+                engine.KeyUp(engine.KeyCode(key))
             case glfw.REPEAT:
-                KeyRepeat(KeyCode(key))
+                engine.KeyRepeat(engine.KeyCode(key))
         }
     }
     glfwMouseButtonProc :: proc "c" (window: glfw.WindowHandle, button, action, mods: c.int) {
         context = runtime.default_context()
         switch action {
             case glfw.PRESS:
-                MouseButtonDown(auto_cast button, mouse_pos.x, mouse_pos.y)
+                engine.MouseButtonDown(auto_cast button, mouse_pos.x, mouse_pos.y)
             case glfw.RELEASE:
-                MouseButtonUp(auto_cast button, mouse_pos.x, mouse_pos.y)
+                engine.MouseButtonUp(auto_cast button, mouse_pos.x, mouse_pos.y)
         }
     }
     glfwCursorPosProc :: proc "c" (window: glfw.WindowHandle, xpos,  ypos: f64) {
         context = runtime.default_context()
         mouse_pos.x = auto_cast xpos
         mouse_pos.y = auto_cast ypos
-        MouseMove(mouse_pos.x, mouse_pos.y)
+        engine.MouseMove(mouse_pos.x, mouse_pos.y)
     }
     glfwCursorEnterProc :: proc "c" (window: glfw.WindowHandle, entered: c.int) {
         context = runtime.default_context()
         if b32(entered) {
             isMouseOut = false
-            MouseIn()
+            engine.MouseIn()
         } else {
             isMouseOut = true
-            MouseOut()
+            engine.MouseOut()
         }
     }
     glfwCharProc :: proc "c"  (window: glfw.WindowHandle, codepoint: rune) {
@@ -372,7 +376,7 @@ glfwLoop :: proc() {
         __windowY = int(ypos)
     }
     glfwWindowCloseProc :: proc "c" (window: glfw.WindowHandle) {
-        glfw.SetWindowShouldClose(window, auto_cast Close())
+        glfw.SetWindowShouldClose(window, auto_cast engine.Close())
     }
     glfwWindowFocusProc :: proc "c" (window: glfw.WindowHandle, focused: c.int) {
         if focused != 0 {
@@ -385,7 +389,7 @@ glfwLoop :: proc() {
                 k = false
             }
         }
-        Activate()
+        engine.Activate()
     }
     glfwWindowRefreshProc :: proc "c" (window: glfw.WindowHandle) {
         //! no need

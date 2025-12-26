@@ -12,6 +12,7 @@ import "base:intrinsics"
 import "base:runtime"
 import "core:math/linalg"
 import vk "vendor:vulkan"
+import graphics_api "./graphics_api"
 
 when is_android {
     @(private="file") app : ^android.android_app
@@ -313,7 +314,7 @@ when is_android {
                 if app.window != nil {
                     if !appInited {
                         context = runtime.default_context()
-                        vkStart()
+                        graphics_api.graphics_init()
 
                         __windowWidth = int(vkExtent.width)
 		                __windowHeight = int(vkExtent.height)
@@ -363,9 +364,9 @@ when is_android {
                 }
 
                 if app.destroyRequested != 0 {
-                    vkWaitDeviceIdle()
+                    graphics_api.graphics_wait_device_idle()
                     Destroy()
-                    vkDestory()
+                    graphics_api.graphics_destroy()
                     systemDestroy()
                     systemAfterDestroy()
                     return

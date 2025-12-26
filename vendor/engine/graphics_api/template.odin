@@ -1,5 +1,4 @@
-#+private
-package engine
+package graphics_api
 
 import "core:math"
 import "core:math/linalg"

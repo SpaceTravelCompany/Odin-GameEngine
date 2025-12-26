@@ -1,9 +1,10 @@
 package engine
 
+import graphics_api "./graphics_api"
 
 ianimate_object :: struct {
     using object:IObject,
-    frameUniform:VkBufferResource,
+    frameUniform:graphics_api.BufferResource,
     frame:u32,
 }
 
@@ -68,7 +69,7 @@ ianimate_object_get_frame_cnt :: #force_inline proc "contextless" (self:^ianimat
 }
 
 ianimate_object_update_frame :: #force_inline proc (self:^ianimate_object) {
-    VkBufferResource_CopyUpdate(&self.frameUniform, &self.frame)
+    BufferResource_CopyUpdate(&self.frameUniform, &self.frame)
 }
 
 ianimate_object_next_frame :: #force_inline proc (self:^ianimate_object) {

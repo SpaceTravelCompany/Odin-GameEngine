@@ -8,6 +8,7 @@ import "core:math/linalg"
 import "base:intrinsics"
 import "base:runtime"
 import vk "vendor:vulkan"
+import graphics_api "./graphics_api"
 
 Camera :: struct {
     using _: __MatrixIn,
@@ -21,7 +22,7 @@ Camera_InitMatrixRaw :: proc (self:^Camera, mat:linalg.Matrix) {
 
 @private __Camera_Init :: #force_inline proc(self:^Camera) {
     mem.ICheckInit_Init(&self.checkInit)
-    VkBufferResource_CreateBuffer(&self.matUniform, {
+    graphics_api.BufferResource_CreateBuffer(&self.matUniform, {
         len = size_of(linalg.Matrix),
         type = .UNIFORM,
         resourceUsage = .CPU,
@@ -30,13 +31,13 @@ Camera_InitMatrixRaw :: proc (self:^Camera, mat:linalg.Matrix) {
 
 Camera_Deinit :: proc(self:^Camera) {
     mem.ICheckInit_Deinit(&self.checkInit)
-    VkBufferResource_Deinit(&self.matUniform)
+    BufferResource_Deinit(&self.matUniform)
 }
 
 Camera_UpdateMatrixRaw :: proc(self:^Camera, _mat:linalg.Matrix) {
     mem.ICheckInit_Check(&self.checkInit)
     self.mat = _mat
-    VkBufferResource_CopyUpdate(&self.matUniform, &self.mat)
+    graphics_api.BufferResource_CopyUpdate(&self.matUniform, &self.mat)
 }
 
 @private __Camera_Update :: #force_inline proc(self:^Camera, eyeVec:linalg.Point3DF, focusVec:linalg.Point3DF, upVec:linalg.Point3DF = {0,0,1}) {

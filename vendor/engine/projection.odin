@@ -8,6 +8,7 @@ import "core:math/linalg"
 import "base:intrinsics"
 import "base:runtime"
 import vk "vendor:vulkan"
+import "graphics_api"
 
 Projection :: struct {
     using _: __MatrixIn,
@@ -33,8 +34,8 @@ Projection_UpdateOrtho :: #force_inline proc(self:^Projection,  left:f32, right:
 }
 
 @private __Projection_UpdateOrthoWindow :: #force_inline proc(self:^Projection, width:f32, height:f32, near:f32 = 0.1, far:f32 = 100, flipAxisForVulkan := true) {
-    windowWidthF := f32(__windowWidth.?)
-    windowHeightF := f32(__windowHeight.?)
+    windowWidthF := f32(graphics_api.__windowWidth.?)
+    windowHeightF := f32(graphics_api.__windowHeight.?)
     ratio := windowWidthF / windowHeightF > width / height ? height / windowHeightF : width / windowWidthF
 
     windowWidthF *= ratio
@@ -71,7 +72,7 @@ Projection_InitMatrixPerspective :: proc (self:^Projection, fov:f32, aspect:f32 
 
 @private __Projection_UpdatePerspective :: #force_inline proc(self:^Projection, fov:f32, aspect:f32 = 0, near:f32 = 0.1, far:f32 = 100, flipAxisForVulkan := true) {
     aspectF := aspect
-    if aspectF == 0 do aspectF = f32(__windowWidth.?) / f32(__windowHeight.?)
+    if aspectF == 0 do aspectF = f32(graphics_api.__windowWidth.?) / f32(graphics_api.__windowHeight.?)
     sfov :f32 = math.sin(0.5 * fov)
     cfov :f32 = math.cos(0.5 * fov)
 
@@ -103,7 +104,7 @@ Projection_UpdatePerspective :: #force_inline proc(self:^Projection, fov:f32, as
     } else {
         mat = self.mat
     }
-    VkBufferResource_CreateBuffer(&self.matUniform, {
+    graphics_api.BufferResource_CreateBuffer(&self.matUniform, {
         len = size_of(linalg.Matrix),
         type = .UNIFORM,
         resourceUsage = .CPU,
@@ -113,7 +114,7 @@ Projection_UpdatePerspective :: #force_inline proc(self:^Projection, fov:f32, as
 
 Projection_Deinit :: proc(self:^Projection) {
     mem.ICheckInit_Deinit(&self.checkInit)
-    VkBufferResource_Deinit(&self.matUniform)
+    graphics_api.BufferResource_Deinit(&self.matUniform)
 }
 
 Projection_UpdateMatrixRaw :: proc(self:^Projection, _mat:linalg.Matrix) {
@@ -125,5 +126,5 @@ Projection_UpdateMatrixRaw :: proc(self:^Projection, _mat:linalg.Matrix) {
         mat = _mat
     }
     self.mat = _mat
-    VkBufferResource_CopyUpdate(&self.matUniform, &mat)
+    graphics_api.BufferResource_CopyUpdate(&self.matUniform, &mat)
 }

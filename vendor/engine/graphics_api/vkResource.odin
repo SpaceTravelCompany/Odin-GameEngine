@@ -1,5 +1,5 @@
 #+private
-package engine
+package graphics_api
 
 import vk "vendor:vulkan"
 import "core:mem"
@@ -9,34 +9,6 @@ import "core:container/intrusive/list"
 import "core:math"
 import "core:c"
 
-VkSize :: vk.DeviceSize
-
-VkResourceRange :: rawptr
-
-
-VkBaseResource :: struct {
-    data : VkResourceData,
-    gUniformIndices : [4]vk.DeviceSize,
-    idx:VkResourceRange,//unused uniform buffer
-    vkMemBuffer:^VkMemBuffer,
-}
-VkResourceData :: struct {
-    data:[]byte,
-    allocator:Maybe(runtime.Allocator),
-    is_creating_modifing:bool,
-}
-VkBufferResource :: struct {
-    using _:VkBaseResource,
-    option:BufferCreateOption,
-    __resource:vk.Buffer,
-}
-VkTextureResource :: struct {
-    using _:VkBaseResource,
-    imgView:vk.ImageView,
-    sampler:vk.Sampler,
-    option:TextureCreateOption,
-    __resource:vk.Image,
-}
 
 @(require_results) samplesToVkSampleCountFlags :: proc "contextless"(#any_int samples : int) -> vk.SampleCountFlags {
     switch samples {

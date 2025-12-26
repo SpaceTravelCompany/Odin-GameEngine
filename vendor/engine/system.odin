@@ -22,21 +22,17 @@ import "core:debug/trace"
 
 import "core:sys/android"
 import "vendor:glfw"
+import graphics_api "./graphics_api"
+
+// Re-export types
+ResourceUsage :: graphics_api.ResourceUsage
 
 //@(private) render_th: ^thread.Thread
 
-@(private) exiting := false
-@(private) programStart := true
-@(private) loopStart := false
-@(private) maxFrame : f64
-@(private) deltaTime : u64
-@(private) processorCoreLen : int
-@(private) gClearColor : [4]f32 = {0.0, 0.0, 0.0, 1.0}
-
-Exiting :: #force_inline proc  "contextless"() -> bool {return exiting}
-dt :: #force_inline proc "contextless" () -> f64 { return f64(deltaTime) / 1000000000.0 }
-dt_u64 :: #force_inline proc "contextless" () -> u64 { return deltaTime }
-GetProcessorCoreLen :: #force_inline proc "contextless" () -> int { return processorCoreLen }
+Exiting :: #force_inline proc  "contextless"() -> bool {return graphics_api.exiting}
+dt :: #force_inline proc "contextless" () -> f64 { return f64(graphics_api.deltaTime) / 1000000000.0 }
+dt_u64 :: #force_inline proc "contextless" () -> u64 { return graphics_api.deltaTime }
+GetProcessorCoreLen :: #force_inline proc "contextless" () -> int { return graphics_api.processorCoreLen }
 
 Init: #type proc()
 Update: #type proc()
@@ -94,19 +90,16 @@ LinuxPlatformVersion :: struct {
 }
 
 when is_android {
-	@(private) androidPlatform:AndroidPlatformVersion
 	GetPlatformVersion :: #force_inline proc "contextless" () -> AndroidPlatformVersion {
-		return androidPlatform
+		return graphics_api.androidPlatform
 	}
 } else when ODIN_OS == .Linux {
-	@(private) linuxPlatform:LinuxPlatformVersion
 	GetPlatformVersion :: #force_inline proc "contextless" () -> LinuxPlatformVersion {
-		return linuxPlatform
+		return graphics_api.linuxPlatform
 	}
 } else when ODIN_OS == .Windows {
-	@(private) windowsPlatform:WindowsPlatformVersion
 	GetPlatformVersion :: #force_inline proc "contextless" () -> WindowsPlatformVersion {
-		return windowsPlatform
+		return graphics_api.windowsPlatform
 	}
 }
 
@@ -121,13 +114,10 @@ Icon_Image :: glfw.Image
 
 @(private="file") inited := false
 
-@(private = "file") __arena: virtual.Arena
-@(private) engineDefAllocator : runtime.Allocator
-
 @(private) windows_hInstance:windows.HINSTANCE
 
-defAllocator :: proc "contextless" () -> runtime.Allocator {
-	return engineDefAllocator
+defAllocator :: proc "contextless" () -> mem.Allocator {
+	return graphics_api.engineDefAllocator
 }
 
 engineMain :: proc(
@@ -142,35 +132,34 @@ engineMain :: proc(
 		windows_hInstance = auto_cast windows.GetModuleHandleA(nil)
 	}
 
+	graphics_api.system_start()
+
 	assert(!(windowWidth != nil && windowWidth.? <= 0))
 	assert(!(windowHeight != nil && windowHeight.? <= 0))
 
-	_ = virtual.arena_init_growing(&__arena)
-	engineDefAllocator =  virtual.arena_allocator(&__arena)
-	
 	systemInit()
 	systemStart()
 
 	inited = true
 
-	__windowTitle = windowTitle
+	graphics_api.__windowTitle = windowTitle
 	when is_android {
 		when is_console {
 			trace.panic_log("Console mode is not supported on Android.")
 		}
-		__windowX = 0
-		__windowY = 0
+		graphics_api.__windowX = 0
+		graphics_api.__windowY = 0
 
 		__android_SetApp(auto_cast android.get_android_app())
 	} else {
 		when !is_console {
-			__windowX = windowX
-			__windowY = windowY
-			__windowWidth = windowWidth
-			__windowHeight = windowHeight
+			graphics_api.__windowX = windowX
+			graphics_api.__windowY = windowY
+			graphics_api.__windowWidth = windowWidth
+			graphics_api.__windowHeight = windowHeight
 		}
 	}
-	__vSync = vSync
+	graphics_api.__vSync = vSync
 
 	when is_android {
 		androidStart()
@@ -183,19 +172,19 @@ engineMain :: proc(
 		} else {
 			windowStart()
 
-			vkStart()
+			graphics_api.graphics_init()
 
 			Init()
 
-			for !exiting {
+			for !graphics_api.exiting {
 				systemLoop()
 			}
 
-			vkWaitDeviceIdle()
+			graphics_api.graphics_wait_device_idle()
 
 			Destroy()
 
-			vkDestory()
+			graphics_api.graphics_destroy()
 
 			systemDestroy()
 
@@ -207,43 +196,42 @@ engineMain :: proc(
 @(private) systemLoop :: proc() {
 	when is_android {
 	} else {
-		glfwLoop()
+		graphics_api.glfwLoop()
 	}
 }
 
 @(private) systemInit :: proc() {
-	monitors = mem.make_non_zeroed([dynamic]MonitorInfo)
+	graphics_api.monitors = mem.make_non_zeroed([dynamic]MonitorInfo)
 	when is_android {
 	} else {
-		glfwSystemInit()
+		graphics_api.glfwSystemInit()
 	}
 }
 
 @(private) systemStart :: proc() {
 	when is_android {
 	} else {
-		glfwSystemStart()
+		graphics_api.glfwSystemStart()
 	}
 }
 
 @(private) windowStart :: proc() {
 	when is_android {
 	} else {
-		glfwStart()
+		graphics_api.glfwStart()
 	}
 }
 
 @(private) systemDestroy :: proc() {
 	when is_android {
 	} else {
-		glfwDestroy()
-		glfwSystemDestroy()
+		graphics_api.glfwDestroy()
+		graphics_api.glfwSystemDestroy()
 	}
 }
 @(private) systemAfterDestroy :: proc() {
-	delete(monitors)
-
-	virtual.arena_destroy(&__arena)
+	delete(graphics_api.monitors)
+	graphics_api.graphics_after_destroy()
 }
 
 @private @thread_local trackAllocator:mem.Tracking_Allocator
@@ -274,61 +262,7 @@ DestroyTrackAllocator :: proc() {
 }
 
 
-when is_android {
-	print :: proc(args: ..any, sep := " ", flush := true) -> int {
-		_ = flush
-		cstr := fmt.caprint(..args, sep=sep)
-		defer delete(cstr)
-		return auto_cast android.__android_log_write(android.LogPriority.INFO, ODIN_BUILD_PROJECT_NAME, cstr)
-	}
-	println  :: print
-	printf   :: proc(_fmt: string, args: ..any, flush := true) -> int {
-		_ = flush
-		cstr := fmt.caprintf(_fmt, ..args)
-		defer delete(cstr)
-		return auto_cast android.__android_log_write(android.LogPriority.INFO, ODIN_BUILD_PROJECT_NAME, cstr)
-	}
-	printfln :: printf
-	printCustomAndroid :: proc(args: ..any, logPriority: android.LogPriority = .INFO, sep := " ") -> int {
-		cstr := fmt.caprint(..args, sep=sep)
-		defer delete(cstr)
-		return auto_cast android.__android_log_write(logPriority, ODIN_BUILD_PROJECT_NAME, cstr)
-	}
-} else {
-	println :: fmt.println
-	printfln :: fmt.printfln
-	printf :: fmt.printf
-	print :: fmt.print
 
-	/**
-	* Android log priority values, in increasing order of priority.
-	*/
-	LogPriority :: enum i32 {
-	/** For internal use only.  */
-	UNKNOWN = 0,
-	/** The default priority, for internal use only.  */
-	DEFAULT, /* only for SetMinPriority() */
-	/** Verbose logging. Should typically be disabled for a release apk. */
-	VERBOSE,
-	/** Debug logging. Should typically be disabled for a release apk. */
-	DEBUG,
-	/** Informational logging. Should typically be disabled for a release apk. */
-	INFO,
-	/** Warning logging. For use with recoverable failures. */
-	WARN,
-	/** Error logging. For use with unrecoverable failures. */
-	ERROR,
-	/** Fatal logging. For use when aborting. */
-	FATAL,
-	/** For internal use only.  */
-	SILENT, /* only for SetMinPriority(); must be last */
-	}
-
-	printCustomAndroid :: proc(args: ..any, logPriority:LogPriority = .INFO, sep := " ") -> int {
-		_ = logPriority
-		return print(..args, sep = sep)
-	}
-}
 
 // @(private) CreateRenderFuncThread :: proc() {
 // 	render_th = thread.create_and_start(RenderFunc)
@@ -350,64 +284,19 @@ when is_android {
 // 	vkDestory()
 // }
 
-@private CalcFrameTime :: proc(Paused_: bool) {
-	@static start:time.Time
-	@static now:time.Time
-
-	if !loopStart {
-		loopStart = true
-		start = time.now()
-		now = start
-	} else {
-		maxFrame_ := GetMaxFrame()
-		if Paused_ && maxFrame_ == 0 {
-			maxFrame_ = 60
-		}
-		n := time.now()
-		delta := n._nsec - now._nsec
-
-		if maxFrame_ > 0 {
-			maxF := u64(1 * (1 / maxFrame_)) * 1000000000
-			if maxF > auto_cast delta {
-				time.sleep(auto_cast (i64(maxF) - delta))
-				n = time.now()
-				delta = n._nsec - now._nsec
-			}
-		}
-		now = n
-		deltaTime = auto_cast delta
-	}
-}
-
-@(private) RenderLoop :: proc() {
-	Paused_ := Paused()
-
-	CalcFrameTime(Paused_)
-	
-	Update()
-	if gMainRenderCmdIdx >= 0 {
-		for obj in gRenderCmd[gMainRenderCmdIdx].scene {
-			IObject_Update(obj)
-		}
-	}
-
-	if !Paused_ {
-		vkDrawFrame()
-	}
-}
 
 GetMaxFrame :: #force_inline proc "contextless" () -> f64 {
-	return intrinsics.atomic_load_explicit(&maxFrame,.Relaxed)
+	return intrinsics.atomic_load_explicit(&graphics_api.maxFrame,.Relaxed)
 }
 
 
 GetFPS :: #force_inline proc "contextless" () -> f64 {
-	if deltaTime == 0 do return 0
+	if graphics_api.deltaTime == 0 do return 0
 	return 1.0 / dt()
 }
 
 SetMaxFrame :: #force_inline proc "contextless" (_maxframe: f64) {
-	intrinsics.atomic_store_explicit(&maxFrame, _maxframe, .Relaxed)
+	intrinsics.atomic_store_explicit(&graphics_api.maxFrame, _maxframe, .Relaxed)
 }
 
 //_int * 1000000000 + _dec
@@ -419,14 +308,14 @@ SecondToNanoSecond2 :: #force_inline proc "contextless" (_sec: $T, _milisec: T, 
     return _sec * 1000000000 + _milisec * 1000000 + _usec * 1000 + _nsec
 }
 
-IsInMainThread :: #force_inline proc "contextless" () -> bool {
-	return sync.current_thread_id() == vkThreadId
+is_main_thread :: #force_inline proc "contextless" () -> bool {
+	return graphics_api.is_main_thread()
 }
 
 
 Windows_SetResIcon :: proc "contextless" (icon_resource_number:int) {
 	when ODIN_OS == .Windows {
-		hWnd := glfwGetHwnd()
+		hWnd := graphics_api.glfwGetHwnd()
 		icon := windows.LPARAM(uintptr(windows.LoadIconW(windows_hInstance, auto_cast windows.MAKEINTRESOURCEW(icon_resource_number))))
 		windows.SendMessageW(hWnd, windows.WM_SETICON, 1, icon)
 		windows.SendMessageW(hWnd, windows.WM_SETICON, 0, icon)
@@ -436,7 +325,7 @@ Windows_SetResIcon :: proc "contextless" (icon_resource_number:int) {
 exit :: proc "contextless" () {
 	when is_mobile {
 	} else {
-		glfwDestroy()
+		graphics_api.glfwDestroy()
 	}
 }
 

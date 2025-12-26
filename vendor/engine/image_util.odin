@@ -4,51 +4,10 @@ import vk "vendor:vulkan"
 import "base:runtime"
 import "base:intrinsics"
 import "core:debug/trace"
+import "./graphics_api"
 
-TextureFmt :: enum {
-    DefaultColor,
-    DefaultDepth,
-    R8G8B8A8Unorm,
-    B8G8R8A8Unorm,
-    // B8G8R8A8Srgb,
-    // R8G8B8A8Srgb,
-    D24UnormS8Uint,
-    D32SfloatS8Uint,
-    D16UnormS8Uint,
-	R8Unorm,
-}
-
-color_fmt :: enum {
-    Unknown,
-	RGB,
-    BGR,
-    RGBA,
-    BGRA,
-    ARGB,
-    ABGR,
-    Gray,
-    RGB16,
-    BGR16,
-    RGBA16,
-    BGRA16,
-    ARGB16,
-    ABGR16,
-    Gray16,
-    RGB32,
-    BGR32,
-    RGBA32,
-    BGRA32,
-    ARGB32,
-    ABGR32,
-    Gray32,
-    RGB32F,
-    BGR32F,
-    RGBA32F,
-    BGRA32F,
-    ARGB32F,
-    ABGR32F,
-    Gray32F,
-}
+TextureFmt :: graphics_api.TextureFmt
+color_fmt :: graphics_api.color_fmt
 
 color_fmt_bit :: proc "contextless" (fmt: color_fmt) -> int {
     switch fmt {
@@ -67,13 +26,13 @@ color_fmt_bit :: proc "contextless" (fmt: color_fmt) -> int {
 }
 
 default_color_fmt :: proc "contextless" () -> color_fmt {
-    return TextureFmtToColorFmt(vkFmtToTextureFmt(vkFmt.format))
+    return TextureFmtToColorFmt(vkFmtToTextureFmt(graphics_api.get_graphics_origin_format()))
 }
 
 @(require_results) TextureFmtToColorFmt :: proc "contextless" (t:TextureFmt) -> color_fmt {
 	#partial switch t {
 		case .DefaultColor:
-			return TextureFmtToColorFmt(vkFmtToTextureFmt(vkFmt.format))
+			return TextureFmtToColorFmt(vkFmtToTextureFmt(graphics_api.get_graphics_origin_format()))
 		case .R8G8B8A8Unorm:
 			return .RGBA
 		case .B8G8R8A8Unorm:
@@ -93,8 +52,8 @@ default_color_fmt :: proc "contextless" () -> color_fmt {
 
 @(require_results) TextureFmt_BitSize :: proc  "contextless" (fmt:TextureFmt) -> int {
     switch (fmt) {
-        case .DefaultColor : return TextureFmt_BitSize(vkFmtToTextureFmt(vkFmt.format))
-        case .DefaultDepth : return TextureFmt_BitSize(__depthFmt)
+        case .DefaultColor : return TextureFmt_BitSize(vkFmtToTextureFmt(graphics_api.get_graphics_origin_format()))
+        case .DefaultDepth : return TextureFmt_BitSize(graphics_api.depthFmt)
         case .R8G8B8A8Unorm:
 		case .B8G8R8A8Unorm:
 		case .D24UnormS8Uint:
@@ -109,12 +68,12 @@ default_color_fmt :: proc "contextless" () -> color_fmt {
     return 4
 }
 
-@(require_results) @private TextureFmtToVkFmt :: proc "contextless" (t:TextureFmt) -> vk.Format {
+@(require_results) TextureFmtToVkFmt :: proc "contextless" (t:TextureFmt) -> vk.Format {
 	switch t {
 		case .DefaultColor:
-			return vkFmt.format
+			return graphics_api.get_graphics_origin_format()
         case .DefaultDepth:
-            return TextureFmtToVkFmt(__depthFmt)
+            return TextureFmtToVkFmt(graphics_api.depthFmt)
 		case .R8G8B8A8Unorm:
 			return .R8G8B8A8_UNORM
 		case .B8G8R8A8Unorm:
@@ -128,7 +87,7 @@ default_color_fmt :: proc "contextless" () -> color_fmt {
 		case .R8Unorm:
 			return .R8_UNORM
 	}
-    return vkFmt.format
+    return graphics_api.get_graphics_origin_format()
 }
 
 @(require_results) @private vkFmtToTextureFmt :: proc "contextless" (t:vk.Format) -> TextureFmt {
