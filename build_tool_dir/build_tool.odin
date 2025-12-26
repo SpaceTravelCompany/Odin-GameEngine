@@ -88,12 +88,34 @@ main :: proc() {
 
 		os2.make_directory("android/lib/lib/arm64-v8a")
 
+		
+		ndkPath := android_paths["ndk"].(json.String)
+		sdkPath := android_paths["sdk"].(json.String)
+		PLATFORM := android_paths["platform-version"].(json.String)
+		//!use build-tools version same as platform version
+
+		toolchainPath : string
+		os2.set_env("ODIN_ANDROID_SDK", sdkPath)
+		os2.set_env("ODIN_ANDROID_NDK", ndkPath)
+		when ODIN_OS == .Windows {
+			toolchainPath = strings.join({ndkPath, "/toolchains/llvm/prebuilt/windows-x86_64"}, "", context.temp_allocator)
+		} else when ODIN_OS == .Linux {
+			toolchainPath = strings.join({ndkPath, "/toolchains/llvm/prebuilt/linux-x86_64"}, "", context.temp_allocator)
+		} else {
+			#panic("Unsupported OS for Android build")
+		}
+		os2.set_env("ODIN_ANDROID_NDK_TOOLCHAIN", toolchainPath)
+
+		err := os2.copy_file("android/lib/lib/arm64-v8a/libc++_shared.so", filepath.join({toolchainPath, "/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so"}, context.temp_allocator))
+		if err != nil {
+			fmt.panicf("libc++_shared copy_file: %s", err)
+		}
+
 		if debug {
-			err := os2.copy_file("android/lib/lib/arm64-v8a/libVkLayer_khronos_validation.so", filepath.join({ODIN_ROOT, "/vendor/vulkan/lib/android/libVkLayer_khronos_validation_arm64.so"}, context.temp_allocator))
+			err = os2.copy_file("android/lib/lib/arm64-v8a/libVkLayer_khronos_validation.so", filepath.join({ODIN_ROOT, "/vendor/vulkan/lib/android/libVkLayer_khronos_validation_arm64.so"}, context.temp_allocator))
 			if err != nil {
 				fmt.panicf("libVkLayer_khronos_validation copy_file: %s", err)
 			}
-			defer os2.remove("android/lib/lib/arm64-v8a/libVkLayer_khronos_validation.so")
 		}
 		// os2.make_directory("android/lib/lib/armeabi-v7a")//!only supports arm64 now
 		// os2.make_directory("android/lib/lib/x86_64")
@@ -115,22 +137,10 @@ main :: proc() {
 			strings.join({"android/lib/lib/riscv64/lib", setting["main-package"].(json.String), ".so"}, "", context.temp_allocator),
 		}
 
-		ndkPath := android_paths["ndk"].(json.String)
-		sdkPath := android_paths["sdk"].(json.String)
-		PLATFORM := android_paths["platform-version"].(json.String)
-		//!use build-tools version same as platform version
 
 		builded := false
 
-		os2.set_env("ODIN_ANDROID_SDK", sdkPath)
-		os2.set_env("ODIN_ANDROID_NDK", ndkPath)
-		when ODIN_OS == .Windows {
-			os2.set_env("ODIN_ANDROID_NDK_TOOLCHAIN", strings.join({ndkPath, "/toolchains/llvm/prebuilt/windows-x86_64"}, "", context.temp_allocator))
-		} else when ODIN_OS == .Linux {
-			os2.set_env("ODIN_ANDROID_NDK_TOOLCHAIN", strings.join({ndkPath, "/toolchains/llvm/prebuilt/linux-x86_64"}, "", context.temp_allocator))
-		} else {
-			#panic("Unsupported OS for Android build")
-		}
+		
 		
 		for target, i in targets {
 			if !runCmd({"odin", "build", 
@@ -164,6 +174,9 @@ main :: proc() {
 				"test.apk")
 
 			break//!only supports arm64 now
+		}
+		if debug {
+			os2.remove("android/lib/lib/arm64-v8a/libVkLayer_khronos_validation.so")
 		}
 
 		if builded {

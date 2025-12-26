@@ -100,7 +100,7 @@ Projection_UpdatePerspective :: #force_inline proc(self:^Projection, fov:f32, as
     mem.ICheckInit_Init(&self.checkInit)
     mat : linalg.Matrix
     when is_mobile {
-        mat = linalg.matrix_mul(vkRotationMatrix, self.mat)
+        mat = linalg.matrix_mul(graphics_api.RotationMatrix, self.mat)
     } else {
         mat = self.mat
     }
@@ -121,7 +121,7 @@ Projection_UpdateMatrixRaw :: proc(self:^Projection, _mat:linalg.Matrix) {
     mem.ICheckInit_Check(&self.checkInit)
     mat : linalg.Matrix
     when is_mobile {
-        mat = linalg.matrix_mul(vkRotationMatrix, _mat)
+        mat = linalg.matrix_mul(graphics_api.RotationMatrix, _mat)
     } else {
         mat = _mat
     }

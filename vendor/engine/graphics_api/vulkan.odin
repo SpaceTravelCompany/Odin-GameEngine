@@ -55,8 +55,6 @@ vkMSAAFrameTexture: Texture
 
 vkFrameBufferImageViews: []vk.ImageView
 
-vkRotationMatrix: linalg.Matrix
-
 vkImageAvailableSemaphore: [engine.MAX_FRAMES_IN_FLIGHT]vk.Semaphore
 vkRenderFinishedSemaphore: [engine.MAX_FRAMES_IN_FLIGHT][]vk.Semaphore
 vkInFlightFence: [engine.MAX_FRAMES_IN_FLIGHT]vk.Fence
@@ -1504,15 +1502,15 @@ vkRefreshPreMatrix :: proc() {
 	if library.is_mobile {
 		orientation := __screenOrientation
 		if orientation == .Landscape90 {
-			vkRotationMatrix = linalg.matrix4_rotate_f32(linalg.to_radians(f32(90.0)), {0, 0, 1})
+			RotationMatrix = linalg.matrix4_rotate_f32(linalg.to_radians(f32(90.0)), {0, 0, 1})
 		} else if orientation == .Landscape270 {
-			vkRotationMatrix = linalg.matrix4_rotate_f32(linalg.to_radians(f32(270.0)), {0, 0, 1})
+			RotationMatrix = linalg.matrix4_rotate_f32(linalg.to_radians(f32(270.0)), {0, 0, 1})
 		} else if orientation == .Vertical180 {
-			vkRotationMatrix = linalg.matrix4_rotate_f32(linalg.to_radians(f32(180.0)), {0, 0, 1})
+			RotationMatrix = linalg.matrix4_rotate_f32(linalg.to_radians(f32(180.0)), {0, 0, 1})
 		} else if orientation == .Vertical360 {
-			vkRotationMatrix = linalg.identity_matrix(linalg.Matrix)
+			RotationMatrix = linalg.identity_matrix(linalg.Matrix)
 		} else {
-			vkRotationMatrix = linalg.identity_matrix(linalg.Matrix)
+			RotationMatrix = linalg.identity_matrix(linalg.Matrix)
 		}
 	}
 }

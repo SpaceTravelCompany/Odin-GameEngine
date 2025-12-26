@@ -169,6 +169,7 @@ ColorTransform :: struct {
     checkInit: mem.ICheckInit,
 }
 
+RotationMatrix: linalg.Matrix
 
 
 ColorTransform_InitMatrixRaw :: proc(self:^ColorTransform, mat:linalg.Matrix = {1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1}) {

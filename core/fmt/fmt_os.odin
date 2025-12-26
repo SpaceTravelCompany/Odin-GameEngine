@@ -8,6 +8,8 @@ import "core:io"
 import "core:bufio"
 import "base:library"
 
+import "core:sys/android"
+
 // fprint formats using the default print settings and writes to fd
 fprint :: proc(fd: os.Handle, args: ..any, sep := " ", flush := true) -> int {
 	buf: [1024]byte
@@ -85,24 +87,28 @@ eprintf   :: proc(fmt: string, args: ..any, flush := true) -> int { return fprin
 // eprintfln formats according to the specified format string and writes to os.stderr, followed by a newline.
 eprintfln :: proc(fmt: string, args: ..any, flush := true) -> int { return fprintf(os.stderr, fmt, ..args, flush=flush, newline=true) }
 
+
+
+
+
 // edited (xfitgd)
 when library.is_android {
 	print :: proc(args: ..any, sep := " ", flush := true) -> int {
 		_ = flush
-		cstr := fmt.caprint(..args, sep=sep)
+		cstr := caprint(..args, sep=sep)
 		defer delete(cstr)
 		return auto_cast android.__android_log_write(android.LogPriority.INFO, ODIN_BUILD_PROJECT_NAME, cstr)
 	}
 	println  :: print
 	printf   :: proc(_fmt: string, args: ..any, flush := true) -> int {
 		_ = flush
-		cstr := fmt.caprintf(_fmt, ..args)
+		cstr := caprintf(_fmt, ..args)
 		defer delete(cstr)
 		return auto_cast android.__android_log_write(android.LogPriority.INFO, ODIN_BUILD_PROJECT_NAME, cstr)
 	}
 	printfln :: printf
 	printCustomAndroid :: proc(args: ..any, logPriority: android.LogPriority = .INFO, sep := " ") -> int {
-		cstr := fmt.caprint(..args, sep=sep)
+		cstr := caprint(..args, sep=sep)
 		defer delete(cstr)
 		return auto_cast android.__android_log_write(logPriority, ODIN_BUILD_PROJECT_NAME, cstr)
 	}
@@ -112,31 +118,7 @@ when library.is_android {
 	printf :: __printf
 	print :: __print
 
-	/**
-	* Android log priority values, in increasing order of priority.
-	*/
-	LogPriority :: enum i32 {
-	/** For internal use only.  */
-	UNKNOWN = 0,
-	/** The default priority, for internal use only.  */
-	DEFAULT, /* only for SetMinPriority() */
-	/** Verbose logging. Should typically be disabled for a release apk. */
-	VERBOSE,
-	/** Debug logging. Should typically be disabled for a release apk. */
-	DEBUG,
-	/** Informational logging. Should typically be disabled for a release apk. */
-	INFO,
-	/** Warning logging. For use with recoverable failures. */
-	WARN,
-	/** Error logging. For use with unrecoverable failures. */
-	ERROR,
-	/** Fatal logging. For use when aborting. */
-	FATAL,
-	/** For internal use only.  */
-	SILENT, /* only for SetMinPriority(); must be last */
-	}
-
-	printCustomAndroid :: proc(args: ..any, logPriority:LogPriority = .INFO, sep := " ") -> int {
+	printCustomAndroid :: proc(args: ..any, logPriority:android.LogPriority = .INFO, sep := " ") -> int {
 		_ = logPriority
 		return print(..args, sep = sep)
 	}

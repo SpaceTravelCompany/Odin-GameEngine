@@ -150,7 +150,7 @@ engineMain :: proc(
 		graphics_api.__windowX = 0
 		graphics_api.__windowY = 0
 
-		__android_SetApp(auto_cast android.get_android_app())
+		graphics_api.__android_SetApp(auto_cast android.get_android_app())
 	} else {
 		when !is_console {
 			graphics_api.__windowX = windowX
@@ -162,7 +162,7 @@ engineMain :: proc(
 	graphics_api.__vSync = vSync
 
 	when is_android {
-		androidStart()
+		graphics_api.androidStart()
 	} else {
 		when is_console {
 			Init()
@@ -193,14 +193,14 @@ engineMain :: proc(
 	}
 }
 
-@(private) systemLoop :: proc() {
+systemLoop :: proc() {
 	when is_android {
 	} else {
 		graphics_api.glfwLoop()
 	}
 }
 
-@(private) systemInit :: proc() {
+systemInit :: proc() {
 	graphics_api.monitors = mem.make_non_zeroed([dynamic]MonitorInfo)
 	when is_android {
 	} else {
@@ -208,28 +208,28 @@ engineMain :: proc(
 	}
 }
 
-@(private) systemStart :: proc() {
+systemStart :: proc() {
 	when is_android {
 	} else {
 		graphics_api.glfwSystemStart()
 	}
 }
 
-@(private) windowStart :: proc() {
+windowStart :: proc() {
 	when is_android {
 	} else {
 		graphics_api.glfwStart()
 	}
 }
 
-@(private) systemDestroy :: proc() {
+systemDestroy :: proc() {
 	when is_android {
 	} else {
 		graphics_api.glfwDestroy()
 		graphics_api.glfwSystemDestroy()
 	}
 }
-@(private) systemAfterDestroy :: proc() {
+systemAfterDestroy :: proc() {
 	delete(graphics_api.monitors)
 	graphics_api.graphics_after_destroy()
 }

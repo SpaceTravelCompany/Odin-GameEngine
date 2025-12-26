@@ -6,9 +6,9 @@ import "../"
 import "core:sync"
 
 when library.is_android {
-	androidPlatform:AndroidPlatformVersion
+	androidPlatform:engine.AndroidPlatformVersion
 } else when ODIN_OS == .Linux {
-	linuxPlatform:LinuxPlatformVersion
+	linuxPlatform:engine.LinuxPlatformVersion
 } else when ODIN_OS == .Windows {
 	windowsPlatform:engine.WindowsPlatformVersion
 }
