@@ -24,7 +24,7 @@ import "base:library"
 
 LIB :: library.LIBPATH + "/libshaderc_combined" + library.ARCH_end
 
-when ODIN_OS == .Windows {
+when ODIN_OS == .Windows && !library.is_android{
     foreign import libshaderc {
         LIB,
     }

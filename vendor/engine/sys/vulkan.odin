@@ -1243,7 +1243,7 @@ vk_recreate_swap_chain :: proc() {
 	vk_wait_device_idle()
 
 	when library.is_android {//? ANDROID ONLY
-		vulkanAndroidStart()
+		vulkan_android_start()
 	}
 
 	//vkCleanSyncObject()
@@ -1294,7 +1294,7 @@ vk_release_full_screen_ex :: proc() {
 
 vk_recreate_surface :: proc() {
 	when library.is_android {
-		vulkanAndroidStart()
+		vulkan_android_start()
 	} else {// !ismobile
 		glfw_vulkan_start()
 	}
