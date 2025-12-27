@@ -364,7 +364,7 @@ texture_init_grey :: sys.texture_init_grey
 
 
 //sampler nil default //TODO (xfitgd)
-// texture_init_r8 :: proc(self:^texture, #any_int width:int, #any_int height:int) {
+// texture_init_r8 :: proc(self:^texture, width:u32, height:u32) {
 //     mem.ICheckInit_Init(&self.check_init)
 //     self.sampler = 0
 //     self.set.bindings = nil
@@ -373,8 +373,8 @@ texture_init_grey :: sys.texture_init_grey
 //     self.set.__set = 0
 
 //     vk_buffer_resource_create_texture(&self.texture, {
-//         width = auto_cast width,
-//         height = auto_cast height,
+//         width = width,
+//         height = height,
 //         use_gcpu_mem = false,
 //         format = .R8Unorm,
 //         samples = 1,
@@ -387,7 +387,7 @@ texture_init_grey :: sys.texture_init_grey
 // }
 
 
-texture_init_depth_stencil :: proc(self:^texture, #any_int width:int, #any_int height:int) {
+texture_init_depth_stencil :: proc(self:^texture, width:u32, height:u32) {
     mem.ICheckInit_Init(&self.check_init)
     self.sampler = 0
     self.set.bindings = nil
@@ -396,8 +396,8 @@ texture_init_depth_stencil :: proc(self:^texture, #any_int width:int, #any_int h
     self.set.__set = 0
 
     sys.buffer_resource_create_texture(&self.texture, {
-        width = auto_cast width,
-        height = auto_cast height,
+        width = width,
+        height = height,
         use_gcpu_mem = false,
         format = .DefaultDepth,
         samples = auto_cast sys.msaa_count,
@@ -409,7 +409,7 @@ texture_init_depth_stencil :: proc(self:^texture, #any_int width:int, #any_int h
     }, self.sampler, nil)
 }
 
-texture_init_msaa :: proc(self:^texture, #any_int width:int, #any_int height:int) {
+texture_init_msaa :: proc(self:^texture, width:u32, height:u32) {
     mem.ICheckInit_Init(&self.check_init)
     self.sampler = 0
     self.set.bindings = nil
@@ -418,8 +418,8 @@ texture_init_msaa :: proc(self:^texture, #any_int width:int, #any_int height:int
     self.set.__set = 0
 
     sys.buffer_resource_create_texture(&self.texture, {
-        width = auto_cast width,
-        height = auto_cast height,
+        width = width,
+        height = height,
         use_gcpu_mem = false,
         format = .DefaultColor,
         samples = auto_cast sys.msaa_count,
@@ -436,10 +436,10 @@ texture_deinit :: #force_inline proc(self:^texture) {
     sys.buffer_resource_deinit(&self.texture)
 }
 
-texture_width :: #force_inline proc "contextless" (self:^texture) -> int {
+texture_width :: #force_inline proc "contextless" (self:^texture) -> u32{
     return auto_cast self.texture.option.width
 }
-texture_height :: #force_inline proc "contextless" (self:^texture) -> int {
+texture_height :: #force_inline proc "contextless" (self:^texture) -> u32 {
     return auto_cast self.texture.option.height
 }
 
@@ -457,7 +457,7 @@ texture_get_sampler :: #force_inline proc "contextless" (self:^texture) -> vk.Sa
     return self.sampler
 }
 
-texture_array_init :: proc(self:^texture_array, #any_int width:int, #any_int height:int, #any_int count:int, pixels:[]byte, sampler:vk.Sampler = 0, inPixelFmt:color_fmt = .RGBA) {
+texture_array_init :: proc(self:^texture_array, width:u32, height:u32, count:u32, pixels:[]byte, sampler:vk.Sampler = 0, inPixelFmt:color_fmt = .RGBA) {
     mem.ICheckInit_Init(&self.check_init)
     self.sampler = sampler == 0 ? sys.linear_sampler : sampler
     self.set.bindings = sys.__single_pool_binding[:]
@@ -469,12 +469,12 @@ texture_array_init :: proc(self:^texture_array, #any_int width:int, #any_int hei
     color_fmt_convert_default(pixels, allocPixels, inPixelFmt)
 
     sys.buffer_resource_create_texture(&self.texture, {
-        width = auto_cast width,
-        height = auto_cast height,
+        width = width,
+        height = height,
         use_gcpu_mem = false,
         format = .DefaultColor,
         samples = 1,
-        len = auto_cast count,
+        len = count,
         texture_usage = {.IMAGE_RESOURCE},
         type = .TEX2D,
         resource_usage = .GPU,
@@ -489,14 +489,14 @@ texture_array_deinit :: #force_inline proc(self:^texture_array) {
     mem.ICheckInit_Deinit(&self.check_init)
     sys.buffer_resource_deinit(&self.texture)
 }
-texture_array_width :: #force_inline proc "contextless" (self:^texture_array) -> int {
-    return auto_cast self.texture.option.width
+texture_array_width :: #force_inline proc "contextless" (self:^texture_array) -> u32 {
+    return self.texture.option.width
 }
-texture_array_height :: #force_inline proc "contextless" (self:^texture_array) -> int {
-    return auto_cast self.texture.option.height
+texture_array_height :: #force_inline proc "contextless" (self:^texture_array) -> u32 {
+    return self.texture.option.height
 }
-texture_array_count :: #force_inline proc "contextless" (self:^texture_array) -> int {
-    return auto_cast self.texture.option.len
+texture_array_count :: #force_inline proc "contextless" (self:^texture_array) -> u32 {
+    return self.texture.option.len
 }
 
 color_fmt_convert_default :: proc "contextless" (pixels:[]byte, out:[]byte, inPixelFmt:color_fmt = .RGBA) {
@@ -538,7 +538,7 @@ color_fmt_convert_default_overlap :: proc "contextless" (pixels:[]byte, out:[]by
 }
 
 
-tile_texture_array_init :: proc(self:^tile_texture_array, #any_int tile_width:int, #any_int tile_height:int, #any_int width:int, #any_int count:int, pixels:[]byte, sampler:vk.Sampler = 0, 
+tile_texture_array_init :: proc(self:^tile_texture_array, tile_width:u32, tile_height:u32, width:u32, count:u32, pixels:[]byte, sampler:vk.Sampler = 0, 
 inPixelFmt:color_fmt = .RGBA) {
     mem.ICheckInit_Init(&self.check_init)
     self.sampler = sampler == 0 ? sys.linear_sampler : sampler
@@ -550,7 +550,7 @@ inPixelFmt:color_fmt = .RGBA) {
     allocPixels := mem.make_non_zeroed_slice([]byte, count * tile_width * tile_height * bit, sys.engine_def_allocator)
 
     //convert tilemap pixel data format to tile image data format arranged sequentially
-    cnt:int
+    cnt:u32
     row := math.floor_div(width, tile_width)
     col := math.floor_div(count, row)
 
@@ -566,12 +566,12 @@ inPixelFmt:color_fmt = .RGBA) {
     }
   
     sys.buffer_resource_create_texture(&self.texture, {
-        width = auto_cast tile_width,
-        height = auto_cast tile_height,
+        width = tile_width,
+        height = tile_height,
         use_gcpu_mem = false,
         format = .DefaultColor,
         samples = 1,
-        len = auto_cast count,
+        len = count,
         texture_usage = {.IMAGE_RESOURCE},
         type = .TEX2D,
     }, self.sampler, allocPixels, false, sys.engine_def_allocator)
@@ -584,14 +584,14 @@ tile_texture_array_deinit :: #force_inline proc(self:^tile_texture_array) {
     mem.ICheckInit_Deinit(&self.check_init)
     sys.buffer_resource_deinit(&self.texture)
 }
-tile_texture_array_width :: #force_inline proc "contextless" (self:^tile_texture_array) -> int {
-    return auto_cast self.texture.option.width
+tile_texture_array_width :: #force_inline proc "contextless" (self:^tile_texture_array) -> u32 {
+    return self.texture.option.width
 }   
-tile_texture_array_height :: #force_inline proc "contextless" (self:^tile_texture_array) -> int {
-    return auto_cast self.texture.option.height
+tile_texture_array_height :: #force_inline proc "contextless" (self:^tile_texture_array) -> u32 {
+    return self.texture.option.height
 }
-tile_texture_array_count :: #force_inline proc "contextless" (self:^tile_texture_array) -> int {
-    return auto_cast self.texture.option.len
+tile_texture_array_count :: #force_inline proc "contextless" (self:^tile_texture_array) -> u32 {
+    return self.texture.option.len
 }
 
 

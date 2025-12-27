@@ -9,7 +9,7 @@ import sys "./sys"
 texture_fmt :: sys.texture_fmt
 color_fmt :: sys.color_fmt
 
-color_fmt_bit :: proc "contextless" (fmt: color_fmt) -> int {
+color_fmt_bit :: proc "contextless" (fmt: color_fmt) -> u32 {
     switch fmt {
         case .RGB, .BGR : return 24
         case .RGBA, .BGRA, .ABGR, .ARGB, .Gray32, .Gray32F : return 32
@@ -50,7 +50,7 @@ default_color_fmt :: proc "contextless" () -> color_fmt {
 	return false
 }
 
-@(require_results) texture_fmt_bit_size :: proc  "contextless" (fmt:texture_fmt) -> int {
+@(require_results) texture_fmt_bit_size :: proc  "contextless" (fmt:texture_fmt) -> u32 {
     switch (fmt) {
         case .DefaultColor : return texture_fmt_bit_size(vk_fmt_to_texture_fmt(sys.get_graphics_origin_format()))
         case .DefaultDepth : return texture_fmt_bit_size(sys.depth_fmt)

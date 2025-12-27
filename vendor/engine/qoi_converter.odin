@@ -16,25 +16,25 @@ qoi_converter :: struct {
     allocator:runtime.Allocator,
 }
 
-qoi_converter_width :: proc "contextless" (self:^qoi_converter) -> int {
+qoi_converter_width :: proc "contextless" (self:^qoi_converter) -> u32 {
     if self.img != nil {
-        return self.img.width
+        return u32(self.img.width)
     }
-    return -1
+    return 0
 }
 
-qoi_converter_height :: proc "contextless" (self:^qoi_converter) -> int {
+qoi_converter_height :: proc "contextless" (self:^qoi_converter) -> u32 {
     if self.img != nil {
-        return self.img.height
+        return u32(self.img.height)
     }
-    return -1
+    return 0
 }
 
-qoi_converter_size :: proc "contextless" (self:^qoi_converter) -> int {
+qoi_converter_size :: proc "contextless" (self:^qoi_converter) -> u32 {
     if self.img != nil {
-        return (self.img.depth >> 3) * self.img.width * self.img.height
+        return u32((self.img.depth >> 3) * self.img.width * self.img.height)
     }
-    return -1
+    return 0
 }
 
 qoi_converter_deinit :: image_converter_deinit

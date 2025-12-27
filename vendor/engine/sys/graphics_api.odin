@@ -515,8 +515,8 @@ texture_init :: proc(
 	engine.color_fmt_convert_default(pixels, alloc_pixels, in_pixel_fmt)
 
 	buffer_resource_create_texture(&self.texture, {
-		width = auto_cast width,
-		height = auto_cast height,
+		width = width,
+		height = height,
 		use_gcpu_mem = false,
 		format = .DefaultColor,
 		samples = 1,
@@ -534,8 +534,8 @@ texture_init :: proc(
 
 texture_init_grey :: proc(
 	self: ^texture,
-	#any_int width: int,
-	#any_int height: int,
+	width: u32,
+	height: u32,
 	pixels: []byte,
 	sampler: vk.Sampler = 0,
 	resource_usage: resource_usage = .GPU,
@@ -551,8 +551,8 @@ texture_init_grey :: proc(
 	mem.copy_non_overlapping(&alloc_pixels[0], &pixels[0], len(pixels))
 
 	buffer_resource_create_texture(&self.texture, {
-		width = auto_cast width,
-		height = auto_cast height,
+		width = width,
+		height = height,
 		use_gcpu_mem = false,
 		format = .R8Unorm,
 		samples = 1,

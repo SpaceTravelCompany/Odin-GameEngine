@@ -21,40 +21,40 @@ webp_converter :: struct {
     allocator:runtime.Allocator,
 }
 
-webp_converter_width :: proc "contextless" (self:^webp_converter) -> int {
+webp_converter_width :: proc "contextless" (self:^webp_converter) -> u32 {
     if self.config != nil {
         switch &t in self.config {
         case webp.WebPDecoderConfig:
-            return auto_cast t.input.width
+            return u32(t.input.width)
         case webp.WebPAnimDecoderOptions:
-            return auto_cast self.anim_info.canvas_width
+            return u32(self.anim_info.canvas_width)
         }
     }
-    return -1
+    return 0
 }
 
-webp_converter_height :: proc "contextless" (self:^webp_converter) -> int {
+webp_converter_height :: proc "contextless" (self:^webp_converter) -> u32 {
     if self.config != nil {
         switch &t in self.config {
         case webp.WebPDecoderConfig:
-            return auto_cast t.input.height
+            return u32(t.input.height)
         case webp.WebPAnimDecoderOptions:
-            return auto_cast self.anim_info.canvas_height
+            return u32(self.anim_info.canvas_height)
         }
     }
-    return -1
+    return 0
 }
 
-webp_converter_size :: proc "contextless" (self:^webp_converter) -> int {
+webp_converter_size :: proc "contextless" (self:^webp_converter) -> u32 {
     if self.config != nil {
         switch &t in self.config {
         case webp.WebPDecoderConfig:
-            return int(t.input.height * t.input.width) * (color_fmt_bit(self.out_fmt) >> 3)
+            return u32(t.input.height * t.input.width) * (color_fmt_bit(self.out_fmt) >> 3)
         case webp.WebPAnimDecoderOptions:
-            return int(self.anim_info.canvas_height * self.anim_info.canvas_width * self.anim_info.frame_count) * (color_fmt_bit(self.out_fmt) >> 3)
+            return self.anim_info.canvas_height * self.anim_info.canvas_width * self.anim_info.frame_count * (color_fmt_bit(self.out_fmt) >> 3)
         }
     }
-    return -1
+    return 0
 }
 
 webp_converter_frame_cnt :: proc "contextless" (self:^webp_converter) -> int {
@@ -156,9 +156,9 @@ webp_converter_load :: proc (self:^webp_converter, data:[]byte, out_fmt:color_fm
             errCode = nil
         }
     case webp.WebPAnimDecoderOptions:
-        idx := 0
+        idx := u32(0)
 
-        frame_size := int(self.anim_info.canvas_width * self.anim_info.canvas_height) * bit
+        frame_size := self.anim_info.canvas_width * self.anim_info.canvas_height * bit
 
         for 0 < webp.WebPAnimDecoderHasMoreFrames(self.anim_dec) {
             timestamp : i32

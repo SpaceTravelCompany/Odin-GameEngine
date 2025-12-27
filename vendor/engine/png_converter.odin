@@ -17,25 +17,25 @@ png_converter :: struct {
 }
 
 
-png_converter_width :: proc "contextless" (self:^png_converter) -> int {
+png_converter_width :: proc "contextless" (self:^png_converter) -> u32 {
     if self.img != nil {
-        return self.img.width
+        return u32(self.img.width)
     }
-    return -1
+    return 0
 }
 
-png_converter_height :: proc "contextless" (self:^png_converter) -> int {
+png_converter_height :: proc "contextless" (self:^png_converter) -> u32 {
     if self.img != nil {
-        return self.img.height
+        return u32(self.img.height)
     }
-    return -1
+    return 0
 }
 
-png_converter_size :: proc "contextless" (self:^png_converter) -> int {
+png_converter_size :: proc "contextless" (self:^png_converter) -> u32 {
     if self.img != nil {
-        return (self.img.depth >> 3) * self.img.width * self.img.height
+        return u32((self.img.depth >> 3) * self.img.width * self.img.height)
     }
-    return -1
+    return 0
 }
 
 png_converter_deinit :: image_converter_deinit
