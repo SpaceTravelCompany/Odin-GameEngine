@@ -29,7 +29,7 @@ when ODIN_OS == .Windows {
         LIB,
     }
 } else when library.is_android {
-    @(extra_linker_flags = "-lc++_shared -std=c++17")
+    @(extra_linker_flags = "-lc++_static -lc++abi -std=c++17")
     foreign import libshaderc {
         LIB,
     }

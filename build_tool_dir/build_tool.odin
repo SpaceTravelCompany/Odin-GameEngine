@@ -106,13 +106,13 @@ main :: proc() {
 		}
 		os2.set_env("ODIN_ANDROID_NDK_TOOLCHAIN", toolchainPath)
 
-		err := os2.copy_file("android/lib/lib/arm64-v8a/libc++_shared.so", filepath.join({toolchainPath, "/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so"}, context.temp_allocator))
-		if err != nil {
-			fmt.panicf("libc++_shared copy_file: %s", err)
-		}
+		// err := os2.copy_file("android/lib/lib/arm64-v8a/libc++_shared.so", filepath.join({toolchainPath, "/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so"}, context.temp_allocator))
+		// if err != nil {
+		// 	fmt.panicf("libc++_shared copy_file: %s", err)
+		// }
 
 		if debug {
-			err = os2.copy_file("android/lib/lib/arm64-v8a/libVkLayer_khronos_validation.so", filepath.join({ODIN_ROOT, "/vendor/vulkan/lib/android/libVkLayer_khronos_validation_arm64.so"}, context.temp_allocator))
+			err := os2.copy_file("android/lib/lib/arm64-v8a/libVkLayer_khronos_validation.so", filepath.join({ODIN_ROOT, "/vendor/vulkan/lib/android/libVkLayer_khronos_validation_arm64.so"}, context.temp_allocator))
 			if err != nil {
 				fmt.panicf("libVkLayer_khronos_validation copy_file: %s", err)
 			}
