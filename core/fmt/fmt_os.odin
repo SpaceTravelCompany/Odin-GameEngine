@@ -78,18 +78,6 @@ __printf   :: proc(fmt: string, args: ..any, flush := true) -> int { return fpri
 // printfln formats according to the specified format string and writes to os.stdout, followed by a newline.
 __printfln :: proc(fmt: string, args: ..any, flush := true) -> int { return fprintf(os.stdout, fmt, ..args, flush=flush, newline=true) }
 
-// eprint formats using the default print settings and writes to os.stderr
-eprint    :: proc(args: ..any, sep := " ", flush := true) -> int { return fprint(os.stderr, ..args, sep=sep, flush=flush) }
-// eprintln formats using the default print settings and writes to os.stderr
-eprintln  :: proc(args: ..any, sep := " ", flush := true) -> int { return fprintln(os.stderr, ..args, sep=sep, flush=flush) }
-// eprintf formats according to the specified format string and writes to os.stderr
-eprintf   :: proc(fmt: string, args: ..any, flush := true) -> int { return fprintf(os.stderr, fmt, ..args, flush=flush) }
-// eprintfln formats according to the specified format string and writes to os.stderr, followed by a newline.
-eprintfln :: proc(fmt: string, args: ..any, flush := true) -> int { return fprintf(os.stderr, fmt, ..args, flush=flush, newline=true) }
-
-
-
-
 
 // edited (xfitgd)
 when library.is_android {
@@ -107,18 +95,42 @@ when library.is_android {
 		return auto_cast android.__android_log_write(android.LogPriority.INFO, ODIN_BUILD_PROJECT_NAME, cstr)
 	}
 	printfln :: printf
-	printCustomAndroid :: proc(args: ..any, logPriority: android.LogPriority = .INFO, sep := " ") -> int {
+	print_custom_android :: proc(args: ..any, logPriority: android.LogPriority = .INFO, sep := " ") -> int {
 		cstr := caprint(..args, sep=sep)
 		defer delete(cstr)
 		return auto_cast android.__android_log_write(logPriority, ODIN_BUILD_PROJECT_NAME, cstr)
 	}
+	
+	eprint    :: proc(args: ..any, sep := " ", flush := true) -> int {
+		_ = flush
+		cstr := caprint(..args, sep=sep)
+		defer delete(cstr)
+		return auto_cast android.__android_log_write(android.LogPriority.ERROR, ODIN_BUILD_PROJECT_NAME, cstr)
+	}
+	eprintln  :: eprint
+	eprintf   :: proc(fmt: string, args: ..any, flush := true) -> int {
+		_ = flush
+		cstr := caprintf(fmt, ..args)
+		defer delete(cstr)
+		return auto_cast android.__android_log_write(android.LogPriority.ERROR, ODIN_BUILD_PROJECT_NAME, cstr)
+	}
+	eprintfln :: eprintf
 } else {
 	println :: __println
 	printfln :: __printfln
 	printf :: __printf
 	print :: __print
 
-	printCustomAndroid :: proc(args: ..any, logPriority:android.LogPriority = .INFO, sep := " ") -> int {
+	// eprint formats using the default print settings and writes to os.stderr
+	eprint    :: proc(args: ..any, sep := " ", flush := true) -> int { return fprint(os.stderr, ..args, sep=sep, flush=flush) }
+	// eprintln formats using the default print settings and writes to os.stderr
+	eprintln  :: proc(args: ..any, sep := " ", flush := true) -> int { return fprintln(os.stderr, ..args, sep=sep, flush=flush) }
+	// eprintf formats according to the specified format string and writes to os.stderr
+	eprintf   :: proc(fmt: string, args: ..any, flush := true) -> int { return fprintf(os.stderr, fmt, ..args, flush=flush) }
+	// eprintfln formats according to the specified format string and writes to os.stderr, followed by a newline.
+	eprintfln :: proc(fmt: string, args: ..any, flush := true) -> int { return fprintf(os.stderr, fmt, ..args, flush=flush, newline=true) }
+
+	print_custom_android :: proc(args: ..any, logPriority:android.LogPriority = .INFO, sep := " ") -> int {
 		_ = logPriority
 		return print(..args, sep = sep)
 	}

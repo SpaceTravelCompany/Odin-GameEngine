@@ -249,14 +249,14 @@ when library.is_android {
                         if auto_cast idx < count {
                             engine.pointer_down(auto_cast idx, pointer_poses[idx].x, pointer_poses[idx].y)
                         } else {
-                            fmt.printCustomAndroid("WARN OUT OF RANGE PointerDown:", idx, count, "\n", logPriority=.WARN)
+                            fmt.print_custom_android("WARN OUT OF RANGE PointerDown:", idx, count, "\n", logPriority=.WARN)
                         }
                     case .POINTER_UP:
                         idx := act.pointer_index
                         if auto_cast idx < count {
                             engine.pointer_up(auto_cast idx, pointer_poses[idx].x, pointer_poses[idx].y)
                         } else {
-                            fmt.printCustomAndroid("WARN OUT OF RANGE PointerUp:", idx, count, "\n", logPriority=.WARN)
+                            fmt.print_custom_android("WARN OUT OF RANGE PointerUp:", idx, count, "\n", logPriority=.WARN)
                         }
                 }
                 return 1
@@ -276,7 +276,7 @@ when library.is_android {
                             engine.key_down(transmute(engine.key_code)(key_code))
                         }
                     } else {
-                        fmt.printCustomAndroid("WARN OUT OF RANGE KeyDown: ", int(key_code), "\n", logPriority=.WARN, sep = "")
+                        fmt.print_custom_android("WARN OUT OF RANGE KeyDown: ", int(key_code), "\n", logPriority=.WARN, sep = "")
                         return 0
                     }
                 case .UP:
@@ -287,7 +287,7 @@ when library.is_android {
                         keys[int(key_code)] = false
                         engine.key_up(transmute(engine.key_code)(key_code))
                     } else {
-                        fmt.printCustomAndroid("WARN OUT OF RANGE KeyUp: ", int(key_code), "\n", logPriority=.WARN, sep = "")
+                        fmt.print_custom_android("WARN OUT OF RANGE KeyUp: ", int(key_code), "\n", logPriority=.WARN, sep = "")
                         return 0
                     }
                 case .MULTIPLE:
@@ -298,7 +298,7 @@ when library.is_android {
                             engine.key_up(transmute(engine.key_code)(key_code))
                         }
                     } else {
-                        fmt.printCustomAndroid("WARN OUT OF RANGE Key Multiple: ", int(key_code), "\n", logPriority=.WARN, sep = "")
+                        fmt.print_custom_android("WARN OUT OF RANGE Key Multiple: ", int(key_code), "\n", logPriority=.WARN, sep = "")
                         return 0
                     }
             }

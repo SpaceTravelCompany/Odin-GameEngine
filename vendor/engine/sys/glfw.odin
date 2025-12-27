@@ -233,7 +233,7 @@ glfw_system_init :: proc() {
             }
         } else {
             windows_platform.version = .Unknown
-            fmt.printCustomAndroid("WARN : unknown windows version\n", logPriority = .WARN)
+            fmt.print_custom_android("WARN : unknown windows version\n", logPriority = .WARN)
         }
 
          when is_log {
