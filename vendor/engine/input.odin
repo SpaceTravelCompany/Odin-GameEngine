@@ -17,11 +17,11 @@ import "core:debug/trace"
 import "vendor:glfw"
 import "core:sys/android"
 
-import "./graphics_api"
+import sys "./sys"
 
 
 when is_mobile {
-    KeyCode :: enum i32 {
+    key_code :: enum i32 {
         KEY_SPACE = auto_cast android.Keycode.SPACE,
         KEY_APOSTROPHE = auto_cast android.Keycode.APOSTROPHE,    /* ' */
         KEY_COMMA = auto_cast android.Keycode.COMMA,         /* , */
@@ -136,7 +136,7 @@ when is_mobile {
         KEY_MENU = auto_cast android.Keycode.MENU,
     }
 } else {
-    KeyCode :: enum i32 {
+    key_code :: enum i32 {
         KEY_SPACE = glfw.KEY_SPACE,
         KEY_APOSTROPHE = glfw.KEY_APOSTROPHE,    /* ' */
         KEY_COMMA = glfw.KEY_COMMA,         /* , */
@@ -274,65 +274,65 @@ when is_mobile {
 }
 
 
-LEFT_MOUSE_BUTTON_IDX :: 0
-MIDDLE_MOUSE_BUTTON_IDX :: 1
-RIGHT_MOUSE_BUTTON_IDX :: 2
+left_mouse_button_idx :: 0
+middle_mouse_button_idx :: 1
+right_mouse_button_idx :: 2
 
-KeyDown : #type proc (keycode:KeyCode) = proc (keycode:KeyCode) {}
-KeyUp : #type proc (keycode:KeyCode) = proc (keycode:KeyCode) {}
-KeyRepeat : #type proc (keycode:KeyCode) = proc (keycode:KeyCode) {}
-MouseButtonDown : #type proc (buttonIdx:int, x:f32, y:f32) = proc (buttonIdx:int, x:f32, y:f32) {}
-MouseButtonUp : #type proc (buttonIdx:int, x:f32, y:f32) = proc (buttonIdx:int, x:f32, y:f32) {}
-PointerDown : #type proc (pointerIdx:int, x:f32, y:f32) = proc (pointerIdx:int, x:f32, y:f32) {}
-PointerUp : #type proc (pointerIdx:int, x:f32, y:f32) = proc (pointerIdx:int, x:f32, y:f32) {}
-PointerMove : #type proc (pointerIdx:int, x:f32, y:f32) = proc (pointerIdx:int, x:f32, y:f32) {}
-MouseScroll : #type proc (dt:int) = proc (dt:int) {}
-MouseMove : #type proc (x:f32, y:f32) = proc (x:f32, y:f32) {}
-MouseIn : #type proc () = proc () {}
-MouseOut : #type proc () = proc () {}
+key_down : #type proc (keycode:key_code) = proc (keycode:key_code) {}
+key_up : #type proc (keycode:key_code) = proc (keycode:key_code) {}
+key_repeat : #type proc (keycode:key_code) = proc (keycode:key_code) {}
+mouse_button_down : #type proc (button_idx:int, x:f32, y:f32) = proc (button_idx:int, x:f32, y:f32) {}
+mouse_button_up : #type proc (button_idx:int, x:f32, y:f32) = proc (button_idx:int, x:f32, y:f32) {}
+pointer_down : #type proc (pointer_idx:int, x:f32, y:f32) = proc (pointer_idx:int, x:f32, y:f32) {}
+pointer_up : #type proc (pointer_idx:int, x:f32, y:f32) = proc (pointer_idx:int, x:f32, y:f32) {}
+pointer_move : #type proc (pointer_idx:int, x:f32, y:f32) = proc (pointer_idx:int, x:f32, y:f32) {}
+mouse_scroll : #type proc (dt:int) = proc (dt:int) {}
+mouse_move : #type proc (x:f32, y:f32) = proc (x:f32, y:f32) {}
+mouse_in : #type proc () = proc () {}
+mouse_out : #type proc () = proc () {}
 
-IsMouseOut :: proc "contextless" () -> bool {return graphics_api.isMouseOut}
-MousePos :: #force_inline proc "contextless" () -> linalg.PointF {
-    return graphics_api.mouse_pos
+is_mouse_out :: proc "contextless" () -> bool {return sys.is_mouse_out}
+mouse_pos :: #force_inline proc "contextless" () -> linalg.PointF {
+    return sys.mouse_pos
 }
 
-ConvertMousePos :: proc "contextless" (pos:linalg.PointF) -> linalg.PointF {
-    w := f32(WindowWidth()) / 2.0
-    h := f32(WindowHeight()) / 2.0
+convert_mouse_pos :: proc "contextless" (pos:linalg.PointF) -> linalg.PointF {
+    w := f32(window_width()) / 2.0
+    h := f32(window_height()) / 2.0
     return linalg.PointF{ pos.x - w, -pos.y + h }
 }
 
-GENERAL_INPUT_STATE :: struct {
+general_input_state :: struct {
     handle:rawptr,
-    leftTrigger:f32,
-    rightTrigger:f32,
-    leftThumb: linalg.PointF,
-    rightThumb: linalg.PointF,
-    buttons:GENERAL_INPUT_BUTTONS,
+    left_trigger:f32,
+    right_trigger:f32,
+    left_thumb: linalg.PointF,
+    right_thumb: linalg.PointF,
+    buttons:general_input_buttons,
 }
 
-GENERAL_INPUT_BUTTONS :: struct #packed {
+general_input_buttons :: struct #packed {
     a:bool,
     b:bool,
     x:bool,
     y:bool,
 
-    dpadUp:bool,
-    dpadDown:bool,
-    dpadLeft:bool,
-    dpadRight:bool,
+    dpad_up:bool,
+    dpad_down:bool,
+    dpad_left:bool,
+    dpad_right:bool,
 
     start:bool,
     back:bool,
 
-    leftThumb:bool,
-    rightThumb:bool,
+    left_thumb:bool,
+    right_thumb:bool,
 
-    leftShoulder:bool,
-    rightShoulder:bool,
+    left_shoulder:bool,
+    right_shoulder:bool,
 
-    volumeUp:bool,
-    volumeDown:bool,
+    volume_up:bool,
+    volume_down:bool,
 }
 
-GeneralInputCallBack : proc (state:GENERAL_INPUT_STATE) = proc (state:GENERAL_INPUT_STATE) {}
+general_input_callback : proc (state:general_input_state) = proc (state:general_input_state) {}

@@ -40,7 +40,7 @@ png_converter_size :: proc "contextless" (self:^png_converter) -> int {
 
 png_converter_deinit :: image_converter_deinit
 
-png_converter_load :: proc (self:^png_converter, data:[]byte, out_fmt:color_fmt, allocator := context.allocator) -> ([]byte, Png_Error) {
+png_converter_load :: proc (self:^png_converter, data:[]byte, out_fmt:color_fmt, allocator := context.allocator) -> ([]byte, png_error) {
     png_converter_deinit(self)
 
     err : image.Error = nil
@@ -62,12 +62,12 @@ png_converter_load :: proc (self:^png_converter, data:[]byte, out_fmt:color_fmt,
     return out_data, err
 }
 
-Png_Error :: union #shared_nil {
+png_error :: union #shared_nil {
     image.Error,
     os2.Error,
 }
 
-png_converter_load_file :: proc (self:^png_converter, file_path:string, out_fmt:color_fmt, allocator := context.allocator) -> ([]byte, Png_Error) {
+png_converter_load_file :: proc (self:^png_converter, file_path:string, out_fmt:color_fmt, allocator := context.allocator) -> ([]byte, png_error) {
     imgFileData:[]byte
     when is_android {
         imgFileReadErr : android.AssetFileError

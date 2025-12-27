@@ -9,127 +9,127 @@ import "core:math/linalg"
 import "base:intrinsics"
 import "base:runtime"
 import vk "vendor:vulkan"
-import graphics_api "./graphics_api"   
+import sys "./sys"   
 
-ShapeSrc :: struct {
-    //?vertexBuf, indexBuf에 checkInit: ICheckInit 있으므로 따로 필요없음
-    vertexBuf:__VertexBuf(geometry.ShapeVertex2D),
-    indexBuf:__IndexBuf,
+shape_src :: struct {
+    //?vertexBuf, indexBuf에 check_init: ICheckInit 있으므로 따로 필요없음
+    vertexBuf:__vertex_buf(geometry.shape_vertex2d),
+    indexBuf:__index_buf,
     rect:linalg.RectF,
 }
 
-Shape :: struct {
-    using object:IObject,
-    src: ^ShapeSrc,
+shape :: struct {
+    using object:iobject,
+    src: ^shape_src,
 }
 
-@private ShapeVTable :IObjectVTable = IObjectVTable{
-    Draw = auto_cast _Super_Shape_Draw,
-    Deinit = auto_cast _Super_Shape_Deinit,
+@private shape_vtable :iobject_vtable = iobject_vtable{
+    draw = auto_cast _super_shape_draw,
+    deinit = auto_cast _super_shape_deinit,
 }
 
 
-Shape_Init :: proc(self:^Shape, $actualType:typeid, src:^ShapeSrc, pos:linalg.Point3DF,
-camera:^Camera, projection:^Projection,  rotation:f32 = 0.0, scale:linalg.PointF = {1,1}, colorTransform:^ColorTransform = nil, pivot:linalg.PointF = {0.0, 0.0}, vtable:^IObjectVTable = nil)
- where intrinsics.type_is_subtype_of(actualType, Shape) {
+shape_init :: proc(self:^shape, $actualType:typeid, src:^shape_src, pos:linalg.Point3DF,
+camera:^camera, projection:^projection,  rotation:f32 = 0.0, scale:linalg.PointF = {1,1}, colorTransform:^color_transform = nil, pivot:linalg.PointF = {0.0, 0.0}, vtable:^iobject_vtable = nil)
+ where intrinsics.type_is_subtype_of(actualType, shape) {
     self.src = src
 
     self.set.bindings = __transformUniformPoolBinding[:]
     self.set.size = __transformUniformPoolSizes[:]
-    self.set.layout = vkShapeDescriptorSetLayout
+    self.set.layout = vkshapeDescriptorSetLayout
 
-    self.vtable = vtable == nil ? &ShapeVTable : vtable
-    if self.vtable.Draw == nil do self.vtable.Draw = auto_cast _Super_Shape_Draw
-    if self.vtable.Deinit == nil do self.vtable.Deinit = auto_cast _Super_Shape_Deinit
+    self.vtable = vtable == nil ? &shape_vtable : vtable
+    if self.vtable.draw == nil do self.vtable.draw = auto_cast _super_shape_draw
+    if self.vtable.deinit == nil do self.vtable.deinit = auto_cast _super_shape_deinit
 
-    if self.vtable.GetUniformResources == nil do self.vtable.GetUniformResources = auto_cast GetUniformResources_Shape
+    if self.vtable.get_uniform_resources == nil do self.vtable.get_uniform_resources = auto_cast get_uniform_resources_shape
 
-    IObject_Init(self, actualType, pos, rotation, scale, camera, projection, colorTransform, pivot)
+    iobject_init(self, actualType, pos, rotation, scale, camera, projection, colorTransform, pivot)
 }
 
-Shape_Init2 :: proc(self:^Shape, $actualType:typeid, src:^ShapeSrc,
-camera:^Camera, projection:^Projection, colorTransform:^ColorTransform = nil, vtable:^IObjectVTable = nil)
- where intrinsics.type_is_subtype_of(actualType, Shape) {
+shape_init2 :: proc(self:^shape, $actualType:typeid, src:^shape_src,
+camera:^camera, projection:^projection, colorTransform:^color_transform = nil, vtable:^iobject_vtable = nil)
+ where intrinsics.type_is_subtype_of(actualType, shape) {
     self.src = src
 
-    self.set.bindings = graphics_api.__transformUniformPoolBinding[:]
-    self.set.size = graphics_api.__transformUniformPoolSizes[:]
-    self.set.layout = graphics_api.ShapeDescriptorSetLayout
+    self.set.bindings = sys.__transform_uniform_pool_binding[:]
+    self.set.size = sys.__transform_uniform_pool_sizes[:]
+    self.set.layout = sys.shape_descriptor_set_layout
 
-    self.vtable = vtable == nil ? &ShapeVTable : vtable
-    if self.vtable.Draw == nil do self.vtable.Draw = auto_cast _Super_Shape_Draw
-    if self.vtable.Deinit == nil do self.vtable.Deinit = auto_cast _Super_Shape_Deinit
+    self.vtable = vtable == nil ? &shape_vtable : vtable
+    if self.vtable.draw == nil do self.vtable.draw = auto_cast _super_shape_draw
+    if self.vtable.deinit == nil do self.vtable.deinit = auto_cast _super_shape_deinit
 
-    if self.vtable.GetUniformResources == nil do self.vtable.GetUniformResources = auto_cast GetUniformResources_Default
+    if self.vtable.get_uniform_resources == nil do self.vtable.get_uniform_resources = auto_cast get_uniform_resources_default
 
-    IObject_Init2(self, actualType, camera, projection, colorTransform)
+    iobject_init2(self, actualType, camera, projection, colorTransform)
 }
 
-_Super_Shape_Deinit :: proc(self:^Shape) {
-    _Super_IObject_Deinit(auto_cast self)
+_super_shape_deinit :: proc(self:^shape) {
+    _super_iobject_deinit(auto_cast self)
 }
 
-Shape_UpdateSrc :: #force_inline proc "contextless" (self:^Shape, src:^ShapeSrc) {
-    mem.ICheckInit_Check(&self.checkInit)
+shape_update_src :: #force_inline proc "contextless" (self:^shape, src:^shape_src) {
+    mem.ICheckInit_Check(&self.check_init)
     self.src = src
 }
-Shape_GetSrc :: #force_inline proc "contextless" (self:^Shape) -> ^ShapeSrc {
-    mem.ICheckInit_Check(&self.checkInit)
+shape_get_src :: #force_inline proc "contextless" (self:^shape) -> ^shape_src {
+    mem.ICheckInit_Check(&self.check_init)
     return self.src
 }
-Shape_GetCamera :: #force_inline proc "contextless" (self:^Shape) -> ^Camera {
-    return IObject_GetCamera(self)
+shape_get_camera :: #force_inline proc "contextless" (self:^shape) -> ^camera {
+    return iobject_get_camera(self)
 }
-Shape_GetProjection :: #force_inline proc "contextless" (self:^Shape) -> ^Projection {
-    return IObject_GetProjection(self)
+shape_get_projection :: #force_inline proc "contextless" (self:^shape) -> ^projection {
+    return iobject_get_projection(self)
 }
-Shape_GetColorTransform :: #force_inline proc "contextless" (self:^Shape) -> ^ColorTransform {
-    return IObject_GetColorTransform(self)
+shape_get_color_transform :: #force_inline proc "contextless" (self:^shape) -> ^color_transform {
+    return iobject_get_color_transform(self)
 }
-Shape_UpdateTransform :: #force_inline proc(self:^Shape, pos:linalg.Point3DF, rotation:f32, scale:linalg.PointF = {1,1}, pivot:linalg.PointF = {0.0,0.0}) {
-    IObject_UpdateTransform(self, pos, rotation, scale, pivot)
+shape_update_transform :: #force_inline proc(self:^shape, pos:linalg.Point3DF, rotation:f32, scale:linalg.PointF = {1,1}, pivot:linalg.PointF = {0.0,0.0}) {
+    iobject_update_transform(self, pos, rotation, scale, pivot)
 }
-Shape_UpdateTransformMatrixRaw :: #force_inline proc(self:^Shape, _mat:linalg.Matrix) {
-    IObject_UpdateTransformMatrixRaw(self, _mat)
+shape_update_transform_matrix_raw :: #force_inline proc(self:^shape, _mat:linalg.Matrix) {
+    iobject_update_transform_matrix_raw(self, _mat)
 }
-Shape_ChangeColorTransform :: #force_inline proc(self:^Shape, colorTransform:^ColorTransform) {
-    IObject_ChangeColorTransform(self, colorTransform)
+shape_change_color_transform :: #force_inline proc(self:^shape, colorTransform:^color_transform) {
+    iobject_change_color_transform(self, colorTransform)
 }
-Shape_UpdateCamera :: #force_inline proc(self:^Shape, camera:^Camera) {
-    IObject_UpdateCamera(self, camera)
+shape_update_camera :: #force_inline proc(self:^shape, camera:^camera) {
+    iobject_update_camera(self, camera)
 }
-Shape_UpdateProjection :: #force_inline proc(self:^Shape, projection:^Projection) {
-    IObject_UpdateProjection(self, projection)
+shape_update_projection :: #force_inline proc(self:^shape, projection:^projection) {
+    iobject_update_projection(self, projection)
 }
 
-_Super_Shape_Draw :: proc (self:^Shape, cmd:graphics_api.CommandBuffer) {
-    mem.ICheckInit_Check(&self.checkInit)
+_super_shape_draw :: proc (self:^shape, cmd:sys.command_buffer) {
+    mem.ICheckInit_Check(&self.check_init)
 
-    graphics_api.graphics_cmd_bind_pipeline(cmd, .GRAPHICS, graphics_api.ShapePipeline)
-    graphics_api.graphics_cmd_bind_descriptor_sets(cmd, .GRAPHICS, graphics_api.ShapePipelineLayout, 0, 1,
+    sys.graphics_cmd_bind_pipeline(cmd, .GRAPHICS, sys.shape_pipeline)
+    sys.graphics_cmd_bind_descriptor_sets(cmd, .GRAPHICS, sys.shape_pipeline_layout, 0, 1,
         &([]vk.DescriptorSet{self.set.__set})[0], 0, nil)
 
     offsets: vk.DeviceSize = 0
-    graphics_api.graphics_cmd_bind_vertex_buffers(cmd, 0, 1, &self.src.vertexBuf.buf.__resource, &offsets)
-    graphics_api.graphics_cmd_bind_index_buffer(cmd, self.src.indexBuf.buf.__resource, 0, .UINT32)
+    sys.graphics_cmd_bind_vertex_buffers(cmd, 0, 1, &self.src.vertexBuf.buf.__resource, &offsets)
+    sys.graphics_cmd_bind_index_buffer(cmd, self.src.indexBuf.buf.__resource, 0, .UINT32)
 
-    graphics_api.graphics_cmd_draw_indexed(cmd, auto_cast (self.src.indexBuf.buf.option.len / size_of(u32)), 1, 0, 0, 0)
+    sys.graphics_cmd_draw_indexed(cmd, auto_cast (self.src.indexBuf.buf.option.len / size_of(u32)), 1, 0, 0, 0)
 }
 
-ShapeSrc_InitRaw :: proc(self:^ShapeSrc, raw:^geometry.RawShape, flag:graphics_api.ResourceUsage = .GPU, colorFlag:graphics_api.ResourceUsage = .CPU) {
-    rawC := geometry.RawShape_Clone(raw, graphics_api.engineDefAllocator)
-    __VertexBuf_Init(&self.vertexBuf, rawC.vertices, flag)
-    __IndexBuf_Init(&self.indexBuf, rawC.indices, flag)
+shape_src_init_raw :: proc(self:^shape_src, raw:^geometry.raw_shape, flag:sys.resource_usage = .GPU, colorFlag:sys.resource_usage = .CPU) {
+    rawC := geometry.raw_shape_clone(raw, sys.engine_def_allocator)
+    __vertex_buf_init(&self.vertexBuf, rawC.vertices, flag)
+    __index_buf_init(&self.indexBuf, rawC.indices, flag)
     self.rect = rawC.rect
 }
 
-@require_results ShapeSrc_Init :: proc(self:^ShapeSrc, shapes:^geometry.Shapes, flag:graphics_api.ResourceUsage = .GPU, colorFlag:graphics_api.ResourceUsage = .CPU) -> (err:geometry.ShapesError = .None) {
-    raw : ^geometry.RawShape
-    raw, err = geometry.Shapes_ComputePolygon(shapes, graphics_api.engineDefAllocator)
+@require_results shape_src_init :: proc(self:^shape_src, shapes:^geometry.shapes, flag:sys.resource_usage = .GPU, colorFlag:sys.resource_usage = .CPU) -> (err:geometry.shape_error = .None) {
+    raw : ^geometry.raw_shape
+    raw, err = geometry.shapes_compute_polygon(shapes, sys.engine_def_allocator)
     if err != .None do return
 
-    __VertexBuf_Init(&self.vertexBuf, raw.vertices, flag)
-    __IndexBuf_Init(&self.indexBuf, raw.indices, flag)
+    __vertex_buf_init(&self.vertexBuf, raw.vertices, flag)
+    __index_buf_init(&self.indexBuf, raw.indices, flag)
 
     self.rect = raw.rect
 
@@ -137,34 +137,34 @@ ShapeSrc_InitRaw :: proc(self:^ShapeSrc, raw:^geometry.RawShape, flag:graphics_a
     return
 }
 
-ShapeSrc_UpdateRaw :: proc(self:^ShapeSrc, raw:^geometry.RawShape) {
-    rawC := geometry.RawShape_Clone(raw, graphics_api.engineDefAllocator)
-    __VertexBuf_Update(&self.vertexBuf, rawC.vertices)
-    __IndexBuf_Update(&self.indexBuf, rawC.indices)
+shape_src_update_raw :: proc(self:^shape_src, raw:^geometry.raw_shape) {
+    rawC := geometry.raw_shape_clone(raw, sys.engine_def_allocator)
+    __vertex_buf_update(&self.vertexBuf, rawC.vertices)
+    __index_buf_update(&self.indexBuf, rawC.indices)
 
     defer free(rawC)
 }
 
-@require_results ShapeSrc_Update :: proc(self:^ShapeSrc, shapes:^geometry.Shapes) -> (err:geometry.ShapesError = .None) {
-    raw : ^geometry.RawShape
-    raw, err = geometry.Shapes_ComputePolygon(shapes, graphics_api.engineDefAllocator)
+@require_results shape_src_update :: proc(self:^shape_src, shapes:^geometry.shapes) -> (err:geometry.shape_error = .None) {
+    raw : ^geometry.raw_shape
+    raw, err = geometry.shapes_compute_polygon(shapes, sys.engine_def_allocator)
     if err != .None do return
 
-    __VertexBuf_Update(&self.vertexBuf, raw.vertices)
-    __IndexBuf_Update(&self.indexBuf, raw.indices)
+    __vertex_buf_update(&self.vertexBuf, raw.vertices)
+    __index_buf_update(&self.indexBuf, raw.indices)
 
     defer free(raw)
     return
 }
 
-ShapeSrc_Deinit :: proc(self:^ShapeSrc) {
-    __VertexBuf_Deinit(&self.vertexBuf)
-    __IndexBuf_Deinit(&self.indexBuf)
+shape_src_deinit :: proc(self:^shape_src) {
+    __vertex_buf_deinit(&self.vertexBuf)
+    __index_buf_deinit(&self.indexBuf)
 }
 
 
-ShapeSrc_IsInited :: proc "contextless" (self:^ShapeSrc) -> bool {
-    return mem.ICheckInit_IsInited(&self.vertexBuf.checkInit)
+shape_src_is_inited :: proc "contextless" (self:^shape_src) -> bool {
+    return mem.ICheckInit_IsInited(&self.vertexBuf.check_init)
 }
 
 

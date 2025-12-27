@@ -1,4 +1,4 @@
-package graphics_api 
+package sys 
 
 import "base:library"
 import "core:sys/android"
@@ -17,29 +17,29 @@ import "../"
 
 when library.is_android {
     @(private="file") app : ^android.android_app
-    @(private="file") appInited := false
+    @(private="file") app_inited := false
 
     //must call start
-    __android_SetApp :: proc "contextless" (_app : ^android.android_app) {
+    __android_set_app :: proc "contextless" (_app : ^android.android_app) {
         app = _app
     }
  
-    android_GetAssetManager :: proc "contextless" () -> ^android.AAssetManager {
+    android_get_asset_manager :: proc "contextless" () -> ^android.AAssetManager {
         return app.activity.assetManager
     }
-    android_GetDeviceWidth :: proc "contextless" () -> u32 {
+    android_get_device_width :: proc "contextless" () -> u32 {
         return auto_cast max(0, android.ANativeWindow_getWidth(app.window))
     }
-    android_GetDeviceHeight :: proc "contextless" () -> u32 {
+    android_get_device_height :: proc "contextless" () -> u32 {
         return auto_cast max(0, android.ANativeWindow_getHeight(app.window))
     }
-    // android_GetCacheDir :: proc "contextless" () -> string {
+    // android_get_cache_dir :: proc "contextless" () -> string {
     //     return app.cacheDir
     // }
-    android_GetInternalDataPath :: proc "contextless" () -> string {
+    android_get_internal_data_path :: proc "contextless" () -> string {
         return string(app.activity.internalDataPath)
     }
-    android_PrintCurrentConfig :: proc () {
+    android_print_current_config :: proc () {
         lang:[2]u8
         country:[2]u8
 
@@ -68,71 +68,71 @@ when library.is_android {
         )
     }
 
-    vulkanAndroidStart :: proc "contextless" () {
-        if vkSurface != 0 {
-            vk.DestroySurfaceKHR(vkInstance, vkSurface, nil)
+    vulkan_android_start :: proc "contextless" () {
+        if vk_surface != 0 {
+            vk.DestroySurfaceKHR(vk_instance, vk_surface, nil)
         }
-        androidSurfaceCreateInfo : vk.AndroidSurfaceCreateInfoKHR = {
+        android_surface_create_info : vk.AndroidSurfaceCreateInfoKHR = {
             sType = vk.StructureType.ANDROID_SURFACE_CREATE_INFO_KHR,
             window = app.window,
         }
-        res := vk.CreateAndroidSurfaceKHR(vkInstance, &androidSurfaceCreateInfo, nil, &vkSurface)
+        res := vk.CreateAndroidSurfaceKHR(vk_instance, &android_surface_create_info, nil, &vk_surface)
         if res != .SUCCESS {
             trace.panic_log(res)
         }
     }
-    @(private="file") inputState:engine.GENERAL_INPUT_STATE
+    @(private="file") input_state:engine.general_input_state
 
-    @(private="file") freeSavedState :: proc "contextless" () {
+    @(private="file") free_saved_state :: proc "contextless" () {
         //TODO (xfitgd)
     }
-    @(private="file") handleInputButtons :: proc (evt : ^android.AInputEvent, keyCode:android.Keycode, upDown:bool) -> bool {
-        #partial switch keyCode {
+    @(private="file") handle_input_buttons :: proc (evt : ^android.AInputEvent, key_code:android.Keycode, up_down:bool) -> bool {
+        #partial switch key_code {
             case .BUTTON_A:
-                if upDown && inputState.buttons.a do return false //already set
-                inputState.buttons.a = upDown
+                if up_down && input_state.buttons.a do return false //already set
+                input_state.buttons.a = up_down
             case .BUTTON_B:
-                if upDown && inputState.buttons.b do return false
-                inputState.buttons.b = upDown
+                if up_down && input_state.buttons.b do return false
+                input_state.buttons.b = up_down
             case .BUTTON_X:
-                if upDown && inputState.buttons.x do return false
-                inputState.buttons.x = upDown
+                if up_down && input_state.buttons.x do return false
+                input_state.buttons.x = up_down
             case .BUTTON_Y:
-                if upDown && inputState.buttons.y do return false
-                inputState.buttons.y = upDown
+                if up_down && input_state.buttons.y do return false
+                input_state.buttons.y = up_down
             case .BUTTON_START:
-                if upDown && inputState.buttons.start do return false
-                inputState.buttons.start = upDown
+                if up_down && input_state.buttons.start do return false
+                input_state.buttons.start = up_down
             case .BUTTON_SELECT:
-                if upDown && inputState.buttons.back do return false
-                inputState.buttons.back = upDown
+                if up_down && input_state.buttons.back do return false
+                input_state.buttons.back = up_down
             case .BUTTON_L1:
-                if upDown && inputState.buttons.leftShoulder do return false
-                inputState.buttons.leftShoulder = upDown
+                if up_down && input_state.buttons.left_shoulder do return false
+                input_state.buttons.left_shoulder = up_down
             case .BUTTON_R1:
-                if upDown && inputState.buttons.rightShoulder do return false
-                inputState.buttons.rightShoulder = upDown
+                if up_down && input_state.buttons.right_shoulder do return false
+                input_state.buttons.right_shoulder = up_down
             case .BUTTON_THUMBL:
-                if upDown && inputState.buttons.leftThumb do return false
-                inputState.buttons.leftThumb = upDown
+                if up_down && input_state.buttons.left_thumb do return false
+                input_state.buttons.left_thumb = up_down
             case .BUTTON_THUMBR:
-                if upDown && inputState.buttons.rightThumb do return false
-                inputState.buttons.rightThumb = upDown
+                if up_down && input_state.buttons.right_thumb do return false
+                input_state.buttons.right_thumb = up_down
             case .VOLUME_UP:
-                if upDown && inputState.buttons.volumeUp do return false
-                inputState.buttons.volumeUp = upDown
+                if up_down && input_state.buttons.volume_up do return false
+                input_state.buttons.volume_up = up_down
             case .VOLUME_DOWN:
-                if upDown && inputState.buttons.volumeDown do return false
-                inputState.buttons.volumeDown = upDown
+                if up_down && input_state.buttons.volume_down do return false
+                input_state.buttons.volume_down = up_down
             case:
                 return false
         }
 
-        inputState.handle = transmute(rawptr)(int(android.AInputEvent_getDeviceId(evt)))
-        engine.GeneralInputCallBack(inputState)
+        input_state.handle = transmute(rawptr)(int(android.AInputEvent_getDeviceId(evt)))
+        engine.general_input_callback(input_state)
         return true
     }
-    @(private="file") handleInput :: proc "c" (app:^android.android_app, evt : ^android.AInputEvent) -> c.int {
+    @(private="file") handle_input :: proc "c" (app:^android.android_app, evt : ^android.AInputEvent) -> c.int {
         MAX_POINTERS :: 20
         @static pointer_poses:[MAX_POINTERS]linalg.PointF
 
@@ -157,33 +157,33 @@ when library.is_android {
                 rz := android.AMotionEvent_getAxisValue(evt, android.MotionEventAxis.RZ, 0)
 
                 if xAxis == -1.0 {
-                    inputState.buttons.dpadLeft = true
-                    inputState.buttons.dpadRight = false
+                    input_state.buttons.dpad_left = true
+                    input_state.buttons.dpad_right = false
                 } else if xAxis == 1.0 {
-                    inputState.buttons.dpadLeft = false
-                    inputState.buttons.dpadRight = true
+                    input_state.buttons.dpad_left = false
+                    input_state.buttons.dpad_right = true
                 } else {
-                    inputState.buttons.dpadLeft = false
-                    inputState.buttons.dpadRight = false
+                    input_state.buttons.dpad_left = false
+                    input_state.buttons.dpad_right = false
                 }
                 if yAxis == -1.0 {
-                    inputState.buttons.dpadUp = true
-                    inputState.buttons.dpadDown = false
+                    input_state.buttons.dpad_up = true
+                    input_state.buttons.dpad_down = false
                 } else if yAxis == 1.0 {
-                    inputState.buttons.dpadUp = false
-                    inputState.buttons.dpadDown = true
+                    input_state.buttons.dpad_up = false
+                    input_state.buttons.dpad_down = true
                 } else {
-                    inputState.buttons.dpadUp = false
-                    inputState.buttons.dpadDown = false
+                    input_state.buttons.dpad_up = false
+                    input_state.buttons.dpad_down = false
                 }
 
-                inputState.leftTrigger = leftTrigger
-                inputState.rightTrigger = rightTrigger
-                inputState.leftThumb = linalg.PointF{x, y}
-                inputState.rightThumb = linalg.PointF{z, rz}
+                input_state.left_trigger = leftTrigger
+                input_state.right_trigger = rightTrigger
+                input_state.left_thumb = linalg.PointF{x, y}
+                input_state.right_thumb = linalg.PointF{z, rz}
 
-                inputState.handle = transmute(rawptr)(int(android.AInputEvent_getDeviceId(evt)))
-                engine.GeneralInputCallBack(inputState)
+                input_state.handle = transmute(rawptr)(int(android.AInputEvent_getDeviceId(evt)))
+                engine.general_input_callback(input_state)
             } else {
                 count:uint
                 act := android.AMotionEvent_getAction(evt)
@@ -191,24 +191,24 @@ when library.is_android {
                 if toolType == .MOUSE {
                     count = 1
                     mm := linalg.PointF{android.AMotionEvent_getX(evt, 0), android.AMotionEvent_getY(evt, 0)}
-                    mm = engine.ConvertMousePos(mm)
+                    mm = engine.convert_mouse_pos(mm)
                     mouse_pos = mm
 
                     #partial switch act.action {
                         case .DOWN:
-                            isPrimary := android.AMotionEvent_getAxisValue(evt, android.MotionEventAxis.PRESSURE, 0) == 1.0
-                            engine.MouseButtonDown(isPrimary ? 0 : 1, mm.x, mm.y)
+                            is_primary := android.AMotionEvent_getAxisValue(evt, android.MotionEventAxis.PRESSURE, 0) == 1.0
+                            engine.mouse_button_down(is_primary ? 0 : 1, mm.x, mm.y)
                         case .UP:
-                            isPrimary := android.AMotionEvent_getAxisValue(evt, android.MotionEventAxis.PRESSURE, 0) == 1.0
-                            engine.MouseButtonUp(isPrimary ? 0 : 1, mm.x, mm.y)
+                            is_primary := android.AMotionEvent_getAxisValue(evt, android.MotionEventAxis.PRESSURE, 0) == 1.0
+                            engine.mouse_button_up(is_primary ? 0 : 1, mm.x, mm.y)
                         case .SCROLL:
                             //TODO (xfitgd) HSCROLL
                             dt := int(android.AMotionEvent_getAxisValue(evt, android.MotionEventAxis.VSCROLL, 0) * 100.0)
-                            engine.MouseScroll(dt)
+                            engine.mouse_scroll(dt)
                         case .MOVE:
                             if mm.x != pointer_poses[0].x || mm.y != pointer_poses[0].y {
                                 pointer_poses[0] = mm
-                                engine.MouseMove(mm.x, mm.y)
+                                engine.mouse_move(mm.x, mm.y)
                             }
                     }
                     return 1
@@ -221,40 +221,40 @@ when library.is_android {
                 if act.action == .MOVE {
                     for i in 0 ..< count {
                         pt := linalg.PointF{android.AMotionEvent_getX(evt, i), android.AMotionEvent_getY(evt, i)}
-                        pt = engine.ConvertMousePos(pt)
+                        pt = engine.convert_mouse_pos(pt)
 
                         if pt.x != pointer_poses[i].x || pt.y != pointer_poses[i].y {
                             pointer_poses[i] = pt
                             if i == 0 {
                                 mouse_pos = pt
                             }
-                            engine.PointerMove(int(i), pt.x, pt.y)
+                            engine.pointer_move(int(i), pt.x, pt.y)
                         }
                     }
                 } else {
                     for i in 0 ..< count {
                         pointer_poses[i] = linalg.PointF{android.AMotionEvent_getX(evt, i), android.AMotionEvent_getY(evt, i)}
-                        pointer_poses[i] = engine.ConvertMousePos(pointer_poses[i])
+                        pointer_poses[i] = engine.convert_mouse_pos(pointer_poses[i])
                     }
                     mouse_pos = pointer_poses[0]
                 }
 
                 #partial switch act.action {
                     case .DOWN:
-                        engine.PointerDown(0, pointer_poses[0].x, pointer_poses[0].y)
+                        engine.pointer_down(0, pointer_poses[0].x, pointer_poses[0].y)
                     case .UP:
-                        engine.PointerUp(0, pointer_poses[0].x, pointer_poses[0].y)
+                        engine.pointer_up(0, pointer_poses[0].x, pointer_poses[0].y)
                     case .POINTER_DOWN:
                         idx := act.pointer_index
                         if auto_cast idx < count {
-                            engine.PointerDown(auto_cast idx, pointer_poses[idx].x, pointer_poses[idx].y)
+                            engine.pointer_down(auto_cast idx, pointer_poses[idx].x, pointer_poses[idx].y)
                         } else {
                             fmt.printCustomAndroid("WARN OUT OF RANGE PointerDown:", idx, count, "\n", logPriority=.WARN)
                         }
                     case .POINTER_UP:
                         idx := act.pointer_index
                         if auto_cast idx < count {
-                            engine.PointerUp(auto_cast idx, pointer_poses[idx].x, pointer_poses[idx].y)
+                            engine.pointer_up(auto_cast idx, pointer_poses[idx].x, pointer_poses[idx].y)
                         } else {
                             fmt.printCustomAndroid("WARN OUT OF RANGE PointerUp:", idx, count, "\n", logPriority=.WARN)
                         }
@@ -262,43 +262,43 @@ when library.is_android {
                 return 1
             }
         } else if type == .KEY {
-            keyCode := android.AKeyEvent_getKeyCode(evt)
+            key_code := android.AKeyEvent_getKeyCode(evt)
             act := android.AKeyEvent_getAction(evt)
 
             switch act {
                 case .DOWN:
                     if .JOYSTICK in transmute(android.InputSourceDevice)(src.device) || .GAMEPAD in transmute(android.InputSourceDevice)(src.device) {
-                        if handleInputButtons(evt, keyCode, true) do return 1
+                        if handle_input_buttons(evt, key_code, true) do return 1
                     }
-                    if int(keyCode) < KEY_SIZE {
-                        if !keys[int(keyCode)] {
-                            keys[int(keyCode)] = true
-                            engine.KeyDown(transmute(engine.KeyCode)(keyCode))
+                    if int(key_code) < key_size {
+                        if !keys[int(key_code)] {
+                            keys[int(key_code)] = true
+                            engine.key_down(transmute(engine.key_code)(key_code))
                         }
                     } else {
-                        fmt.printCustomAndroid("WARN OUT OF RANGE KeyDown: ", int(keyCode), "\n", logPriority=.WARN, sep = "")
+                        fmt.printCustomAndroid("WARN OUT OF RANGE KeyDown: ", int(key_code), "\n", logPriority=.WARN, sep = "")
                         return 0
                     }
                 case .UP:
                     if .JOYSTICK in transmute(android.InputSourceDevice)(src.device) || .GAMEPAD in transmute(android.InputSourceDevice)(src.device) {
-                        if handleInputButtons(evt, keyCode, false) do return 1
+                        if handle_input_buttons(evt, key_code, false) do return 1
                     }
-                    if int(keyCode) < KEY_SIZE {
-                        keys[int(keyCode)] = false
-                        engine.KeyUp(transmute(engine.KeyCode)(keyCode))
+                    if int(key_code) < key_size {
+                        keys[int(key_code)] = false
+                        engine.key_up(transmute(engine.key_code)(key_code))
                     } else {
-                        fmt.printCustomAndroid("WARN OUT OF RANGE KeyUp: ", int(keyCode), "\n", logPriority=.WARN, sep = "")
+                        fmt.printCustomAndroid("WARN OUT OF RANGE KeyUp: ", int(key_code), "\n", logPriority=.WARN, sep = "")
                         return 0
                     }
                 case .MULTIPLE:
-                    if int(keyCode) < KEY_SIZE {
+                    if int(key_code) < key_size {
                         cnt := android.AKeyEvent_getRepeatCount(evt)
                         for i in 0 ..< cnt {
-                            engine.KeyDown(transmute(engine.KeyCode)(keyCode))
-                            engine.KeyUp(transmute(engine.KeyCode)(keyCode))
+                            engine.key_down(transmute(engine.key_code)(key_code))
+                            engine.key_up(transmute(engine.key_code)(key_code))
                         }
                     } else {
-                        fmt.printCustomAndroid("WARN OUT OF RANGE Key Multiple: ", int(keyCode), "\n", logPriority=.WARN, sep = "")
+                        fmt.printCustomAndroid("WARN OUT OF RANGE Key Multiple: ", int(key_code), "\n", logPriority=.WARN, sep = "")
                         return 0
                     }
             }
@@ -307,23 +307,23 @@ when library.is_android {
         }
         return 0
     }
-    @(private="file") handleCmd :: proc "c" (app:^android.android_app, cmd : android.AppCmd) {
+    @(private="file") handle_cmd :: proc "c" (app:^android.android_app, cmd : android.AppCmd) {
         #partial switch cmd {
             case .SAVE_STATE:
                 //TODO (xfitgd)
             case .INIT_WINDOW:
                 if app.window != nil {
-                    if !appInited {
+                    if !app_inited {
                         context = runtime.default_context()
                         graphics_init()
 
-                        __windowWidth = int(vkExtent.width)
-		                __windowHeight = int(vkExtent.height)
+                        __window_width = int(vk_extent.width)
+		                __window_height = int(vk_extent.height)
 
-		                engine.Init()
-                        appInited = true
+		                engine.init()
+                        app_inited = true
                     } else {
-                        sizeUpdated = true
+                        size_updated = true
                     }
                 }
             case .TERM_WINDOW:
@@ -331,28 +331,28 @@ when library.is_android {
             case .GAINED_FOCUS:
                 paused = false
                 activated = false
-                engine.Activate()
+                engine.activate()
             case .LOST_FOCUS:
                 paused = true
                 activated = true
-                engine.Activate()
+                engine.activate()
             case .WINDOW_RESIZED:
-                sync.mutex_lock(&fullScreenMtx)
-                defer sync.mutex_unlock(&fullScreenMtx)
+                sync.mutex_lock(&full_screen_mtx)
+                defer sync.mutex_unlock(&full_screen_mtx)
 
                 prop : vk.SurfaceCapabilitiesKHR
-                res := vk.GetPhysicalDeviceSurfaceCapabilitiesKHR(vkPhysicalDevice, vkSurface, &prop)
+                res := vk.GetPhysicalDeviceSurfaceCapabilitiesKHR(vk_physical_device, vk_surface, &prop)
                 if res != .SUCCESS do trace.panic_log(res)
-                if prop.currentExtent.width != vkExtent.width || prop.currentExtent.height != vkExtent.height {
-                    sizeUpdated = true
+                if prop.currentExtent.width != vk_extent.width || prop.currentExtent.height != vk_extent.height {
+                    size_updated = true
                 }
         }
     }
 
-    androidStart :: proc () {
+    android_start :: proc () {
         app.userData = nil
-        app.onAppCmd = handleCmd
-        app.onInputEvent = handleInput
+        app.onAppCmd = handle_cmd
+        app.onInputEvent = handle_input
 
         for {
             events: i32
@@ -366,18 +366,18 @@ when library.is_android {
 
                 if app.destroyRequested != 0 {
                     graphics_wait_device_idle()
-                    engine.Destroy()
+                    engine.destroy()
                     graphics_destroy()
-                    engine.systemDestroy()
-                    engine.systemAfterDestroy()
+                    engine.system_destroy()
+                    system_after_destroy()
                     return
                 }
 
                 ident = android.ALooper_pollAll(!paused ? 0 : -1, nil, &events, cast(^rawptr)&source)
             }
 
-            if (!paused && appInited) {
-                RenderLoop()
+            if (!paused && app_inited) {
+                render_loop()
             }
         }
     }

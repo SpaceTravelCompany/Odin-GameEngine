@@ -7,92 +7,92 @@ import "core:debug/trace"
 import "base:intrinsics"
 import "base:runtime"
 
-@(private = "file") Sound_private :: struct #packed {
+@(private = "file") sound_private :: struct #packed {
     __miniaudio_sound:miniaudio.sound,
     __miniaudio_audioBuf:miniaudio.audio_buffer,
     __inited:bool
 }
 
-SoundError :: miniaudio.result
+sound_error :: miniaudio.result
 
-Sound :: struct {
-    src:^SoundSrc,
-   __private : Sound_private,
+sound :: struct {
+    src:^sound_src,
+   __private : sound_private,
 }
 
-SoundFormat::miniaudio.format
+sound_format::miniaudio.format
 
-SoundSrc :: struct {
-    format:SoundFormat,
+sound_src :: struct {
+    format:sound_format,
     channels:u32,
-    sampleRate:u32,
-    sizeInFrames:u64,
-    decoderConfig:miniaudio.decoder_config,
+    sample_rate:u32,
+    size_in_frames:u64,
+    decoder_config:miniaudio.decoder_config,
     decoder:miniaudio.decoder
 }
 
 @(private = "file") miniaudio_engine:miniaudio.engine
 
-@(private = "file") miniaudio_pCustomBackendVTables:[2]^miniaudio.decoding_backend_vtable
-@(private = "file") miniaudio_pCustomBackendVTables2:[2]^miniaudio.decoding_backend_vtable
-@(private = "file") miniaudio_resourceManager:miniaudio.resource_manager
-@(private = "file") miniaudio_resourceManagerConfig:miniaudio.resource_manager_config
-@(private = "file") miniaudio_engineConfig:miniaudio.engine_config
+@(private = "file") miniaudio_p_custom_backend_v_tables:[2]^miniaudio.decoding_backend_vtable
+@(private = "file") miniaudio_p_custom_backend_v_tables2:[2]^miniaudio.decoding_backend_vtable
+@(private = "file") miniaudio_resource_manager:miniaudio.resource_manager
+@(private = "file") miniaudio_resource_manager_config:miniaudio.resource_manager_config
+@(private = "file") miniaudio_engine_config:miniaudio.engine_config
 
-@(private = "file") gSoundsMtx:sync.Mutex
-@(private = "file") gEndSoundsMtx:sync.Mutex
-@(private = "file") gSema:sync.Sema
-@(private = "file") gThread:^thread.Thread
+@(private = "file") g_sounds_mtx:sync.Mutex
+@(private = "file") g_end_sounds_mtx:sync.Mutex
+@(private = "file") g_sema:sync.Sema
+@(private = "file") g_thread:^thread.Thread
 
 @(private = "file") started:bool = false
 
-@(private = "file") gEndSounds:[dynamic]^Sound
-@(private = "file") gSounds:map[^Sound]^Sound
+@(private = "file") g_end_sounds:[dynamic]^sound
+@(private = "file") g_sounds:map[^sound]^sound
 
 @private g_init :: proc() {
-    gSounds = make(map[^Sound]^Sound)
-    gEndSounds = make([dynamic]^Sound)
+    g_sounds = make(map[^sound]^sound)
+    g_end_sounds = make([dynamic]^sound)
 
-    miniaudio_resourceManagerConfig = miniaudio.resource_manager_config_init()
-    miniaudio_pCustomBackendVTables[0] = miniaudio.ma_decoding_backend_libvorbis
-    miniaudio_pCustomBackendVTables[1] = miniaudio.ma_decoding_backend_libopus
-    miniaudio_pCustomBackendVTables2[0] = miniaudio.ma_decoding_backend_libvorbis
-    miniaudio_pCustomBackendVTables2[1] = miniaudio.ma_decoding_backend_libopus
+    miniaudio_resource_manager_config = miniaudio.resource_manager_config_init()
+    miniaudio_p_custom_backend_v_tables[0] = miniaudio.ma_decoding_backend_libvorbis
+    miniaudio_p_custom_backend_v_tables[1] = miniaudio.ma_decoding_backend_libopus
+    miniaudio_p_custom_backend_v_tables2[0] = miniaudio.ma_decoding_backend_libvorbis
+    miniaudio_p_custom_backend_v_tables2[1] = miniaudio.ma_decoding_backend_libopus
 
-    miniaudio_resourceManagerConfig.ppCustomDecodingBackendVTables = &miniaudio_pCustomBackendVTables[0]
-    miniaudio_resourceManagerConfig.customDecodingBackendCount = 2
-    miniaudio_resourceManagerConfig.pCustomDecodingBackendUserData = nil
+    miniaudio_resource_manager_config.ppCustomDecodingBackendVTables = &miniaudio_p_custom_backend_v_tables[0]
+    miniaudio_resource_manager_config.customDecodingBackendCount = 2
+    miniaudio_resource_manager_config.pCustomDecodingBackendUserData = nil
 
-    res := miniaudio.resource_manager_init(&miniaudio_resourceManagerConfig, &miniaudio_resourceManager)
+    res := miniaudio.resource_manager_init(&miniaudio_resource_manager_config, &miniaudio_resource_manager)
     if res != .SUCCESS do trace.panic_log("miniaudio.resource_manager_init : ", res)
 
-    miniaudio_engineConfig = miniaudio.engine_config_init()
-    miniaudio_engineConfig.pResourceManager = &miniaudio_resourceManager
+    miniaudio_engine_config = miniaudio.engine_config_init()
+    miniaudio_engine_config.pResourceManager = &miniaudio_resource_manager
     
     
-    res = miniaudio.engine_init(&miniaudio_engineConfig, &miniaudio_engine)
+    res = miniaudio.engine_init(&miniaudio_engine_config, &miniaudio_engine)
     if res != .SUCCESS do trace.panic_log("miniaudio.engine_init : ", res)
 
     started = true
-    gThread = thread.create(Callback)
-    thread.start(gThread)
+    g_thread = thread.create(callback)
+    thread.start(g_thread)
 }
 
-@(private = "file") Callback :: proc(_: ^thread.Thread) {
+@(private = "file") callback :: proc(_: ^thread.Thread) {
     for intrinsics.atomic_load_explicit(&started, .Acquire) {
-        sync.sema_wait(&gSema)
+        sync.sema_wait(&g_sema)
         if !intrinsics.atomic_load_explicit(&started, .Acquire) do break
 
-        this : ^Sound = nil
-        sync.mutex_lock(&gEndSoundsMtx)
-        if len(gEndSounds) > 0 {
-            this = pop(&gEndSounds)
+        this : ^sound = nil
+        sync.mutex_lock(&g_end_sounds_mtx)
+        if len(g_end_sounds) > 0 {
+            this = pop(&g_end_sounds)
         }
-        sync.mutex_unlock(&gEndSoundsMtx)
+        sync.mutex_unlock(&g_end_sounds_mtx)
 
         if this != nil {
-            sync.mutex_lock(&gSoundsMtx)
-            defer sync.mutex_unlock(&gSoundsMtx)
+            sync.mutex_lock(&g_sounds_mtx)
+            defer sync.mutex_unlock(&g_sounds_mtx)
             if !miniaudio.sound_is_looping(&this.__private.__miniaudio_sound) {
                 deinit2(this)
             }
@@ -100,66 +100,66 @@ SoundSrc :: struct {
     }
 }
 
-Sound_Deinit :: proc(self:^Sound) {
-    sync.mutex_lock(&gSoundsMtx)
-    defer sync.mutex_unlock(&gSoundsMtx)
+sound_deinit :: proc(self:^sound) {
+    sync.mutex_lock(&g_sounds_mtx)
+    defer sync.mutex_unlock(&g_sounds_mtx)
     deinit2(self)
 }
-@(private = "file") deinit2 :: proc(self:^Sound) {
+@(private = "file") deinit2 :: proc(self:^sound) {
     if !self.__private.__inited do return
     miniaudio.sound_uninit(&self.__private.__miniaudio_sound)
     miniaudio.audio_buffer_uninit(&self.__private.__miniaudio_audioBuf)
     free(self)
-    if intrinsics.atomic_load_explicit(&started, .Acquire) do delete_key(&gSounds, self)
+    if intrinsics.atomic_load_explicit(&started, .Acquire) do delete_key(&g_sounds, self)
 }
 
-@(private = "file") EndCallback :: proc "c" (userdata:rawptr, _:^miniaudio.sound) {
-    self := cast(^Sound)(userdata)
+@(private = "file") end_callback :: proc "c" (userdata:rawptr, _:^miniaudio.sound) {
+    self := cast(^sound)(userdata)
 
     context = runtime.default_context()
-    sync.mutex_lock(&gEndSoundsMtx)
-    non_zero_append(&gEndSounds, self)
-    sync.mutex_unlock(&gEndSoundsMtx)
-    sync.sema_post(&gSema)
+    sync.mutex_lock(&g_end_sounds_mtx)
+    non_zero_append(&g_end_sounds, self)
+    sync.mutex_unlock(&g_end_sounds_mtx)
+    sync.sema_post(&g_sema)
 }
 
 @(fini, private) g_deinit :: proc "contextless" () {
     if !intrinsics.atomic_load_explicit(&started, .Acquire) do return
     intrinsics.atomic_store_explicit(&started, false, .Release)
-    sync.sema_post(&gSema)
+    sync.sema_post(&g_sema)
     
     context = runtime.default_context()
-    thread.join(gThread)
+    thread.join(g_thread)
 
     miniaudio.engine_uninit(&miniaudio_engine)
 
-    sync.mutex_lock(&gSoundsMtx)
-    for key in gSounds {
+    sync.mutex_lock(&g_sounds_mtx)
+    for key in g_sounds {
         deinit2(key)
     }
-    sync.mutex_unlock(&gSoundsMtx)
+    sync.mutex_unlock(&g_sounds_mtx)
 
-    delete(gEndSounds)
-    delete(gSounds)
+    delete(g_end_sounds)
+    delete(g_sounds)
 }
 
-SoundSrc_Deinit :: proc(self:^SoundSrc) {
-    sync.mutex_lock(&gSoundsMtx)
-    for key in gSounds {
+sound_src_deinit :: proc(self:^sound_src) {
+    sync.mutex_lock(&g_sounds_mtx)
+    for key in g_sounds {
         if key.src == self do deinit2(key)
     }
-    sync.mutex_unlock(&gSoundsMtx)
+    sync.mutex_unlock(&g_sounds_mtx)
     miniaudio.decoder_uninit(&self.decoder)
     free(self)
 }
 
-SoundSrc_PlaySoundMemory :: proc(self:^SoundSrc, volume:f32, loop:bool) -> (snd: ^Sound, err: SoundError) {
-    if !intrinsics.atomic_load_explicit(&started, .Acquire) do trace.panic_log("SoundSrc_PlaySoundMemory : sound not started.")
+sound_src_play_sound_memory :: proc(self:^sound_src, volume:f32, loop:bool) -> (snd: ^sound, err: sound_error) {
+    if !intrinsics.atomic_load_explicit(&started, .Acquire) do trace.panic_log("sound_src_play_sound_memory : sound not started.")
 
     err = .SUCCESS
-    snd = new(Sound)
+    snd = new(sound)
     defer if err != .SUCCESS do free(snd)
-    snd^ = Sound{ src = self }
+    snd^ = sound{ src = self }
 
     err = miniaudio.sound_init_from_data_source(
         pEngine = &miniaudio_engine,
@@ -169,7 +169,7 @@ SoundSrc_PlaySoundMemory :: proc(self:^SoundSrc, volume:f32, loop:bool) -> (snd:
         pSound = &snd.__private.__miniaudio_sound,
     )
     if err != .SUCCESS do return
-    miniaudio.sound_set_end_callback(&snd.__private.__miniaudio_sound, EndCallback, auto_cast snd)
+    miniaudio.sound_set_end_callback(&snd.__private.__miniaudio_sound, end_callback, auto_cast snd)
     miniaudio.sound_set_looping(&snd.__private.__miniaudio_sound, auto_cast loop)
 
     miniaudio.sound_set_volume(&snd.__private.__miniaudio_sound, volume)
@@ -180,97 +180,97 @@ SoundSrc_PlaySoundMemory :: proc(self:^SoundSrc, volume:f32, loop:bool) -> (snd:
         return
     }
 
-    sync.mutex_lock(&gSoundsMtx)
-    map_insert(&gSounds, snd, snd)
-    sync.mutex_unlock(&gSoundsMtx)
+    sync.mutex_lock(&g_sounds_mtx)
+    map_insert(&g_sounds, snd, snd)
+    sync.mutex_unlock(&g_sounds_mtx)
 
     snd.__private.__inited = true
     return
 }
 
-SetVolume :: #force_inline proc "contextless" (self:^Sound, volume:f32) {
+set_volume :: #force_inline proc "contextless" (self:^sound, volume:f32) {
     miniaudio.sound_set_volume(&self.__private.__miniaudio_sound, volume)
 }
 
 //= playing speed
-SetPitch :: #force_inline proc "contextless" (self:^Sound, pitch:f32) {
+set_pitch :: #force_inline proc "contextless" (self:^sound, pitch:f32) {
     miniaudio.sound_set_pitch(&self.__private.__miniaudio_sound, pitch)
 }
 
-Pause :: #force_inline proc "contextless" (self:^Sound) {
+pause :: #force_inline proc "contextless" (self:^sound) {
     res := miniaudio.sound_stop(&self.__private.__miniaudio_sound)
     if res != .SUCCESS do trace.panic_log(res)
 }
 
-Resume :: #force_inline proc "contextless" (self:^Sound) {
+resume :: #force_inline proc "contextless" (self:^sound) {
    res := miniaudio.sound_start(&self.__private.__miniaudio_sound)
    if res != .SUCCESS do trace.panic_log(res)
 }
 
-@require_results GetLenSec :: #force_inline proc "contextless" (self:^Sound) -> f32 {
+@require_results get_len_sec :: #force_inline proc "contextless" (self:^sound) -> f32 {
     sec:f32
     res := miniaudio.sound_get_length_in_seconds(&self.__private.__miniaudio_sound, &sec)
     if res != .SUCCESS do trace.panic_log(res)
     return sec
 }
 
-@require_results GetLen :: #force_inline proc "contextless" (self:^Sound) -> u64 {
+@require_results get_len :: #force_inline proc "contextless" (self:^sound) -> u64 {
     frames:u64
     res := miniaudio.sound_get_length_in_pcm_frames(&self.__private.__miniaudio_sound, &frames)
     if res != .SUCCESS do trace.panic_log(res)
     return frames
 }
 
-@require_results GetPosSec :: #force_inline proc "contextless" (self:^Sound) -> f32 {
+@require_results get_pos_sec :: #force_inline proc "contextless" (self:^sound) -> f32 {
     sec:f32
     res := miniaudio.sound_get_cursor_in_seconds(&self.__private.__miniaudio_sound, &sec)
     if res != .SUCCESS do trace.panic_log(res)
     return sec
 }
 
-@require_results GetPos :: #force_inline proc "contextless" (self:^Sound) -> u64 {
+@require_results get_pos :: #force_inline proc "contextless" (self:^sound) -> u64 {
     frames:u64
     res := miniaudio.sound_get_cursor_in_pcm_frames(&self.__private.__miniaudio_sound, &frames)
     if res != .SUCCESS do trace.panic_log(res)
     return frames
 }
 
-SetPos :: #force_inline proc "contextless" (self:^Sound, pos:u64) {
+set_pos :: #force_inline proc "contextless" (self:^sound, pos:u64) {
     res := miniaudio.sound_seek_to_pcm_frame(&self.__private.__miniaudio_sound, pos)
     if res != .SUCCESS do trace.panic_log(res)
 }
 
-SetPosSec :: #force_inline proc "contextless" (self:^Sound, posSec:f32) -> bool {
-    pos:u64 = u64(f64(posSec) * f64(self.src.sampleRate))
-    if pos >= GetLen(self) do return false
+set_pos_sec :: #force_inline proc "contextless" (self:^sound, pos_sec:f32) -> bool {
+    pos:u64 = u64(f64(pos_sec) * f64(self.src.sample_rate))
+    if pos >= get_len(self) do return false
     res := miniaudio.sound_seek_to_pcm_frame(&self.__private.__miniaudio_sound, pos)
     if res != .SUCCESS do trace.panic_log(res)
     return true
 }
 
-SetLooping :: #force_inline proc "contextless" (self:^Sound, loop:bool) {
+set_looping :: #force_inline proc "contextless" (self:^sound, loop:bool) {
     miniaudio.sound_set_looping(&self.__private.__miniaudio_sound, auto_cast loop)
 }
 
-@require_results IsLooping :: #force_inline proc "contextless" (self:^Sound) -> bool {
+@require_results is_looping :: #force_inline proc "contextless" (self:^sound) -> bool {
    return auto_cast miniaudio.sound_is_looping(&self.__private.__miniaudio_sound)
 }
 
-@require_results IsPlaying :: #force_inline proc "contextless" (self:^Sound) -> bool {
+@require_results is_playing :: #force_inline proc "contextless" (self:^sound) -> bool {
     return auto_cast miniaudio.sound_is_playing(&self.__private.__miniaudio_sound)
 }
 
-@require_results SoundSrc_DecodeSoundMemory :: proc(data:[]byte) -> (result : ^SoundSrc, err: SoundError) {
+@require_results sound_src_decode_sound_memory :: proc(data:[]byte) -> (result : ^sound_src, err: sound_error) {
     if !intrinsics.atomic_load_explicit(&started, .Acquire) do g_init()//?g_init 따로 호출하지 않고 최초로 사용할때 시작
 
-    result = new(SoundSrc)
+    result = new(sound_src)
     defer if err != .SUCCESS do free(result)
 
-    result.decoderConfig = miniaudio.decoder_config_init_default()
-    result.decoderConfig.ppCustomBackendVTables = &miniaudio_pCustomBackendVTables2[0]
-    result.decoderConfig.customBackendCount = 2
+    result.decoder_config = miniaudio.decoder_config_init_default()
+    result.decoder_config.ppCustomBackendVTables = &miniaudio_p_custom_backend_v_tables2[0]
+    result.decoder_config.customBackendCount = 2
 
-    err = miniaudio.decoder_init_memory(raw_data(data), len(data), &result.decoderConfig, &result.decoder)
+    err = miniaudio.decoder_init_memory(raw_data(data), len(data), &result.decoder_config, &result.decoder)
     if err != .SUCCESS {
         return
     }

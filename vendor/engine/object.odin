@@ -10,49 +10,49 @@ import "core:math/linalg"
 import "base:intrinsics"
 import "base:runtime"
 import vk "vendor:vulkan"
-import graphics_api "./graphics_api"
+import sys "./sys"
 
 
 
-ColorTransform :: graphics_api.ColorTransform
+color_transform :: sys.color_transform
 
 
-IObjectVTable :: struct {
-    GetUniformResources: #type proc (self:^IObject) -> []graphics_api.UnionResource,
-    Draw: #type proc (self:^IObject, cmd:graphics_api.CommandBuffer),
-    Deinit: #type proc (self:^IObject),
-    Update: #type proc (self:^IObject),
-    Size: #type proc (self:^IObject),
+iobject_vtable :: struct {
+    get_uniform_resources: #type proc (self:^iobject) -> []sys.union_resource,
+    draw: #type proc (self:^iobject, cmd:sys.command_buffer),
+    deinit: #type proc (self:^iobject),
+    update: #type proc (self:^iobject),
+    size: #type proc (self:^iobject),
 }
 
-IAnimateObjectVTable :: struct {
-    using _: IObjectVTable,
+ianimate_object_vtable :: struct {
+    using _: iobject_vtable,
     get_frame_cnt: #type proc "contextless" (self:^ianimate_object) -> u32,
 }
 
-IObject :: struct {
-    using _: __MatrixIn,
-    set:graphics_api.DescriptorSet,
-    camera: ^Camera,
-    projection: ^Projection,
-    colorTransform: ^ColorTransform,
-    actualType: typeid,
-    vtable: ^IObjectVTable,
+iobject :: struct {
+    using _: __matrix_in,
+    set:sys.descriptor_set,
+    camera: ^camera,
+    projection: ^projection,
+    color_transform: ^color_transform,
+    actual_type: typeid,
+    vtable: ^iobject_vtable,
 }
 
-__MatrixIn :: struct {
+__matrix_in :: struct {
     mat: linalg.Matrix,
-    matUniform:graphics_api.BufferResource,
-    checkInit: mem.ICheckInit,
+    mat_uniform:sys.buffer_resource,
+    check_init: mem.ICheckInit,
 }
 
-ColorTransform_InitMatrixRaw :: graphics_api.ColorTransform_InitMatrixRaw
-ColorTransform_Deinit :: graphics_api.ColorTransform_Deinit
-ColorTransform_UpdateMatrixRaw :: graphics_api.ColorTransform_UpdateMatrixRaw
+color_transform_init_matrix_raw :: sys.color_transform_init_matrix_raw
+color_transform_deinit :: sys.color_transform_deinit
+color_transform_update_matrix_raw :: sys.color_transform_update_matrix_raw
 
 
 @(require_results)
-__SRTC_2D_Matrix :: proc "contextless" (t: linalg.Point3DF, s: linalg.PointF, r: f32, cp:linalg.PointF) -> linalg.Matrix4x4f32 {
+__SRTC_2D_MATRIX :: proc "contextless" (t: linalg.Point3DF, s: linalg.PointF, r: f32, cp:linalg.PointF) -> linalg.Matrix4x4f32 {
 	pivot := linalg.matrix4_translate(linalg.Point3DF{cp.x,cp.y,0.0})
 	translation := linalg.matrix4_translate(t)
 	rotation := linalg.matrix4_rotate_f32(r, linalg.Vector3f32{0.0, 0.0, 1.0})
@@ -61,7 +61,7 @@ __SRTC_2D_Matrix :: proc "contextless" (t: linalg.Point3DF, s: linalg.PointF, r:
 }
 
 @(require_results)
-__SRT_2D_Matrix :: proc "contextless" (t: linalg.Point3DF, s: linalg.PointF, r: f32) -> linalg.Matrix4x4f32 {
+__SRT_2D_MATRIX :: proc "contextless" (t: linalg.Point3DF, s: linalg.PointF, r: f32) -> linalg.Matrix4x4f32 {
 	translation := linalg.matrix4_translate(t)
 	rotation := linalg.matrix4_rotate_f32(r, linalg.Vector3f32{0.0, 0.0, 1.0})
 	scale := linalg.matrix4_scale(linalg.Point3DF{s.x,s.y,1.0})
@@ -69,14 +69,14 @@ __SRT_2D_Matrix :: proc "contextless" (t: linalg.Point3DF, s: linalg.PointF, r: 
 }
 
 @(require_results)
-__ST_2D_Matrix :: proc "contextless" (t: linalg.Point3DF, s: linalg.PointF) -> linalg.Matrix4x4f32 {
+__ST_2D_MATRIX :: proc "contextless" (t: linalg.Point3DF, s: linalg.PointF) -> linalg.Matrix4x4f32 {
 	translation := linalg.matrix4_translate(t)
 	scale := linalg.matrix4_scale(linalg.Point3DF{s.x,s.y,1.0})
 	return linalg.mul(translation, scale)
 }
 
 @(require_results)
-__RT_2D_Matrix :: proc "contextless" (t: linalg.Point3DF, r: f32) -> linalg.Matrix4x4f32 {
+__RT_2D_MATRIX :: proc "contextless" (t: linalg.Point3DF, r: f32) -> linalg.Matrix4x4f32 {
 	translation := linalg.matrix4_translate(t)
     rotation := linalg.matrix4_rotate_f32(r, linalg.Vector3f32{0.0, 0.0, 1.0})
 	return linalg.mul(translation, rotation)
@@ -84,22 +84,22 @@ __RT_2D_Matrix :: proc "contextless" (t: linalg.Point3DF, r: f32) -> linalg.Matr
 
 
 @(require_results)
-__T_2D_Matrix :: proc "contextless" (t: linalg.Point3DF) -> linalg.Matrix4x4f32 {
+__T_2D_MATRIX :: proc "contextless" (t: linalg.Point3DF) -> linalg.Matrix4x4f32 {
 	translation := linalg.matrix4_translate(t)
 	return translation
 }
 
 
-SRT_2D_Matrix :: proc {
-    __SRTC_2D_Matrix,
-    __ST_2D_Matrix,
-    __RT_2D_Matrix,
-    __T_2D_Matrix,
-    __SRT_2D_Matrix,
+srt_2d_matrix :: proc {
+    __SRTC_2D_MATRIX,
+    __ST_2D_MATRIX,
+    __RT_2D_MATRIX,
+    __T_2D_MATRIX,
+    __SRT_2D_MATRIX,
 }
 
 @(require_results)
-__SRC_2D_Matrix :: proc "contextless" (s: linalg.PointF, r: f32, cp:linalg.PointF) -> linalg.Matrix4x4f32 {
+__SRC_2D_MATRIX :: proc "contextless" (s: linalg.PointF, r: f32, cp:linalg.PointF) -> linalg.Matrix4x4f32 {
 	pivot := linalg.matrix4_translate(linalg.Point3DF{cp.x,cp.y,0.0})
 	rotation := linalg.matrix4_rotate_f32(r, linalg.Vector3f32{0.0, 0.0, 1.0})
 	scale := linalg.matrix4_scale(linalg.Point3DF{s.x,s.y,1.0})
@@ -107,410 +107,410 @@ __SRC_2D_Matrix :: proc "contextless" (s: linalg.PointF, r: f32, cp:linalg.Point
 }
 
 @(require_results)
-__SR_2D_Matrix :: proc "contextless" (s: linalg.PointF, r: f32) -> linalg.Matrix4x4f32 {
+__SR_2D_MATRIX :: proc "contextless" (s: linalg.PointF, r: f32) -> linalg.Matrix4x4f32 {
 	rotation := linalg.matrix4_rotate_f32(r, linalg.Vector3f32{0.0, 0.0, 1.0})
 	scale := linalg.matrix4_scale(linalg.Point3DF{s.x,s.y,1.0})
 	return linalg.mul(rotation, scale)
 }
 
 @(require_results)
-__S_2D_Matrix :: proc "contextless" (s: linalg.PointF) -> linalg.Matrix4x4f32 {
+__S_2D_MATRIX :: proc "contextless" (s: linalg.PointF) -> linalg.Matrix4x4f32 {
 	scale := linalg.matrix4_scale(linalg.Point3DF{s.x,s.y,1.0})
 	return scale
 }
 
 @(require_results)
-__R_2D_Matrix :: proc "contextless" (r: f32) -> linalg.Matrix4x4f32 {
+__R_2D_MATRIX :: proc "contextless" (r: f32) -> linalg.Matrix4x4f32 {
     rotation := linalg.matrix4_rotate_f32(r, linalg.Vector3f32{0.0, 0.0, 1.0})
 	return rotation
 }
 
-SR_2D_Matrix :: proc {
-    __SRC_2D_Matrix,
-    __S_2D_Matrix,
-    __R_2D_Matrix,
-    __SR_2D_Matrix,
+SR_2D_MATRIX :: proc {
+    __SRC_2D_MATRIX,
+    __S_2D_MATRIX,
+    __R_2D_MATRIX,
+    __SR_2D_MATRIX,
 }
 
 @(require_results)
-SRT_2D_Matrix2 :: proc "contextless" (t: linalg.Point3DF, s: linalg.PointF, r: f32, cp:linalg.PointF) -> linalg.Matrix4x4f32 {
+SRT_2D_MATRIX2 :: proc "contextless" (t: linalg.Point3DF, s: linalg.PointF, r: f32, cp:linalg.PointF) -> linalg.Matrix4x4f32 {
     if cp != {0.0, 0.0} {
-        return __SRTC_2D_Matrix(t,s,r,cp)
+        return __SRTC_2D_MATRIX(t,s,r,cp)
     }
     if r != 0.0 {
         if s != {1.0, 1.0} {
-            return __SRT_2D_Matrix(t,s,r)
+            return __SRT_2D_MATRIX(t,s,r)
         } else {
-            return __RT_2D_Matrix(t,r)
+            return __RT_2D_MATRIX(t,r)
         }
     }
     if s != {1.0, 1.0} {
-        return __ST_2D_Matrix(t,s)
+        return __ST_2D_MATRIX(t,s)
     }
-    return __T_2D_Matrix(t)
+    return __T_2D_MATRIX(t)
 }
 
 @(require_results)
-SR_2D_Matrix2 :: proc "contextless" (s: linalg.PointF, r: f32, cp:linalg.PointF) -> Maybe(linalg.Matrix4x4f32) {
+SR_2D_MATRIX2 :: proc "contextless" (s: linalg.PointF, r: f32, cp:linalg.PointF) -> Maybe(linalg.Matrix4x4f32) {
     if cp != {0.0, 0.0} {
-        return __SRC_2D_Matrix(s,r,cp)
+        return __SRC_2D_MATRIX(s,r,cp)
     }
     if r != 0.0 {
         if s != {1.0, 1.0} {
-            return __SR_2D_Matrix(s,r)
+            return __SR_2D_MATRIX(s,r)
         } else {
-            return __R_2D_Matrix(r)
+            return __R_2D_MATRIX(r)
         }
     }
     if s != {1.0, 1.0} {
-        return __S_2D_Matrix(s)
+        return __S_2D_MATRIX(s)
     }
     return nil
 }
 
-IObject_Init :: proc(self:^IObject, $actualType:typeid,
+iobject_init :: proc(self:^iobject, $actual_type:typeid,
     pos:linalg.Point3DF, rotation:f32, scale:linalg.PointF = {1,1},
-    camera:^Camera, projection:^Projection, colorTransform:^ColorTransform = nil, pivot:linalg.PointF = {0.0, 0.0})
-    where actualType != IObject && intrinsics.type_is_subtype_of(actualType, IObject) {
+    _camera:^camera, _projection:^projection, _color_transform:^color_transform = nil, pivot:linalg.PointF = {0.0, 0.0})
+    where actual_type != iobject && intrinsics.type_is_subtype_of(actual_type, iobject) {
 
-    mem.ICheckInit_Init(&self.checkInit)
-    self.camera = camera
-    self.projection = projection
-    self.colorTransform = colorTransform == nil ? &graphics_api.__defColorTransform : colorTransform
+    mem.ICheckInit_Init(&self.check_init)
+    self.camera = _camera
+    self.projection = _projection
+    self.color_transform = _color_transform == nil ? &sys.__def_color_transform : _color_transform
     
-    self.mat = SRT_2D_Matrix2(pos, scale, rotation, pivot)
+    self.mat = SRT_2D_MATRIX2(pos, scale, rotation, pivot)
 
-    graphics_api.BufferResource_CreateBuffer(&self.matUniform, {
+    sys.buffer_resource_create_buffer(&self.mat_uniform, {
         len = size_of(linalg.Matrix),
         type = .UNIFORM,
-        resourceUsage = .CPU,
+        resource_usage = .CPU,
     }, mem.ptr_to_bytes(&self.mat), true)
 
-    resources := GetUniformResources(self)
+    resources := get_uniform_resources(self)
     defer delete(resources, context.temp_allocator)
-    __IObject_UpdateUniform(self, resources)
+    __iobject_update_uniform(self, resources)
 
-    self.actualType = actualType
+    self.actual_type = actual_type
 }
 
-_Super_IObject_Deinit :: #force_inline proc (self:^IObject) {
-    mem.ICheckInit_Deinit(&self.checkInit)
-    graphics_api.BufferResource_Deinit(&self.matUniform)
+_super_iobject_deinit :: #force_inline proc (self:^iobject) {
+    mem.ICheckInit_Deinit(&self.check_init)
+    sys.buffer_resource_deinit(&self.mat_uniform)
 }
 
-IObject_Init2 :: proc(self:^IObject, $actualType:typeid,
-    camera:^Camera, projection:^Projection, colorTransform:^ColorTransform = nil)
-    where actualType != IObject && intrinsics.type_is_subtype_of(actualType, IObject) {
+iobject_init2 :: proc(self:^iobject, $actual_type:typeid,
+    _camera:^camera, _projection:^projection, _color_transform:^color_transform = nil)
+    where actual_type != iobject && intrinsics.type_is_subtype_of(actual_type, iobject) {
 
-    mem.ICheckInit_Init(&self.checkInit)
-    self.camera = camera
-    self.projection = projection
-    self.colorTransform = colorTransform == nil ? &graphics_api.__defColorTransform : colorTransform
+    mem.ICheckInit_Init(&self.check_init)
+    self.camera = _camera
+    self.projection = _projection
+    self.color_transform = _color_transform == nil ? &sys.__def_color_transform : _color_transform
 
-    self.actualType = actualType
+    self.actual_type = actual_type
 }
 
 //!alloc result array in temp_allocator
-@private GetUniformResources :: proc(self:^IObject) -> []graphics_api.UnionResource {
-    if self.vtable != nil && self.vtable.GetUniformResources != nil {
-        return self.vtable.GetUniformResources(self)
+@private get_uniform_resources :: proc(self:^iobject) -> []sys.union_resource {
+    if self.vtable != nil && self.vtable.get_uniform_resources != nil {
+        return self.vtable.get_uniform_resources(self)
     } else {
-        trace.panic_log("GetUniformResources is not implemented")
+        trace.panic_log("get_uniform_resources is not implemented")
     }
 }
 
-@private GetUniformResources_AnimateImage :: #force_inline proc(self:^IObject) -> []graphics_api.UnionResource {
-    res := mem.make_non_zeroed([]graphics_api.UnionResource, 5, context.temp_allocator)
-    res[0] = &self.matUniform
-    res[1] = &self.camera.matUniform
-    res[2] = &self.projection.matUniform
-    res[3] = &self.colorTransform.matUniform
+@private get_uniform_resources_animate_image :: #force_inline proc(self:^iobject) -> []sys.union_resource {
+    res := mem.make_non_zeroed([]sys.union_resource, 5, context.temp_allocator)
+    res[0] = &self.mat_uniform
+    res[1] = &self.camera.mat_uniform
+    res[2] = &self.projection.mat_uniform
+    res[3] = &self.color_transform.mat_uniform
 
-    animateImage : ^AnimateImage= auto_cast self
-    res[4] = &animateImage.frameUniform
+    animate_image_ : ^animate_image = auto_cast self
+    res[4] = &animate_image_.frame_uniform
     return res[:]
 }
 
-@private GetUniformResources_TileImage :: #force_inline proc(self:^IObject) -> []graphics_api.UnionResource {
-    res := mem.make_non_zeroed([]graphics_api.UnionResource, 5, context.temp_allocator)
-    res[0] = &self.matUniform
-    res[1] = &self.camera.matUniform
-    res[2] = &self.projection.matUniform
-    res[3] = &self.colorTransform.matUniform
+@private get_uniform_resources_tile_image :: #force_inline proc(self:^iobject) -> []sys.union_resource {
+    res := mem.make_non_zeroed([]sys.union_resource, 5, context.temp_allocator)
+    res[0] = &self.mat_uniform
+    res[1] = &self.camera.mat_uniform
+    res[2] = &self.projection.mat_uniform
+    res[3] = &self.color_transform.mat_uniform
 
-    tileImage : ^TileImage = auto_cast self
-    res[4] = &tileImage.tileUniform
+    tile_image_ : ^tile_image = auto_cast self
+    res[4] = &tile_image_.tile_uniform
     return res[:]
 }
 
-@private GetUniformResources_Default :: #force_inline proc(self:^IObject) -> []graphics_api.UnionResource {
-    res := mem.make_non_zeroed([]graphics_api.UnionResource, 4, context.temp_allocator)
-    res[0] = &self.matUniform
-    res[1] = &self.camera.matUniform
-    res[2] = &self.projection.matUniform
-    res[3] = &self.colorTransform.matUniform
+@private get_uniform_resources_default :: #force_inline proc(self:^iobject) -> []sys.union_resource {
+    res := mem.make_non_zeroed([]sys.union_resource, 4, context.temp_allocator)
+    res[0] = &self.mat_uniform
+    res[1] = &self.camera.mat_uniform
+    res[2] = &self.projection.mat_uniform
+    res[3] = &self.color_transform.mat_uniform
 
     return res[:]
 }
 
 
-@private __IObject_UpdateUniform :: proc(self:^IObject, resources:[]graphics_api.UnionResource) {
-    mem.ICheckInit_Check(&self.checkInit)
+@private __iobject_update_uniform :: proc(self:^iobject, resources:[]sys.union_resource) {
+    mem.ICheckInit_Check(&self.check_init)
 
     //업데이트 하면 tempArenaAllocator를 다 지우니 중복 할당해도 됨.
-    self.set.__resources = mem.make_non_zeroed_slice([]graphics_api.UnionResource, len(resources), graphics_api.tempArenaAllocator)
-    mem.copy_non_overlapping(&self.set.__resources[0], &resources[0], len(resources) * size_of(graphics_api.UnionResource))
-    graphics_api.UpdateDescriptorSets(mem.slice_ptr(&self.set, 1))
+    self.set.__resources = mem.make_non_zeroed_slice([]sys.union_resource, len(resources), sys.temp_arena_allocator)
+    mem.copy_non_overlapping(&self.set.__resources[0], &resources[0], len(resources) * size_of(sys.union_resource))
+    sys.update_descriptor_sets(mem.slice_ptr(&self.set, 1))
 }
 
-IObject_UpdateTransform :: proc(self:^IObject, pos:linalg.Point3DF, rotation:f32 = 0.0, scale:linalg.PointF = {1.0,1.0}, pivot:linalg.PointF = {0.0,0.0}) {
-    mem.ICheckInit_Check(&self.checkInit)
-    self.mat = SRT_2D_Matrix2(pos, scale, rotation, pivot)
+iobject_update_transform :: proc(self:^iobject, pos:linalg.Point3DF, rotation:f32 = 0.0, scale:linalg.PointF = {1.0,1.0}, pivot:linalg.PointF = {0.0,0.0}) {
+    mem.ICheckInit_Check(&self.check_init)
+    self.mat = SRT_2D_MATRIX2(pos, scale, rotation, pivot)
 
-    if self.matUniform.__resource == 0 {
-        graphics_api.BufferResource_CreateBuffer(&self.matUniform, {
+    if self.mat_uniform.__resource == 0 {
+        sys.buffer_resource_create_buffer(&self.mat_uniform, {
             len = size_of(linalg.Matrix),
             type = .UNIFORM,
-            resourceUsage = .CPU,
+            resource_usage = .CPU,
         }, mem.ptr_to_bytes(&self.mat), true)
 
-        resources := GetUniformResources(self)
+        resources := get_uniform_resources(self)
         defer delete(resources, context.temp_allocator)
-        __IObject_UpdateUniform(self, resources)
+        __iobject_update_uniform(self, resources)
     } else {
-        graphics_api.BufferResource_CopyUpdate(&self.matUniform, &self.mat)
+        sys.buffer_resource_copy_update(&self.mat_uniform, &self.mat)
     }
 }
-IObject_UpdateTransformMatrixRaw :: proc(self:^IObject, _mat:linalg.Matrix) {
-    mem.ICheckInit_Check(&self.checkInit)
+iobject_update_transform_matrix_raw :: proc(self:^iobject, _mat:linalg.Matrix) {
+    mem.ICheckInit_Check(&self.check_init)
     self.mat = _mat
     
-    if self.matUniform.__resource == 0 {
-        graphics_api.BufferResource_CreateBuffer(&self.matUniform, {
+    if self.mat_uniform.__resource == 0 {
+        sys.buffer_resource_create_buffer(&self.mat_uniform, {
             len = size_of(linalg.Matrix),
             type = .UNIFORM,
-            resourceUsage = .CPU,
+            resource_usage = .CPU,
         }, mem.ptr_to_bytes(&self.mat), true)
 
-        resources := GetUniformResources(self)
+        resources := get_uniform_resources(self)
         defer delete(resources, context.temp_allocator)
-        __IObject_UpdateUniform(self, resources)
+        __iobject_update_uniform(self, resources)
     } else {
-        graphics_api.BufferResource_CopyUpdate(&self.matUniform, &self.mat)
+        sys.buffer_resource_copy_update(&self.mat_uniform, &self.mat)
     }
 }
 
-IObject_UpdateTransformMatrix :: proc(self:^IObject) {
-    mem.ICheckInit_Check(&self.checkInit)
+iobject_update_transform_matrix :: proc(self:^iobject) {
+    mem.ICheckInit_Check(&self.check_init)
     
-    if self.matUniform.__resource == 0 {
-        graphics_api.BufferResource_CreateBuffer(&self.matUniform, {
+    if self.mat_uniform.__resource == 0 {
+        sys.buffer_resource_create_buffer(&self.mat_uniform, {
             len = size_of(linalg.Matrix),
             type = .UNIFORM,
-            resourceUsage = .CPU,
+            resource_usage = .CPU,
         }, mem.ptr_to_bytes(&self.mat), true)
 
-        resources := GetUniformResources(self)
+        resources := get_uniform_resources(self)
         defer delete(resources, context.temp_allocator)
-        __IObject_UpdateUniform(self, resources)
+        __iobject_update_uniform(self, resources)
     } else {
-        graphics_api.BufferResource_CopyUpdate(&self.matUniform, &self.mat)
+        sys.buffer_resource_copy_update(&self.mat_uniform, &self.mat)
     }
 }
 
-IObject_ChangeColorTransform :: proc(self:^IObject, colorTransform:^ColorTransform) {
-    mem.ICheckInit_Check(&self.checkInit)
-    self.colorTransform = colorTransform
-    __IObject_UpdateUniform(self, GetUniformResources(self))
+iobject_change_color_transform :: proc(self:^iobject, _color_transform:^color_transform) {
+    mem.ICheckInit_Check(&self.check_init)
+    self.color_transform = _color_transform
+    __iobject_update_uniform(self, get_uniform_resources(self))
 }
-IObject_UpdateCamera :: proc(self:^IObject, camera:^Camera) {
-    mem.ICheckInit_Check(&self.checkInit)
-    self.camera = camera
-    __IObject_UpdateUniform(self, GetUniformResources(self))
+iobject_update_camera :: proc(self:^iobject, _camera:^camera) {
+    mem.ICheckInit_Check(&self.check_init)
+    self.camera = _camera
+    __iobject_update_uniform(self, get_uniform_resources(self))
 }
-IObject_UpdateProjection :: proc(self:^IObject, projection:^Projection) {
-    mem.ICheckInit_Check(&self.checkInit)
-    self.projection = projection
-    __IObject_UpdateUniform(self, GetUniformResources(self))
+iobject_update_projection :: proc(self:^iobject, _projection:^projection) {
+    mem.ICheckInit_Check(&self.check_init)
+    self.projection = _projection
+    __iobject_update_uniform(self, get_uniform_resources(self))
 }
-IObject_GetColorTransform :: #force_inline proc "contextless" (self:^IObject) -> ^ColorTransform {
-    mem.ICheckInit_Check(&self.checkInit)
-    return self.colorTransform
+iobject_get_color_transform :: #force_inline proc "contextless" (self:^iobject) -> ^color_transform {
+    mem.ICheckInit_Check(&self.check_init)
+    return self.color_transform
 }
-IObject_GetCamera :: #force_inline proc "contextless" (self:^IObject) -> ^Camera {
-    mem.ICheckInit_Check(&self.checkInit)
+iobject_get_camera :: #force_inline proc "contextless" (self:^iobject) -> ^camera {
+    mem.ICheckInit_Check(&self.check_init)
     return self.camera
 }
-IObject_GetProjection :: #force_inline proc "contextless" (self:^IObject) -> ^Projection {
-    mem.ICheckInit_Check(&self.checkInit)
+iobject_get_projection :: #force_inline proc "contextless" (self:^iobject) -> ^projection {
+    mem.ICheckInit_Check(&self.check_init)
     return self.projection
 }
 
-IObject_GetActualType :: #force_inline proc "contextless" (self:^IObject) -> typeid {
-    return self.actualType
+iobject_get_actual_type :: #force_inline proc "contextless" (self:^iobject) -> typeid {
+    return self.actual_type
 }
 
-IObject_Draw :: proc (self:^IObject, cmd:graphics_api.CommandBuffer) {
-    if self.vtable != nil && self.vtable.Draw != nil {
-        self.vtable.Draw(self, cmd)
+iobject_draw :: proc (self:^iobject, cmd:sys.command_buffer) {
+    if self.vtable != nil && self.vtable.draw != nil {
+        self.vtable.draw(self, cmd)
     } else {
-        trace.panic_log("IObjectType_Draw: unknown object type")
+        trace.panic_log("iobjectType_Draw: unknown object type")
     }
 }
 
-IObject_Deinit :: proc(self:^IObject) {
-    if self.vtable != nil && self.vtable.Deinit != nil {
-        self.vtable.Deinit(self)
+iobject_deinit :: proc(self:^iobject) {
+    if self.vtable != nil && self.vtable.deinit != nil {
+        self.vtable.deinit(self)
     } else {
-        trace.panic_log("IObjectType_Deinit: unknown object type")
+        trace.panic_log("iobjectType_Deinit: unknown object type")
     }
 }
 
-IObject_Update :: proc(self:^IObject) {
-    if self.vtable != nil && self.vtable.Update != nil {
-        self.vtable.Update(self)
+iobject_update :: proc(self:^iobject) {
+    if self.vtable != nil && self.vtable.update != nil {
+        self.vtable.update(self)
     }
     //Update Not Required Default
 }
 
-IObject_Size :: proc(self:^IObject) {
-    if self.vtable != nil && self.vtable.Size != nil {
-        self.vtable.Size(self)
+iobject_size :: proc(self:^iobject) {
+    if self.vtable != nil && self.vtable.size != nil {
+        self.vtable.size(self)
     }
     //Size Not Required Default
 }
 
 
 
-SetRenderClearColor :: proc "contextless" (color:linalg.Point3DwF) {
-    graphics_api.gClearColor = color
+set_render_clear_color :: proc "contextless" (_color:linalg.Point3DwF) {
+    sys.g_clear_color = _color
 }
 
-//AUTO DELETE USE engineDefAllocator
-@private __VertexBuf_Init :: proc (self:^__VertexBuf($NodeType), array:[]NodeType, _flag:ResourceUsage, _useGPUMem := false) {
-    mem.ICheckInit_Init(&self.checkInit)
-    if len(array) == 0 do trace.panic_log("VertexBuf_Init: array is empty")
-    graphics_api.BufferResource_CreateBuffer(&self.buf, {
+//AUTO DELETE USE engine_def_allocator
+@private __vertex_buf_init :: proc (self:^__vertex_buf($NodeType), array:[]NodeType, _flag:sys.resource_usage, _useGPUMem := false) {
+    mem.ICheckInit_Init(&self.check_init)
+    if len(array) == 0 do trace.panic_log("vertex_buf_init: array is empty")
+    sys.buffer_resource_create_buffer(&self.buf, {
         len = vk.DeviceSize(len(array) * size_of(NodeType)),
         type = .VERTEX,
-        resourceUsage = _flag,
+        resource_usage = _flag,
         single = false,
-        useGCPUMem = _useGPUMem,
-    }, mem.slice_to_bytes(array), false, graphics_api.engineDefAllocator)
+        use_gcpu_mem = _useGPUMem,
+    }, mem.slice_to_bytes(array), false, sys.engine_def_allocator)
 }
 
-@private __VertexBuf_Deinit :: proc (self:^__VertexBuf($NodeType)) {
-    mem.ICheckInit_Deinit(&self.checkInit)
+@private __vertex_buf_deinit :: proc (self:^__vertex_buf($NodeType)) {
+    mem.ICheckInit_Deinit(&self.check_init)
 
-    graphics_api.BufferResource_Deinit(&self.buf)
+    sys.buffer_resource_deinit(&self.buf)
 }
 
-@private __VertexBuf_Update :: proc (self:^__VertexBuf($NodeType), array:[]NodeType) {
-    graphics_api.BufferResource_MapUpdateSlice(&self.buf, array, graphics_api.engineDefAllocator)
+@private __vertex_buf_update :: proc (self:^__vertex_buf($NodeType), array:[]NodeType) {
+    sys.buffer_resource_map_update_slice(&self.buf, array, sys.engine_def_allocator)
 }
 
-//AUTO DELETE USE engineDefAllocator
-@private __StorageBuf_Init :: proc (self:^__StorageBuf($NodeType), array:[]NodeType, _flag:ResourceUsage, _useGPUMem := false) {
-    mem.ICheckInit_Init(&self.checkInit)
-    if len(array) == 0 do trace.panic_log("StorageBuf_Init: array is empty")
-    graphics_api.BufferResource_CreateBuffer(&self.buf, {
+//AUTO DELETE USE engine_def_allocator
+@private __storage_buf_init :: proc (self:^__storage_buf($NodeType), array:[]NodeType, _flag:sys.resource_usage, _useGPUMem := false) {
+    mem.ICheckInit_Init(&self.check_init)
+    if len(array) == 0 do trace.panic_log("storage_buf_init: array is empty")
+    sys.buffer_resource_create_buffer(&self.buf, {
         len = vk.DeviceSize(len(array) * size_of(NodeType)),
         type = .STORAGE,
-        resourceUsage = _flag,
+        resource_usage = _flag,
         single = false,
-        useGCPUMem = _useGPUMem,
-    }, mem.slice_to_bytes(array), false, graphics_api.engineDefAllocator)
+        use_gcpu_mem = _useGPUMem,
+    }, mem.slice_to_bytes(array), false, sys.engine_def_allocator)
 }
 
-@private __StorageBuf_Deinit :: proc (self:^__StorageBuf($NodeType)) {
-    mem.ICheckInit_Deinit(&self.checkInit)
+@private __storage_buf_deinit :: proc (self:^__storage_buf($NodeType)) {
+    mem.ICheckInit_Deinit(&self.check_init)
 
-    graphics_api.BufferResource_Deinit(&self.buf)
+    sys.buffer_resource_deinit(&self.buf)
 }
 
-@private __StorageBuf_Update :: proc (self:^__StorageBuf($NodeType), array:[]NodeType) {
-    VkBufferResource_MapUpdateSlice(&self.buf, array, graphics_api.engineDefAllocator)
+@private __storage_buf_update :: proc (self:^__storage_buf($NodeType), array:[]NodeType) {
+    sys.buffer_resource_map_update_slice(&self.buf, array, sys.engine_def_allocator)
 }
 
-//AUTO DELETE USE engineDefAllocator
-@private __IndexBuf_Init :: proc (self:^__IndexBuf, array:[]u32, _flag:ResourceUsage, _useGPUMem := false) {
-    mem.ICheckInit_Init(&self.checkInit)
-    if len(array) == 0 do trace.panic_log("IndexBuf_Init: array is empty")
-    graphics_api.BufferResource_CreateBuffer(&self.buf, {
+//AUTO DELETE USE engine_def_allocator
+@private __index_buf_init :: proc (self:^__index_buf, array:[]u32, _flag:sys.resource_usage, _useGPUMem := false) {
+    mem.ICheckInit_Init(&self.check_init)
+    if len(array) == 0 do trace.panic_log("index_buf_init: array is empty")
+    sys.buffer_resource_create_buffer(&self.buf, {
         len = vk.DeviceSize(len(array) * size_of(u32)),
         type = .INDEX,
-        resourceUsage = _flag,
-        useGCPUMem = _useGPUMem,
-    }, mem.slice_to_bytes(array), false, graphics_api.engineDefAllocator)
+        resource_usage = _flag,
+        use_gcpu_mem = _useGPUMem,
+    }, mem.slice_to_bytes(array), false, sys.engine_def_allocator)
 }
 
 
-@private __IndexBuf_Deinit :: proc (self:^__IndexBuf) {
-    mem.ICheckInit_Deinit(&self.checkInit)
+@private __index_buf_deinit :: proc (self:^__index_buf) {
+    mem.ICheckInit_Deinit(&self.check_init)
 
-    graphics_api.BufferResource_Deinit(&self.buf)
+    sys.buffer_resource_deinit(&self.buf)
 }
 
-@private __IndexBuf_Update :: #force_inline proc (self:^__IndexBuf, array:[]u32) {
-    graphics_api.BufferResource_MapUpdateSlice(&self.buf, array, graphics_api.engineDefAllocator)
+@private __index_buf_update :: #force_inline proc (self:^__index_buf, array:[]u32) {
+    sys.buffer_resource_map_update_slice(&self.buf, array, sys.engine_def_allocator)
 }
 
-@private __VertexBuf :: struct($NodeType:typeid) {
-    buf:graphics_api.BufferResource,
-    checkInit: mem.ICheckInit,
+@private __vertex_buf :: struct($NodeType:typeid) {
+    buf:sys.buffer_resource,
+    check_init: mem.ICheckInit,
 }
 
-@private __IndexBuf :: distinct __VertexBuf(u32)
-@private __StorageBuf :: struct($NodeType:typeid) {
-    buf:graphics_api.BufferResource,
-    checkInit: ICheckInit,
+@private __index_buf :: distinct __vertex_buf(u32)
+@private __storage_buf :: struct($NodeType:typeid) {
+    buf:sys.buffer_resource,
+    check_init: mem.ICheckInit,
 }
 
 
 //!do not use anymore
-// AllocObjectNonZeroed :: #force_inline proc($T:typeid) -> (^T, runtime.Allocator_Error) where intrinsics.type_is_subtype_of(T, IObject) #optional_allocator_error {
-//     obj, err := mem.alloc_bytes_non_zeroed(size_of(T),align_of(T), graphics_api.engineDefAllocator)
+// alloc_objectNonZeroed :: #force_inline proc($T:typeid) -> (^T, runtime.Allocator_Error) where intrinsics.type_is_subtype_of(T, iobject) #optional_allocator_error {
+//     obj, err := mem.alloc_bytes_non_zeroed(size_of(T),align_of(T), sys.engine_def_allocator)
 //     if err != .None do return nil, err
 // 	return transmute(^T)raw_data(obj), .None
 // }
 
-// AllocObjectSliceNonZeroed :: #force_inline proc($T:typeid, #any_int count:int) -> ([]T, runtime.Allocator_Error) where intrinsics.type_is_subtype_of(T, IObject) #optional_allocator_error {
-//     arr, err := mem.alloc_bytes_non_zeroed(count * size_of(T), align_of(T), graphics_api.engineDefAllocator)
+// alloc_objectSliceNonZeroed :: #force_inline proc($T:typeid, #any_int count:int) -> ([]T, runtime.Allocator_Error) where intrinsics.type_is_subtype_of(T, iobject) #optional_allocator_error {
+//     arr, err := mem.alloc_bytes_non_zeroed(count * size_of(T), align_of(T), sys.engine_def_allocator)
 //     if err != .None do return nil, err
 //     s := runtime.Raw_Slice{raw_data(arr), count}
 //     return transmute([]T)s, .None
 // }
 
-// AllocObjectDynamicNonZeroed :: #force_inline proc($T:typeid) -> ([dynamic]T, runtime.Allocator_Error) where intrinsics.type_is_subtype_of(T, IObject) #optional_allocator_error {
-//     res, err := make_non_zeroed_dynamic_array([dynamic]T, graphics_api.engineDefAllocator)
+// alloc_objectDynamicNonZeroed :: #force_inline proc($T:typeid) -> ([dynamic]T, runtime.Allocator_Error) where intrinsics.type_is_subtype_of(T, iobject) #optional_allocator_error {
+//     res, err := make_non_zeroed_dynamic_array([dynamic]T, sys.engine_def_allocator)
 //     if err != .None do return nil, err
 //     return res, .None
 // }
 
-AllocObject :: #force_inline proc($T:typeid) -> (^T, runtime.Allocator_Error) where intrinsics.type_is_subtype_of(T, IObject) #optional_allocator_error {
-    obj, err := mem.alloc_bytes(size_of(T),align_of(T), graphics_api.engineDefAllocator)
+alloc_object :: #force_inline proc($T:typeid) -> (^T, runtime.Allocator_Error) where intrinsics.type_is_subtype_of(T, iobject) #optional_allocator_error {
+    obj, err := mem.alloc_bytes(size_of(T),align_of(T), sys.engine_def_allocator)
     if err != .None do return nil, err
 	return transmute(^T)raw_data(obj), .None
 }
 
-AllocObjectSlice :: #force_inline proc($T:typeid, #any_int count:int) -> ([]T, runtime.Allocator_Error) where intrinsics.type_is_subtype_of(T, IObject) #optional_allocator_error {
-    arr, err := mem.alloc_bytes(count * size_of(T), align_of(T), graphics_api.engineDefAllocator)
+alloc_objectSlice :: #force_inline proc($T:typeid, #any_int count:int) -> ([]T, runtime.Allocator_Error) where intrinsics.type_is_subtype_of(T, iobject) #optional_allocator_error {
+    arr, err := mem.alloc_bytes(count * size_of(T), align_of(T), sys.engine_def_allocator)
     if err != .None do return nil, err
     s := runtime.Raw_Slice{raw_data(arr), count}
     return transmute([]T)s, .None
 }
 
-AllocObjectDynamic :: #force_inline proc($T:typeid) -> ([dynamic]T, runtime.Allocator_Error) where intrinsics.type_is_subtype_of(T, IObject) #optional_allocator_error {
-    res, err := make([dynamic]T, graphics_api.engineDefAllocator)
+alloc_objectDynamic :: #force_inline proc($T:typeid) -> ([dynamic]T, runtime.Allocator_Error) where intrinsics.type_is_subtype_of(T, iobject) #optional_allocator_error {
+    res, err := make([dynamic]T, sys.engine_def_allocator)
     if err != .None do return nil, err
     return res, .None
 }
 
-FreeObject :: #force_inline proc(obj:^$T) where intrinsics.type_is_subtype_of(T, IObject) {
+free_object :: #force_inline proc(obj:^$T) where intrinsics.type_is_subtype_of(T, iobject) {
     aObj := FREE_OBJ{
         typeSize = size_of(T),
         len = 1,
-        deinit = obj.vtable.Deinit,
+        deinit = obj.vtable.deinit,
         obj = rawptr(obj),
     }
     sync.mutex_lock(&gFreeObjectMtx)
@@ -518,11 +518,11 @@ FreeObject :: #force_inline proc(obj:^$T) where intrinsics.type_is_subtype_of(T,
     sync.mutex_unlock(&gFreeObjectMtx)
 }
 
-FreeObjectSlice :: #force_inline proc(arr:$T/[]$E) where intrinsics.type_is_subtype_of(E, IObject) {
+free_object_slice :: #force_inline proc(arr:$T/[]$E) where intrinsics.type_is_subtype_of(E, iobject) {
     aObj := FREE_OBJ{
         typeSize = size_of(E),
         len = len(arr),
-        deinit = len(arr) > 0 ? arr[0].vtable.Deinit : nil,
+        deinit = len(arr) > 0 ? arr[0].vtable.deinit : nil,
         obj = rawptr(raw_data(arr)),
     }
     sync.mutex_lock(&gFreeObjectMtx)
@@ -530,11 +530,11 @@ FreeObjectSlice :: #force_inline proc(arr:$T/[]$E) where intrinsics.type_is_subt
     sync.mutex_unlock(&gFreeObjectMtx)
 }
 
-FreeObjectDynamic :: #force_inline proc(arr:$T/[dynamic]$E) where intrinsics.type_is_subtype_of(E, IObject) {
+free_object_dynamic :: #force_inline proc(arr:$T/[dynamic]$E) where intrinsics.type_is_subtype_of(E, iobject) {
     aObj := FREE_OBJ{
         typeSize = size_of(E),
         len = cap(arr),
-        deinit = len(arr) > 0 ? arr[0].vtable.Deinit : nil,
+        deinit = len(arr) > 0 ? arr[0].vtable.deinit : nil,
         obj = rawptr(raw_data(arr)),
     }
     sync.mutex_lock(&gFreeObjectMtx)
@@ -542,10 +542,10 @@ FreeObjectDynamic :: #force_inline proc(arr:$T/[dynamic]$E) where intrinsics.typ
     sync.mutex_unlock(&gFreeObjectMtx)
 }
 
-GraphicsWaitAllOps :: #force_inline proc () {
-    if graphics_api.is_main_thread() {
-        graphics_api.graphics_execute_ops(true)
+graphics_wait_all_ops :: #force_inline proc () {
+    if sys.is_main_thread() {
+        sys.graphics_execute_ops(true)
     } else {
-        graphics_api.graphics_wait_all_ops()
+        sys.graphics_wait_all_ops()
     }
 }

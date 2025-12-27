@@ -9,40 +9,40 @@ import "base:runtime"
 import "base:intrinsics"
 
 // 스트로크 스타일 정의
-StrokeCap :: enum {
+stroke_cap :: enum {
     Butt,    // 평평한 끝
     Round,   // 둥근 끝
     Square,  // 사각형 끝
 }
 
-StrokeJoin :: enum {
+stroke_join :: enum {
     Miter,   // 뾰족한 연결
     Round,   // 둥근 연결
     Bevel,   // 베벨 연결
 }
 
-StrokeStyle :: struct {
+stroke_style :: struct {
     width: f32,
-    cap: StrokeCap,
-    join: StrokeJoin,
-    miterLimit: f32,  // Miter join에서 사용
+    cap: stroke_cap,
+    join: stroke_join,
+    miter_limit: f32,  // Miter join에서 사용
 }
 
 
 
-ShapeVertex2D :: struct #align(1) {
+shape_vertex2d :: struct #align(1) {
     pos: linalg.PointF,
     uvw: linalg.Point3DF,
     color: linalg.Point3DwF,
 };
 
-RawShape :: struct {
-    vertices : []ShapeVertex2D,
+raw_shape :: struct {
+    vertices : []shape_vertex2d,
     indices:[]u32,
     rect:linalg.RectF,
 }
 
-CurveType :: enum {
+curve_type :: enum {
     Line,
     Unknown,
     Serpentine,
@@ -66,16 +66,16 @@ __ShapesError :: enum {
     EmptyColor,
 }
 
-ShapesError :: union #shared_nil {
+shape_error :: union #shared_nil {
     __ShapesError,
     poly2tri.Trianguate_Error,
 }
 
-Shapes :: struct {
+shapes :: struct {
     poly:[]linalg.PointF,//len(poly) == all sum nPolys
     nPolys:[]u32,
     nTypes:[]u32,
-    types:[]CurveType,
+    types:[]curve_type,
     colors:[]linalg.Point3DwF,//same length as nPolys
     strokeColors:[]linalg.Point3DwF,//same length as nPolys
     thickness:[]f32,//same length as nPolys
@@ -88,17 +88,17 @@ CvtQuadraticToCubic1 :: #force_inline proc "contextless" (_end : linalg.PointF, 
     return CvtQuadraticToCubic0(_end, _control)
 }
 
-RawShape_Free :: proc (self:^RawShape, allocator := context.allocator) {
+raw_shape_free :: proc (self:^raw_shape, allocator := context.allocator) {
     delete(self.vertices, allocator)
     delete(self.indices, allocator)
     free(self, allocator)
 }
 
-RawShape_Clone :: proc (self:^RawShape, allocator := context.allocator) -> (res:^RawShape = nil) {
-    res = new(RawShape, allocator)
-    res.vertices = mem.make_non_zeroed_slice([]ShapeVertex2D, len(self.vertices), allocator)
+raw_shape_clone :: proc (self:^raw_shape, allocator := context.allocator) -> (res:^raw_shape = nil) {
+    res = new(raw_shape, allocator)
+    res.vertices = mem.make_non_zeroed_slice([]shape_vertex2d, len(self.vertices), allocator)
     res.indices = mem.make_non_zeroed_slice([]u32, len(self.indices), allocator)
-    intrinsics.mem_copy_non_overlapping(&res.vertices[0], &self.vertices[0], len(self.vertices) * size_of(ShapeVertex2D))
+    intrinsics.mem_copy_non_overlapping(&res.vertices[0], &self.vertices[0], len(self.vertices) * size_of(shape_vertex2d))
     intrinsics.mem_copy_non_overlapping(&res.indices[0], &self.indices[0], len(self.indices) * size_of(u32))
 
     res.rect = self.rect
@@ -108,7 +108,7 @@ RawShape_Clone :: proc (self:^RawShape, allocator := context.allocator) -> (res:
 
 
 GetCubicCurveType :: proc "contextless" (_start:[2]$T, _control0:[2]T, _control1:[2]T, _end:[2]T) ->
-(type:CurveType = .Unknown, err:ShapesError = nil, outD:[3]T) where intrinsics.type_is_float(T) {
+(type:curve_type = .Unknown, err:shape_error = nil, outD:[3]T) where intrinsics.type_is_float(T) {
 
     if _start == _control0 && _control0 == _control1 && _control1 == _end {
         err = .IsPointNotLine
@@ -182,19 +182,19 @@ LineSplitLine :: proc "contextless" (pts:[2][$N]$T, t:T) -> (outPts1:[2][N]T, ou
 }
 
 @(private="file") _Shapes_ComputeLine :: proc(
-    vertList:^[dynamic]ShapeVertex2D,
+    vertList:^[dynamic]shape_vertex2d,
     indList:^[dynamic]u32,
     outPoly:^[dynamic]CurveStruct,
     color:linalg.Point3DwF,
     pts:[]linalg.PointF,
-    type:CurveType,
+    type:curve_type,
     _subdiv :f32 = 0.0,
-    _repeat :int = -1) -> ShapesError {
+    _repeat :int = -1) -> shape_error {
 
     if _subdiv < 0 do trace.panic_log("_subdiv can't negative.")
 
     curveType := type
-    err:ShapesError = nil
+    err:shape_error = nil
 
     pts2 : [4][2]f32
     pts_:[4][2]f32
@@ -209,33 +209,33 @@ LineSplitLine :: proc "contextless" (pts:[2][$N]$T, t:T) -> (outPts1:[2][N]T, ou
         if _subdiv == 0.0 {
             vlen :u32 = u32(len(vertList))
             if linalg.GetPolygonOrientation(pts) == .CounterClockwise {
-                non_zero_append(vertList, ShapeVertex2D{
+                non_zero_append(vertList, shape_vertex2d{
                     uvw = {0,0,0},
                     pos = pts[0],
                     color = color,
                 })
-                non_zero_append(vertList, ShapeVertex2D{
+                non_zero_append(vertList, shape_vertex2d{
                     uvw = {-0.5,0,0.5},
                     pos = pts[1],
                     color = color,
                 })
-                non_zero_append(vertList, ShapeVertex2D{
+                non_zero_append(vertList, shape_vertex2d{
                     uvw = {-1,-1,1},
                     pos = pts[2],
                     color = color,
                 })
             } else {
-                non_zero_append(vertList, ShapeVertex2D{
+                non_zero_append(vertList, shape_vertex2d{
                     uvw = {0,0,0},
                     pos = pts[0],
                     color = color,
                 })
-                non_zero_append(vertList, ShapeVertex2D{
+                non_zero_append(vertList, shape_vertex2d{
                     uvw = {0.5,0,0.5},
                     pos = pts[1],
                     color = color,
                 })
-                non_zero_append(vertList, ShapeVertex2D{
+                non_zero_append(vertList, shape_vertex2d{
                     uvw = {1,1,1},
                     pos = pts[2],
                     color = color,
@@ -413,24 +413,24 @@ LineSplitLine :: proc "contextless" (pts:[2][$N]$T, t:T) -> (outPts1:[2][N]T, ou
       F = reverseOrientation(F)
     }
 
-    appendLine :: proc (vertList:^[dynamic]ShapeVertex2D, indList:^[dynamic]u32, color:linalg.Point3DwF, pts:[]linalg.PointF, F:matrix[4,4]f32) {
+    appendLine :: proc (vertList:^[dynamic]shape_vertex2d, indList:^[dynamic]u32, color:linalg.Point3DwF, pts:[]linalg.PointF, F:matrix[4,4]f32) {
         if len(pts) == 2 {
             return
         }
         start :u32 = u32(len(vertList))
-        non_zero_append(vertList, ShapeVertex2D{
+        non_zero_append(vertList, shape_vertex2d{
             uvw = {F[0,0], F[0,1], F[0,2]},
             color = color,
         })
-        non_zero_append(vertList, ShapeVertex2D{
+        non_zero_append(vertList, shape_vertex2d{
             uvw = {F[1,0], F[1,1], F[1,2]},
             color = color,
         })
-        non_zero_append(vertList, ShapeVertex2D{
+        non_zero_append(vertList, shape_vertex2d{
             uvw = {F[2,0], F[2,1], F[2,2]},
             color = color,
         })
-        non_zero_append(vertList, ShapeVertex2D{
+        non_zero_append(vertList, shape_vertex2d{
             uvw = {F[3,0], F[3,1], F[3,2]},
             color = color,
         })
@@ -521,11 +521,11 @@ LineSplitLine :: proc "contextless" (pts:[2][$N]$T, t:T) -> (outPts1:[2][N]T, ou
     isCurve:bool,
 }
 
-Shapes_ComputePolygon :: proc(poly:^Shapes, allocator := context.allocator) -> (res:^RawShape = nil, err:ShapesError = nil) {
-    vertList:[dynamic]ShapeVertex2D = mem.make_non_zeroed_dynamic_array([dynamic]ShapeVertex2D, allocator)
+shapes_compute_polygon :: proc(poly:^shapes, allocator := context.allocator) -> (res:^raw_shape = nil, err:shape_error = nil) {
+    vertList:[dynamic]shape_vertex2d = mem.make_non_zeroed_dynamic_array([dynamic]shape_vertex2d, allocator)
     indList:[dynamic]u32 = mem.make_non_zeroed_dynamic_array([dynamic]u32, allocator)
 
-    res = mem.new_non_zeroed(RawShape, allocator)
+    res = mem.new_non_zeroed(raw_shape, allocator)
 
     defer if err != nil {
         delete(vertList)
@@ -534,7 +534,7 @@ Shapes_ComputePolygon :: proc(poly:^Shapes, allocator := context.allocator) -> (
         res = nil
     }
 
-    Shapes_ComputePolygon_In :: proc(vertList:^[dynamic]ShapeVertex2D, indList:^[dynamic]u32, poly:^Shapes, allocator : runtime.Allocator) -> (err:ShapesError = nil) {
+    shapes_compute_polygon_in :: proc(vertList:^[dynamic]shape_vertex2d, indList:^[dynamic]u32, poly:^shapes, allocator : runtime.Allocator) -> (err:shape_error = nil) {
         outPoly:[][dynamic]CurveStruct = mem.make_non_zeroed_slice([][dynamic]CurveStruct, len(poly.nPolys), context.temp_allocator)
         outPoly2:[dynamic]linalg.PointF = mem.make_non_zeroed_dynamic_array([dynamic]linalg.PointF, context.temp_allocator)
         outPoly2N:[]u32 = mem.make_non_zeroed_slice([]u32, len(poly.nPolys), context.temp_allocator)
@@ -637,7 +637,7 @@ Shapes_ComputePolygon :: proc(poly:^Shapes, allocator := context.allocator) -> (
         vLen :u32 = auto_cast len(vertList)//Existing Curve Vertices Length
         for _, i in outPoly2N {
             for idx in start..<start+outPoly2N[i] {
-                non_zero_append(vertList, ShapeVertex2D{
+                non_zero_append(vertList, shape_vertex2d{
                     pos = outPoly2[idx],
                     uvw = {1,0,0},
                     color = poly.colors[i],
@@ -656,12 +656,12 @@ Shapes_ComputePolygon :: proc(poly:^Shapes, allocator := context.allocator) -> (
 
 
     if poly.colors != nil {
-        err = Shapes_ComputePolygon_In(&vertList, &indList, poly, allocator)
+        err = shapes_compute_polygon_in(&vertList, &indList, poly, allocator)
         if err != nil do return
     }
 
     if poly.thickness != nil && poly.strokeColors != nil {
-        polyT:^Shapes = mem.new(Shapes, context.temp_allocator)
+        polyT:^shapes = mem.new(shapes, context.temp_allocator)
         defer free(polyT, context.temp_allocator)
 
         polyT.poly = mem.make_non_zeroed_slice([]linalg.PointF, len(poly.poly) * 2, context.temp_allocator)
@@ -673,7 +673,7 @@ Shapes_ComputePolygon :: proc(poly:^Shapes, allocator := context.allocator) -> (
         polyT.colors = mem.make_non_zeroed_slice([]linalg.Point3DwF, len(poly.strokeColors) * 2, context.temp_allocator)
         defer delete(polyT.colors, context.temp_allocator)
 
-        polyT.types = mem.make_non_zeroed_slice([]CurveType, len(poly.types) * 2, context.temp_allocator)
+        polyT.types = mem.make_non_zeroed_slice([]curve_type, len(poly.types) * 2, context.temp_allocator)
         defer delete(polyT.types, context.temp_allocator)
 
         polyT.nTypes = mem.make_non_zeroed_slice([]u32, len(poly.nTypes) * 2, context.temp_allocator)
@@ -700,7 +700,7 @@ Shapes_ComputePolygon :: proc(poly:^Shapes, allocator := context.allocator) -> (
 
                 polyT.poly[start_2 + e] = linalg.LineExtendPoint(prevPoint, poly.poly[start_ + e], nextPoint, poly.thickness[i], polyOri)
             }
-            ReversePolygonExceptFirst :: proc "contextless" (poly: []linalg.PointF, types:[]CurveType) {
+            ReversePolygonExceptFirst :: proc "contextless" (poly: []linalg.PointF, types:[]curve_type) {
                 count := len(poly) - 1
                 for j in 0..<(count/2) {
                     tmp := poly[j + 1]
@@ -738,7 +738,7 @@ Shapes_ComputePolygon :: proc(poly:^Shapes, allocator := context.allocator) -> (
             start_type2 += poly.nTypes[i]
         }
 
-        err = Shapes_ComputePolygon_In(&vertList, &indList, polyT, allocator)
+        err = shapes_compute_polygon_in(&vertList, &indList, polyT, allocator)
         if err != nil do return
     }
 

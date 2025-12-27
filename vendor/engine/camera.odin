@@ -8,59 +8,59 @@ import "core:math/linalg"
 import "base:intrinsics"
 import "base:runtime"
 import vk "vendor:vulkan"
-import graphics_api "./graphics_api"
+import sys "./sys"
 
-Camera :: struct {
-    using _: __MatrixIn,
+camera :: struct {
+    using _: __matrix_in,
 }
 
-Camera_InitMatrixRaw :: proc (self:^Camera, mat:linalg.Matrix) {
-    mem.ICheckInit_Init(&self.checkInit)
+camera_init_matrix_raw :: proc (self:^camera, mat:linalg.Matrix) {
+    mem.ICheckInit_Init(&self.check_init)
     self.mat = mat
-    __Camera_Init(self)
+    __camera_init(self)
 }
 
-@private __Camera_Init :: #force_inline proc(self:^Camera) {
-    mem.ICheckInit_Init(&self.checkInit)
-    graphics_api.BufferResource_CreateBuffer(&self.matUniform, {
+@private __camera_init :: #force_inline proc(self:^camera) {
+    mem.ICheckInit_Init(&self.check_init)
+    sys.buffer_resource_create_buffer(&self.mat_uniform, {
         len = size_of(linalg.Matrix),
         type = .UNIFORM,
-        resourceUsage = .CPU,
+        resource_usage = .CPU,
     }, mem.ptr_to_bytes(&self.mat), true)
 }
 
-Camera_Deinit :: proc(self:^Camera) {
-    mem.ICheckInit_Deinit(&self.checkInit)
-    BufferResource_Deinit(&self.matUniform)
+camera_deinit :: proc(self:^camera) {
+    mem.ICheckInit_Deinit(&self.check_init)
+    sys.buffer_resource_deinit(&self.mat_uniform)
 }
 
-Camera_UpdateMatrixRaw :: proc(self:^Camera, _mat:linalg.Matrix) {
-    mem.ICheckInit_Check(&self.checkInit)
+camera_update_matrix_raw :: proc(self:^camera, _mat:linalg.Matrix) {
+    mem.ICheckInit_Check(&self.check_init)
     self.mat = _mat
-    graphics_api.BufferResource_CopyUpdate(&self.matUniform, &self.mat)
+    sys.buffer_resource_copy_update(&self.mat_uniform, &self.mat)
 }
 
-@private __Camera_Update :: #force_inline proc(self:^Camera, eyeVec:linalg.Point3DF, focusVec:linalg.Point3DF, upVec:linalg.Point3DF = {0,0,1}) {
-    f := linalg.normalize(focusVec - eyeVec)
-	s := linalg.normalize(linalg.cross(upVec, f))
+@private __camera_update :: #force_inline proc(self:^camera, eye_vec:linalg.Point3DF, focus_vec:linalg.Point3DF, up_vec:linalg.Point3DF = {0,0,1}) {
+    f := linalg.normalize(focus_vec - eye_vec)
+	s := linalg.normalize(linalg.cross(up_vec, f))
 	u := linalg.normalize(linalg.cross(f, s))
 
-	fe := linalg.dot(f, eyeVec)
+	fe := linalg.dot(f, eye_vec)
 
     self.mat = {
-		+s.x, +s.y, +s.z, -linalg.dot(s, eyeVec),
-		+u.x, +u.y, +u.z, -linalg.dot(u, eyeVec),
+		+s.x, +s.y, +s.z, -linalg.dot(s, eye_vec),
+		+u.x, +u.y, +u.z, -linalg.dot(u, eye_vec),
 		+f.x, +f.y, +f.z, -fe,
 		   0,    0,    0, 1,
 	}
 }
 
-Camera_Init :: proc (self:^Camera, eyeVec:linalg.Point3DF = {0,0,-1}, focusVec:linalg.Point3DF = {0,0,0}, upVec:linalg.Point3DF = {0,1,0}) {
-    __Camera_Update(self, eyeVec, focusVec, upVec)
-    __Camera_Init(self)
+camera_init :: proc (self:^camera, eye_vec:linalg.Point3DF = {0,0,-1}, focus_vec:linalg.Point3DF = {0,0,0}, up_vec:linalg.Point3DF = {0,1,0}) {
+    __camera_update(self, eye_vec, focus_vec, up_vec)
+    __camera_init(self)
 }
 
-Camera_Update :: proc(self:^Camera, eyeVec:linalg.Point3DF = {0,0,-1}, focusVec:linalg.Point3DF = {0,0,0}, upVec:linalg.Point3DF = {0,0,1}) {
-    __Camera_Update(self, eyeVec, focusVec, upVec)
-    Camera_UpdateMatrixRaw(self, self.mat)
+camera_update :: proc(self:^camera, eye_vec:linalg.Point3DF = {0,0,-1}, focus_vec:linalg.Point3DF = {0,0,0}, up_vec:linalg.Point3DF = {0,0,1}) {
+    __camera_update(self, eye_vec, focus_vec, up_vec)
+    camera_update_matrix_raw(self, self.mat)
 }

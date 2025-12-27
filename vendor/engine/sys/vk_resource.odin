@@ -1,5 +1,5 @@
 #+private
-package graphics_api
+package sys
 
 import vk "vendor:vulkan"
 import "core:mem"
@@ -10,7 +10,7 @@ import "core:math"
 import "core:c"
 
 
-@(require_results) samplesToVkSampleCountFlags :: proc "contextless"(#any_int samples : int) -> vk.SampleCountFlags {
+@(require_results) samples_to_vk_sample_count_flags :: proc "contextless"(#any_int samples : int) -> vk.SampleCountFlags {
     switch samples {
         case 1: return {._1}
         case 2: return {._2}
@@ -20,17 +20,17 @@ import "core:c"
         case 32: return {._32}
         case 64: return {._64}
     }
-    trace.panic_log("unsupport samples samplesToVkSampleCountFlags : ", samples)
+    trace.panic_log("unsupport samples samples_to_vk_sample_count_flags : ", samples)
 }
 
-@(require_results) TextureTypeToVkImageType :: proc "contextless"(t : TextureType) -> vk.ImageType {
+@(require_results) texture_type_to_vk_image_type :: proc "contextless"(t : texture_type) -> vk.ImageType {
     switch t {
         case .TEX2D:return .D2
     }
     return .D2
 }
 
-@(require_results) DescriptorTypeToVkDescriptorType :: proc "contextless"(t : custom_object_DescriptorType) -> vk.DescriptorType {
+@(require_results) descriptor_type_to_vk_descriptor_type :: proc "contextless"(t : descriptor_type) -> vk.DescriptorType {
     switch t {
         case .SAMPLER : return .COMBINED_IMAGE_SAMPLER
         case .UNIFORM : return .UNIFORM_BUFFER

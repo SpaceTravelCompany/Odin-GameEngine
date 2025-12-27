@@ -1,10 +1,10 @@
 package engine
 
-import graphics_api "./graphics_api"
+import sys "./sys"
 
 ianimate_object :: struct {
-    using object:IObject,
-    frameUniform:graphics_api.BufferResource,
+    using object:iobject,
+    frame_uniform:sys.buffer_resource,
     frame:u32,
 }
 
@@ -65,11 +65,11 @@ animate_player_next_frame :: proc (self:^animate_player) {
 }
 
 ianimate_object_get_frame_cnt :: #force_inline proc "contextless" (self:^ianimate_object) -> u32{
-    return ((^IAnimateObjectVTable)(self.vtable)).get_frame_cnt(self)
+    return ((^ianimate_object_vtable)(self.vtable)).get_frame_cnt(self)
 }
 
 ianimate_object_update_frame :: #force_inline proc (self:^ianimate_object) {
-    BufferResource_CopyUpdate(&self.frameUniform, &self.frame)
+    sys.buffer_resource_copy_update(&self.frame_uniform, &self.frame)
 }
 
 ianimate_object_next_frame :: #force_inline proc (self:^ianimate_object) {

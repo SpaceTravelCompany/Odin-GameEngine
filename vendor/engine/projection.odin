@@ -8,76 +8,76 @@ import "core:math/linalg"
 import "base:intrinsics"
 import "base:runtime"
 import vk "vendor:vulkan"
-import "graphics_api"
+import sys "./sys"
 
-Projection :: struct {
-    using _: __MatrixIn,
+projection :: struct {
+    using _: __matrix_in,
 }
 
-Projection_InitMatrixOrtho :: proc (self:^Projection, left:f32, right:f32, bottom:f32, top:f32, near:f32 = 0.1, far:f32 = 100, flipZAxisForVulkan := true) {
-    __Projection_UpdateOrtho(self, left, right, bottom, top, near, far, flipZAxisForVulkan)
-    __Projection_Init(self)
+projection_init_matrix_ortho :: proc (self:^projection, left:f32, right:f32, bottom:f32, top:f32, near:f32 = 0.1, far:f32 = 100, flip_z_axis_for_vulkan := true) {
+    __projection_update_ortho(self, left, right, bottom, top, near, far, flip_z_axis_for_vulkan)
+    __projection_init(self)
 }
 
-Projection_InitMatrixOrthoWindow :: proc (self:^Projection, width:f32, height:f32, near:f32 = 0.1, far:f32 = 100, flipZAxisForVulkan := true) {
-    __Projection_UpdateOrthoWindow(self, width, height, near, far, flipZAxisForVulkan)
-    __Projection_Init(self)
+projection_init_matrix_ortho_window :: proc (self:^projection, width:f32, height:f32, near:f32 = 0.1, far:f32 = 100, flip_z_axis_for_vulkan := true) {
+    __projection_update_ortho_window(self, width, height, near, far, flip_z_axis_for_vulkan)
+    __projection_init(self)
 }
 
-@private __Projection_UpdateOrtho :: #force_inline proc(self:^Projection, left:f32, right:f32, bottom:f32, top:f32, near:f32 = 0.1, far:f32 = 100, flipZAxisForVulkan := true) {
-    self.mat = linalg.matrix_ortho3d_f32(left, right, bottom, top, near, far, flipZAxisForVulkan)
+@private __projection_update_ortho :: #force_inline proc(self:^projection, left:f32, right:f32, bottom:f32, top:f32, near:f32 = 0.1, far:f32 = 100, flip_z_axis_for_vulkan := true) {
+    self.mat = linalg.matrix_ortho3d_f32(left, right, bottom, top, near, far, flip_z_axis_for_vulkan)
 }
 
-Projection_UpdateOrtho :: #force_inline proc(self:^Projection,  left:f32, right:f32, bottom:f32, top:f32, near:f32 = 0.1, far:f32 = 100, flipZAxisForVulkan := true) {
-    __Projection_UpdateOrtho(self, left, right, bottom, top, near, far, flipZAxisForVulkan)
-    Projection_UpdateMatrixRaw(self, self.mat)
+projection_update_ortho :: #force_inline proc(self:^projection,  left:f32, right:f32, bottom:f32, top:f32, near:f32 = 0.1, far:f32 = 100, flip_z_axis_for_vulkan := true) {
+    __projection_update_ortho(self, left, right, bottom, top, near, far, flip_z_axis_for_vulkan)
+    projection_update_matrix_raw(self, self.mat)
 }
 
-@private __Projection_UpdateOrthoWindow :: #force_inline proc(self:^Projection, width:f32, height:f32, near:f32 = 0.1, far:f32 = 100, flipAxisForVulkan := true) {
-    windowWidthF := f32(graphics_api.__windowWidth.?)
-    windowHeightF := f32(graphics_api.__windowHeight.?)
-    ratio := windowWidthF / windowHeightF > width / height ? height / windowHeightF : width / windowWidthF
+@private __projection_update_ortho_window :: #force_inline proc(self:^projection, width:f32, height:f32, near:f32 = 0.1, far:f32 = 100, flip_axis_for_vulkan := true) {
+    window_width_f := f32(sys.__window_width.?)
+    window_height_f := f32(sys.__window_height.?)
+    ratio := window_width_f / window_height_f > width / height ? height / window_height_f : width / window_width_f
 
-    windowWidthF *= ratio
-    windowHeightF *= ratio
+    window_width_f *= ratio
+    window_height_f *= ratio
 
     self.mat = {
-        2.0 / windowWidthF, 0, 0, 0,
-        0, 2.0 / windowHeightF, 0, 0,
+        2.0 / window_width_f, 0, 0, 0,
+        0, 2.0 / window_height_f, 0, 0,
         0, 0, 1 / (far - near), -near / (far - near),
         0, 0, 0, 1,
     }
-    if flipAxisForVulkan {
+    if flip_axis_for_vulkan {
         self.mat[1,1] = -self.mat[1,1]
     }
 }
 
-Projection_UpdateOrthoWindow :: #force_inline proc(self:^Projection, width:f32, height:f32, near:f32 = 0.1, far:f32 = 100, flipZAxisForVulkan := true) {
-    __Projection_UpdateOrthoWindow(self, width, height, near, far, flipZAxisForVulkan)
-    Projection_UpdateMatrixRaw(self, self.mat)
+projection_update_ortho_window :: #force_inline proc(self:^projection, width:f32, height:f32, near:f32 = 0.1, far:f32 = 100, flip_z_axis_for_vulkan := true) {
+    __projection_update_ortho_window(self, width, height, near, far, flip_z_axis_for_vulkan)
+    projection_update_matrix_raw(self, self.mat)
 }
 
-Projection_InitMatrixRaw :: proc (self:^Projection, mat:linalg.Matrix) {
+projection_init_matrix_raw :: proc (self:^projection, mat:linalg.Matrix) {
     self.mat = mat
 
-    __Projection_Init(self)
+    __projection_init(self)
 }
 
 
 //! aspect is 0 means use window aspect
-Projection_InitMatrixPerspective :: proc (self:^Projection, fov:f32, aspect:f32 = 0, near:f32 = 0.1, far:f32 = 100, flipZAxisForVulkan := true) {
-    __Projection_UpdatePerspective(self, fov, aspect, near, far, flipZAxisForVulkan)
-    __Projection_Init(self)
+projection_init_matrix_perspective :: proc (self:^projection, fov:f32, aspect:f32 = 0, near:f32 = 0.1, far:f32 = 100, flip_z_axis_for_vulkan := true) {
+    __projection_update_perspective(self, fov, aspect, near, far, flip_z_axis_for_vulkan)
+    __projection_init(self)
 }
 
-@private __Projection_UpdatePerspective :: #force_inline proc(self:^Projection, fov:f32, aspect:f32 = 0, near:f32 = 0.1, far:f32 = 100, flipAxisForVulkan := true) {
-    aspectF := aspect
-    if aspectF == 0 do aspectF = f32(graphics_api.__windowWidth.?) / f32(graphics_api.__windowHeight.?)
+@private __projection_update_perspective :: #force_inline proc(self:^projection, fov:f32, aspect:f32 = 0, near:f32 = 0.1, far:f32 = 100, flip_axis_for_vulkan := true) {
+    aspect_f := aspect
+    if aspect_f == 0 do aspect_f = f32(sys.__window_width.?) / f32(sys.__window_height.?)
     sfov :f32 = math.sin(0.5 * fov)
     cfov :f32 = math.cos(0.5 * fov)
 
     h := cfov / sfov
-    w := h / aspectF
+    w := h / aspect_f
     r := far / (far - near)
     self.mat = {
          w, 0, 0, 0,
@@ -85,46 +85,46 @@ Projection_InitMatrixPerspective :: proc (self:^Projection, fov:f32, aspect:f32 
          0, 0, r, -r * near,
          0, 0, 1, 0,
     };
-    if flipAxisForVulkan {
+    if flip_axis_for_vulkan {
         self.mat[1,1] = -self.mat[1,1]
     }
 }
 
-Projection_UpdatePerspective :: #force_inline proc(self:^Projection, fov:f32, aspect:f32 = 0, near:f32 = 0.1, far:f32 = 100, flipAxisForVulkan := true) {
-    __Projection_UpdatePerspective(self, fov, aspect, near, far, flipAxisForVulkan)
-    Projection_UpdateMatrixRaw(self, self.mat)
+projection_update_perspective :: #force_inline proc(self:^projection, fov:f32, aspect:f32 = 0, near:f32 = 0.1, far:f32 = 100, flip_axis_for_vulkan := true) {
+    __projection_update_perspective(self, fov, aspect, near, far, flip_axis_for_vulkan)
+    projection_update_matrix_raw(self, self.mat)
 }
 
 //? uniform object is all small, so use_gcpu_mem is true by default
-@private __Projection_Init :: #force_inline proc(self:^Projection) {
-    mem.ICheckInit_Init(&self.checkInit)
+@private __projection_init :: #force_inline proc(self:^projection) {
+    mem.ICheckInit_Init(&self.check_init)
     mat : linalg.Matrix
     when is_mobile {
-        mat = linalg.matrix_mul(graphics_api.RotationMatrix, self.mat)
+        mat = linalg.matrix_mul(sys.rotation_matrix, self.mat)
     } else {
         mat = self.mat
     }
-    graphics_api.BufferResource_CreateBuffer(&self.matUniform, {
+    sys.buffer_resource_create_buffer(&self.mat_uniform, {
         len = size_of(linalg.Matrix),
         type = .UNIFORM,
-        resourceUsage = .CPU,
+        resource_usage = .CPU,
         single = false,
     }, mem.ptr_to_bytes(&mat), true)
 }
 
-Projection_Deinit :: proc(self:^Projection) {
-    mem.ICheckInit_Deinit(&self.checkInit)
-    graphics_api.BufferResource_Deinit(&self.matUniform)
+projection_deinit :: proc(self:^projection) {
+    mem.ICheckInit_Deinit(&self.check_init)
+    sys.buffer_resource_deinit(&self.mat_uniform)
 }
 
-Projection_UpdateMatrixRaw :: proc(self:^Projection, _mat:linalg.Matrix) {
-    mem.ICheckInit_Check(&self.checkInit)
+projection_update_matrix_raw :: proc(self:^projection, _mat:linalg.Matrix) {
+    mem.ICheckInit_Check(&self.check_init)
     mat : linalg.Matrix
     when is_mobile {
-        mat = linalg.matrix_mul(graphics_api.RotationMatrix, _mat)
+        mat = linalg.matrix_mul(sys.rotation_matrix, _mat)
     } else {
         mat = _mat
     }
     self.mat = _mat
-    graphics_api.BufferResource_CopyUpdate(&self.matUniform, &mat)
+    sys.buffer_resource_copy_update(&self.mat_uniform, &mat)
 }
