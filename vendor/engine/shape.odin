@@ -34,15 +34,15 @@ camera:^camera, projection:^projection,  rotation:f32 = 0.0, scale:linalg.PointF
  where intrinsics.type_is_subtype_of(actualType, shape) {
     self.src = src
 
-    self.set.bindings = __transformUniformPoolBinding[:]
-    self.set.size = __transformUniformPoolSizes[:]
-    self.set.layout = vkshapeDescriptorSetLayout
+    self.set.bindings = sys.__transform_uniform_pool_binding[:]
+    self.set.size = sys.__transform_uniform_pool_sizes[:]
+    self.set.layout = sys.shape_descriptor_set_layout
 
     self.vtable = vtable == nil ? &shape_vtable : vtable
     if self.vtable.draw == nil do self.vtable.draw = auto_cast _super_shape_draw
     if self.vtable.deinit == nil do self.vtable.deinit = auto_cast _super_shape_deinit
 
-    if self.vtable.get_uniform_resources == nil do self.vtable.get_uniform_resources = auto_cast get_uniform_resources_shape
+    if self.vtable.get_uniform_resources == nil do self.vtable.get_uniform_resources = get_uniform_resources_default
 
     iobject_init(self, actualType, pos, rotation, scale, camera, projection, colorTransform, pivot)
 }

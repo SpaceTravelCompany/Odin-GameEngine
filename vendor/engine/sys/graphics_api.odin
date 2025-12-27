@@ -510,6 +510,26 @@ texture_init :: proc(
 	self.set.size = __single_sampler_pool_sizes[:]
 	self.set.layout = tex_descriptor_set_layout2
 	self.set.__set = 0
+
+	alloc_pixels := mem.make_non_zeroed_slice([]byte, width * height * 4, engine_def_allocator)
+	engine.color_fmt_convert_default(pixels, alloc_pixels, in_pixel_fmt)
+
+	buffer_resource_create_texture(&self.texture, {
+		width = auto_cast width,
+		height = auto_cast height,
+		use_gcpu_mem = false,
+		format = .DefaultColor,
+		samples = 1,
+		len = 1,
+		texture_usage = {.IMAGE_RESOURCE},
+		type = .TEX2D,
+		resource_usage = resource_usage,
+		single = false,
+	}, self.sampler, alloc_pixels, false, engine_def_allocator)
+
+	self.set.__resources = mem.make_non_zeroed_slice([]union_resource, 1, temp_arena_allocator)
+	self.set.__resources[0] = &self.texture
+	update_descriptor_sets(mem.slice_ptr(&self.set, 1))
 }
 
 texture_init_grey :: proc(
