@@ -317,6 +317,7 @@ allocator : runtime.Allocator) -> (rect:linalg.RectF, err:geometry.shape_error =
     }
 
     thickness2 := color != nil ? -thickness : thickness
+    thickness2 = f32(int(thickness2 * 10000 / 10000)) //소수점 아래 4자리 이하로 자른다. //!need test
 
     if ok {
         charD = &self.char_array[FONT_KEY{_char, thickness2}]
