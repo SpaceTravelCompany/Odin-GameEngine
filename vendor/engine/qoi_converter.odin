@@ -92,7 +92,7 @@ qoi_converter_load_file :: proc (self:^qoi_converter, file_path:string, out_fmt:
     return qoi_converter_load(self, imgFileData, out_fmt, allocator)
 }
 
-qoi_converter_encode :: proc (self:^qoi_converter, data:[]byte, in_fmt:color_fmt, width:int, height:int, allocator := context.allocator) -> ([]byte, Qoi_Error) {
+qoi_converter_encode :: proc (self:^qoi_converter, data:[]byte, in_fmt:color_fmt, width:u32, height:u32, allocator := context.allocator) -> ([]byte, Qoi_Error) {
     qoi_converter_deinit(self)
 
     ok:bool
@@ -109,16 +109,16 @@ qoi_converter_encode :: proc (self:^qoi_converter, data:[]byte, in_fmt:color_fmt
     #partial switch in_fmt {
         case .RGBA: 
             if s.len % 4 != 0 do return nil, .Encode_Size_Mismatch
-            self.img^, ok = image.pixels_to_image((cast([^][4]byte)s.data)[:s.len / 4], width, height)
+            self.img^, ok = image.pixels_to_image((cast([^][4]byte)s.data)[:s.len / 4], int(width), int(height))
         case .RGBA16:
             if s.len % 8 != 0 do return nil, .Encode_Size_Mismatch
-            self.img^, ok = image.pixels_to_image((cast([^][4]u16)s.data)[:s.len / 8], width, height)
+            self.img^, ok = image.pixels_to_image((cast([^][4]u16)s.data)[:s.len / 8], int(width), int(height))
         case .RGB:
             if s.len % 3 != 0 do return nil, .Encode_Size_Mismatch
-            self.img^, ok = image.pixels_to_image((cast([^][3]byte)s.data)[:s.len / 3], width, height)
+            self.img^, ok = image.pixels_to_image((cast([^][3]byte)s.data)[:s.len / 3], int(width), int(height))
         case .RGB16:
             if s.len % 6 != 0 do return nil, .Encode_Size_Mismatch
-            self.img^, ok = image.pixels_to_image((cast([^][3]u16)s.data)[:s.len / 6], width, height)
+            self.img^, ok = image.pixels_to_image((cast([^][3]u16)s.data)[:s.len / 6], int(width), int(height))
         case : trace.panic_log("unsupport option")
     }
 
@@ -138,7 +138,7 @@ qoi_converter_encode :: proc (self:^qoi_converter, data:[]byte, in_fmt:color_fmt
     return bytes.buffer_to_bytes(&out), nil
 }
 
-qoi_converter_encode_file :: proc (self:^qoi_converter, data:[]byte, in_fmt:color_fmt, width:int, height:int, save_file_path:string) -> Qoi_Error {
+qoi_converter_encode_file :: proc (self:^qoi_converter, data:[]byte, in_fmt:color_fmt, width:u32, height:u32, save_file_path:string) -> Qoi_Error {
     out, err := qoi_converter_encode(self, data, in_fmt, width, height, context.temp_allocator)
     if err != nil do return err
 
