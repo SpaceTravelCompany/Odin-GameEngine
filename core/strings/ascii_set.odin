@@ -42,3 +42,17 @@ Returns:
 ascii_set_contains :: proc(as: Ascii_Set, c: byte) -> (res: bool) #no_bounds_check {
 	return as[c>>5] & (1<<(c&31)) != 0
 }
+
+is_digit :: proc(c: byte) -> bool {
+	return c >= '0' && c <= '9'
+}
+
+is_digit_str :: proc(s: string) -> bool {
+	arr := transmute([]byte)s
+	for c in arr {
+		if !is_digit(c) {
+			return false
+		}
+	}
+	return true
+}
