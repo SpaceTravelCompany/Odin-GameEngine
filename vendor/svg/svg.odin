@@ -80,11 +80,16 @@ POLYGON :: struct {
 	_0:     FILL_AND_STROKE,
 }
 
-SVG_ERROR :: enum {
+__SVG_ERROR :: enum {
 	NOT_INITIALIZED,
 	OVERLAPPING_NODE,
 	INVALID_NODE,
 	UNSUPPORTED_FEATURE,
+}
+
+SVG_ERROR :: union {
+	__SVG_ERROR,
+	xml.Error,
 }
 
 svg_shape_ptr :: union #no_nil {
@@ -98,10 +103,9 @@ svg_shape_ptr :: union #no_nil {
     ^SVG,
 }
 
-SVG_Parser :: struct {
+svg_parser :: struct {
 	arena_allocator: Maybe(mem.Allocator),
     __arena:         mem.Dynamic_Arena,
-	xml_error_code:  xml.Error,
 	svg:             SVG,
 	path:            []PATH,
 	rect:            []RECT,
@@ -503,14 +507,14 @@ SVG_Parser :: struct {
 	return true
 }
 
-deinit :: proc(self: ^SVG_Parser) {
+deinit :: proc(self: ^svg_parser) {
 	if arena, ok := self.arena_allocator.?; ok {
 		mem.dynamic_arena_destroy(&self.__arena)
 		self.arena_allocator = nil
 	}
 }
 
-init_parse :: proc(svg_data: []u8, allocator: mem.Allocator = context.allocator) -> (parser: SVG_Parser, err: SVG_ERROR) {
+init_parse :: proc(svg_data: []u8, allocator: mem.Allocator = context.allocator) -> (parser: svg_parser, err: SVG_ERROR) {
 	parser = {}
     mem.dynamic_arena_init(&parser.__arena, allocator,allocator)
 	arena := mem.dynamic_arena_allocator(&parser.__arena)
@@ -522,8 +526,8 @@ init_parse :: proc(svg_data: []u8, allocator: mem.Allocator = context.allocator)
 	// Parse XML document
 	xml_doc, xml_err := xml.parse_bytes(svg_data, {}, "", allocator = arena)
 	if xml_err != nil {
-		parser.xml_error_code = xml_err
-		return parser, .INVALID_NODE
+		err = xml_err
+		return
 	}
 	defer xml.destroy(xml_doc)
 
@@ -549,7 +553,7 @@ init_parse :: proc(svg_data: []u8, allocator: mem.Allocator = context.allocator)
 		polyline_list: ^[dynamic]POLYLINE,
 		polygon_list: ^[dynamic]POLYGON,
 		shapes_list: ^[dynamic]svg_shape_ptr,
-		parser: ^SVG_Parser,
+		parser: ^svg_parser,
 		allocator: mem.Allocator,
 	) -> (ok: bool) {
 		element := &doc.elements[element_id]
