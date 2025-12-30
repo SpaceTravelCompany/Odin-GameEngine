@@ -229,9 +229,7 @@ start_tracking_allocator :: proc() {
 
 destroy_tracking_allocator :: proc() {
 	when ODIN_DEBUG {
-		if !is_main_thread() {
-			__destroy_tracking_allocator()
-		}	
+		__destroy_tracking_allocator()
 	}
 }
 
@@ -251,6 +249,7 @@ destroy_tracking_allocator :: proc() {
 				}
 			}
 			mem.tracking_allocator_destroy(&track_allocator)
+			track_allocator = {}
 		}
 	}
 }
