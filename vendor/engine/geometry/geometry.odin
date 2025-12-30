@@ -89,6 +89,7 @@ CvtQuadraticToCubic1 :: #force_inline proc "contextless" (_end : linalg.PointF, 
 }
 
 raw_shape_free :: proc (self:^raw_shape, allocator := context.allocator) {
+    if self == nil do return
     delete(self.vertices, allocator)
     delete(self.indices, allocator)
     free(self, allocator)
@@ -742,10 +743,11 @@ shapes_compute_polygon :: proc(poly:^shapes, allocator := context.allocator) -> 
         if err != nil do return
     }
 
-    shrink(&vertList)
-    shrink(&indList)
-    res.vertices = vertList[:]
-    res.indices = indList[:]
+    res.vertices = mem.make_non_zeroed_slice([]shape_vertex2d, len(vertList), allocator)
+    res.indices = mem.make_non_zeroed_slice([]u32, len(indList), allocator)
+
+    intrinsics.mem_copy_non_overlapping(&res.vertices[0], &vertList[0], len(vertList) * size_of(shape_vertex2d))
+    intrinsics.mem_copy_non_overlapping(&res.indices[0], &indList[0], len(indList) * size_of(u32))
 
     return
 }
