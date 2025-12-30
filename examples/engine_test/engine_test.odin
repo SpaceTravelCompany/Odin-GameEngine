@@ -59,7 +59,7 @@ Init ::proc() {
     engine.projection_init_matrix_ortho_window(&proj, CANVAS_W, CANVAS_H)
 
     //Font Test
-    shape: ^engine.shape = engine.alloc_object(engine.shape)
+    shape: ^engine.shape = new(engine.shape, engine.def_allocator())
 
     fontFileData:[]u8
     defer delete(fontFileData, context.temp_allocator)
@@ -171,7 +171,7 @@ Init ::proc() {
 
     engine.texture_init(&texture, u32(engine.image_converter_width(&qoiD)), u32(engine.image_converter_height(&qoiD)), imgData)
 
-    img: ^GUI_Image = engine.alloc_object(GUI_Image)
+    img: ^GUI_Image = new(GUI_Image, engine.def_allocator())
     img.com.gui_scale = {0.7,0.7}
     img.com.gui_rotation = math.to_radians_f32(45.0)
     img.com.gui_align_x = .left
@@ -210,7 +210,9 @@ Destroy ::proc() {
     engine.texture_deinit(&texture)
     len := engine.render_cmd_get_object_len(renderCmd)
     for i in 0..<len {
-        engine.iobject_deinit(engine.render_cmd_get_object(renderCmd, i))
+        obj := engine.render_cmd_get_object(renderCmd, i)
+        engine.iobject_deinit(obj)
+        free(obj, engine.def_allocator())
     }
     engine.render_cmd_deinit(renderCmd)
 
