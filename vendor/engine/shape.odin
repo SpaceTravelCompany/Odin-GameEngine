@@ -118,8 +118,10 @@ _super_shape_draw :: proc (self:^shape, cmd:sys.command_buffer) {
 
 shape_src_init_raw :: proc(self:^shape_src, raw:^geometry.raw_shape, flag:sys.resource_usage = .GPU, colorFlag:sys.resource_usage = .CPU) {
     rawC := geometry.raw_shape_clone(raw, sys.engine_def_allocator)
+    defer free(rawC, sys.engine_def_allocator)
     __vertex_buf_init(&self.vertexBuf, rawC.vertices, flag)
     __index_buf_init(&self.indexBuf, rawC.indices, flag)
+
     self.rect = rawC.rect
 }
 

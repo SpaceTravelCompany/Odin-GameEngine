@@ -123,7 +123,7 @@ font_deinit :: proc(self:^font) -> (err : freetype.Error = .Ok) {
     }
     delete(self_.char_array)
     sync.mutex_unlock(&self_.mutex)
-    free(self_)
+    free(self_, engine.def_allocator())
 
     return
 }

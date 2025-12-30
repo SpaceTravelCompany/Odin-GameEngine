@@ -255,6 +255,7 @@ vk_allocator_destroy :: proc() {
 
 	for b in gVkMemBufs {
 		vk_mem_buffer_Deinit2(b)
+		free(b, engine_def_allocator)
 	}
 	delete(gVkMemBufs)
 
@@ -631,13 +632,25 @@ where T == vk.Buffer || T == vk.Image {
 	if exiting {
 		#partial switch n in node {
 		case OpMapCopy:
-			if n.pData.allocator != nil do delete(n.pData.data, n.pData.allocator.?)
+			if n.pData.allocator != nil && n.pData.data != nil {
+				delete(n.pData.data, n.pData.allocator.?)
+				n.pData.data = nil
+				n.pData.allocator = nil
+			}
 			return
 		case OpCreateBuffer:
-			if n.src.data.allocator != nil && n.src.data.data != nil do delete(n.src.data.data, n.src.data.allocator.?)
+			if n.src.data.allocator != nil && n.src.data.data != nil {
+				delete(n.src.data.data, n.src.data.allocator.?)
+				n.src.data.data = nil
+				n.src.data.allocator = nil
+			}
 			return
 		case OpCreateTexture:
-			if n.src.data.allocator != nil && n.src.data.data != nil do delete(n.src.data.data, n.src.data.allocator.?)
+			if n.src.data.allocator != nil && n.src.data.data != nil {
+				delete(n.src.data.data, n.src.data.allocator.?)
+				n.src.data.data = nil
+				n.src.data.allocator = nil
+			}
 			return
 		}
 	} else {
@@ -742,12 +755,24 @@ vkbuffer_resource_create_texture :: proc(
 
 @(private = "file") buffer_resource_DestroyBufferNoAsync :: proc(self: ^buffer_resource) {
 	vk_mem_buffer_UnBindBufferNode(self.mem_buffer, self.__resource, self.idx)
+
+	if self.data.allocator != nil && self.data.data != nil {
+		delete(self.data.data, self.data.allocator.?)
+		self.data.data = nil
+		self.data.allocator = nil
+	}
 	self.__resource = 0
 }
 
 @(private = "file") buffer_resource_DestroyTextureNoAsync :: proc(self: ^texture_resource) {
 	vk.DestroyImageView(graphics_device, self.img_view, nil)
 	vk_mem_buffer_UnBindBufferNode(self.mem_buffer, self.__resource, self.idx)
+
+	if self.data.allocator != nil && self.data.data != nil {
+		delete(self.data.data, self.data.allocator.?)
+		self.data.data = nil
+		self.data.allocator = nil
+	}
 	self.__resource = 0
 }
 
@@ -1268,7 +1293,11 @@ vk_update_descriptor_sets :: proc(sets: []descriptor_set) {
 	for node in opAllocQueue {
 		#partial switch n in node {
 		case OpMapCopy:
-			if n.pData.allocator != nil do delete(n.pData.data, n.pData.allocator.?)
+			if n.pData.allocator != nil && n.pData.data != nil {
+				delete(n.pData.data, n.pData.allocator.?)
+				n.pData.data = nil
+				n.pData.allocator = nil
+			}
 		}
 	}
 	clear(&opAllocQueue)

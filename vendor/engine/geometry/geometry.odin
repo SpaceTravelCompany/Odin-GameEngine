@@ -523,14 +523,16 @@ LineSplitLine :: proc "contextless" (pts:[2][$N]$T, t:T) -> (outPts1:[2][N]T, ou
 }
 
 shapes_compute_polygon :: proc(poly:^shapes, allocator := context.allocator) -> (res:^raw_shape = nil, err:shape_error = nil) {
-    vertList:[dynamic]shape_vertex2d = mem.make_non_zeroed_dynamic_array([dynamic]shape_vertex2d, allocator)
-    indList:[dynamic]u32 = mem.make_non_zeroed_dynamic_array([dynamic]u32, allocator)
+    vertList:[dynamic]shape_vertex2d = mem.make_non_zeroed_dynamic_array([dynamic]shape_vertex2d, context.temp_allocator)
+    indList:[dynamic]u32 = mem.make_non_zeroed_dynamic_array([dynamic]u32, context.temp_allocator)
 
     res = mem.new_non_zeroed(raw_shape, allocator)
 
-    defer if err != nil {
+    defer {
         delete(vertList)
         delete(indList)
+    }
+    defer if err != nil {
         free(res, allocator)
         res = nil
     }
