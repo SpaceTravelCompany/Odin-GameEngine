@@ -130,15 +130,6 @@ vk_uniform_alloc :: struct {
 
 @(private="file") gWaitOpSem:sync.Sema
 
-FREE_OBJ :: struct {
-	typeSize:u64,
-	len:u64,
-	deinit:proc(obj:^engine.iobject),
-	obj:rawptr,
-}
-gFreeObjects:[dynamic]FREE_OBJ
-gFreeObjectMtx:sync.Mutex
-
 gVkMinUniformBufferOffsetAlignment : vk.DeviceSize = 0
 
 vk_wait_all_op :: #force_inline proc "contextless" () {
@@ -254,7 +245,6 @@ vk_allocator_init :: proc() {
 	opDestroyQueue = mem.make_non_zeroed([dynamic]OpNode, engine_def_allocator)
 	gVkUpdateDesciptorSetList = mem.make_non_zeroed([dynamic]vk.WriteDescriptorSet, engine_def_allocator)
 
-	gFreeObjects = mem.make_non_zeroed([dynamic]FREE_OBJ, engine_def_allocator)
 	gUniforms = mem.make_non_zeroed([dynamic]vk_uniform_alloc, engine_def_allocator)
 	gTempUniforms = mem.make_non_zeroed([dynamic]vk_temp_uniform_struct, engine_def_allocator)
 	gNonInsertedUniforms = mem.make_non_zeroed([dynamic]vk_temp_uniform_struct, engine_def_allocator)
@@ -275,6 +265,17 @@ vk_allocator_destroy :: proc() {
 			vk.DestroyDescriptorPool(graphics_device, i.pool, nil)
 		}
 	}
+
+	delete(gVkUpdateDesciptorSetList)
+	delete(gDesciptorPools)
+	delete(gUniforms)
+	delete(gTempUniforms)
+	delete(gNonInsertedUniforms)
+	delete(opQueue)
+	delete(opSaveQueue)
+	delete(opMapQueue)
+	delete(opAllocQueue)
+	delete(opDestroyQueue)
 
 	virtual.arena_destroy(&__tempArena)
 
@@ -1427,12 +1428,7 @@ vk_update_descriptor_sets :: proc(sets: []descriptor_set) {
 
 vk_op_execute_destroy :: proc() {
 	sync.atomic_mutex_lock(&gDestroyQueueMtx)
-	if len(opDestroyQueue) == 0 {
-		sync.atomic_mutex_unlock(&gDestroyQueueMtx)
-
-		sync.sema_post(&gWaitOpSem)
-		return
-	}
+	
 	for node in opDestroyQueue {
 		#partial switch n in node {
 			case OpDestroyBuffer : 
@@ -1441,15 +1437,6 @@ vk_op_execute_destroy :: proc() {
 				executeDestroyTexture(n.src)
 		}
 	}
-	sync.mutex_lock(&gFreeObjectMtx)
-	for &o in gFreeObjects {
-		for i in 0 ..< o.len {
-			o.deinit(  auto_cast &(([^]byte)(o.obj))[i * o.typeSize] )
-		}
-		mem.free_with_size(o.obj, int(o.len * o.typeSize), engine_def_allocator)
-	}
-	clear(&gFreeObjects)
-	sync.mutex_unlock(&gFreeObjectMtx)
 	
 	clear(&opDestroyQueue)
 

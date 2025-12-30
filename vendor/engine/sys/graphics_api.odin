@@ -474,7 +474,9 @@ color_transform_init_matrix_raw :: proc(self: ^color_transform, mat: linalg.Matr
 
 color_transform_deinit :: proc(self: ^color_transform) {
 	mem.ICheckInit_Deinit(&self.check_init)
-	buffer_resource_deinit(&self.mat_uniform)
+	clone_mat_uniform := new(buffer_resource, temp_arena_allocator)
+	clone_mat_uniform^ = self.mat_uniform
+	buffer_resource_deinit(clone_mat_uniform)
 }
 
 color_transform_update_matrix_raw :: proc(self: ^color_transform, _mat: linalg.Matrix) {

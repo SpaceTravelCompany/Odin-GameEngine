@@ -31,7 +31,10 @@ camera_init_matrix_raw :: proc (self:^camera, mat:linalg.Matrix) {
 
 camera_deinit :: proc(self:^camera) {
     mem.ICheckInit_Deinit(&self.check_init)
-    sys.buffer_resource_deinit(&self.mat_uniform)
+
+    clone_mat_uniform := new(sys.buffer_resource, sys.temp_arena_allocator)
+    clone_mat_uniform^ = self.mat_uniform
+    sys.buffer_resource_deinit(clone_mat_uniform)
 }
 
 camera_update_matrix_raw :: proc(self:^camera, _mat:linalg.Matrix) {

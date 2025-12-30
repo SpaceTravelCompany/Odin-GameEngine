@@ -271,7 +271,9 @@ buffer_resource_copy_update :: #force_inline proc(self:^sys.buffer_resource, dat
     sys.buffer_resource_copy_update(self, data, allocator)
 }
 buffer_resource_deinit :: #force_inline proc(self:^sys.buffer_resource) {
-    sys.buffer_resource_deinit(self)
+    clone_buf := new(sys.buffer_resource, sys.temp_arena_allocator)
+    clone_buf^ = self^
+    sys.buffer_resource_deinit(clone_buf)
 }
 
 

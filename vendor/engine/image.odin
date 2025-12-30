@@ -206,7 +206,10 @@ camera:^camera, projection:^projection, colorTransform:^color_transform = nil, v
 }   
 
 _super_animate_image_deinit :: proc(self:^animate_image) {
-    sys.buffer_resource_deinit(&self.frame_uniform)
+    clone_frame_uniform := new(sys.buffer_resource, sys.temp_arena_allocator)
+    clone_frame_uniform^ = self.frame_uniform
+    sys.buffer_resource_deinit(clone_frame_uniform)
+
     _super_iobject_deinit(auto_cast self)
 }
 
@@ -305,7 +308,10 @@ camera:^camera, projection:^projection, colorTransform:^color_transform = nil, v
 }   
 
 _super_tile_image_deinit :: proc(self:^tile_image) {
-    sys.buffer_resource_deinit(&self.tile_uniform)
+    clone_tile_uniform := new(sys.buffer_resource, sys.temp_arena_allocator)
+    clone_tile_uniform^ = self.tile_uniform
+    sys.buffer_resource_deinit(clone_tile_uniform)
+
     _super_iobject_deinit(auto_cast self)
 }
 
@@ -433,7 +439,9 @@ texture_init_msaa :: proc(self:^texture, width:u32, height:u32) {
 
 texture_deinit :: #force_inline proc(self:^texture) {
     mem.ICheckInit_Deinit(&self.check_init)
-    sys.buffer_resource_deinit(&self.texture)
+    clone_texture := new(sys.texture_resource, sys.temp_arena_allocator)
+    clone_texture^ = self.texture
+    sys.buffer_resource_deinit(clone_texture)
 }
 
 texture_width :: #force_inline proc "contextless" (self:^texture) -> u32{
@@ -487,7 +495,9 @@ texture_array_init :: proc(self:^texture_array, width:u32, height:u32, count:u32
 
 texture_array_deinit :: #force_inline proc(self:^texture_array) {
     mem.ICheckInit_Deinit(&self.check_init)
-    sys.buffer_resource_deinit(&self.texture)
+    clone_texture := new(sys.texture_resource, sys.temp_arena_allocator)
+    clone_texture^ = self.texture
+    sys.buffer_resource_deinit(clone_texture)
 }
 texture_array_width :: #force_inline proc "contextless" (self:^texture_array) -> u32 {
     return self.texture.option.width
@@ -582,7 +592,9 @@ inPixelFmt:color_fmt = .RGBA) {
 }
 tile_texture_array_deinit :: #force_inline proc(self:^tile_texture_array) {
     mem.ICheckInit_Deinit(&self.check_init)
-    sys.buffer_resource_deinit(&self.texture)
+    clone_texture := new(sys.texture_resource, sys.temp_arena_allocator)
+    clone_texture^ = self.texture
+    sys.buffer_resource_deinit(clone_texture)
 }
 tile_texture_array_width :: #force_inline proc "contextless" (self:^tile_texture_array) -> u32 {
     return self.texture.option.width

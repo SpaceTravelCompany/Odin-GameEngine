@@ -114,7 +114,10 @@ projection_update_perspective :: #force_inline proc(self:^projection, fov:f32, a
 
 projection_deinit :: proc(self:^projection) {
     mem.ICheckInit_Deinit(&self.check_init)
-    sys.buffer_resource_deinit(&self.mat_uniform)
+    
+    clone_mat_uniform := new(sys.buffer_resource, sys.temp_arena_allocator)
+    clone_mat_uniform^ = self.mat_uniform
+    sys.buffer_resource_deinit(clone_mat_uniform)
 }
 
 projection_update_matrix_raw :: proc(self:^projection, _mat:linalg.Matrix) {

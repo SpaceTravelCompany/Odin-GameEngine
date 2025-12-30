@@ -195,7 +195,9 @@ iobject_init :: proc(self:^iobject, $actual_type:typeid,
 
 _super_iobject_deinit :: #force_inline proc (self:^iobject) {
     mem.ICheckInit_Deinit(&self.check_init)
-    sys.buffer_resource_deinit(&self.mat_uniform)
+    clone_mat_uniform := new(sys.buffer_resource, sys.temp_arena_allocator)
+    clone_mat_uniform^ = self.mat_uniform
+    sys.buffer_resource_deinit(clone_mat_uniform)
 }
 
 iobject_init2 :: proc(self:^iobject, $actual_type:typeid,
@@ -402,7 +404,9 @@ set_render_clear_color :: proc "contextless" (_color:linalg.Point3DwF) {
 @private __vertex_buf_deinit :: proc (self:^__vertex_buf($NodeType)) {
     mem.ICheckInit_Deinit(&self.check_init)
 
-    sys.buffer_resource_deinit(&self.buf)
+    clone_buf := new(sys.buffer_resource, sys.temp_arena_allocator)
+    clone_buf^ = self.buf
+    sys.buffer_resource_deinit(clone_buf)
 }
 
 @private __vertex_buf_update :: proc (self:^__vertex_buf($NodeType), array:[]NodeType) {
@@ -425,7 +429,9 @@ set_render_clear_color :: proc "contextless" (_color:linalg.Point3DwF) {
 @private __storage_buf_deinit :: proc (self:^__storage_buf($NodeType)) {
     mem.ICheckInit_Deinit(&self.check_init)
 
-    sys.buffer_resource_deinit(&self.buf)
+    clone_buf := new(sys.buffer_resource, sys.temp_arena_allocator)
+    clone_buf^ = self.buf
+    sys.buffer_resource_deinit(clone_buf)
 }
 
 @private __storage_buf_update :: proc (self:^__storage_buf($NodeType), array:[]NodeType) {
@@ -448,7 +454,9 @@ set_render_clear_color :: proc "contextless" (_color:linalg.Point3DwF) {
 @private __index_buf_deinit :: proc (self:^__index_buf) {
     mem.ICheckInit_Deinit(&self.check_init)
 
-    sys.buffer_resource_deinit(&self.buf)
+    clone_buf := new(sys.buffer_resource, sys.temp_arena_allocator)
+    clone_buf^ = self.buf
+    sys.buffer_resource_deinit(clone_buf)
 }
 
 @private __index_buf_update :: #force_inline proc (self:^__index_buf, array:[]u32) {
@@ -464,58 +472,6 @@ set_render_clear_color :: proc "contextless" (_color:linalg.Point3DwF) {
 @private __storage_buf :: struct($NodeType:typeid) {
     buf:sys.buffer_resource,
     check_init: mem.ICheckInit,
-}
-
-
-//!do not use anymore
-// alloc_objectNonZeroed :: #force_inline proc($T:typeid) -> (^T, runtime.Allocator_Error) where intrinsics.type_is_subtype_of(T, iobject) #optional_allocator_error {
-//     obj, err := mem.alloc_bytes_non_zeroed(size_of(T),align_of(T), sys.engine_def_allocator)
-//     if err != .None do return nil, err
-// 	return transmute(^T)raw_data(obj), .None
-// }
-
-// alloc_objectSliceNonZeroed :: #force_inline proc($T:typeid, #any_int count:int) -> ([]T, runtime.Allocator_Error) where intrinsics.type_is_subtype_of(T, iobject) #optional_allocator_error {
-//     arr, err := mem.alloc_bytes_non_zeroed(count * size_of(T), align_of(T), sys.engine_def_allocator)
-//     if err != .None do return nil, err
-//     s := runtime.Raw_Slice{raw_data(arr), count}
-//     return transmute([]T)s, .None
-// }
-
-// alloc_objectDynamicNonZeroed :: #force_inline proc($T:typeid) -> ([dynamic]T, runtime.Allocator_Error) where intrinsics.type_is_subtype_of(T, iobject) #optional_allocator_error {
-//     res, err := make_non_zeroed_dynamic_array([dynamic]T, sys.engine_def_allocator)
-//     if err != .None do return nil, err
-//     return res, .None
-// }
-
-alloc_object :: #force_inline proc($T:typeid) -> (^T, runtime.Allocator_Error) where intrinsics.type_is_subtype_of(T, iobject) #optional_allocator_error {
-    obj, err := mem.alloc_bytes(size_of(T),align_of(T), sys.engine_def_allocator)
-    if err != .None do return nil, err
-	return transmute(^T)raw_data(obj), .None
-}
-
-alloc_objectSlice :: #force_inline proc($T:typeid, #any_int count:int) -> ([]T, runtime.Allocator_Error) where intrinsics.type_is_subtype_of(T, iobject) #optional_allocator_error {
-    arr, err := mem.alloc_bytes(count * size_of(T), align_of(T), sys.engine_def_allocator)
-    if err != .None do return nil, err
-    s := runtime.Raw_Slice{raw_data(arr), count}
-    return transmute([]T)s, .None
-}
-
-alloc_objectDynamic :: #force_inline proc($T:typeid) -> ([dynamic]T, runtime.Allocator_Error) where intrinsics.type_is_subtype_of(T, iobject) #optional_allocator_error {
-    res, err := make([dynamic]T, sys.engine_def_allocator)
-    if err != .None do return nil, err
-    return res, .None
-}
-
-free_object :: #force_inline proc(obj:^$T) where intrinsics.type_is_subtype_of(T, iobject) {
-    sys.free_object(obj)
-}
-
-free_object_slice :: #force_inline proc(arr:$T/[]$E) where intrinsics.type_is_subtype_of(E, iobject) {
-    sys.free_object_slice(arr)
-}
-
-free_object_dynamic :: #force_inline proc(arr:$T/[dynamic]$E) where intrinsics.type_is_subtype_of(E, iobject) {
-    sys.free_object_dynamic(arr)
 }
 
 graphics_wait_all_ops :: #force_inline proc () {
