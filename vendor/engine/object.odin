@@ -507,39 +507,15 @@ alloc_objectDynamic :: #force_inline proc($T:typeid) -> ([dynamic]T, runtime.All
 }
 
 free_object :: #force_inline proc(obj:^$T) where intrinsics.type_is_subtype_of(T, iobject) {
-    aObj := FREE_OBJ{
-        typeSize = size_of(T),
-        len = 1,
-        deinit = obj.vtable.deinit,
-        obj = rawptr(obj),
-    }
-    sync.mutex_lock(&gFreeObjectMtx)
-    append(&gFreeObjects, aObj)
-    sync.mutex_unlock(&gFreeObjectMtx)
+    sys.free_object(obj)
 }
 
 free_object_slice :: #force_inline proc(arr:$T/[]$E) where intrinsics.type_is_subtype_of(E, iobject) {
-    aObj := FREE_OBJ{
-        typeSize = size_of(E),
-        len = len(arr),
-        deinit = len(arr) > 0 ? arr[0].vtable.deinit : nil,
-        obj = rawptr(raw_data(arr)),
-    }
-    sync.mutex_lock(&gFreeObjectMtx)
-    append(&gFreeObjects, aObj)
-    sync.mutex_unlock(&gFreeObjectMtx)
+    sys.free_object_slice(arr)
 }
 
 free_object_dynamic :: #force_inline proc(arr:$T/[dynamic]$E) where intrinsics.type_is_subtype_of(E, iobject) {
-    aObj := FREE_OBJ{
-        typeSize = size_of(E),
-        len = cap(arr),
-        deinit = len(arr) > 0 ? arr[0].vtable.deinit : nil,
-        obj = rawptr(raw_data(arr)),
-    }
-    sync.mutex_lock(&gFreeObjectMtx)
-    append(&gFreeObjects, aObj)
-    sync.mutex_unlock(&gFreeObjectMtx)
+    sys.free_object_dynamic(arr)
 }
 
 graphics_wait_all_ops :: #force_inline proc () {
