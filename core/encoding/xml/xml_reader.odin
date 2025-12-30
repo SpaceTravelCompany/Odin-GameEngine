@@ -193,6 +193,9 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 	// If an expected DOCTYPE is given in options (i.e. it's non-empty), the DOCTYPE (if present) and root tag have to match.
 	expected_doctype := options.expected_doctype
 
+	// edited (xfitgd)
+	doc.strings_to_free = make([dynamic]string, 0, allocator)
+
 	loop: for {
 		skip_whitespace(t)
 		switch t.ch {
@@ -388,6 +391,8 @@ load_from_file :: proc(filename: string, options := DEFAULT_OPTIONS, error_handl
 
 destroy :: proc(doc: ^Document) {
 	if doc == nil { return }
+	// edited (xfitgd)
+	context.allocator = doc.allocator
 
 	for el in doc.elements {
 		delete(el.attribs)

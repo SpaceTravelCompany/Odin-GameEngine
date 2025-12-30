@@ -526,7 +526,7 @@ init_parse :: proc(svg_data: []u8, allocator: mem.Allocator = context.allocator)
 	}
 
 	// Parse XML document
-	xml_doc, xml_err := xml.parse_bytes(svg_data, {}, "", allocator = arena)
+	xml_doc, xml_err := xml.parse(svg_data, allocator = arena)
 	if xml_err != nil {
 		err = xml_err
 		return
