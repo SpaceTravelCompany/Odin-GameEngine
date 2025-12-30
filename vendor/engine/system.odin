@@ -186,7 +186,8 @@ engine_main :: proc(
 			system_destroy()
 
 			sys.system_after_destroy()
-		}	
+		}
+		__destroy_tracking_allocator()
 	}
 }
 
@@ -228,21 +229,32 @@ start_tracking_allocator :: proc() {
 
 destroy_tracking_allocator :: proc() {
 	when ODIN_DEBUG {
-		if len(track_allocator.allocation_map) > 0 {
+		if !is_main_thread() {
+			__destroy_tracking_allocator()
+		}	
+	}
+}
+
+@private __destroy_tracking_allocator :: proc() {
+	when ODIN_DEBUG {
+		if track_allocator.backing.procedure != nil {
+			if len(track_allocator.allocation_map) > 0 {
 			fmt.eprintf("=== %v allocations not freed: ===\n", len(track_allocator.allocation_map))
 			for _, entry in track_allocator.allocation_map {
 				fmt.eprintf("- %v bytes @ %v\n", entry.size, entry.location)
 			}
-		}
-		if len(track_allocator.bad_free_array) > 0 {
-			fmt.eprintf("=== %v incorrect frees: ===\n", len(track_allocator.bad_free_array))
-			for entry in track_allocator.bad_free_array {
-				fmt.eprintf("- %p @ %v\n", entry.memory, entry.location)
 			}
+			if len(track_allocator.bad_free_array) > 0 {
+				fmt.eprintf("=== %v incorrect frees: ===\n", len(track_allocator.bad_free_array))
+				for entry in track_allocator.bad_free_array {
+					fmt.eprintf("- %p @ %v\n", entry.memory, entry.location)
+				}
+			}
+			mem.tracking_allocator_destroy(&track_allocator)
 		}
-		mem.tracking_allocator_destroy(&track_allocator)
 	}
 }
+
 
 
 

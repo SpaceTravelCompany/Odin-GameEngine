@@ -419,7 +419,7 @@ vk_allocator_error :: enum {
 	curNext: ^vk_mem_buffer_node = auto_cast  (cur.node.next if cur.node.next != nil else self.list.head)
 	if cur == curNext {
 		if remain > 0 {
-			list.push_back(&self.list, auto_cast new(vk_mem_buffer_node))
+			list.push_back(&self.list, auto_cast new(vk_mem_buffer_node, engine_def_allocator))
 			tail: ^vk_mem_buffer_node = auto_cast self.list.tail
 			tail.free = true
 			tail.size = remain
@@ -428,7 +428,7 @@ vk_allocator_error :: enum {
 	} else {
 		if remain > 0 {
 			if !curNext.free || curNext.idx < cur.idx {
-				list.insert_after(&self.list, auto_cast cur, auto_cast new(vk_mem_buffer_node))
+				list.insert_after(&self.list, auto_cast cur, auto_cast new(vk_mem_buffer_node, engine_def_allocator))
 				next: ^vk_mem_buffer_node = auto_cast cur.node.next
 				next.free = true
 				next.idx = cur.idx + cellCnt

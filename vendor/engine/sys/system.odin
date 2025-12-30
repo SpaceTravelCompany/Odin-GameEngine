@@ -31,6 +31,7 @@ is_main_thread :: #force_inline proc "contextless" () -> bool {
 
 system_start :: #force_inline proc() {
 	engine_def_allocator = context.allocator
+	engine.start_tracking_allocator()
 
     monitors = mem.make_non_zeroed([dynamic]monitor_info)
 	when library.is_android {
