@@ -217,7 +217,12 @@ system_destroy :: proc() {
 start_tracking_allocator :: proc() {
 	when ODIN_DEBUG {
 		mem.tracking_allocator_init(&track_allocator, context.allocator)
-		context.allocator = mem.tracking_allocator(&track_allocator)
+		if sys.engine_def_allocator == context.allocator {
+			sys.engine_def_allocator = mem.tracking_allocator(&track_allocator)
+			context.allocator = sys.engine_def_allocator
+		} else {
+			context.allocator = mem.tracking_allocator(&track_allocator)
+		}
 	}
 }
 

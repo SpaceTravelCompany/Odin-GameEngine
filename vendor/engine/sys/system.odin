@@ -18,7 +18,6 @@ when library.is_android {
 
 @private main_thread_id: int
 // Allocators
-@(private = "file") __arena: virtual.Arena
 temp_arena_allocator: mem.Allocator
 engine_def_allocator: mem.Allocator
 
@@ -31,8 +30,7 @@ is_main_thread :: #force_inline proc "contextless" () -> bool {
 // ============================================================================
 
 system_start :: #force_inline proc() {
-	_ = virtual.arena_init_growing(&__arena)
-	engine_def_allocator = virtual.arena_allocator(&__arena)
+	engine_def_allocator = context.allocator
 
     monitors = mem.make_non_zeroed([dynamic]monitor_info)
 	when library.is_android {
@@ -44,7 +42,6 @@ system_start :: #force_inline proc() {
 
 system_after_destroy :: #force_inline proc() {
 	delete(monitors)
-	virtual.arena_destroy(&__arena)
 }
 
 // ============================================================================
