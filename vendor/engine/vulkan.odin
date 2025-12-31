@@ -1,5 +1,5 @@
 #+private
-package sys
+package engine
 
 import "base:runtime"
 import "base:library"
@@ -18,7 +18,7 @@ import vk "vendor:vulkan"
 import "vendor:glfw"
 import "core:sys/windows"
 
-import "../"
+
 
 vk_instance: vk.Instance
 vk_library: dynlib.Library
@@ -55,9 +55,9 @@ vk_msaa_frame_texture: texture
 
 vk_frame_buffer_image_views: []vk.ImageView
 
-vk_image_available_semaphore: [engine.MAX_FRAMES_IN_FLIGHT]vk.Semaphore
-vk_render_finished_semaphore: [engine.MAX_FRAMES_IN_FLIGHT][]vk.Semaphore
-vk_in_flight_fence: [engine.MAX_FRAMES_IN_FLIGHT]vk.Fence
+vk_image_available_semaphore: [MAX_FRAMES_IN_FLIGHT]vk.Semaphore
+vk_render_finished_semaphore: [MAX_FRAMES_IN_FLIGHT][]vk.Semaphore
+vk_in_flight_fence: [MAX_FRAMES_IN_FLIGHT]vk.Fence
 
 vk_get_instance_proc_addr: proc "system" (
 	_instance: vk.Instance,
@@ -119,7 +119,7 @@ animateTexShaderStages: [2]vk.PipelineShaderStageCreateInfo
 
 
 vk_cmd_pool:vk.CommandPool
-vk_cmd_buffer:[engine.MAX_FRAMES_IN_FLIGHT]vk.CommandBuffer
+vk_cmd_buffer:[MAX_FRAMES_IN_FLIGHT]vk.CommandBuffer
 
 when msaa_count == 4 {
 	VK_SAMPLE_COUNT_FLAGS :: vk.SampleCountFlags{._4}
@@ -643,9 +643,9 @@ vk_create_swap_chain_and_image_views :: proc() -> bool {
 	//vk_clear_frame_buffers = mem.make_non_zeroed([]vk.Framebuffer, swapImgCnt)
 	vk_frame_buffer_image_views = mem.make_non_zeroed([]vk.ImageView, swap_img_cnt)
 	
-	engine.texture_init_depth_stencil(&vk_frame_depth_stencil_texture, vk_extent_rotation.width, vk_extent_rotation.height)
+	texture_init_depth_stencil(&vk_frame_depth_stencil_texture, vk_extent_rotation.width, vk_extent_rotation.height)
 	when msaa_count > 1 {
-		engine.texture_init_msaa(&vk_msaa_frame_texture, vk_extent_rotation.width, vk_extent_rotation.height)
+		texture_init_msaa(&vk_msaa_frame_texture, vk_extent_rotation.width, vk_extent_rotation.height)
 	}
 
 	vk_refresh_pre_matrix()
@@ -969,11 +969,11 @@ vk_start :: proc() {
 		sType = vk.StructureType.COMMAND_BUFFER_ALLOCATE_INFO,
 		commandPool = vk_cmd_pool,
 		level = vk.CommandBufferLevel.PRIMARY,
-		commandBufferCount = engine.MAX_FRAMES_IN_FLIGHT,
+		commandBufferCount = MAX_FRAMES_IN_FLIGHT,
 	}, &vk_cmd_buffer[0])
 	if res != .SUCCESS do trace.panic_log("vk.AllocateCommandBuffers(&vk_cmd_buffer) : ", res)
 
-	engine.__render_cmd_create()
+	__render_cmd_create()
 
 	vk_init_block_len()
 	vk_allocator_init()
@@ -1006,7 +1006,7 @@ vk_start :: proc() {
 	samplerInfo.minFilter = .NEAREST
 	vk.CreateSampler(graphics_device, &samplerInfo, nil, &nearest_sampler)
 
-	vk_depth_fmt := engine.texture_fmt_to_vk_fmt(depth_fmt)
+	vk_depth_fmt := texture_fmt_to_vk_fmt(depth_fmt)
 	depthAttachmentSample := vk.AttachmentDescriptionInit(
 		format = vk_depth_fmt,
 		loadOp = .CLEAR,
@@ -1201,7 +1201,7 @@ vk_destroy :: proc() {
 
 	delete(vk_fmts)
 	delete(vkPresentModes)
-	engine.__render_cmd_clean()
+	__render_cmd_clean()
 
 	vk.DestroySurfaceKHR(vk_instance, vk_surface, nil)
 
@@ -1261,12 +1261,12 @@ vk_recreate_swap_chain :: proc() {
 
 	sync.mutex_unlock(&full_screen_mtx)
 
-	engine.render_cmd_refresh_all()
+	render_cmd_refresh_all()
 
-	engine.size()
-	if engine.__g_main_render_cmd_idx >= 0 {
-		for obj in engine.__g_render_cmd[engine.__g_main_render_cmd_idx].scene {
-			engine.iobject_size(auto_cast obj)
+	size()
+	if __g_main_render_cmd_idx >= 0 {
+		for obj in __g_render_cmd[__g_main_render_cmd_idx].scene {
+			iobject_size(auto_cast obj)
 		}
 	}
 }
@@ -1300,7 +1300,7 @@ vk_recreate_surface :: proc() {
 	}
 }
 
-vk_record_command_buffer :: proc(cmd:^engine.__render_cmd, frame:int) {
+vk_record_command_buffer :: proc(cmd:^__render_cmd, frame:int) {
 	clsColor :vk.ClearValue = {color = {float32 = g_clear_color}}
 	clsDepthStencil :vk.ClearValue = {depthStencil = {depth = 1.0, stencil = 0}}
 	clsZero :vk.ClearValue = {depthStencil = {depth = 1.0, stencil = 0}}
@@ -1344,13 +1344,13 @@ vk_record_command_buffer :: proc(cmd:^engine.__render_cmd, frame:int) {
 		vk.CmdSetScissor(c.__handle, 0, 1, &scissor)
 
 		sync.rw_mutex_lock(&cmd.obj_lock)
-		objs := mem.make_non_zeroed_slice([]^engine.iobject, len(cmd.scene), context.temp_allocator)
+		objs := mem.make_non_zeroed_slice([]^iobject, len(cmd.scene), context.temp_allocator)
 		copy_slice(objs, cmd.scene[:])
 		sync.rw_mutex_unlock(&cmd.obj_lock)
 		defer delete(objs, context.temp_allocator)
 		
 		for obj in objs {
-			engine.iobject_draw(auto_cast obj, c)
+			iobject_draw(auto_cast obj, c)
 		}
 
 		vk.CmdEndRenderPass(c.__handle)
@@ -1388,11 +1388,11 @@ vk_draw_frame :: proc() {
 		return
 	} else if res != .SUCCESS { trace.panic_log("AcquireNextImageKHR : ", res) }
 	
-	if engine.__g_render_cmd != nil && engine.__g_main_render_cmd_idx >= 0 {
-		sync.mutex_lock(&engine.__g_render_cmd_mtx)
-		if engine.__g_render_cmd[engine.__g_main_render_cmd_idx].refresh[frame] {
-			engine.__g_render_cmd[engine.__g_main_render_cmd_idx].refresh[frame] = false
-			vk_record_command_buffer(engine.__g_render_cmd[engine.__g_main_render_cmd_idx], frame)
+	if __g_render_cmd != nil && __g_main_render_cmd_idx >= 0 {
+		sync.mutex_lock(&__g_render_cmd_mtx)
+		if __g_render_cmd[__g_main_render_cmd_idx].refresh[frame] {
+			__g_render_cmd[__g_main_render_cmd_idx].refresh[frame] = false
+			vk_record_command_buffer(__g_render_cmd[__g_main_render_cmd_idx], frame)
 		}
 		waitStages := vk.PipelineStageFlags{.COLOR_ATTACHMENT_OUTPUT}
 		submitInfo := vk.SubmitInfo {
@@ -1401,7 +1401,7 @@ vk_draw_frame :: proc() {
 			pWaitSemaphores = &vk_image_available_semaphore[frame],
 			pWaitDstStageMask = &waitStages,
 			commandBufferCount = 1,
-			pCommandBuffers = auto_cast &engine.__g_render_cmd[engine.__g_main_render_cmd_idx].cmds[frame][imageIndex],
+			pCommandBuffers = auto_cast &__g_render_cmd[__g_main_render_cmd_idx].cmds[frame][imageIndex],
 			signalSemaphoreCount = 1,
 			pSignalSemaphores = &vk_render_finished_semaphore[frame][imageIndex],
 		}
@@ -1412,10 +1412,10 @@ vk_draw_frame :: proc() {
 		res = vk.QueueSubmit(vk_graphics_queue, 1, &submitInfo, vk_in_flight_fence[frame])
 		if res != .SUCCESS do trace.panic_log("QueueSubmit : ", res)
 
-		sync.mutex_unlock(&engine.__g_render_cmd_mtx)
+		sync.mutex_unlock(&__g_render_cmd_mtx)
 	} else {
 		//?그릴 오브젝트가 없는 경우
-		sync.mutex_lock(&engine.__g_render_cmd_mtx)
+		sync.mutex_lock(&__g_render_cmd_mtx)
 		waitStages := vk.PipelineStageFlags{.COLOR_ATTACHMENT_OUTPUT}
 
 		clsColor :vk.ClearValue = {color = {float32 = g_clear_color}}
@@ -1458,7 +1458,7 @@ vk_draw_frame :: proc() {
 		res = vk.QueueSubmit(vk_graphics_queue, 1, &submitInfo, 	vk_in_flight_fence[frame])
 		if res != .SUCCESS do trace.panic_log("QueueSubmit : ", res)
 
-		sync.mutex_unlock(&engine.__g_render_cmd_mtx)
+		sync.mutex_unlock(&__g_render_cmd_mtx)
 	}
 
 	presentInfo := vk.PresentInfoKHR {
@@ -1495,7 +1495,7 @@ vk_draw_frame :: proc() {
 		return
 	} else if res != .SUCCESS { trace.panic_log("QueuePresentKHR : ", res) }
 
-	frame = (frame + 1) % engine.MAX_FRAMES_IN_FLIGHT
+	frame = (frame + 1) % MAX_FRAMES_IN_FLIGHT
 }
 
 vk_refresh_pre_matrix :: proc() {
@@ -1516,7 +1516,7 @@ vk_refresh_pre_matrix :: proc() {
 }
 
 vk_create_sync_object :: proc() {
-	for i in 0..<engine.MAX_FRAMES_IN_FLIGHT {
+	for i in 0..<MAX_FRAMES_IN_FLIGHT {
 		vk.CreateSemaphore(graphics_device, &vk.SemaphoreCreateInfo{
 			sType = vk.StructureType.SEMAPHORE_CREATE_INFO,
 		}, nil, &vk_image_available_semaphore[i])
@@ -1536,7 +1536,7 @@ vk_create_sync_object :: proc() {
 }
 
 vk_clean_sync_object :: proc() {
-	for i in 0..<engine.MAX_FRAMES_IN_FLIGHT {
+	for i in 0..<MAX_FRAMES_IN_FLIGHT {
 		vk.DestroySemaphore(graphics_device, vk_image_available_semaphore[i], nil)
 		for j in 0..<int(swap_img_cnt) {
 			vk.DestroySemaphore(graphics_device, vk_render_finished_semaphore[i][j], nil)
@@ -1554,9 +1554,9 @@ vk_clean_swap_chain :: proc() {
 			vk.DestroyImageView(graphics_device, vk_frame_buffer_image_views[i], nil)
 		}
 
-		engine.texture_deinit(&vk_frame_depth_stencil_texture)
+		texture_deinit(&vk_frame_depth_stencil_texture)
 		when msaa_count > 1 {
-			engine.texture_deinit(&vk_msaa_frame_texture)
+			texture_deinit(&vk_msaa_frame_texture)
 		}
 		vk_op_execute(true)
 

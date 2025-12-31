@@ -1,4 +1,4 @@
-package sys
+package engine
 
 import "vendor:glfw"
 import "core:reflect"
@@ -19,7 +19,7 @@ import "base:library"
 import vk "vendor:vulkan"
 import "core:fmt"
 
-import "../"
+
 
 when !library.is_mobile {
 
@@ -28,7 +28,7 @@ when !library.is_mobile {
 
 
 glfw_start :: proc() {
-    when !engine.is_console {
+    when !is_console {
         //?default screen idx 0
         if __window_width == nil do __window_width = int(monitors[0].rect.size.x / 2)
         if __window_height == nil do __window_height = int(monitors[0].rect.size.y / 2)
@@ -263,7 +263,7 @@ glfw_system_start :: proc() {
         } else if event == glfw.DISCONNECTED {
             for m, i in glfw_monitors {
                 if m == monitor {
-                    when is_log && !engine.is_console {
+                    when is_log && !is_console {
                         fmt.println(
                             "XFIT SYSLOG : DEL %s monitor name: %s, x:%d, y:%d, size.x:%d, size.y:%d, refleshrate%d\n",
                             "primary" if monitors[i].is_primary else "",
@@ -290,7 +290,7 @@ glfw_system_start :: proc() {
 }
 
 glfw_destroy :: proc "contextless" () {
-    when !engine.is_console {
+    when !is_console {
         if wnd != nil do glfw.SetWindowShouldClose(wnd, true)
         //!glfw.DestroyWindow(wnd) 를 쓰지 않는다 왜냐하면 윈도우만 종료되고 윈도우 루프를 빠져나가지 않는다.
     }
@@ -315,7 +315,7 @@ glfw_system_destroy :: proc() {
 glfw_loop :: proc() {
     glfw_key_proc :: proc "c" (window: glfw.WindowHandle, key, scancode, action, mods: c.int) {
         //glfw.KEY_SPACE
-        if key > key_size-1 || key < 0 || !reflect.is_valid_enum_value(engine.key_code, key) {
+        if key > key_size-1 || key < 0 || !reflect.is_valid_enum_value(key_code, key) {
             return
         }
         context = runtime.default_context()
@@ -323,38 +323,38 @@ glfw_loop :: proc() {
             case glfw.PRESS:
                 if !keys[key] {
                     keys[key] = true
-                    engine.key_down(engine.key_code(key))
+                    key_down(key_code(key))
                 }
             case glfw.RELEASE:
                 keys[key] = false
-                engine.key_up(engine.key_code(key))
+                key_up(key_code(key))
             case glfw.REPEAT:
-                engine.key_repeat(engine.key_code(key))
+                key_repeat(key_code(key))
         }
     }
     glfw_mouse_button_proc :: proc "c" (window: glfw.WindowHandle, button, action, mods: c.int) {
         context = runtime.default_context()
         switch action {
             case glfw.PRESS:
-                engine.mouse_button_down(auto_cast button, mouse_pos.x, mouse_pos.y)
+                mouse_button_down(auto_cast button, __mouse_pos.x, __mouse_pos.y)
             case glfw.RELEASE:
-                engine.mouse_button_up(auto_cast button, mouse_pos.x, mouse_pos.y)
+                mouse_button_up(auto_cast button, __mouse_pos.x, __mouse_pos.y)
         }
     }
     glfw_cursor_pos_proc :: proc "c" (window: glfw.WindowHandle, xpos,  ypos: f64) {
         context = runtime.default_context()
-        mouse_pos.x = auto_cast xpos
-        mouse_pos.y = auto_cast ypos
-        engine.mouse_move(mouse_pos.x, mouse_pos.y)
+        __mouse_pos.x = auto_cast xpos
+        __mouse_pos.y = auto_cast ypos
+        mouse_move(__mouse_pos.x, __mouse_pos.y)
     }
     glfw_cursor_enter_proc :: proc "c" (window: glfw.WindowHandle, entered: c.int) {
         context = runtime.default_context()
         if b32(entered) {
-            is_mouse_out = false
-            engine.mouse_in()
+            __is_mouse_out = false
+            mouse_in()
         } else {
-            is_mouse_out = true
-            engine.mouse_out()
+            __is_mouse_out = true
+            mouse_out()
         }
     }
     glfw_char_proc :: proc "c"  (window: glfw.WindowHandle, codepoint: rune) {
@@ -376,24 +376,24 @@ glfw_loop :: proc() {
         __window_y = int(ypos)
     }
     glfw_window_close_proc :: proc "c" (window: glfw.WindowHandle) {
-        glfw.SetWindowShouldClose(window, auto_cast engine.close())
+        glfw.SetWindowShouldClose(window, auto_cast close())
     }
     glfw_window_focus_proc :: proc "c" (window: glfw.WindowHandle, focused: c.int) {
         if focused != 0 {
-            sync.atomic_store_explicit(&paused, false, .Relaxed)
-            activated = true
+            sync.atomic_store_explicit(&__paused, false, .Relaxed)
+            __activated = true
         } else {
-            activated = false
+            __activated = false
 
             for &k in keys {
                 k = false
             }
         }
-        engine.activate()
+        activate()
     }
     glfw_window_refresh_proc :: proc "c" (window: glfw.WindowHandle) {
         //! no need
-        // if !paused() {
+        // if !__paused() {
         //     context = runtime.default_context()
         //     vk_draw_frame()
         // }
@@ -416,7 +416,7 @@ glfw_loop :: proc() {
         glfw.PollEvents()
         render_loop()
     }
-    exiting = true
+    __exiting = true
     wnd = nil
    // thread.join(render_th)
 }

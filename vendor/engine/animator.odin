@@ -1,10 +1,10 @@
 package engine
 
-import sys "./sys"
+
 
 ianimate_object :: struct {
     using object:iobject,
-    frame_uniform:sys.buffer_resource,
+    frame_uniform:buffer_resource,
     frame:u32,
 }
 
@@ -69,7 +69,7 @@ ianimate_object_get_frame_cnt :: #force_inline proc "contextless" (self:^ianimat
 }
 
 ianimate_object_update_frame :: #force_inline proc (self:^ianimate_object) {
-    sys.buffer_resource_copy_update(&self.frame_uniform, &self.frame)
+    buffer_resource_copy_update(&self.frame_uniform, &self.frame)
 }
 
 ianimate_object_next_frame :: #force_inline proc (self:^ianimate_object) {

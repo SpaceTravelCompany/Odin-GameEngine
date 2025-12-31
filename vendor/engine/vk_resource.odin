@@ -1,5 +1,5 @@
 #+private
-package sys
+package engine
 
 import vk "vendor:vulkan"
 import "core:mem"

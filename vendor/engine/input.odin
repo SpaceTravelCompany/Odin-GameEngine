@@ -17,8 +17,12 @@ import "core:debug/trace"
 import "vendor:glfw"
 import "core:sys/android"
 
-import sys "./sys"
 
+key_size :: 512
+keys : [key_size]bool = { 0..<key_size = false }
+__is_mouse_out:bool
+__mouse_pos:linalg.PointF
+scroll_dt:int
 
 when is_mobile {
     key_code :: enum i32 {
@@ -291,9 +295,11 @@ mouse_move : #type proc (x:f32, y:f32) = proc (x:f32, y:f32) {}
 mouse_in : #type proc () = proc () {}
 mouse_out : #type proc () = proc () {}
 
-is_mouse_out :: proc "contextless" () -> bool {return sys.is_mouse_out}
+is_mouse_out :: proc "contextless" () -> bool {return __is_mouse_out}
+
+
 mouse_pos :: #force_inline proc "contextless" () -> linalg.PointF {
-    return sys.mouse_pos
+    return __mouse_pos
 }
 
 convert_mouse_pos :: proc "contextless" (pos:linalg.PointF) -> linalg.PointF {

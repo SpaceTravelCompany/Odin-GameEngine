@@ -1,5 +1,5 @@
 #+private
-package sys
+package engine
 
 import "base:runtime"
 import "base:intrinsics"
@@ -16,7 +16,7 @@ import "core:thread"
 import "core:reflect"
 import vk "vendor:vulkan"
 
-import "../"
+
 
 vkMemBlockLen: vk.DeviceSize = mem.Megabyte * 256
 vkMemSpcialBlockLen: vk.DeviceSize = mem.Megabyte * 256
@@ -25,7 +25,6 @@ vkPoolBlock :: 256
 vkUniformSizeBlock :: mem.Megabyte
 vkSupportCacheLocal := false
 vkSupportNonCacheLocal := false
-is_log :: true
 @(private = "file") __tempArena: virtual.Arena
 @(private = "file") gQueueMtx: sync.Atomic_Mutex
 @(private = "file") gDestroyQueueMtx: sync.Atomic_Mutex
@@ -629,7 +628,7 @@ where T == vk.Buffer || T == vk.Image {
 }
 
 @(private = "file") AppendOp :: proc(node: OpNode) {
-	if exiting {
+	if __exiting {
 		#partial switch n in node {
 		case OpMapCopy:
 			if n.pData.allocator != nil && n.pData.data != nil {
@@ -1025,7 +1024,7 @@ vkbuffer_resource_deinit :: proc(self: ^$T) where T == buffer_resource || T == t
 		case .CPU:memProp = {.HOST_CACHED, .HOST_VISIBLE}
 	}
 	texUsage:vk.ImageUsageFlags = {}
-	isDepth := engine.texture_fmt_is_depth(self.option.format)
+	isDepth := texture_fmt_is_depth(self.option.format)
 
 	if .IMAGE_RESOURCE in self.option.texture_usage do texUsage |= {.SAMPLED}
 	if .FRAME_BUFFER in self.option.texture_usage {
@@ -1056,7 +1055,7 @@ vkbuffer_resource_deinit :: proc(self: ^$T) where T == buffer_resource || T == t
 			tiling = .LINEAR
 		}
 	}
-	bit : u32 = auto_cast engine.texture_fmt_bit_size(self.option.format)
+	bit : u32 = auto_cast texture_fmt_bit_size(self.option.format)
 
 	imgInfo := vk.ImageCreateInfo{
 		sType = .IMAGE_CREATE_INFO,
@@ -1067,7 +1066,7 @@ vkbuffer_resource_deinit :: proc(self: ^$T) where T == buffer_resource || T == t
 		samples = samples_to_vk_sample_count_flags(self.option.samples),
 		tiling = tiling,
 		mipLevels = 1,
-		format = engine.texture_fmt_to_vk_fmt(self.option.format),
+		format = texture_fmt_to_vk_fmt(self.option.format),
 		imageType = texture_type_to_vk_image_type(self.option.type),
 		initialLayout = .UNDEFINED,
 	}

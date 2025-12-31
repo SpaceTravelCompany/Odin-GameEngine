@@ -9,10 +9,7 @@ import "core:math/linalg"
 import "base:intrinsics"
 import "base:runtime"
 import vk "vendor:vulkan"
-import sys "./sys"
 
-
-texture :: sys.texture
 
 image_center_pt_pos :: enum {
     Center,
@@ -28,16 +25,16 @@ image_center_pt_pos :: enum {
 
 
 texture_array :: struct {
-    using _: sys.texture,
+    using _: texture,
 }
 
 tile_texture_array :: struct {
-    using _: sys.texture,
+    using _: texture,
 }
 
 image :: struct {
     using _:iobject,
-    src: ^sys.texture,
+    src: ^texture,
 }
 
 animate_image :: struct {
@@ -47,14 +44,14 @@ animate_image :: struct {
 
 tile_image :: struct {
     using object:iobject,
-    tile_uniform:sys.buffer_resource,
+    tile_uniform:buffer_resource,
     tile_idx:u32,
     src: ^tile_texture_array,
 }
 
 is_any_image_type :: #force_inline proc "contextless" ($any_image:typeid) -> bool {
     return intrinsics.type_is_subtype_of(any_image, iobject) && intrinsics.type_has_field(any_image, "src") && 
-    (intrinsics.type_field_type(any_image, "src") == ^sys.texture ||
+    (intrinsics.type_field_type(any_image, "src") == ^texture ||
     intrinsics.type_field_type(any_image, "src") == texture_array ||
     intrinsics.type_field_type(any_image, "src") == tile_texture_array)
 }
@@ -64,14 +61,14 @@ is_any_image_type :: #force_inline proc "contextless" ($any_image:typeid) -> boo
     deinit = auto_cast _super_image_deinit,
 }
 
-image_init :: proc(self:^image, $actualType:typeid, src:^sys.texture, pos:linalg.Point3DF,
+image_init :: proc(self:^image, $actualType:typeid, src:^texture, pos:linalg.Point3DF,
 camera:^camera, projection:^projection,
 rotation:f32 = 0.0, scale:linalg.PointF = {1,1}, colorTransform:^color_transform = nil, pivot:linalg.PointF = {0.0, 0.0}, vtable:^iobject_vtable = nil) where intrinsics.type_is_subtype_of(actualType, image) {
     self.src = src
         
-    self.set.bindings = sys.__transform_uniform_pool_binding[:]
-    self.set.size = sys.__transform_uniform_pool_sizes[:]
-    self.set.layout = sys.tex_descriptor_set_layout
+    self.set.bindings = __transform_uniform_pool_binding[:]
+    self.set.size = __transform_uniform_pool_sizes[:]
+    self.set.layout = tex_descriptor_set_layout
 
     self.vtable = vtable == nil ? &image_vtable : vtable
     if self.vtable.draw == nil do self.vtable.draw = auto_cast _super_image_draw
@@ -82,14 +79,14 @@ rotation:f32 = 0.0, scale:linalg.PointF = {1,1}, colorTransform:^color_transform
     iobject_init(self, actualType, pos, rotation, scale, camera, projection, colorTransform, pivot)
 }
 
-image_init2 :: proc(self:^image, $actualType:typeid, src:^sys.texture,
+image_init2 :: proc(self:^image, $actualType:typeid, src:^texture,
 camera:^camera, projection:^projection,
 colorTransform:^color_transform = nil, vtable:^iobject_vtable = nil) where intrinsics.type_is_subtype_of(actualType, image) {
     self.src = src
         
-    self.set.bindings = sys.__transform_uniform_pool_binding[:]
-    self.set.size = sys.__transform_uniform_pool_sizes[:]
-    self.set.layout = sys.tex_descriptor_set_layout
+    self.set.bindings = __transform_uniform_pool_binding[:]
+    self.set.size = __transform_uniform_pool_sizes[:]
+    self.set.layout = tex_descriptor_set_layout
 
     self.vtable = vtable == nil ? &image_vtable : vtable
     if self.vtable.draw == nil do self.vtable.draw = auto_cast _super_image_draw
@@ -104,7 +101,7 @@ _super_image_deinit :: proc(self:^image) {
     _super_iobject_deinit(self)
 }
 
-image_get_texture :: #force_inline proc "contextless" (self:^image) -> ^sys.texture {
+image_get_texture :: #force_inline proc "contextless" (self:^image) -> ^texture {
     return self.src
 }
 image_get_camera :: proc "contextless" (self:^image) -> ^camera {
@@ -128,26 +125,26 @@ image_update_camera :: #force_inline proc(self:^image, camera:^camera) {
 image_update_projection :: #force_inline proc(self:^image, projection:^projection) {
     iobject_update_projection(self, projection)
 }
-image_update_texture :: #force_inline proc "contextless" (self:^image, src:^sys.texture) {
+image_update_texture :: #force_inline proc "contextless" (self:^image, src:^texture) {
     self.src = src
 }
 image_change_color_transform :: #force_inline proc(self:^image, colorTransform:^color_transform) {
     iobject_change_color_transform(self, colorTransform)
 }
 
-_super_image_draw :: proc (self:^image, cmd:sys.command_buffer) {
+_super_image_draw :: proc (self:^image, cmd:command_buffer) {
     mem.ICheckInit_Check(&self.check_init)
     mem.ICheckInit_Check(&self.src.check_init)
 
    _image_BindingSetsAndDraw(cmd, self.set, self.src.set)
 }
 
-_image_BindingSetsAndDraw :: proc "contextless" (cmd:sys.command_buffer, imageSet:sys.descriptor_set, textureSet:sys.descriptor_set) {
-    sys.graphics_cmd_bind_pipeline(cmd, .GRAPHICS, sys.tex_pipeline)
-    sys.graphics_cmd_bind_descriptor_sets(cmd, .GRAPHICS, sys.tex_pipeline_layout, 0, 2,
+_image_BindingSetsAndDraw :: proc "contextless" (cmd:command_buffer, imageSet:descriptor_set, textureSet:descriptor_set) {
+    graphics_cmd_bind_pipeline(cmd, .GRAPHICS, tex_pipeline)
+    graphics_cmd_bind_descriptor_sets(cmd, .GRAPHICS, tex_pipeline_layout, 0, 2,
         &([]vk.DescriptorSet{imageSet.__set, textureSet.__set})[0], 0, nil)
 
-    sys.graphics_cmd_draw(cmd, 6, 1, 0, 0)
+    graphics_cmd_draw(cmd, 6, 1, 0, 0)
 }
 
 
@@ -161,9 +158,9 @@ animate_image_init :: proc(self:^animate_image, $actualType:typeid, src:^texture
 camera:^camera, projection:^projection, colorTransform:^color_transform = nil, pivot:linalg.PointF = {0.0, 0.0}, vtable:^ianimate_object_vtable = nil) where intrinsics.type_is_subtype_of(actualType, animate_image) {
     self.src = src
     
-    self.set.bindings = sys.__animate_image_uniform_pool_binding[:]
-    self.set.size = sys.__animate_image_uniform_pool_sizes[:]
-    self.set.layout = sys.animate_tex_descriptor_set_layout
+    self.set.bindings = __animate_image_uniform_pool_binding[:]
+    self.set.size = __animate_image_uniform_pool_sizes[:]
+    self.set.layout = animate_tex_descriptor_set_layout
 
     self.vtable = auto_cast (vtable == nil ? &animate_image_vtable : vtable)
     if self.vtable.draw == nil do self.vtable.draw = auto_cast _super_animate_image_draw
@@ -172,7 +169,7 @@ camera:^camera, projection:^projection, colorTransform:^color_transform = nil, p
 
     if self.vtable.get_uniform_resources == nil do self.vtable.get_uniform_resources = auto_cast get_uniform_resources_animate_image
 
-    sys.buffer_resource_create_buffer(&self.frame_uniform, {
+    buffer_resource_create_buffer(&self.frame_uniform, {
         len = size_of(u32),
         type = .UNIFORM,
         resource_usage = .CPU,
@@ -185,9 +182,9 @@ animate_image_init2 :: proc(self:^animate_image, $actualType:typeid, src:^textur
 camera:^camera, projection:^projection, colorTransform:^color_transform = nil, vtable:^ianimate_object_vtable = nil) where intrinsics.type_is_subtype_of(actualType, animate_image) {
     self.src = src
     
-    self.set.bindings = sys.__animate_image_uniform_pool_binding[:]
-    self.set.size = sys.__animate_image_uniform_pool_sizes[:]
-    self.set.layout = sys.animate_tex_descriptor_set_layout
+    self.set.bindings = __animate_image_uniform_pool_binding[:]
+    self.set.size = __animate_image_uniform_pool_sizes[:]
+    self.set.layout = animate_tex_descriptor_set_layout
 
     self.vtable = auto_cast (vtable == nil ? &animate_image_vtable : vtable)
     if self.vtable.draw == nil do self.vtable.draw = auto_cast _super_animate_image_draw
@@ -196,7 +193,7 @@ camera:^camera, projection:^projection, colorTransform:^color_transform = nil, v
 
     if self.vtable.get_uniform_resources == nil do self.vtable.get_uniform_resources = auto_cast get_uniform_resources_animate_image
 
-    sys.buffer_resource_create_buffer(&self.frame_uniform, {
+    buffer_resource_create_buffer(&self.frame_uniform, {
         len = size_of(u32),
         type = .UNIFORM,
         resource_usage = .CPU,
@@ -206,9 +203,9 @@ camera:^camera, projection:^projection, colorTransform:^color_transform = nil, v
 }   
 
 _super_animate_image_deinit :: proc(self:^animate_image) {
-    clone_frame_uniform := new(sys.buffer_resource, sys.temp_arena_allocator)
+    clone_frame_uniform := new(buffer_resource, temp_arena_allocator)
     clone_frame_uniform^ = self.frame_uniform
-    sys.buffer_resource_deinit(clone_frame_uniform)
+    buffer_resource_deinit(clone_frame_uniform)
 
     _super_iobject_deinit(auto_cast self)
 }
@@ -250,15 +247,15 @@ animate_image_update_texture_array :: #force_inline proc "contextless" (self:^an
 animate_image_update_projection :: #force_inline proc(self:^animate_image, projection:^projection) {
     iobject_update_projection(self, projection)
 }
-_super_animate_image_draw :: proc (self:^animate_image, cmd:sys.command_buffer) {
+_super_animate_image_draw :: proc (self:^animate_image, cmd:command_buffer) {
     mem.ICheckInit_Check(&self.check_init)
     mem.ICheckInit_Check(&self.src.check_init)
 
-    sys.graphics_cmd_bind_pipeline(cmd, .GRAPHICS, sys.animate_tex_pipeline)
-    sys.graphics_cmd_bind_descriptor_sets(cmd, .GRAPHICS, sys.animate_tex_pipeline_layout, 0, 2,
+    graphics_cmd_bind_pipeline(cmd, .GRAPHICS, animate_tex_pipeline)
+    graphics_cmd_bind_descriptor_sets(cmd, .GRAPHICS, animate_tex_pipeline_layout, 0, 2,
         &([]vk.DescriptorSet{self.set.__set, self.src.set.__set})[0], 0, nil)
 
-    sys.graphics_cmd_draw(cmd, 6, 1, 0, 0)
+    graphics_cmd_draw(cmd, 6, 1, 0, 0)
 }
 
 @private tile_image_vtable :iobject_vtable = iobject_vtable {
@@ -270,9 +267,9 @@ tile_image_init :: proc(self:^tile_image, $actualType:typeid, src:^tile_texture_
 camera:^camera, projection:^projection, colorTransform:^color_transform = nil, pivot:linalg.PointF = {0, 0}, vtable:^iobject_vtable = nil) where intrinsics.type_is_subtype_of(actualType, tile_image) {
     self.src = src
 
-    self.set.bindings = sys.__tile_image_uniform_pool_binding[:]
-    self.set.size = sys.__tile_image_uniform_pool_sizes[:]
-    self.set.layout = sys.animate_tex_descriptor_set_layout //animate_tex_descriptor_set_layout 공용
+    self.set.bindings = __tile_image_uniform_pool_binding[:]
+    self.set.size = __tile_image_uniform_pool_sizes[:]
+    self.set.layout = animate_tex_descriptor_set_layout //animate_tex_descriptor_set_layout 공용
 
     self.vtable = vtable == nil ? &tile_image_vtable : vtable
     if self.vtable.draw == nil do self.vtable.draw = auto_cast _super_tile_image_draw
@@ -281,7 +278,7 @@ camera:^camera, projection:^projection, colorTransform:^color_transform = nil, p
     if self.vtable.get_uniform_resources == nil do self.vtable.get_uniform_resources = auto_cast get_uniform_resources_tile_image
 
 
-    sys.buffer_resource_create_buffer(&self.tile_uniform, {
+    buffer_resource_create_buffer(&self.tile_uniform, {
         len = size_of(u32),
         type = .UNIFORM,
         resource_usage = .CPU,
@@ -296,7 +293,7 @@ camera:^camera, projection:^projection, colorTransform:^color_transform = nil, v
 
     self.set.bindings = __tile_image_uniform_pool_binding[:]
     self.set.size = __tile_image_uniform_pool_sizes[:]
-    self.set.layout = sys.animate_tex_descriptor_set_layout
+    self.set.layout = animate_tex_descriptor_set_layout
 
     self.vtable = vtable == nil ? &tile_image_vtable : vtable
     if self.vtable.draw == nil do self.vtable.draw = auto_cast _super_tile_image_draw
@@ -308,9 +305,9 @@ camera:^camera, projection:^projection, colorTransform:^color_transform = nil, v
 }   
 
 _super_tile_image_deinit :: proc(self:^tile_image) {
-    clone_tile_uniform := new(sys.buffer_resource, sys.temp_arena_allocator)
+    clone_tile_uniform := new(buffer_resource, temp_arena_allocator)
     clone_tile_uniform^ = self.tile_uniform
-    sys.buffer_resource_deinit(clone_tile_uniform)
+    buffer_resource_deinit(clone_tile_uniform)
 
     _super_iobject_deinit(auto_cast self)
 }
@@ -350,24 +347,93 @@ tile_image_update_idx :: proc(self:^tile_image, idx:u32) {
     mem.ICheckInit_Check(&self.check_init)
     self.tile_idx = idx
 
-    sys.buffer_resource_copy_update(&self.tile_uniform, &self.tile_idx)
+    buffer_resource_copy_update(&self.tile_uniform, &self.tile_idx)
 }
 
-_super_tile_image_draw :: proc (self:^tile_image, cmd:sys.command_buffer) {
+_super_tile_image_draw :: proc (self:^tile_image, cmd:command_buffer) {
     mem.ICheckInit_Check(&self.check_init)
     mem.ICheckInit_Check(&self.src.check_init)
 
-    sys.graphics_cmd_bind_pipeline(cmd, .GRAPHICS, sys.animate_tex_pipeline)
-    sys.graphics_cmd_bind_descriptor_sets(cmd, .GRAPHICS, sys.animate_tex_pipeline_layout, 0, 2,
+    graphics_cmd_bind_pipeline(cmd, .GRAPHICS, animate_tex_pipeline)
+    graphics_cmd_bind_descriptor_sets(cmd, .GRAPHICS, animate_tex_pipeline_layout, 0, 2,
         &([]vk.DescriptorSet{self.set.__set, self.src.set.__set})[0], 0, nil)
 
-    sys.graphics_cmd_draw(cmd, 6, 1, 0, 0)
+    graphics_cmd_draw(cmd, 6, 1, 0, 0)
 }
 
 
-texture_init :: sys.texture_init
-texture_init_grey :: sys.texture_init_grey
+texture_init :: proc(
+	self: ^texture,
+	width: u32,
+	height: u32,
+	pixels: []byte,
+	sampler: vk.Sampler = 0,
+	resource_usage: resource_usage = .GPU,
+	in_pixel_fmt: color_fmt = .RGBA,
+) {
+	mem.ICheckInit_Init(&self.check_init)
+	self.sampler = sampler == 0 ? linear_sampler : sampler
+	self.set.bindings = __single_pool_binding[:]
+	self.set.size = __single_sampler_pool_sizes[:]
+	self.set.layout = tex_descriptor_set_layout2
+	self.set.__set = 0
 
+	alloc_pixels := mem.make_non_zeroed_slice([]byte, width * height * 4, engine_def_allocator)
+	color_fmt_convert_default(pixels, alloc_pixels, in_pixel_fmt)
+
+	buffer_resource_create_texture(&self.texture, {
+		width = width,
+		height = height,
+		use_gcpu_mem = false,
+		format = .DefaultColor,
+		samples = 1,
+		len = 1,
+		texture_usage = {.IMAGE_RESOURCE},
+		type = .TEX2D,
+		resource_usage = resource_usage,
+		single = false,
+	}, self.sampler, alloc_pixels, false, engine_def_allocator)
+
+	self.set.__resources = mem.make_non_zeroed_slice([]union_resource, 1, temp_arena_allocator)
+	self.set.__resources[0] = &self.texture
+	update_descriptor_sets(mem.slice_ptr(&self.set, 1))
+}
+
+texture_init_grey :: proc(
+	self: ^texture,
+	width: u32,
+	height: u32,
+	pixels: []byte,
+	sampler: vk.Sampler = 0,
+	resource_usage: resource_usage = .GPU,
+) {
+	mem.ICheckInit_Init(&self.check_init)
+	self.sampler = sampler == 0 ? linear_sampler : sampler
+	self.set.bindings = __single_pool_binding[:]
+	self.set.size = __single_sampler_pool_sizes[:]
+	self.set.layout = tex_descriptor_set_layout2
+	self.set.__set = 0
+
+	alloc_pixels := mem.make_non_zeroed_slice([]byte, width * height, engine_def_allocator)
+	mem.copy_non_overlapping(&alloc_pixels[0], &pixels[0], len(pixels))
+
+	buffer_resource_create_texture(&self.texture, {
+		width = width,
+		height = height,
+		use_gcpu_mem = false,
+		format = .R8Unorm,
+		samples = 1,
+		len = 1,
+		texture_usage = {.IMAGE_RESOURCE},
+		type = .TEX2D,
+		resource_usage = resource_usage,
+		single = false,
+	}, self.sampler, alloc_pixels, false, engine_def_allocator)
+
+	self.set.__resources = mem.make_non_zeroed_slice([]union_resource, 1, temp_arena_allocator)
+	self.set.__resources[0] = &self.texture
+	update_descriptor_sets(mem.slice_ptr(&self.set, 1))
+}
 
 //sampler nil default //TODO (xfitgd)
 // texture_init_r8 :: proc(self:^texture, width:u32, height:u32) {
@@ -401,12 +467,12 @@ texture_init_depth_stencil :: proc(self:^texture, width:u32, height:u32) {
     self.set.layout = 0
     self.set.__set = 0
 
-    sys.buffer_resource_create_texture(&self.texture, {
+    buffer_resource_create_texture(&self.texture, {
         width = width,
         height = height,
         use_gcpu_mem = false,
         format = .DefaultDepth,
-        samples = auto_cast sys.msaa_count,
+        samples = auto_cast msaa_count,
         len = 1,
         texture_usage = {.FRAME_BUFFER},
         type = .TEX2D,
@@ -423,12 +489,12 @@ texture_init_msaa :: proc(self:^texture, width:u32, height:u32) {
     self.set.layout = 0
     self.set.__set = 0
 
-    sys.buffer_resource_create_texture(&self.texture, {
+    buffer_resource_create_texture(&self.texture, {
         width = width,
         height = height,
         use_gcpu_mem = false,
         format = .DefaultColor,
-        samples = auto_cast sys.msaa_count,
+        samples = auto_cast msaa_count,
         len = 1,
         texture_usage = {.FRAME_BUFFER,.__TRANSIENT_ATTACHMENT},
         type = .TEX2D,
@@ -439,9 +505,9 @@ texture_init_msaa :: proc(self:^texture, width:u32, height:u32) {
 
 texture_deinit :: #force_inline proc(self:^texture) {
     mem.ICheckInit_Deinit(&self.check_init)
-    clone_texture := new(sys.texture_resource, sys.temp_arena_allocator)
+    clone_texture := new(texture_resource, temp_arena_allocator)
     clone_texture^ = self.texture
-    sys.buffer_resource_deinit(clone_texture)
+    buffer_resource_deinit(clone_texture)
 }
 
 texture_width :: #force_inline proc "contextless" (self:^texture) -> u32{
@@ -452,10 +518,10 @@ texture_height :: #force_inline proc "contextless" (self:^texture) -> u32 {
 }
 
 get_default_linear_sampler :: #force_inline proc "contextless" () -> vk.Sampler {
-    return sys.linear_sampler
+    return linear_sampler
 }
 get_default_nearest_sampler :: #force_inline proc "contextless" () -> vk.Sampler {
-    return sys.nearest_sampler
+    return nearest_sampler
 }
 
 texture_update_sampler :: #force_inline proc "contextless" (self:^texture, sampler:vk.Sampler) {
@@ -467,16 +533,16 @@ texture_get_sampler :: #force_inline proc "contextless" (self:^texture) -> vk.Sa
 
 texture_array_init :: proc(self:^texture_array, width:u32, height:u32, count:u32, pixels:[]byte, sampler:vk.Sampler = 0, inPixelFmt:color_fmt = .RGBA) {
     mem.ICheckInit_Init(&self.check_init)
-    self.sampler = sampler == 0 ? sys.linear_sampler : sampler
-    self.set.bindings = sys.__single_pool_binding[:]
-    self.set.size = sys.__single_sampler_pool_sizes[:]
-    self.set.layout = sys.tex_descriptor_set_layout2
+    self.sampler = sampler == 0 ? linear_sampler : sampler
+    self.set.bindings = __single_pool_binding[:]
+    self.set.size = __single_sampler_pool_sizes[:]
+    self.set.layout = tex_descriptor_set_layout2
     self.set.__set = 0
 
-    allocPixels := mem.make_non_zeroed_slice([]byte, count * width * height * 4, sys.engine_def_allocator)
+    allocPixels := mem.make_non_zeroed_slice([]byte, count * width * height * 4, engine_def_allocator)
     color_fmt_convert_default(pixels, allocPixels, inPixelFmt)
 
-    sys.buffer_resource_create_texture(&self.texture, {
+    buffer_resource_create_texture(&self.texture, {
         width = width,
         height = height,
         use_gcpu_mem = false,
@@ -486,18 +552,18 @@ texture_array_init :: proc(self:^texture_array, width:u32, height:u32, count:u32
         texture_usage = {.IMAGE_RESOURCE},
         type = .TEX2D,
         resource_usage = .GPU,
-    }, self.sampler, allocPixels, false, sys.engine_def_allocator)
+    }, self.sampler, allocPixels, false, engine_def_allocator)
 
-    self.set.__resources = mem.make_non_zeroed_slice([]sys.union_resource, 1, sys.temp_arena_allocator)
+    self.set.__resources = mem.make_non_zeroed_slice([]union_resource, 1, temp_arena_allocator)
     self.set.__resources[0] = &self.texture
-    sys.update_descriptor_sets(mem.slice_ptr(&self.set, 1))
+    update_descriptor_sets(mem.slice_ptr(&self.set, 1))
 }
 
 texture_array_deinit :: #force_inline proc(self:^texture_array) {
     mem.ICheckInit_Deinit(&self.check_init)
-    clone_texture := new(sys.texture_resource, sys.temp_arena_allocator)
+    clone_texture := new(texture_resource, temp_arena_allocator)
     clone_texture^ = self.texture
-    sys.buffer_resource_deinit(clone_texture)
+    buffer_resource_deinit(clone_texture)
 }
 texture_array_width :: #force_inline proc "contextless" (self:^texture_array) -> u32 {
     return self.texture.option.width
@@ -551,13 +617,13 @@ color_fmt_convert_default_overlap :: proc "contextless" (pixels:[]byte, out:[]by
 tile_texture_array_init :: proc(self:^tile_texture_array, tile_width:u32, tile_height:u32, width:u32, count:u32, pixels:[]byte, sampler:vk.Sampler = 0, 
 inPixelFmt:color_fmt = .RGBA) {
     mem.ICheckInit_Init(&self.check_init)
-    self.sampler = sampler == 0 ? sys.linear_sampler : sampler
-    self.set.bindings = sys.__single_pool_binding[:]
-    self.set.size = sys.__single_sampler_pool_sizes[:]
-    self.set.layout = sys.tex_descriptor_set_layout2
+    self.sampler = sampler == 0 ? linear_sampler : sampler
+    self.set.bindings = __single_pool_binding[:]
+    self.set.size = __single_sampler_pool_sizes[:]
+    self.set.layout = tex_descriptor_set_layout2
     self.set.__set = 0
     bit :: 4//outBit count default 4
-    allocPixels := mem.make_non_zeroed_slice([]byte, count * tile_width * tile_height * bit, sys.engine_def_allocator)
+    allocPixels := mem.make_non_zeroed_slice([]byte, count * tile_width * tile_height * bit, engine_def_allocator)
 
     //convert tilemap pixel data format to tile image data format arranged sequentially
     cnt:u32
@@ -575,7 +641,7 @@ inPixelFmt:color_fmt = .RGBA) {
         }
     }
   
-    sys.buffer_resource_create_texture(&self.texture, {
+    buffer_resource_create_texture(&self.texture, {
         width = tile_width,
         height = tile_height,
         use_gcpu_mem = false,
@@ -584,17 +650,17 @@ inPixelFmt:color_fmt = .RGBA) {
         len = count,
         texture_usage = {.IMAGE_RESOURCE},
         type = .TEX2D,
-    }, self.sampler, allocPixels, false, sys.engine_def_allocator)
+    }, self.sampler, allocPixels, false, engine_def_allocator)
 
-    self.set.__resources = mem.make_non_zeroed_slice([]sys.union_resource, 1, sys.temp_arena_allocator)
+    self.set.__resources = mem.make_non_zeroed_slice([]union_resource, 1, temp_arena_allocator)
     self.set.__resources[0] = &self.texture
-    sys.update_descriptor_sets(mem.slice_ptr(&self.set, 1))
+    update_descriptor_sets(mem.slice_ptr(&self.set, 1))
 }
 tile_texture_array_deinit :: #force_inline proc(self:^tile_texture_array) {
     mem.ICheckInit_Deinit(&self.check_init)
-    clone_texture := new(sys.texture_resource, sys.temp_arena_allocator)
+    clone_texture := new(texture_resource, temp_arena_allocator)
     clone_texture^ = self.texture
-    sys.buffer_resource_deinit(clone_texture)
+    buffer_resource_deinit(clone_texture)
 }
 tile_texture_array_width :: #force_inline proc "contextless" (self:^tile_texture_array) -> u32 {
     return self.texture.option.width

@@ -1,4 +1,4 @@
-package sys 
+package engine
 
 import "base:library"
 import "core:sys/android"
@@ -13,7 +13,7 @@ import "base:intrinsics"
 import "base:runtime"
 import "core:math/linalg"
 import vk "vendor:vulkan"
-import "../"
+
 
 when library.is_android {
     @(private="file") app : ^android.android_app
@@ -81,7 +81,7 @@ when library.is_android {
             trace.panic_log(res)
         }
     }
-    @(private="file") input_state:engine.general_input_state
+    @(private="file") input_state:general_input_state
 
     @(private="file") free_saved_state :: proc "contextless" () {
         //TODO (xfitgd)
@@ -129,7 +129,7 @@ when library.is_android {
         }
 
         input_state.handle = transmute(rawptr)(int(android.AInputEvent_getDeviceId(evt)))
-        engine.general_input_callback(input_state)
+        general_input_callback(input_state)
         return true
     }
     @(private="file") handle_input :: proc "c" (app:^android.android_app, evt : ^android.AInputEvent) -> c.int {
@@ -183,7 +183,7 @@ when library.is_android {
                 input_state.right_thumb = linalg.PointF{z, rz}
 
                 input_state.handle = transmute(rawptr)(int(android.AInputEvent_getDeviceId(evt)))
-                engine.general_input_callback(input_state)
+                general_input_callback(input_state)
             } else {
                 count:uint
                 act := android.AMotionEvent_getAction(evt)
@@ -191,24 +191,24 @@ when library.is_android {
                 if toolType == .MOUSE {
                     count = 1
                     mm := linalg.PointF{android.AMotionEvent_getX(evt, 0), android.AMotionEvent_getY(evt, 0)}
-                    mm = engine.convert_mouse_pos(mm)
-                    mouse_pos = mm
+                    mm = convert_mouse_pos(mm)
+                    __mouse_pos = mm
 
                     #partial switch act.action {
                         case .DOWN:
                             is_primary := android.AMotionEvent_getAxisValue(evt, android.MotionEventAxis.PRESSURE, 0) == 1.0
-                            engine.mouse_button_down(is_primary ? 0 : 1, mm.x, mm.y)
+                            mouse_button_down(is_primary ? 0 : 1, mm.x, mm.y)
                         case .UP:
                             is_primary := android.AMotionEvent_getAxisValue(evt, android.MotionEventAxis.PRESSURE, 0) == 1.0
-                            engine.mouse_button_up(is_primary ? 0 : 1, mm.x, mm.y)
+                            mouse_button_up(is_primary ? 0 : 1, mm.x, mm.y)
                         case .SCROLL:
                             //TODO (xfitgd) HSCROLL
                             dt := int(android.AMotionEvent_getAxisValue(evt, android.MotionEventAxis.VSCROLL, 0) * 100.0)
-                            engine.mouse_scroll(dt)
+                            mouse_scroll(dt)
                         case .MOVE:
                             if mm.x != pointer_poses[0].x || mm.y != pointer_poses[0].y {
                                 pointer_poses[0] = mm
-                                engine.mouse_move(mm.x, mm.y)
+                                mouse_move(mm.x, mm.y)
                             }
                     }
                     return 1
@@ -221,40 +221,40 @@ when library.is_android {
                 if act.action == .MOVE {
                     for i in 0 ..< count {
                         pt := linalg.PointF{android.AMotionEvent_getX(evt, i), android.AMotionEvent_getY(evt, i)}
-                        pt = engine.convert_mouse_pos(pt)
+                        pt = convert_mouse_pos(pt)
 
                         if pt.x != pointer_poses[i].x || pt.y != pointer_poses[i].y {
                             pointer_poses[i] = pt
                             if i == 0 {
-                                mouse_pos = pt
+                                __mouse_pos = pt
                             }
-                            engine.pointer_move(int(i), pt.x, pt.y)
+                            pointer_move(int(i), pt.x, pt.y)
                         }
                     }
                 } else {
                     for i in 0 ..< count {
                         pointer_poses[i] = linalg.PointF{android.AMotionEvent_getX(evt, i), android.AMotionEvent_getY(evt, i)}
-                        pointer_poses[i] = engine.convert_mouse_pos(pointer_poses[i])
+                        pointer_poses[i] = convert_mouse_pos(pointer_poses[i])
                     }
-                    mouse_pos = pointer_poses[0]
+                    __mouse_pos = pointer_poses[0]
                 }
 
                 #partial switch act.action {
                     case .DOWN:
-                        engine.pointer_down(0, pointer_poses[0].x, pointer_poses[0].y)
+                        pointer_down(0, pointer_poses[0].x, pointer_poses[0].y)
                     case .UP:
-                        engine.pointer_up(0, pointer_poses[0].x, pointer_poses[0].y)
+                        pointer_up(0, pointer_poses[0].x, pointer_poses[0].y)
                     case .POINTER_DOWN:
                         idx := act.pointer_index
                         if auto_cast idx < count {
-                            engine.pointer_down(auto_cast idx, pointer_poses[idx].x, pointer_poses[idx].y)
+                            pointer_down(auto_cast idx, pointer_poses[idx].x, pointer_poses[idx].y)
                         } else {
                             fmt.print_custom_android("WARN OUT OF RANGE PointerDown:", idx, count, "\n", logPriority=.WARN)
                         }
                     case .POINTER_UP:
                         idx := act.pointer_index
                         if auto_cast idx < count {
-                            engine.pointer_up(auto_cast idx, pointer_poses[idx].x, pointer_poses[idx].y)
+                            pointer_up(auto_cast idx, pointer_poses[idx].x, pointer_poses[idx].y)
                         } else {
                             fmt.print_custom_android("WARN OUT OF RANGE PointerUp:", idx, count, "\n", logPriority=.WARN)
                         }
@@ -273,7 +273,7 @@ when library.is_android {
                     if int(key_code) < key_size {
                         if !keys[int(key_code)] {
                             keys[int(key_code)] = true
-                            engine.key_down(transmute(engine.key_code)(key_code))
+                            key_down(transmute(key_code)(key_code))
                         }
                     } else {
                         fmt.print_custom_android("WARN OUT OF RANGE KeyDown: ", int(key_code), "\n", logPriority=.WARN, sep = "")
@@ -285,7 +285,7 @@ when library.is_android {
                     }
                     if int(key_code) < key_size {
                         keys[int(key_code)] = false
-                        engine.key_up(transmute(engine.key_code)(key_code))
+                        key_up(transmute(key_code)(key_code))
                     } else {
                         fmt.print_custom_android("WARN OUT OF RANGE KeyUp: ", int(key_code), "\n", logPriority=.WARN, sep = "")
                         return 0
@@ -294,8 +294,8 @@ when library.is_android {
                     if int(key_code) < key_size {
                         cnt := android.AKeyEvent_getRepeatCount(evt)
                         for i in 0 ..< cnt {
-                            engine.key_down(transmute(engine.key_code)(key_code))
-                            engine.key_up(transmute(engine.key_code)(key_code))
+                            key_down(transmute(key_code)(key_code))
+                            key_up(transmute(key_code)(key_code))
                         }
                     } else {
                         fmt.print_custom_android("WARN OUT OF RANGE Key Multiple: ", int(key_code), "\n", logPriority=.WARN, sep = "")
@@ -320,7 +320,7 @@ when library.is_android {
                         __window_width = int(vk_extent.width)
 		                __window_height = int(vk_extent.height)
 
-		                engine.init()
+		                init()
                         app_inited = true
                     } else {
                         size_updated = true
@@ -329,13 +329,13 @@ when library.is_android {
             case .TERM_WINDOW:
                 //EMPTY
             case .GAINED_FOCUS:
-                paused = false
-                activated = false
-                engine.activate()
+                __paused = false
+                __activated = false
+                activate()
             case .LOST_FOCUS:
-                paused = true
-                activated = true
-                engine.activate()
+                __paused = true
+                __activated = true
+                activate()
             case .WINDOW_RESIZED:
                 sync.mutex_lock(&full_screen_mtx)
                 defer sync.mutex_unlock(&full_screen_mtx)
@@ -358,7 +358,7 @@ when library.is_android {
             events: i32
             source: ^android.android_poll_source
 
-            ident := android.ALooper_pollAll(!paused ? 0 : -1, nil, &events, cast(^rawptr)&source)
+            ident := android.ALooper_pollAll(!__paused ? 0 : -1, nil, &events, cast(^rawptr)&source)
             for ident >= 0 {
                 if source != nil {
                     source.process(app, source)
@@ -366,17 +366,17 @@ when library.is_android {
 
                 if app.destroyRequested != 0 {
                     graphics_wait_device_idle()
-                    engine.destroy()
+                    destroy()
                     graphics_destroy()
-                    engine.system_destroy()
+                    system_destroy()
                     system_after_destroy()
                     return
                 }
 
-                ident = android.ALooper_pollAll(!paused ? 0 : -1, nil, &events, cast(^rawptr)&source)
+                ident = android.ALooper_pollAll(!__paused ? 0 : -1, nil, &events, cast(^rawptr)&source)
             }
 
-            if (!paused && app_inited) {
+            if (!__paused && app_inited) {
                 render_loop()
             }
         }

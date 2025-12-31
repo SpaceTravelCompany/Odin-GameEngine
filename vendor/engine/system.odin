@@ -1,6 +1,7 @@
 package engine
 
 import "base:intrinsics"
+import "base:library"
 import "core:fmt"
 import "core:c/libc"
 import "core:c"
@@ -22,17 +23,14 @@ import "core:debug/trace"
 
 import "core:sys/android"
 import "vendor:glfw"
-import sys "./sys"
 
-// Re-export types
-resource_usage :: sys.resource_usage
 
 //@(private) render_th: ^thread.Thread
 
-exiting :: #force_inline proc  "contextless"() -> bool {return sys.exiting}
-dt :: #force_inline proc "contextless" () -> f64 { return f64(sys.delta_time) / 1000000000.0 }
-dt_u64 :: #force_inline proc "contextless" () -> u64 { return sys.delta_time }
-get_processor_core_len :: #force_inline proc "contextless" () -> int { return sys.processor_core_len }
+exiting :: #force_inline proc  "contextless"() -> bool {return __exiting}
+dt :: #force_inline proc "contextless" () -> f64 { return f64(delta_time) / 1000000000.0 }
+dt_u64 :: #force_inline proc "contextless" () -> u64 { return delta_time }
+get_processor_core_len :: #force_inline proc "contextless" () -> int { return processor_core_len }
 
 init: #type proc()
 update: #type proc()
@@ -91,15 +89,15 @@ linux_platform_version :: struct {
 
 when is_android {
 	get_platform_version :: #force_inline proc "contextless" () -> android_platform_version {
-		return sys.android_platform
+		return android_platform
 	}
 } else when ODIN_OS == .Linux {
 	get_platform_version :: #force_inline proc "contextless" () -> linux_platform_version {
-		return sys.linux_platform
+		return linux_platform
 	}
 } else when ODIN_OS == .Windows {
 	get_platform_version :: #force_inline proc "contextless" () -> windows_platform_version {
-		return sys.windows_platform
+		return windows_platform
 	}
 }
 
@@ -116,8 +114,36 @@ icon_image :: glfw.Image
 
 @(private) windows_h_instance:windows.HINSTANCE
 
-def_allocator :: proc "contextless" () -> mem.Allocator {
-	return sys.engine_def_allocator
+when library.is_android {
+	android_platform:android_platform_version
+} else when ODIN_OS == .Linux {
+	linux_platform:linux_platform_version
+} else when ODIN_OS == .Windows {
+	windows_platform:windows_platform_version
+}
+
+// ============================================================================
+// System Initialization & Cleanup
+// ============================================================================
+
+system_start :: #force_inline proc() {
+	engine_def_allocator = context.allocator
+	start_tracking_allocator()
+
+    monitors = mem.make_non_zeroed([dynamic]monitor_info)
+	when library.is_android {
+	} else {
+		glfw_system_init()
+		glfw_system_start()
+	}
+}
+
+system_after_destroy :: #force_inline proc() {
+	delete(monitors)
+}
+
+def_allocator :: #force_inline proc "contextless" () -> mem.Allocator {
+	return engine_def_allocator
 }
 
 engine_main :: proc(
@@ -126,66 +152,66 @@ engine_main :: proc(
 	window_y:Maybe(int) = nil,
 	window_width:Maybe(int) = nil,
 	window_height:Maybe(int) = nil,
-	v_sync:sys.v_sync = .Double,
+	v_sync:v_sync = .Double,
 ) {
 	when ODIN_OS == .Windows {
 		windows_h_instance = auto_cast windows.GetModuleHandleA(nil)
 	}
 
-	sys.system_start()
+	system_start()
 
 	assert(!(window_width != nil && window_width.? <= 0))
 	assert(!(window_height != nil && window_height.? <= 0))
 
 	inited = true
 
-	sys.__window_title = window_title
+	__window_title = window_title
 	when is_android {
 		when is_console {
 			trace.panic_log("Console mode is not supported on Android.")
 		}
-		sys.__window_x = 0
-		sys.__window_y = 0
+		__window_x = 0
+		__window_y = 0
 
-		sys.__android_set_app(auto_cast android.get_android_app())
+		__android_set_app(auto_cast android.get_android_app())
 	} else {
 		when !is_console {
-			sys.__window_x = window_x
-			sys.__window_y = window_y
-			sys.__window_width = window_width
-			sys.__window_height = window_height
+			__window_x = window_x
+			__window_y = window_y
+			__window_width = window_width
+			__window_height = window_height
 		}
 	}
-	sys.__v_sync = v_sync
+	__v_sync = v_sync
 
 	when is_android {
-		sys.android_start()
+		android_start()
 	} else {
 		when is_console {
 			init()
 			destroy()
 			system_destroy()
-			sys.system_after_destroy()
+			system_after_destroy()
 		} else {
 			window_start()
 
-			sys.graphics_init()
+			graphics_init()
 
 			init()
 
-			for !sys.exiting {
+			for !__exiting {
 				system_loop()
 			}
 
-			sys.graphics_wait_device_idle()
+			graphics_wait_device_idle()
 
 			destroy()
 
-			sys.graphics_destroy()
+			graphics_destroy()
 
 			system_destroy()
 
-			sys.system_after_destroy()
+			system_after_destroy()
 		}
 		__destroy_tracking_allocator()
 	}
@@ -194,22 +220,22 @@ engine_main :: proc(
 system_loop :: proc() {
 	when is_android {
 	} else {
-		sys.glfw_loop()
+		glfw_loop()
 	}
 }
 
 window_start :: proc() {
 	when is_android {
 	} else {
-		sys.glfw_start()
+		glfw_start()
 	}
 }
 
 system_destroy :: proc() {
 	when is_android {
 	} else {
-		sys.glfw_destroy()
-		sys.glfw_system_destroy()
+		glfw_destroy()
+		glfw_system_destroy()
 	}
 }
 
@@ -218,9 +244,9 @@ system_destroy :: proc() {
 start_tracking_allocator :: proc() {
 	when ODIN_DEBUG {
 		mem.tracking_allocator_init(&track_allocator, context.allocator)
-		if sys.engine_def_allocator == context.allocator {
-			sys.engine_def_allocator = mem.tracking_allocator(&track_allocator)
-			context.allocator = sys.engine_def_allocator
+		if engine_def_allocator == context.allocator {
+			engine_def_allocator = mem.tracking_allocator(&track_allocator)
+			context.allocator = engine_def_allocator
 		} else {
 			context.allocator = mem.tracking_allocator(&track_allocator)
 		}
@@ -254,10 +280,6 @@ destroy_tracking_allocator :: proc() {
 	}
 }
 
-
-
-
-
 // @(private) CreateRenderFuncThread :: proc() {
 // 	render_th = thread.create_and_start(RenderFunc)
 // }
@@ -267,7 +289,7 @@ destroy_tracking_allocator :: proc() {
 
 // 	Init()
 
-// 	for !exiting {
+// 	for !__exiting {
 // 		RenderLoop()
 // 	}
 
@@ -280,17 +302,17 @@ destroy_tracking_allocator :: proc() {
 
 
 get_max_frame :: #force_inline proc "contextless" () -> f64 {
-	return intrinsics.atomic_load_explicit(&sys.max_frame,.Relaxed)
+	return intrinsics.atomic_load_explicit(&max_frame,.Relaxed)
 }
 
 
 get_fps :: #force_inline proc "contextless" () -> f64 {
-	if sys.delta_time == 0 do return 0
+	if delta_time == 0 do return 0
 	return 1.0 / dt()
 }
 
 set_max_frame :: #force_inline proc "contextless" (_maxframe: f64) {
-	intrinsics.atomic_store_explicit(&sys.max_frame, _maxframe, .Relaxed)
+	intrinsics.atomic_store_explicit(&max_frame, _maxframe, .Relaxed)
 }
 
 //_int * 1000000000 + _dec
@@ -302,14 +324,10 @@ second_to_nano_second2 :: #force_inline proc "contextless" (_sec: $T, _milisec: 
     return _sec * 1000000000 + _milisec * 1000000 + _usec * 1000 + _nsec
 }
 
-is_main_thread :: #force_inline proc "contextless" () -> bool {
-	return sys.is_main_thread()
-}
-
 
 windows_set_res_icon :: proc "contextless" (icon_resource_number:int) {
 	when ODIN_OS == .Windows {
-		h_wnd := sys.glfw_get_hwnd()
+		h_wnd := glfw_get_hwnd()
 		icon := windows.LPARAM(uintptr(windows.LoadIconW(windows_h_instance, auto_cast windows.MAKEINTRESOURCEW(icon_resource_number))))
 		windows.SendMessageW(h_wnd, windows.WM_SETICON, 1, icon)
 		windows.SendMessageW(h_wnd, windows.WM_SETICON, 0, icon)
@@ -319,7 +337,7 @@ windows_set_res_icon :: proc "contextless" (icon_resource_number:int) {
 exit :: proc "contextless" () {
 	when is_mobile {
 	} else {
-		sys.glfw_destroy()
+		glfw_destroy()
 	}
 }
 
@@ -332,5 +350,64 @@ start_console :: proc() {
 		os.stdin = os.get_std_handle(uint(windows.STD_INPUT_HANDLE))
 		os.stdout = os.get_std_handle(uint(windows.STD_OUTPUT_HANDLE))
 		os.stderr = os.get_std_handle(uint(windows.STD_ERROR_HANDLE))
+	}
+}
+
+@private main_thread_id: int
+// Allocators
+temp_arena_allocator: mem.Allocator
+engine_def_allocator: mem.Allocator
+
+is_main_thread :: #force_inline proc "contextless" () -> bool {
+	return sync.current_thread_id() == main_thread_id
+}
+
+// ============================================================================
+// Render Loop
+// ============================================================================
+
+@private calc_frame_time :: proc(paused_: bool) {
+	@static start: time.Time
+	@static now: time.Time
+
+	if !loop_start {
+		loop_start = true
+		start = time.now()
+		now = start
+	} else {
+		max_frame_ := get_max_frame()
+		if paused_ && max_frame_ == 0 {
+			max_frame_ = 60
+		}
+		n := time.now()
+		delta := n._nsec - now._nsec
+
+		if max_frame_ > 0 {
+			max_f := u64(1 * (1 / max_frame_)) * 1000000000
+			if max_f > auto_cast delta {
+				time.sleep(auto_cast (i64(max_f) - delta))
+				n = time.now()
+				delta = n._nsec - now._nsec
+			}
+		}
+		now = n
+		delta_time = auto_cast delta
+	}
+}
+
+render_loop :: proc() {
+	paused_ := paused()
+
+	calc_frame_time(paused_)
+
+	update()
+	if __g_main_render_cmd_idx >= 0 {
+		for obj in __g_render_cmd[__g_main_render_cmd_idx].scene {
+			iobject_update(auto_cast obj)
+		}
+	}
+
+	if !paused_ {
+		graphics_draw_frame()
 	}
 }

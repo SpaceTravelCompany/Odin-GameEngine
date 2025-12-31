@@ -1,6 +1,6 @@
 package components
 
-import "../"
+
 import vk "vendor:vulkan"
 import sys "../sys"
 import "core:math/linalg"
@@ -13,9 +13,9 @@ button_state :: enum {
 
 image_button :: struct {
     using _:__button,
-    up_texture:^engine.texture,
-    over_texture:^engine.texture,
-    down_texture:^engine.texture,
+    up_texture:^texture,
+    over_texture:^texture,
+    down_texture:^texture,
 }
 
 _super_button_up :: proc (self:^__button, mousePos:linalg.PointF) {
@@ -96,7 +96,7 @@ _super_button_touch_move :: proc (self:^__button, touchPos:linalg.PointF, touchI
 }
 
 __button :: struct {
-    using _:engine.iobject,
+    using _:iobject,
     area:linalg.AreaF,
     state : button_state,
     touchIdx:Maybe(u8),
@@ -113,7 +113,7 @@ shape_button :: struct {
 }
 
 button_vtable :: struct {
-    using _: engine.iobject_vtable,
+    using _: iobject_vtable,
     button_up: proc (self:^__button, mousePos:linalg.PointF),
     button_down: proc (self:^__button, mousePos:linalg.PointF),
     button_move: proc (self:^__button, mousePos:linalg.PointF),
@@ -128,12 +128,12 @@ button_vtable :: struct {
 }
 
 _super_image_button_deinit :: proc(self:^image_button) {
-    engine._super_iobject_deinit(auto_cast self)
+    _super_iobject_deinit(auto_cast self)
 }
 
-_super_image_button_draw :: proc (self:^image_button, cmd:sys.command_buffer) {
+_super_image_button_draw :: proc (self:^image_button, cmd:command_buffer) {
     mem.ICheckInit_Check(&self.check_init)
-    texture :^engine.texture
+    texture :^texture
 
     switch self.state {
         case .UP:texture = self.up_texture
@@ -145,13 +145,13 @@ _super_image_button_draw :: proc (self:^image_button, cmd:sys.command_buffer) {
         mem.ICheckInit_Check(&texture.check_init)
     }
 
-    engine._image_binding_sets_and_draw(cmd, self.set, texture.set)
+    _image_binding_sets_and_draw(cmd, self.set, texture.set)
 }
 
 image_button_init :: proc(self:^image_button, $actualType:typeid, pos:linalg.Point3DF,
-camera:^engine.camera, projection:^engine.projection,
-rotation:f32 = 0.0, scale:linalg.PointF = {1,1}, colorTransform:^engine.color_transform = nil, pivot:linalg.PointF = {0.0, 0.0},
-up:^engine.texture = nil, over:^engine.texture = nil, down:^engine.texture = nil, vtable:^button_vtable = nil) where intrinsics.type_is_subtype_of(actualType, image_button) {
+camera:^camera, projection:^projection,
+rotation:f32 = 0.0, scale:linalg.PointF = {1,1}, colorTransform:^color_transform = nil, pivot:linalg.PointF = {0.0, 0.0},
+up:^texture = nil, over:^texture = nil, down:^texture = nil, vtable:^button_vtable = nil) where intrinsics.type_is_subtype_of(actualType, image_button) {
     self.up_texture = up
     self.over_texture = over
     self.down_texture = down

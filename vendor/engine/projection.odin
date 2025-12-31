@@ -8,7 +8,7 @@ import "core:math/linalg"
 import "base:intrinsics"
 import "base:runtime"
 import vk "vendor:vulkan"
-import sys "./sys"
+
 
 projection :: struct {
     using _: __matrix_in,
@@ -34,8 +34,8 @@ projection_update_ortho :: #force_inline proc(self:^projection,  left:f32, right
 }
 
 @private __projection_update_ortho_window :: #force_inline proc(self:^projection, width:f32, height:f32, near:f32 = 0.1, far:f32 = 100, flip_axis_for_vulkan := true) {
-    window_width_f := f32(sys.__window_width.?)
-    window_height_f := f32(sys.__window_height.?)
+    window_width_f := f32(__window_width.?)
+    window_height_f := f32(__window_height.?)
     ratio := window_width_f / window_height_f > width / height ? height / window_height_f : width / window_width_f
 
     window_width_f *= ratio
@@ -72,7 +72,7 @@ projection_init_matrix_perspective :: proc (self:^projection, fov:f32, aspect:f3
 
 @private __projection_update_perspective :: #force_inline proc(self:^projection, fov:f32, aspect:f32 = 0, near:f32 = 0.1, far:f32 = 100, flip_axis_for_vulkan := true) {
     aspect_f := aspect
-    if aspect_f == 0 do aspect_f = f32(sys.__window_width.?) / f32(sys.__window_height.?)
+    if aspect_f == 0 do aspect_f = f32(__window_width.?) / f32(__window_height.?)
     sfov :f32 = math.sin(0.5 * fov)
     cfov :f32 = math.cos(0.5 * fov)
 
@@ -100,11 +100,11 @@ projection_update_perspective :: #force_inline proc(self:^projection, fov:f32, a
     mem.ICheckInit_Init(&self.check_init)
     mat : linalg.Matrix
     when is_mobile {
-        mat = linalg.matrix_mul(sys.rotation_matrix, self.mat)
+        mat = linalg.matrix_mul(rotation_matrix, self.mat)
     } else {
         mat = self.mat
     }
-    sys.buffer_resource_create_buffer(&self.mat_uniform, {
+    buffer_resource_create_buffer(&self.mat_uniform, {
         len = size_of(linalg.Matrix),
         type = .UNIFORM,
         resource_usage = .CPU,
@@ -114,20 +114,20 @@ projection_update_perspective :: #force_inline proc(self:^projection, fov:f32, a
 
 projection_deinit :: proc(self:^projection) {
     mem.ICheckInit_Deinit(&self.check_init)
-    
-    clone_mat_uniform := new(sys.buffer_resource, sys.temp_arena_allocator)
+
+    clone_mat_uniform := new(buffer_resource, temp_arena_allocator)
     clone_mat_uniform^ = self.mat_uniform
-    sys.buffer_resource_deinit(clone_mat_uniform)
+    buffer_resource_deinit(clone_mat_uniform)
 }
 
 projection_update_matrix_raw :: proc(self:^projection, _mat:linalg.Matrix) {
     mem.ICheckInit_Check(&self.check_init)
     mat : linalg.Matrix
     when is_mobile {
-        mat = linalg.matrix_mul(sys.rotation_matrix, _mat)
+        mat = linalg.matrix_mul(rotation_matrix, _mat)
     } else {
         mat = _mat
     }
     self.mat = _mat
-    sys.buffer_resource_copy_update(&self.mat_uniform, &mat)
+    buffer_resource_copy_update(&self.mat_uniform, &mat)
 }

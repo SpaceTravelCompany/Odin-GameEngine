@@ -1,4 +1,4 @@
-package sys
+package engine
 
 import "base:library"
 import vk "vendor:vulkan"
@@ -9,7 +9,7 @@ import "core:math/linalg"
 import "core:time"
 import "core:debug/trace"
 
-import "../"
+
 
 // ============================================================================
 // Constants
@@ -105,7 +105,7 @@ descriptor_type :: enum {
 }
 
 // Type Aliases
-size :: vk.DeviceSize
+graphics_size :: vk.DeviceSize
 resource_range :: rawptr
 
 // Structs
@@ -117,7 +117,7 @@ resource_data :: struct {
 
 base_resource :: struct {
 	data: resource_data,
-	g_uniform_indices: [4]size,
+	g_uniform_indices: [4]graphics_size,
 	idx: resource_range,  // unused uniform buffer
 	mem_buffer: ^vk_mem_buffer,
 }
@@ -142,7 +142,7 @@ union_resource :: union #no_nil {
 }
 
 buffer_create_option :: struct {
-	len: size,
+	len: graphics_size,
 	type: buffer_type,
 	resource_usage: resource_usage,
 	single: bool,
@@ -205,7 +205,7 @@ texture :: struct {
 // System State
 program_start := true
 loop_start := false
-exiting: bool = false
+__exiting := false
 max_frame: f64
 delta_time: u64
 processor_core_len: int
@@ -283,8 +283,12 @@ graphics_wait_present_idle :: #force_inline proc "contextless" () {
 }
 
 // 모든 비동기 작업 대기
-graphics_wait_all_ops :: #force_inline proc "contextless" () {
-	vk_wait_all_op()
+graphics_wait_all_ops :: #force_inline proc () {
+    if is_main_thread() {
+        graphics_execute_ops(true)
+    } else {
+        vk_wait_all_op()
+    }
 }
 
 // 작업 실행
@@ -494,88 +498,11 @@ color_transform_update_matrix_raw :: proc(self: ^color_transform, _mat: linalg.M
 }
 
 // ============================================================================
-// Texture Operations
-// ============================================================================
-
-texture_init :: proc(
-	self: ^texture,
-	width: u32,
-	height: u32,
-	pixels: []byte,
-	sampler: vk.Sampler = 0,
-	resource_usage: resource_usage = .GPU,
-	in_pixel_fmt: color_fmt = .RGBA,
-) {
-	mem.ICheckInit_Init(&self.check_init)
-	self.sampler = sampler == 0 ? linear_sampler : sampler
-	self.set.bindings = __single_pool_binding[:]
-	self.set.size = __single_sampler_pool_sizes[:]
-	self.set.layout = tex_descriptor_set_layout2
-	self.set.__set = 0
-
-	alloc_pixels := mem.make_non_zeroed_slice([]byte, width * height * 4, engine_def_allocator)
-	engine.color_fmt_convert_default(pixels, alloc_pixels, in_pixel_fmt)
-
-	buffer_resource_create_texture(&self.texture, {
-		width = width,
-		height = height,
-		use_gcpu_mem = false,
-		format = .DefaultColor,
-		samples = 1,
-		len = 1,
-		texture_usage = {.IMAGE_RESOURCE},
-		type = .TEX2D,
-		resource_usage = resource_usage,
-		single = false,
-	}, self.sampler, alloc_pixels, false, engine_def_allocator)
-
-	self.set.__resources = mem.make_non_zeroed_slice([]union_resource, 1, temp_arena_allocator)
-	self.set.__resources[0] = &self.texture
-	update_descriptor_sets(mem.slice_ptr(&self.set, 1))
-}
-
-texture_init_grey :: proc(
-	self: ^texture,
-	width: u32,
-	height: u32,
-	pixels: []byte,
-	sampler: vk.Sampler = 0,
-	resource_usage: resource_usage = .GPU,
-) {
-	mem.ICheckInit_Init(&self.check_init)
-	self.sampler = sampler == 0 ? linear_sampler : sampler
-	self.set.bindings = __single_pool_binding[:]
-	self.set.size = __single_sampler_pool_sizes[:]
-	self.set.layout = tex_descriptor_set_layout2
-	self.set.__set = 0
-
-	alloc_pixels := mem.make_non_zeroed_slice([]byte, width * height, engine_def_allocator)
-	mem.copy_non_overlapping(&alloc_pixels[0], &pixels[0], len(pixels))
-
-	buffer_resource_create_texture(&self.texture, {
-		width = width,
-		height = height,
-		use_gcpu_mem = false,
-		format = .R8Unorm,
-		samples = 1,
-		len = 1,
-		texture_usage = {.IMAGE_RESOURCE},
-		type = .TEX2D,
-		resource_usage = resource_usage,
-		single = false,
-	}, self.sampler, alloc_pixels, false, engine_def_allocator)
-
-	self.set.__resources = mem.make_non_zeroed_slice([]union_resource, 1, temp_arena_allocator)
-	self.set.__resources[0] = &self.texture
-	update_descriptor_sets(mem.slice_ptr(&self.set, 1))
-}
-
-// ============================================================================
 // Pipeline Creation
 // ============================================================================
 
 create_graphics_pipeline :: proc(
-	self: ^engine.custom_object_pipeline,
+	self: ^custom_object_pipeline,
 	stages: []vk.PipelineShaderStageCreateInfo,
 	depth_stencil_state: ^vk.PipelineDepthStencilStateCreateInfo,
 	viewport_state: ^vk.PipelineViewportStateCreateInfo,

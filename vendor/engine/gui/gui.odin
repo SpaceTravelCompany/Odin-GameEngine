@@ -3,7 +3,9 @@ package gui
 import "base:intrinsics"
 import "core:math/linalg"
 import "core:math"
-import "../"
+
+
+import ".."
 
 pos_align_x :: enum {
     center,
@@ -27,7 +29,7 @@ gui_component :: struct {
     gui_align_y : pos_align_y,
 }
 
-@(require_results, private="file") __base_mat :: #force_inline proc "contextless" (self_component:^gui_component, mul: linalg.PointF) -> Maybe(linalg.Matrix) {
+@(require_results, private) __base_mat :: #force_inline proc "contextless" (self_component:^gui_component, mul: linalg.PointF) -> Maybe(linalg.Matrix) {
     return engine.SR_2D_MATRIX2(self_component.gui_scale, self_component.gui_rotation, self_component.gui_center_pt * mul)
 }
 

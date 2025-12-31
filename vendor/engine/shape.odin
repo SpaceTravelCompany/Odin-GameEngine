@@ -9,7 +9,7 @@ import "core:math/linalg"
 import "base:intrinsics"
 import "base:runtime"
 import vk "vendor:vulkan"
-import sys "./sys"   
+   
 
 shape_src :: struct {
     //?vertexBuf, indexBuf에 check_init: ICheckInit 있으므로 따로 필요없음
@@ -34,9 +34,9 @@ camera:^camera, projection:^projection,  rotation:f32 = 0.0, scale:linalg.PointF
  where intrinsics.type_is_subtype_of(actualType, shape) {
     self.src = src
 
-    self.set.bindings = sys.__transform_uniform_pool_binding[:]
-    self.set.size = sys.__transform_uniform_pool_sizes[:]
-    self.set.layout = sys.shape_descriptor_set_layout
+    self.set.bindings = __transform_uniform_pool_binding[:]
+    self.set.size = __transform_uniform_pool_sizes[:]
+    self.set.layout = shape_descriptor_set_layout
 
     self.vtable = vtable == nil ? &shape_vtable : vtable
     if self.vtable.draw == nil do self.vtable.draw = auto_cast _super_shape_draw
@@ -52,9 +52,9 @@ camera:^camera, projection:^projection, colorTransform:^color_transform = nil, v
  where intrinsics.type_is_subtype_of(actualType, shape) {
     self.src = src
 
-    self.set.bindings = sys.__transform_uniform_pool_binding[:]
-    self.set.size = sys.__transform_uniform_pool_sizes[:]
-    self.set.layout = sys.shape_descriptor_set_layout
+    self.set.bindings = __transform_uniform_pool_binding[:]
+    self.set.size = __transform_uniform_pool_sizes[:]
+    self.set.layout = shape_descriptor_set_layout
 
     self.vtable = vtable == nil ? &shape_vtable : vtable
     if self.vtable.draw == nil do self.vtable.draw = auto_cast _super_shape_draw
@@ -102,32 +102,32 @@ shape_update_projection :: #force_inline proc(self:^shape, projection:^projectio
     iobject_update_projection(self, projection)
 }
 
-_super_shape_draw :: proc (self:^shape, cmd:sys.command_buffer) {
+_super_shape_draw :: proc (self:^shape, cmd:command_buffer) {
     mem.ICheckInit_Check(&self.check_init)
 
-    sys.graphics_cmd_bind_pipeline(cmd, .GRAPHICS, sys.shape_pipeline)
-    sys.graphics_cmd_bind_descriptor_sets(cmd, .GRAPHICS, sys.shape_pipeline_layout, 0, 1,
+    graphics_cmd_bind_pipeline(cmd, .GRAPHICS, shape_pipeline)
+    graphics_cmd_bind_descriptor_sets(cmd, .GRAPHICS, shape_pipeline_layout, 0, 1,
         &([]vk.DescriptorSet{self.set.__set})[0], 0, nil)
 
     offsets: vk.DeviceSize = 0
-    sys.graphics_cmd_bind_vertex_buffers(cmd, 0, 1, &self.src.vertexBuf.buf.__resource, &offsets)
-    sys.graphics_cmd_bind_index_buffer(cmd, self.src.indexBuf.buf.__resource, 0, .UINT32)
+    graphics_cmd_bind_vertex_buffers(cmd, 0, 1, &self.src.vertexBuf.buf.__resource, &offsets)
+    graphics_cmd_bind_index_buffer(cmd, self.src.indexBuf.buf.__resource, 0, .UINT32)
 
-    sys.graphics_cmd_draw_indexed(cmd, auto_cast (self.src.indexBuf.buf.option.len / size_of(u32)), 1, 0, 0, 0)
+    graphics_cmd_draw_indexed(cmd, auto_cast (self.src.indexBuf.buf.option.len / size_of(u32)), 1, 0, 0, 0)
 }
 
-shape_src_init_raw :: proc(self:^shape_src, raw:^geometry.raw_shape, flag:sys.resource_usage = .GPU, colorFlag:sys.resource_usage = .CPU) {
-    rawC := geometry.raw_shape_clone(raw, sys.engine_def_allocator)
-    defer free(rawC, sys.engine_def_allocator)
+shape_src_init_raw :: proc(self:^shape_src, raw:^geometry.raw_shape, flag:resource_usage = .GPU, colorFlag:resource_usage = .CPU) {
+    rawC := geometry.raw_shape_clone(raw, engine_def_allocator)
+    defer free(rawC, engine_def_allocator)
     __vertex_buf_init(&self.vertexBuf, rawC.vertices, flag)
     __index_buf_init(&self.indexBuf, rawC.indices, flag)
 
     self.rect = rawC.rect
 }
 
-@require_results shape_src_init :: proc(self:^shape_src, shapes:^geometry.shapes, flag:sys.resource_usage = .GPU, colorFlag:sys.resource_usage = .CPU) -> (err:geometry.shape_error = .None) {
+@require_results shape_src_init :: proc(self:^shape_src, shapes:^geometry.shapes, flag:resource_usage = .GPU, colorFlag:resource_usage = .CPU) -> (err:geometry.shape_error = .None) {
     raw : ^geometry.raw_shape
-    raw, err = geometry.shapes_compute_polygon(shapes, sys.engine_def_allocator)
+    raw, err = geometry.shapes_compute_polygon(shapes, engine_def_allocator)
     if err != .None do return
 
     __vertex_buf_init(&self.vertexBuf, raw.vertices, flag)
@@ -140,7 +140,7 @@ shape_src_init_raw :: proc(self:^shape_src, raw:^geometry.raw_shape, flag:sys.re
 }
 
 shape_src_update_raw :: proc(self:^shape_src, raw:^geometry.raw_shape) {
-    rawC := geometry.raw_shape_clone(raw, sys.engine_def_allocator)
+    rawC := geometry.raw_shape_clone(raw, engine_def_allocator)
     __vertex_buf_update(&self.vertexBuf, rawC.vertices)
     __index_buf_update(&self.indexBuf, rawC.indices)
 
@@ -149,7 +149,7 @@ shape_src_update_raw :: proc(self:^shape_src, raw:^geometry.raw_shape) {
 
 @require_results shape_src_update :: proc(self:^shape_src, shapes:^geometry.shapes) -> (err:geometry.shape_error = .None) {
     raw : ^geometry.raw_shape
-    raw, err = geometry.shapes_compute_polygon(shapes, sys.engine_def_allocator)
+    raw, err = geometry.shapes_compute_polygon(shapes, engine_def_allocator)
     if err != .None do return
 
     __vertex_buf_update(&self.vertexBuf, raw.vertices)

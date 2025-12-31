@@ -2,7 +2,7 @@ package font
 
 
 import "core:math"
-import "../"
+
 import "core:c"
 import "core:mem"
 import "core:slice"
@@ -15,6 +15,7 @@ import "core:sync"
 import "core:fmt"
 import "base:runtime"
 import "vendor:freetype"
+import "../"
 
 
 @(private="file") char_data :: struct {
@@ -43,6 +44,7 @@ font :: struct {}
     mutex:sync.Mutex,
 
     scale:f32,//default 256
+    allocator:mem.Allocator,
 }
 
 font_render_opt :: struct {
@@ -68,34 +70,36 @@ font_render_range :: struct {
     len:uint,
 }
 
-@(private="file") freetypeLib:freetype.Library = nil
+@(private) freetype_lib:freetype.Library = nil
 
-@(private="file") _init_freetype :: proc "contextless" () {
-    err := freetype.init_free_type(&freetypeLib)
+@(private) _init_freetype :: proc "contextless" () {
+    err := freetype.init_free_type(&freetype_lib)
     if err != .Ok do trace.panic_log(err)
 }
 
-@(private) _deinit_freetype :: proc "contextless" () {
-    err := freetype.done_free_type(freetypeLib)
-    if err != .Ok do trace.panic_log(err)
-    freetypeLib = nil
+@(private, fini) _deinit_freetype :: proc "contextless" () {
+    if (freetype_lib != nil) {
+        err := freetype.done_free_type(freetype_lib)
+        if err != .Ok do trace.panic_log(err)
+        freetype_lib = nil
+    }
 }
 
 freetype_err :: freetype.Error
 
-font_init :: proc(_fontData:[]byte, #any_int _faceIdx:int = 0) -> (font : ^font = nil, err : freetype_err = .Ok)  {
-    font_ := mem.new_non_zeroed(font_t, engine.def_allocator())
-    defer if err != .Ok do free(font_, engine.def_allocator())
+font_init :: proc(_fontData:[]byte, #any_int _faceIdx:int = 0, allocator:mem.Allocator = context.allocator) -> (font : ^font = nil, err : freetype_err = .Ok)  {
+    font_ := mem.new_non_zeroed(font_t, allocator)
+    defer if err != .Ok do free(font_, allocator)
 
     font_.scale = SCALE_DEFAULT
     font_.mutex = {}
 
-    font_.char_array = make_map( map[FONT_KEY]char_data, engine.def_allocator() )
+    font_.char_array = make_map( map[FONT_KEY]char_data, allocator )
     defer if err != .Ok do delete(font_.char_array)
 
-    if freetypeLib == nil do _init_freetype()
+    if freetype_lib == nil do _init_freetype()
 
-    err = freetype.new_memory_face(freetypeLib, raw_data(_fontData), auto_cast len(_fontData), auto_cast _faceIdx, &font_.face)
+    err = freetype.new_memory_face(freetype_lib, raw_data(_fontData), auto_cast len(_fontData), auto_cast _faceIdx, &font_.face)
     if err != .Ok {
         return
     }
@@ -107,6 +111,7 @@ font_init :: proc(_fontData:[]byte, #any_int _faceIdx:int = 0) -> (font : ^font 
     err = freetype.set_char_size(font_.face, 0, 16 * 256 * 64, 0, 0)
     if err != .Ok do return
 
+    font_.allocator = allocator
     font = auto_cast font_
     return
 }
@@ -119,11 +124,11 @@ font_deinit :: proc(self:^font) -> (err : freetype.Error = .Ok) {
     if err != .Ok do trace.panic_log(err)
 
     for key,value in self_.char_array {
-        geometry.raw_shape_free(value.raw_shape, engine.def_allocator())
+        geometry.raw_shape_free(value.raw_shape, self_.allocator)
     }
     delete(self_.char_array)
     sync.mutex_unlock(&self_.mutex)
-    free(self_, engine.def_allocator())
+    free(self_, self_.allocator)
 
     return
 }
@@ -431,11 +436,11 @@ allocator : runtime.Allocator) -> (rect:linalg.RectF, err:geometry.shape_error =
                 }
 
                 rawP : ^geometry.raw_shape
-                rawP , shapeErr = geometry.shapes_compute_polygon(&poly, engine.def_allocator())//높은 부하 작업 High load operations
+                rawP , shapeErr = geometry.shapes_compute_polygon(&poly)//높은 부하 작업 High load operations
                 if shapeErr != .None do return
 
                 defer if shapeErr != .None {
-                    geometry.raw_shape_free(rawP, engine.def_allocator())
+                    geometry.raw_shape_free(rawP)
                 }
                 if len(rawP.vertices) > 0 {
                     maxP :linalg.PointF = {min(f32), min(f32)}

@@ -5,7 +5,7 @@ import "core:debug/trace"
 import "core:sync"
 import vk "vendor:vulkan"
 
-import sys "./sys"
+
 
 MAX_FRAMES_IN_FLIGHT :: 2
 render_cmd :: struct {}
@@ -14,7 +14,7 @@ __render_cmd :: struct {
     scene: [dynamic]^iobject,
     scene_t: [dynamic]^iobject,
     refresh:[MAX_FRAMES_IN_FLIGHT]bool,
-    cmds:[MAX_FRAMES_IN_FLIGHT][]sys.command_buffer,
+    cmds:[MAX_FRAMES_IN_FLIGHT][]command_buffer,
     obj_lock:sync.RW_Mutex
 }
 
@@ -28,8 +28,8 @@ render_cmd_init :: proc() -> ^render_cmd {
     cmd.scene_t = mem.make_non_zeroed([dynamic]^iobject)
     for i in 0..<MAX_FRAMES_IN_FLIGHT {
         cmd.refresh[i] = false
-        cmd.cmds[i] = mem.make_non_zeroed([]sys.command_buffer, sys.swap_img_cnt)
-        sys.allocate_command_buffers(&cmd.cmds[i][0], sys.swap_img_cnt)
+        cmd.cmds[i] = mem.make_non_zeroed([]command_buffer, swap_img_cnt)
+        allocate_command_buffers(&cmd.cmds[i][0], swap_img_cnt)
     }
     cmd.obj_lock = sync.RW_Mutex{}
 
@@ -42,7 +42,7 @@ render_cmd_init :: proc() -> ^render_cmd {
 render_cmd_deinit :: proc(cmd: ^render_cmd) {
     cmd_ :^__render_cmd = (^__render_cmd)(cmd)
     for i in 0..<MAX_FRAMES_IN_FLIGHT {
-        sys.free_command_buffers(&cmd_.cmds[i][0], sys.swap_img_cnt)
+        free_command_buffers(&cmd_.cmds[i][0], swap_img_cnt)
         delete(cmd_.cmds[i])
     }
     delete(cmd_.scene)
