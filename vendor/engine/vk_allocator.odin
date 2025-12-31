@@ -264,6 +264,10 @@ vk_allocator_destroy :: proc() {
 		for i in value {
 			vk.DestroyDescriptorPool(graphics_device, i.pool, nil)
 		}
+		delete(value)
+	}
+	for i in gUniforms {
+		delete(i.uniforms)
 	}
 
 	delete(gVkUpdateDesciptorSetList)
@@ -365,6 +369,9 @@ vk_find_mem_type :: proc "contextless" (
 		for n: ^list.Node = self.list.head; n.next != nil; n = n.next {
 			free(n, engine_def_allocator)
 		}
+		free(self.list.head, engine_def_allocator)
+		self.list.head = nil
+		self.list.tail = nil
 	}
 }
 @(private = "file") vk_mem_buffer_Deinit :: proc(self: ^vk_mem_buffer) {
@@ -938,6 +945,7 @@ vkbuffer_resource_deinit :: proc(self: ^$T) where T == buffer_resource || T == t
 	}
 	if empty {
 		buffer_resource_DestroyBufferNoAsync(buf)
+		delete(gUniforms[buf.g_uniform_indices[0]].uniforms)
 		gUniforms[buf.g_uniform_indices[0]] = {}
 
 		return

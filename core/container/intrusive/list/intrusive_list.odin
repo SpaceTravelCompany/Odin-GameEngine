@@ -79,10 +79,6 @@ remove :: proc "contextless" (list: ^List, node: ^Node) {
 		if list.tail == node {
 			list.tail = node.prev
 		}
-		if list.head == nil {//edited (xfitgd) : always head not nil when list is not empty
-			list.head = list.tail
-			list.tail = nil
-		}
 	}
 }
 /*
@@ -107,10 +103,6 @@ remove_by_proc :: proc(list: ^List, to_erase: proc(^Node) -> bool) {
 			}
 			if list.tail == node {
 				list.tail = node.prev
-			}
-			if list.head == nil {//edited (xfitgd) : always head not nil when list is not empty
-				list.head = list.tail
-				list.tail = nil
 			}
 		}
 		node = next
@@ -138,10 +130,6 @@ remove_by_proc_contextless :: proc(list: ^List, to_erase: proc "contextless" (^N
 			}
 			if list.tail == node {
 				list.tail = node.prev
-			}
-			if list.head == nil {//edited (xfitgd) : always head not nil when list is not empty
-				list.head = list.tail
-				list.tail = nil
 			}
 		}
 		node = next
@@ -185,10 +173,6 @@ pop_front :: proc "contextless" (list: ^List) -> ^Node {
 	if link == list.tail {
 		list.tail = link.prev
 	}
-	if list.head == nil {//edited (xfitgd) : always head not nil when list is not empty
-		list.head = list.tail
-		list.tail = nil
-	}
 	return link
 
 }
@@ -216,10 +200,6 @@ pop_back :: proc "contextless" (list: ^List) -> ^Node {
 	}
 	if link == list.tail {
 		list.tail = link.prev
-	}
-	if list.head == nil {//edited (xfitgd) : always head not nil when list is not empty
-		list.head = list.tail
-		list.tail = nil
 	}
 	return link
 }
