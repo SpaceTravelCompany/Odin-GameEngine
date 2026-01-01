@@ -62,7 +62,7 @@ NOTE: The created string is only valid as long as the pointer and length are val
 Returns:
 - res: A string created from the byte pointer and length
 */
-string_from_ptr :: proc(ptr: ^byte, len: int) -> (res: string) {
+string_from_ptr :: proc "contextless" (ptr: ^byte, len: int) -> (res: string) {
 	return transmute(string)mem.Raw_String{ptr, len}
 }
 
@@ -96,7 +96,7 @@ WARNING: This is unsafe because the original string may not contain a null-byte.
 Returns:
 - res: The converted cstring
 */
-unsafe_string_to_cstring :: proc(str: string) -> (res: cstring) {
+unsafe_string_to_cstring :: proc "contextless" (str: string) -> (res: cstring) {
 	d := transmute(mem.Raw_String)str
 	return cstring(d.data)
 }
@@ -131,7 +131,7 @@ Inputs:
 Returns:
 - res: The truncated string
 */
-truncate_to_rune :: proc(str: string, r: rune) -> (res: string) {
+truncate_to_rune :: proc "contextless" (str: string, r: rune) -> (res: string) {
 	n := index_rune(str, r)
 	if n < 0 {
 		n = len(str)
@@ -256,7 +256,7 @@ Inputs:
 Returns:
 - result: `true` if the rune `r` in the string `s`, `false` otherwise
 */
-contains_rune :: proc(s: string, r: rune) -> (result: bool) {
+contains_rune :: proc "contextless" (s: string, r: rune) -> (result: bool) {
 	for c in s {
 		if c == r {
 			return true
@@ -293,7 +293,7 @@ Output:
 	false
 
 */
-contains :: proc(s, substr: string) -> (res: bool) {
+contains :: proc "contextless" (s, substr: string) -> (res: bool) {
 	return index(s, substr) >= 0
 }
 
@@ -327,7 +327,7 @@ Output:
 	false
 
 */
-contains_any :: proc(s, chars: string) -> (res: bool) {
+contains_any :: proc "contextless" (s, chars: string) -> (res: bool) {
 	return index_any(s, chars) >= 0
 }
 
@@ -366,7 +366,7 @@ Output:
 	5
 
 */
-rune_count :: proc(s: string) -> (res: int) {
+rune_count :: proc "contextless" (s: string) -> (res: int) {
 	return utf8.rune_count_in_string(s)
 }
 
@@ -401,7 +401,7 @@ Output:
 	false
 
 */
-equal_fold :: proc(u, v: string) -> (res: bool) {
+equal_fold :: proc "contextless" (u, v: string) -> (res: bool) {
 	s, t := u, v
 	loop: for s != "" && t != "" {
 		sr, tr: rune
@@ -527,7 +527,7 @@ Output:
 
 
 */
-common_prefix :: proc(a, b: string) -> string {
+common_prefix :: proc "contextless" (a, b: string) -> string {
 	return a[:prefix_length(a, b)]
 }
 
@@ -561,7 +561,7 @@ Output:
 	false
 
 */
-has_prefix :: proc(s, prefix: string) -> (result: bool) {
+has_prefix :: proc "contextless" (s, prefix: string) -> (result: bool) {
 	return len(s) >= len(prefix) && s[0:len(prefix)] == prefix
 }
 
@@ -595,7 +595,7 @@ Output:
 	true
 
 */
-has_suffix :: proc(s, suffix: string) -> (result: bool) {
+has_suffix :: proc "contextless" (s, suffix: string) -> (result: bool) {
 	return len(s) >= len(suffix) && s[len(s)-len(suffix):] == suffix
 }
 
@@ -813,7 +813,7 @@ Returns:
 - err: An optional allocator error if one occured, `nil` otherwise
 */
 @private
-_split :: proc(s_, sep: string, sep_save, n_: int, allocator := context.allocator, loc := #caller_location) -> (res: []string, err: mem.Allocator_Error) {
+_split :: proc (s_, sep: string, sep_save, n_: int, allocator := context.allocator, loc := #caller_location) -> (res: []string, err: mem.Allocator_Error) {
 	s, n := s_, n_
 
 	if n == 0 {
@@ -1022,7 +1022,7 @@ Returns:
 - ok: `true` if an iteration result was returned, `false` if the iterator has reached the end
 */
 @private
-_split_iterator :: proc(s: ^string, sep: string, sep_save: int) -> (res: string, ok: bool) {
+_split_iterator :: proc "contextless" (s: ^string, sep: string, sep_save: int) -> (res: string, ok: bool) {
 	m: int
 	if sep == "" {
 		if len(s) == 0 {
@@ -1079,7 +1079,7 @@ Output:
 	e
 
 */
-split_by_byte_iterator :: proc(s: ^string, sep: u8) -> (res: string, ok: bool) {
+split_by_byte_iterator :: proc "contextless" (s: ^string, sep: u8) -> (res: string, ok: bool) {
 	m := index_byte(s^, sep)
 	if m < 0 {
 		// not found
@@ -1126,7 +1126,7 @@ Output:
 	e
 
 */
-split_iterator :: proc(s: ^string, sep: string) -> (res: string, ok: bool) {
+split_iterator :: proc "contextless" (s: ^string, sep: string) -> (res: string, ok: bool) {
 	return _split_iterator(s, sep, 0)
 }
 
@@ -1162,7 +1162,7 @@ Output:
 	e
 
 */
-split_after_iterator :: proc(s: ^string, sep: string) -> (res: string, ok: bool) {
+split_after_iterator :: proc "contextless" (s: ^string, sep: string) -> (res: string, ok: bool) {
 	return _split_iterator(s, sep, len(sep))
 }
 
@@ -1178,7 +1178,7 @@ Returns:
 - res: The trimmed string as a slice of the original.
 */
 @(private)
-_trim_cr :: proc(s: string) -> (res: string) {
+_trim_cr :: proc "contextless" (s: string) -> (res: string) {
 	n := len(s)
 	if n > 0 {
 		if s[n-1] == '\r' {
@@ -1258,7 +1258,7 @@ Output:
 	["a", "b", "c\nd\ne"]
 
 */
-split_lines_n :: proc(s: string, n: int, allocator := context.allocator) -> (res: []string, err: mem.Allocator_Error) #optional_allocator_error {
+split_lines_n :: proc (s: string, n: int, allocator := context.allocator) -> (res: []string, err: mem.Allocator_Error) #optional_allocator_error {
 	sep :: "\n"
 	lines := _split(s, sep, 0, n, allocator) or_return
 	for &line in lines {
@@ -1378,7 +1378,7 @@ Output:
 	abcde
 
 */
-split_lines_iterator :: proc(s: ^string) -> (line: string, ok: bool) {
+split_lines_iterator :: proc "contextless" (s: ^string) -> (line: string, ok: bool) {
 	sep :: "\n"
 	line = _split_iterator(s, sep, 0) or_return
 	return _trim_cr(line), true
@@ -1416,7 +1416,7 @@ Output:
 	e
 
 */
-split_lines_after_iterator :: proc(s: ^string) -> (line: string, ok: bool) {
+split_lines_after_iterator :: proc "contextless" (s: ^string) -> (line: string, ok: bool) {
 	sep :: "\n"
 	line = _split_iterator(s, sep, len(sep)) or_return
 	return _trim_cr(line), true
@@ -1532,7 +1532,7 @@ Output:
 	7
 
 */
-index_rune :: proc(s: string, r: rune) -> (res: int) {
+index_rune :: proc "contextless" (s: string, r: rune) -> (res: int) {
 	switch {
 	case u32(r) < utf8.RUNE_SELF:
 		return index_byte(s, byte(r))
@@ -1664,8 +1664,8 @@ Output:
 	-1
 
 */
-last_index :: proc(s, substr: string) -> (res: int) {
-	hash_str_rabin_karp_reverse :: proc(s: string) -> (hash: u32 = 0, pow: u32 = 1) {
+last_index :: proc "contextless" (s, substr: string) -> (res: int) {
+	hash_str_rabin_karp_reverse :: proc "contextless" (s: string) -> (hash: u32 = 0, pow: u32 = 1) {
 		for i := len(s) - 1; i >= 0; i -= 1 {
 			hash = hash*PRIME_RABIN_KARP + u32(s[i])
 		}
@@ -1744,7 +1744,7 @@ Output:
 	-1
 
 */
-index_any :: proc(s, chars: string) -> (res: int) {
+index_any :: proc "contextless" (s, chars: string) -> (res: int) {
 	if chars == "" {
 		return -1
 	}
@@ -1808,7 +1808,7 @@ Output:
 	-1
 
 */
-last_index_any :: proc(s, chars: string) -> (res: int) {
+last_index_any :: proc "contextless" (s, chars: string) -> (res: int) {
 	if chars == "" {
 		return -1
 	}
@@ -1869,7 +1869,7 @@ Returns:
 - idx: the index of the first matching substring
 - width: the length of the found substring
 */
-index_multi :: proc(s: string, substrs: []string) -> (idx: int, width: int) {
+index_multi :: proc "contextless" (s: string, substrs: []string) -> (idx: int, width: int) {
 	idx = -1
 	if s == "" || len(substrs) <= 0 {
 		return
@@ -1932,7 +1932,7 @@ Output:
 	0
 
 */
-count :: proc(s, substr: string) -> (res: int) {
+count :: proc "contextless" (s, substr: string) -> (res: int) {
 	if len(substr) == 0 { // special case
 		return rune_count(s) + 1
 	}
@@ -2623,7 +2623,7 @@ Output:
 	testing
 
 */
-trim_prefix :: proc(s, prefix: string) -> (res: string) {
+trim_prefix :: proc "contextless" (s, prefix: string) -> (res: string) {
 	if has_prefix(s, prefix) {
 		return s[len(prefix):]
 	}
@@ -2656,7 +2656,7 @@ Output:
 	todo.doc
 
 */
-trim_suffix :: proc(s, suffix: string) -> (res: string) {
+trim_suffix :: proc "contextless" (s, suffix: string) -> (res: string) {
 	if has_suffix(s, suffix) {
 		return s[:len(s)-len(suffix)]
 	}
@@ -2770,7 +2770,7 @@ Output:
 	last
 
 */
-split_multi_iterate :: proc(it: ^string, substrs: []string) -> (res: string, ok: bool) #no_bounds_check {
+split_multi_iterate :: proc "contextless" (it: ^string, substrs: []string) -> (res: string, ok: bool) #no_bounds_check {
 	if len(it) == 0 || len(substrs) <= 0 {
 		return
 	}
@@ -3012,7 +3012,7 @@ Output:
 	true
 
 */
-partition :: proc(str, sep: string) -> (head, match, tail: string) {
+partition :: proc "contextless" (str, sep: string) -> (head, match, tail: string) {
 	i := index(str, sep)
 	if i == -1 {
 		head = str
@@ -3382,7 +3382,7 @@ levenshtein_distance :: proc(a, b: string, allocator := context.allocator, loc :
 }
 
 @(private)
-internal_substring :: proc(s: string, rune_start: int, rune_end: int) -> (sub: string, ok: bool) {
+internal_substring :: proc "contextless" (s: string, rune_start: int, rune_end: int) -> (sub: string, ok: bool) {
 	sub = s
 	ok  = true
 
@@ -3434,7 +3434,7 @@ Returns:
 - sub: the substring
 - ok: whether the rune indexes where in bounds of the original string
 */
-substring :: proc(s: string, rune_start: int, rune_end: int) -> (sub: string, ok: bool) {
+substring :: proc "contextless" (s: string, rune_start: int, rune_end: int) -> (sub: string, ok: bool) {
 	if rune_start < 0 || rune_end < 0 || rune_end < rune_start {
 		return
 	}
@@ -3455,7 +3455,7 @@ Returns:
 - sub: the substring
 - ok: whether the rune indexes where in bounds of the original string
 */
-substring_from :: proc(s: string, rune_start: int) -> (sub: string, ok: bool) {
+substring_from :: proc "contextless" (s: string, rune_start: int) -> (sub: string, ok: bool) {
 	if rune_start < 0 {
 		return
 	}
@@ -3476,7 +3476,7 @@ Returns:
 - sub: the substring
 - ok: whether the rune indexes where in bounds of the original string
 */
-substring_to :: proc(s: string, rune_end: int) -> (sub: string, ok: bool) {
+substring_to :: proc "contextless" (s: string, rune_end: int) -> (sub: string, ok: bool) {
 	if rune_end < 0 {
 		return
 	}

@@ -43,7 +43,7 @@ Example:
 **Returns**
 - A byte slice containing the formatted string
 */
-generic_ftoa :: proc(buf: []byte, val: f64, fmt: byte, precision, bit_size: int) -> []byte {
+generic_ftoa :: proc "contextless" (buf: []byte, val: f64, fmt: byte, precision, bit_size: int) -> []byte {
 	bits: u64
 	flt: ^Float_Info
 	switch bit_size {
@@ -57,7 +57,7 @@ generic_ftoa :: proc(buf: []byte, val: f64, fmt: byte, precision, bit_size: int)
 		bits = transmute(u64)val
 		flt = &_f64_info
 	case:
-		panic("strconv: invalid bit_size")
+		panic_contextless("strconv: invalid bit_size")
 	}
 
 	neg  := bits>>(flt.expbits+flt.mantbits) != 0
@@ -133,16 +133,16 @@ Converts a decimal floating-point number into a byte buffer with the given forma
 **Returns**
 - A byte slice containing the formatted decimal floating-point number
 */
-format_digits :: proc(buf: []byte, shortest: bool, neg: bool, digs: Decimal_Slice, precision: int, fmt: byte) -> []byte {
+format_digits :: proc "contextless" (buf: []byte, shortest: bool, neg: bool, digs: Decimal_Slice, precision: int, fmt: byte) -> []byte {
 	Buffer :: struct {
 		b: []byte,
 		n: int,
 	}
 
-	to_bytes :: proc(b: Buffer) -> []byte {
+	to_bytes :: #force_inline proc "contextless" (b: Buffer) -> []byte {
 		return b.b[:b.n]
 	}
-	add_bytes :: proc(buf: ^Buffer, bytes: ..byte) {
+	add_bytes :: #force_inline proc "contextless" (buf: ^Buffer, bytes: ..byte) {
 		buf.n += copy(buf.b[buf.n:], bytes)
 	}
 
@@ -262,7 +262,7 @@ Rounds the given decimal number to its shortest representation, considering the 
 - exp: The exponent of the floating-point number
 - flt: Pointer to the Float_Info structure containing information about the floating-point format
 */
-round_shortest :: proc(d: ^decimal.Decimal, mant: u64, exp: int, flt: ^Float_Info) {
+round_shortest :: proc "contextless" (d: ^decimal.Decimal, mant: u64, exp: int, flt: ^Float_Info) {
 	if mant == 0 { // If mantissa is zero, the number is zero
 		d.count = 0
 		return
@@ -339,7 +339,7 @@ Converts a decimal number to its floating-point representation with the given fo
 - b: The bits representing the floating-point number
 - overflow: A boolean indicating whether an overflow occurred during conversion
 */
-decimal_to_float_bits :: proc(d: ^decimal.Decimal, info: ^Float_Info) -> (b: u64, overflow: bool) {
+decimal_to_float_bits :: proc "contextless" (d: ^decimal.Decimal, info: ^Float_Info) -> (b: u64, overflow: bool) {
 	overflow_end :: proc "contextless" (d: ^decimal.Decimal, info: ^Float_Info) -> (u64, bool) {
 		mant: u64 = 0
 		exp:  int = 1<<info.expbits - 1 + info.bias

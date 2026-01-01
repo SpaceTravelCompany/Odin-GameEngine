@@ -13,7 +13,7 @@ ZERO_WIDTH_JOINER     :: '\u200D'
 WORD_JOINER           :: '\u2060'
 
 @(require_results)
-binary_search :: proc(c: i32, table: []i32, length, stride: int, loc := #caller_location) -> int #no_bounds_check {
+binary_search :: proc "contextless" (c: i32, table: []i32, length, stride: int, loc := #caller_location) -> int #no_bounds_check {
 	runtime.bounds_check_error_loc(loc, length*stride-1, len(table))
 	n := length
 	t := 0
@@ -34,7 +34,7 @@ binary_search :: proc(c: i32, table: []i32, length, stride: int, loc := #caller_
 }
 
 @(require_results)
-to_lower :: proc(r: rune) -> rune #no_bounds_check {
+to_lower :: proc "contextless" (r: rune) -> rune #no_bounds_check {
 	c := i32(r)
 	p := binary_search(c, to_lower_ranges[:], len(to_lower_ranges)/3, 3)
 	if p >= 0 && to_lower_ranges[p] <= c && c <= to_lower_ranges[p+1] {
@@ -47,7 +47,7 @@ to_lower :: proc(r: rune) -> rune #no_bounds_check {
 	return rune(c)
 }
 @(require_results)
-to_upper :: proc(r: rune) -> rune #no_bounds_check {
+to_upper :: proc "contextless" (r: rune) -> rune #no_bounds_check {
 	c := i32(r)
 	p := binary_search(c, to_upper_ranges[:], len(to_upper_ranges)/3, 3)
 	if p >= 0 && to_upper_ranges[p] <= c && c <= to_upper_ranges[p+1] {
@@ -60,7 +60,7 @@ to_upper :: proc(r: rune) -> rune #no_bounds_check {
 	return rune(c)
 }
 @(require_results)
-to_title :: proc(r: rune) -> rune #no_bounds_check {
+to_title :: proc "contextless" (r: rune) -> rune #no_bounds_check {
 	c := i32(r)
 	p := binary_search(c, to_upper_singlets[:], len(to_title_singlets)/2, 2)
 	if p >= 0 && c == to_upper_singlets[p] {

@@ -20,7 +20,7 @@ If parsing fails, the Decimal will be left in an undefined state.
 **Returns**
 - ok: A boolean indicating whether the parsing was successful
 */
-set :: proc(d: ^Decimal, s: string) -> (ok: bool) {
+set :: proc "contextless" (d: ^Decimal, s: string) -> (ok: bool) {
 	d^ = {}
 
 	if len(s) == 0 {
@@ -112,8 +112,8 @@ Converts a Decimal to a string representation, using the provided buffer as stor
 **Returns**
 - A string representation of the Decimal
 */
-decimal_to_string :: proc(buf: []byte, a: ^Decimal) -> string {
-	digit_zero :: proc(buf: []byte) -> int {
+decimal_to_string :: proc "contextless" (buf: []byte, a: ^Decimal) -> string {
+	digit_zero :: #force_inline proc "contextless" (buf: []byte) -> int {
 		for _, i in buf {
 			buf[i] = '0'
 		}
@@ -123,7 +123,7 @@ decimal_to_string :: proc(buf: []byte, a: ^Decimal) -> string {
 	n := 10 + a.count + abs(a.decimal_point)
 
 	// TODO(bill): make this work with a buffer that's not big enough
-	assert(len(buf) >= n)
+	assert_contextless(len(buf) >= n)
 	b := buf[0:n]
 
 	if a.count == 0 {
@@ -154,7 +154,7 @@ Trims trailing zeros in the given Decimal, updating the count and decimal_point 
 **Inputs**
 - a: Pointer to the Decimal struct to be trimmed
 */
-trim :: proc(a: ^Decimal) {
+trim :: proc "contextless" (a: ^Decimal) {
 	for a.count > 0 && a.digits[a.count-1] == '0' {
 		a.count -= 1
 	}
@@ -171,7 +171,7 @@ Converts a given u64 integer `idx` to its Decimal representation in the provided
 - a: Where the result will be stored
 - idx: The value to be assigned to the Decimal
 */
-assign :: proc(a: ^Decimal, idx: u64) {
+assign :: proc "contextless" (a: ^Decimal, idx: u64) {
 	buf: [64]byte
 	n := 0
 	for i := idx; i > 0;  {
@@ -199,7 +199,7 @@ Shifts the Decimal value to the right by k positions.
 - a: The Decimal struct to be shifted
 - k: The number of positions to shift right
 */
-shift_right :: proc(a: ^Decimal, k: uint) {
+shift_right :: proc "contextless" (a: ^Decimal, k: uint) {
 	r := 0 // read index
 	w := 0 // write index
 
@@ -349,7 +349,7 @@ WARNING: asserts `k < 61`
 - a: The Decimal to be modified
 - k: The number of places to shift the decimal to the left
 */
-shift_left :: proc(a: ^Decimal, k: uint) #no_bounds_check {
+shift_left :: proc "contextless" (a: ^Decimal, k: uint) #no_bounds_check {
 	prefix_less :: #force_inline proc "contextless" (b: []byte, s: string) -> bool #no_bounds_check {
 		for i in 0..<len(s) {
 			if i >= len(b) {
@@ -362,7 +362,7 @@ shift_left :: proc(a: ^Decimal, k: uint) #no_bounds_check {
 		return false
 	}
 
-	assert(k < 61)
+	assert_contextless(k < 61)
 
 	delta := _shift_left_offsets[k].delta
 	if prefix_less(a.digits[:a.count], _shift_left_offsets[k].cutoff) {
@@ -410,7 +410,7 @@ Shifts the decimal of the input value by the specified number of places
 - a: The Decimal to be modified
 - i: The number of places to shift the decimal (positive for left shift, negative for right shift)
 */
-shift :: proc(a: ^Decimal, i: int) {
+shift :: proc "contextless" (a: ^Decimal, i: int) {
 	uint_size :: 8*size_of(uint)
 	max_shift :: uint_size-4
 
@@ -442,7 +442,7 @@ Determines if the Decimal can be rounded up at the given digit index
 
 **Returns**   Boolean if can be rounded up at the given index (>=5)
 */
-can_round_up :: proc(a: ^Decimal, nd: int) -> bool {
+can_round_up :: proc "contextless" (a: ^Decimal, nd: int) -> bool {
 	if nd < 0 || nd >= a.count { return false  }
 	if a.digits[nd] == '5' && nd+1 == a.count {
 		if a.trunc {
@@ -460,7 +460,7 @@ Rounds the Decimal at the given digit index
 - a: The Decimal to be modified
 - nd: The digit index to round
 */
-round :: proc(a: ^Decimal, nd: int) {
+round :: proc "contextless" (a: ^Decimal, nd: int) {
 	if nd < 0 || nd >= a.count { return }
 	if can_round_up(a, nd) {
 		round_up(a, nd)
@@ -475,7 +475,7 @@ Rounds the Decimal up at the given digit index
 - a: The Decimal to be modified
 - nd: The digit index to round up
 */
-round_up :: proc(a: ^Decimal, nd: int) {
+round_up :: proc "contextless" (a: ^Decimal, nd: int) {
 	if nd < 0 || nd >= a.count { return }
 
 	for i := nd-1; i >= 0; i -= 1 {
@@ -515,7 +515,7 @@ Output:
 	123.45
 
 */
-round_down :: proc(a: ^Decimal, nd: int) {
+round_down :: proc "contextless" (a: ^Decimal, nd: int) {
 	if nd < 0 || nd >= a.count { return }
 	a.count = nd
 	trim(a)
@@ -545,7 +545,7 @@ Output:
 	123
 
 */
-rounded_integer :: proc(a: ^Decimal) -> u64 {
+rounded_integer :: proc "contextless" (a: ^Decimal) -> u64 {
 	if a.decimal_point > 20 {
 		return 0xffff_ffff_ffff_ffff
 	}

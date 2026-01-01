@@ -318,7 +318,7 @@ rune_count :: proc{
 	rune_count_in_bytes,
 }
 
-rune_count_in_string :: #force_inline proc(s: string) -> int {
+rune_count_in_string :: #force_inline proc "contextless" (s: string) -> int {
 	return rune_count_in_bytes(transmute([]u8)s)
 }
 rune_count_in_bytes :: proc "contextless" (s: []u8) -> int {

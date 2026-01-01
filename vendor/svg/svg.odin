@@ -81,85 +81,6 @@ POLYGON :: struct {
 	_0:     FILL_AND_STROKE,
 }
 
-__SVG_ERROR :: enum {
-	NOT_INITIALIZED,
-	OVERLAPPING_NODE,
-	INVALID_NODE,
-	UNSUPPORTED_FEATURE,
-}
-
-SVG_ERROR :: union {
-	__SVG_ERROR,
-	xml.Error,
-}
-
-svg_shape_ptr :: union #no_nil {
-	^PATH,
-	^RECT,
-	^CIRCLE,
-	^ELLIPSE,
-	^LINE,
-	^POLYLINE,
-	^POLYGON,
-    ^SVG,
-}
-
-svg_parser :: struct {
-	arena_allocator: Maybe(mem.Allocator),
-    __arena:         mem.Dynamic_Arena,
-	svg:             SVG,
-	path:            []PATH,
-	rect:            []RECT,
-	circle:          []CIRCLE,
-	ellipse:         []ELLIPSE,
-	line:            []LINE,
-	polyline:        []POLYLINE,
-	polygon:         []POLYGON,
-	shape_ptrs:      []svg_shape_ptr,
-	shapes:          Maybe(geometry.shapes),
-}
-
-@private _parse_bool :: proc(_str: string, i: ^int) -> (value: bool, ok: bool) {
-	start := i^
-	for start < len(_str) && _str[start] != '0' && _str[start] != '1' {
-		start += 1
-	}
-	if start >= len(_str) {
-		return false, false
-	}
-
-	value = _str[start] == '1'
-	i^ = start + 1
-	return value, true
-}
-
-deinit :: proc(self: ^svg_parser) {
-	if arena, ok := self.arena_allocator.?; ok {
-		mem.dynamic_arena_destroy(&self.__arena)
-		self.arena_allocator = nil
-	}
-}
-
-init_parse :: proc(svg_data: []u8, allocator: mem.Allocator = context.allocator) -> (parser: svg_parser, err: SVG_ERROR) {
-	parser = {}
-    mem.dynamic_arena_init(&parser.__arena, allocator,allocator)
-	arena := mem.dynamic_arena_allocator(&parser.__arena)
-	parser.arena_allocator = arena
-	defer if err != nil {
-		deinit(&parser)
-	}
-
-	// Parse XML document
-	xml_doc, xml_err := xml.parse(svg_data, allocator = arena)
-	if xml_err != nil {
-		err = xml_err
-		return
-	}
-	defer xml.destroy(xml_doc)
-
-	return parser, nil
-}
-
 CSS_COLOR :: enum(u32) {
 	black = 0x000000,
 	silver = 0xc0c0c0,
@@ -308,6 +229,294 @@ CSS_COLOR :: enum(u32) {
 	whitesmoke = 0xf5f5f5,
 	yellowgreen = 0x9acd32,
 	rebeccapurple = 0x663399,
+}
+
+__SVG_ERROR :: enum {
+	NOT_INITIALIZED,
+	OVERLAPPING_NODE,
+	INVALID_NODE,
+	UNSUPPORTED_FEATURE,
+}
+
+SVG_ERROR :: union {
+	__SVG_ERROR,
+	xml.Error,
+}
+
+svg_shape_ptr :: union #no_nil {
+	^PATH,
+	^RECT,
+	^CIRCLE,
+	^ELLIPSE,
+	^LINE,
+	^POLYLINE,
+	^POLYGON,
+    ^SVG,
+}
+
+svg_parser :: struct {
+	arena_allocator: Maybe(mem.Allocator),
+    __arena:         mem.Dynamic_Arena,
+	svg:             SVG,
+	path:            []PATH,
+	rect:            []RECT,
+	circle:          []CIRCLE,
+	ellipse:         []ELLIPSE,
+	line:            []LINE,
+	polyline:        []POLYLINE,
+	polygon:         []POLYGON,
+	shape_ptrs:      []svg_shape_ptr,
+	shapes:          Maybe(geometry.shapes),
+}
+
+@private __svg_parser_data :: struct {
+	svg:             SVG,
+	path:            [dynamic]PATH,
+	rect:            [dynamic]RECT,
+	circle:          [dynamic]CIRCLE,
+	ellipse:         [dynamic]ELLIPSE,
+	line:            [dynamic]LINE,
+	polyline:        [dynamic]POLYLINE,
+	polygon:         [dynamic]POLYGON,
+	shape_ptrs:      [dynamic]svg_shape_ptr,
+	shapes:          Maybe(geometry.shapes),
+}
+
+deinit :: proc(self: ^svg_parser) {
+	if arena, ok := self.arena_allocator.?; ok {
+		mem.dynamic_arena_destroy(&self.__arena)
+		self.arena_allocator = nil
+	}
+}
+
+@private _parse_fill_and_stroke :: proc "contextless" (attribs: xml.Attribute, out: ^FILL_AND_STROKE) -> SVG_ERROR {
+	err : bool = false
+	
+	switch attribs.key {
+	case "fill":out.fill = attribs.val
+	case "stroke":out.stroke = attribs.val
+	case "stroke-width":out.stroke_width, err = strconv.parse_f32(attribs.val)
+	case "fill-opacity":out.fill_opacity, err = strconv.parse_f32(attribs.val)
+	case "stroke-opacity":out.stroke_opacity, err = strconv.parse_f32(attribs.val)
+	}
+
+	if err do return .INVALID_NODE
+	return nil
+}
+
+@private _parse_point :: proc "contextless" (points: string, inout_idx: ^int) -> (result: linalg.PointF, err: SVG_ERROR = nil) {
+	check_two_more_dots :: proc "contextless" (points: string, inout_idx: int, nonidx: int) -> int {
+		found_dot := false
+		for idx in inout_idx..<len(points) {
+			if points[idx] == '.' {
+				if !found_dot {
+					found_dot = true
+				} else {
+					return idx//find and check two more dots.
+				}
+			}
+		}
+		return nonidx
+	}
+
+	// 숫자나 '-' 또는 '.' 문자가 처음 나타나는 위치 찾기
+	idx_any := strings.index_any(points[inout_idx^:], "0123456789.-")
+	if idx_any == -1 {
+		err = .INVALID_NODE
+		return
+	}
+	inout_idx^ += idx_any
+	
+	// 숫자나 '.'이 아닌 문자가 처음 나타나는 위치 찾기
+	nonidx := inout_idx^ + 1
+	for nonidx < len(points) {
+		c := points[nonidx]
+		if !(c >= '0' && c <= '9' || c == '.') {
+			break
+		}
+		nonidx += 1
+	}
+	if nonidx == inout_idx^ + 1 {
+		err = .INVALID_NODE
+		return
+	}
+
+	nonidx = check_two_more_dots(points, inout_idx^, nonidx)
+	
+	// x 좌표 파싱
+	x, parse_ok_x := strconv.parse_f32(points[inout_idx^:nonidx])
+	if !parse_ok_x {
+		err = .INVALID_NODE
+		return
+	}
+
+	
+	// 다음 숫자 시작 위치 찾기
+	idx_any = strings.index_any(points[nonidx:], "0123456789.-")
+	if idx_any == -1 {
+		err = .INVALID_NODE
+		return
+	}
+	inout_idx^ = nonidx + idx_any
+	
+	// y 좌표의 끝 위치 찾기
+	nonidx = inout_idx^ + 1
+	for nonidx < len(points) {
+		c := points[nonidx]
+		if !(c >= '0' && c <= '9' || c == '.') {
+			break
+		}
+		nonidx += 1
+	}
+	if nonidx == len(points) {
+		nonidx = len(points)
+	}
+	
+	nonidx = check_two_more_dots(points, inout_idx^, nonidx)
+	
+	// y 좌표 파싱
+	y, parse_ok_y := strconv.parse_f32(points[inout_idx^:nonidx])
+	if !parse_ok_y {
+		err = .INVALID_NODE
+		return
+	}
+	
+	inout_idx^ = nonidx
+	result = linalg.PointF{x, y}
+	return
+}
+
+@private _parse_points :: proc (points: string, allocator: mem.Allocator) -> (result: []linalg.PointF, err: SVG_ERROR) {
+	result_ := mem.make_non_zeroed([dynamic]linalg.PointF, context.temp_allocator)
+	defer delete(result_)
+
+	i := 0
+	for i < len(points) {
+		non_zero_append(&result_, _parse_point(points, &i) or_return)
+	}
+
+	result = mem.make_non_zeroed([]linalg.PointF, len(result_), allocator)
+	mem.copy_non_overlapping(&result[0], &result_[0], len(result_) * size_of(linalg.PointF))
+	return result, nil
+}
+
+@private _parse_svg_element :: proc(xml_doc: ^xml.Document, idx: xml.Element_ID, out: ^__svg_parser_data, allocator: mem.Allocator) -> SVG_ERROR {
+	e := &xml_doc.elements[idx]
+	err : bool = false
+
+	switch e.ident {
+	case "svg":
+		for a in e.attribs {
+			switch a.key {
+			case "width" : out.svg.width = a.val
+			case "height" : out.svg.height = a.val
+			}
+		}
+	case "path":
+		non_zero_append(&out.path, PATH{})
+		for a in e.attribs {
+			switch a.key {
+			case "d" : out.path[len(out.path) - 1].d = a.val
+			case "fill-rule" : out.path[len(out.path) - 1].fill_rule = a.val
+			case "clip-rule" : out.path[len(out.path) - 1].clip_rule = a.val
+			case : _parse_fill_and_stroke(a, &out.path[len(out.path) - 1]._0) or_return
+			}
+		}
+	case "rect":
+		non_zero_append(&out.rect, RECT{})
+		for a in e.attribs {
+			switch a.key {
+			case "x" : out.rect[len(out.rect) - 1].x, err = strconv.parse_f32(a.val)
+			case "y" : out.rect[len(out.rect) - 1].y, err = strconv.parse_f32(a.val)
+			case "width" : out.rect[len(out.rect) - 1].width, err = strconv.parse_f32(a.val)
+			case "height" : out.rect[len(out.rect) - 1].height, err = strconv.parse_f32(a.val)
+			case "rx" : out.rect[len(out.rect) - 1].rx, err = strconv.parse_f32(a.val)
+			case "ry" : out.rect[len(out.rect) - 1].ry, err = strconv.parse_f32(a.val)
+			case : _parse_fill_and_stroke(a, &out.rect[len(out.rect) - 1]._0) or_return
+			}
+		}
+	case "circle":
+		non_zero_append(&out.circle, CIRCLE{})
+		for a in e.attribs {
+			switch a.key {
+			case "cx" : out.circle[len(out.circle) - 1].cx, err = strconv.parse_f32(a.val)
+			case "cy" : out.circle[len(out.circle) - 1].cy, err = strconv.parse_f32(a.val)
+			case "r" : out.circle[len(out.circle) - 1].r, err = strconv.parse_f32(a.val)
+			case : _parse_fill_and_stroke(a, &out.circle[len(out.circle) - 1]._0) or_return
+			}
+		}
+	case "ellipse":
+		non_zero_append(&out.ellipse, ELLIPSE{})
+		for a in e.attribs {
+			switch a.key {
+			case "cx" : out.ellipse[len(out.ellipse) - 1].cx, err = strconv.parse_f32(a.val)
+			case "cy" : out.ellipse[len(out.ellipse) - 1].cy, err = strconv.parse_f32(a.val)
+			case "rx" : out.ellipse[len(out.ellipse) - 1].rx, err = strconv.parse_f32(a.val)
+			case "ry" : out.ellipse[len(out.ellipse) - 1].ry, err = strconv.parse_f32(a.val)
+			case : _parse_fill_and_stroke(a, &out.ellipse[len(out.ellipse) - 1]._0) or_return
+			}
+		}
+	case "line":
+		non_zero_append(&out.line, LINE{})
+		for a in e.attribs {
+			switch a.key {
+			case "x1" : out.line[len(out.line) - 1].x1, err = strconv.parse_f32(a.val)
+			case "y1" : out.line[len(out.line) - 1].y1, err = strconv.parse_f32(a.val)
+			case "x2" : out.line[len(out.line) - 1].x2, err = strconv.parse_f32(a.val)
+			case "y2" : out.line[len(out.line) - 1].y2, err = strconv.parse_f32(a.val)
+			case : _parse_fill_and_stroke(a, &out.line[len(out.line) - 1]._0) or_return
+			}
+		}
+	case "polyline":
+		non_zero_append(&out.polyline, POLYLINE{})
+		for a in e.attribs {
+			switch a.key {
+			case "points" : out.polyline[len(out.polyline) - 1].points = _parse_points(a.val, allocator) or_return
+			case : _parse_fill_and_stroke(a, &out.polyline[len(out.polyline) - 1]._0) or_return
+			}
+		}
+		
+	case "polygon":
+		non_zero_append(&out.polygon, POLYGON{})
+		for a in e.attribs {
+			switch a.key {
+			case "points" : out.polygon[len(out.polygon) - 1].points = _parse_points(a.val, allocator) or_return
+			case : _parse_fill_and_stroke(a, &out.polygon[len(out.polygon) - 1]._0) or_return
+			}
+		}
+	}
+	if err do return .INVALID_NODE
+
+	switch v in e.value[idx] {
+	case xml.Element_ID:
+		_parse_svg_element(xml_doc, v, out, allocator)
+	case string:
+		return nil//!svg xml not have value
+	}
+	return nil
+}
+
+init_parse :: proc(svg_data: []u8, allocator: mem.Allocator = context.allocator) -> (parser: svg_parser, err: SVG_ERROR) {
+	parser = {}
+    mem.dynamic_arena_init(&parser.__arena, allocator,allocator)
+	arena := mem.dynamic_arena_allocator(&parser.__arena)
+	parser.arena_allocator = arena
+	defer if err != nil {
+		deinit(&parser)
+	}
+
+	// Parse XML document
+	xml_doc, xml_err := xml.parse(svg_data, allocator = arena)
+	if xml_err != nil {
+		err = xml_err
+		return
+	}
+	defer xml.destroy(xml_doc)
+
+	data : __svg_parser_data = {}
+	_parse_svg_element(xml_doc, 0, &data, allocator)
+
+	return parser, nil
 }
 
 @private _parse_color :: proc(color: string, opacity: Maybe(f32)) -> (result: Maybe(linalg.Vector4f32), err: SVG_ERROR) {

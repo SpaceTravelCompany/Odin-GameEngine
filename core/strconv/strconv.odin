@@ -16,7 +16,7 @@ Parses a boolean value from the input string
 - result: The parsed boolean value (default: false)
 - ok: A boolean indicating whether the parsing was successful
 */
-parse_bool :: proc(s: string, n: ^int = nil) -> (result: bool = false, ok: bool) {
+parse_bool :: proc "contextless" (s: string, n: ^int = nil) -> (result: bool = false, ok: bool) {
 	switch s {
 	case "1", "t", "T", "true", "TRUE", "True":
 		if n != nil { n^ = len(s) }
@@ -35,7 +35,7 @@ Finds the integer value of the given rune
 
 **Returns**   The integer value of the given rune
 */
-_digit_value :: proc(r: rune) -> int {
+_digit_value :: proc "contextless" (r: rune) -> int {
 	ri := int(r)
 	v: int = 16
 	switch r {
@@ -70,8 +70,8 @@ Output:
 - value: Parses an integer value from a string, in the given base, without a prefix.
 - ok: ok=false if no numeric value of the appropriate base could be found, or if the input string contained more than just the number.
 */
-parse_i64_of_base :: proc(str: string, base: int, n: ^int = nil) -> (value: i64, ok: bool) {
-	assert(base <= 16, "base must be 1-16")
+parse_i64_of_base :: proc "contextless" (str: string, base: int, n: ^int = nil) -> (value: i64, ok: bool) {
+	assert_contextless(base <= 16, "base must be 1-16")
 
 	s := str
 
@@ -743,7 +743,7 @@ Output:
 - value: The parsed 32-bit floating point number.
 - ok: `false` if a base 10 float could not be found, or if the input string contained more than just the number.
 */
-parse_f32 :: proc(s: string, n: ^int = nil) -> (value: f32, ok: bool) {
+parse_f32 :: proc "contextless" (s: string, n: ^int = nil) -> (value: f32, ok: bool) {
 	v: f64 = ---
 	v, ok = parse_f64(s, n)
 	return f32(v), ok
@@ -776,7 +776,7 @@ Output:
 - value: The parsed 64-bit floating point number.
 - ok: `false` if a base 10 float could not be found, or if the input string contained more than just the number.
 */
-parse_f64 :: proc(str: string, n: ^int = nil) -> (value: f64, ok: bool) {
+parse_f64 :: proc "contextless" (str: string, n: ^int = nil) -> (value: f64, ok: bool) {
 	nr: int
 	value, nr, ok = parse_f64_prefix(str)
 	if ok && len(str) != nr {
@@ -852,7 +852,7 @@ Output:
 - nr: The length of the parsed substring.
 - ok: `false` if a base 10 float could not be found
 */
-parse_f64_prefix :: proc(str: string) -> (value: f64, nr: int, ok: bool) {
+parse_f64_prefix :: proc "contextless" (str: string) -> (value: f64, nr: int, ok: bool) {
 	common_prefix_len_ignore_case :: proc "contextless" (s, prefix: string) -> int {
 		n := len(prefix)
 		if n > len(s) {
