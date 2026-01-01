@@ -2,35 +2,30 @@ package engine
 
 import "base:intrinsics"
 import "base:library"
-import "core:fmt"
-import "core:c/libc"
+import "base:runtime"
 import "core:c"
+import "core:c/libc"
+import "core:debug/trace"
+import "core:fmt"
+import "core:io"
 import "core:math"
 import "core:math/linalg"
-import "core:os"
-import "core:os/os2"
-import "core:sys/windows"
 import "core:mem"
 import "core:mem/virtual"
-import "core:io"
-import "core:time"
+import "core:os"
+import "core:os/os2"
 import "core:reflect"
-import "core:thread"
-import "core:sync"
 import "core:strings"
-import "base:runtime"
-import "core:debug/trace"
-
+import "core:sync"
 import "core:sys/android"
+import "core:sys/windows"
+import "core:thread"
+import "core:time"
 import "vendor:glfw"
 
-
-//@(private) render_th: ^thread.Thread
-
-exiting :: #force_inline proc  "contextless"() -> bool {return __exiting}
-dt :: #force_inline proc "contextless" () -> f64 { return f64(delta_time) / 1000000000.0 }
-dt_u64 :: #force_inline proc "contextless" () -> u64 { return delta_time }
-get_processor_core_len :: #force_inline proc "contextless" () -> int { return processor_core_len }
+// ============================================================================
+// Type Definitions
+// ============================================================================
 
 init: #type proc()
 update: #type proc()
@@ -38,6 +33,10 @@ destroy: #type proc()
 size: #type proc() = proc () {}
 activate: #type proc "contextless" () = proc "contextless" () {}
 close: #type proc "contextless" () -> bool = proc "contextless" () -> bool{ return true }
+
+dt :: #force_inline proc "contextless" () -> f64 { return f64(delta_time) / 1000000000.0 }
+dt_u64 :: #force_inline proc "contextless" () -> u64 { return delta_time }
+get_processor_core_len :: #force_inline proc "contextless" () -> int { return processor_core_len }
 
 android_api_level :: enum u32 {
 	Nougat = 24,
@@ -87,21 +86,9 @@ linux_platform_version :: struct {
 	machine:string,
 }
 
-when is_android {
-	get_platform_version :: #force_inline proc "contextless" () -> android_platform_version {
-		return android_platform
-	}
-} else when ODIN_OS == .Linux {
-	get_platform_version :: #force_inline proc "contextless" () -> linux_platform_version {
-		return linux_platform
-	}
-} else when ODIN_OS == .Windows {
-	get_platform_version :: #force_inline proc "contextless" () -> windows_platform_version {
-		return windows_platform
-	}
-}
-
-
+// ============================================================================
+// Platform Detection
+// ============================================================================
 
 is_android :: ODIN_PLATFORM_SUBTARGET == .Android
 is_mobile :: is_android
@@ -109,6 +96,10 @@ is_log :: #config(__log__, false)
 is_console :: #config(__console__, false)
 
 icon_image :: glfw.Image
+
+// ============================================================================
+// Global Variables
+// ============================================================================
 
 @(private="file") inited := false
 
@@ -120,6 +111,32 @@ when library.is_android {
 	linux_platform:linux_platform_version
 } else when ODIN_OS == .Windows {
 	windows_platform:windows_platform_version
+}
+
+@private main_thread_id: int
+temp_arena_allocator: mem.Allocator
+engine_def_allocator: mem.Allocator
+
+@private @thread_local track_allocator:mem.Tracking_Allocator
+
+// ============================================================================
+// Utility Functions
+// ============================================================================
+
+exiting :: #force_inline proc  "contextless"() -> bool {return __exiting}
+
+when library.is_android {
+	get_platform_version :: #force_inline proc "contextless" () -> android_platform_version {
+		return android_platform
+	}
+} else when ODIN_OS == .Linux {
+	get_platform_version :: #force_inline proc "contextless" () -> linux_platform_version {
+		return linux_platform
+	}
+} else when ODIN_OS == .Windows {
+	get_platform_version :: #force_inline proc "contextless" () -> windows_platform_version {
+		return windows_platform
+	}
 }
 
 // ============================================================================
@@ -145,6 +162,10 @@ system_after_destroy :: #force_inline proc() {
 def_allocator :: #force_inline proc "contextless" () -> mem.Allocator {
 	return engine_def_allocator
 }
+
+// ============================================================================
+// Main Entry Point
+// ============================================================================
 
 engine_main :: proc(
 	window_title:cstring = "xfit",
@@ -224,6 +245,10 @@ system_loop :: proc() {
 	}
 }
 
+// ============================================================================
+// Window Management
+// ============================================================================
+
 window_start :: proc() {
 	when is_android {
 	} else {
@@ -239,7 +264,9 @@ system_destroy :: proc() {
 	}
 }
 
-@private @thread_local track_allocator:mem.Tracking_Allocator
+// ============================================================================
+// Memory Tracking
+// ============================================================================
 
 start_tracking_allocator :: proc() {
 	when ODIN_DEBUG {
@@ -300,6 +327,9 @@ destroy_tracking_allocator :: proc() {
 // 	vkDestory()
 // }
 
+// ============================================================================
+// Frame Management
+// ============================================================================
 
 get_max_frame :: #force_inline proc "contextless" () -> f64 {
 	return intrinsics.atomic_load_explicit(&max_frame,.Relaxed)
@@ -324,6 +354,9 @@ second_to_nano_second2 :: #force_inline proc "contextless" (_sec: $T, _milisec: 
     return _sec * 1000000000 + _milisec * 1000000 + _usec * 1000 + _nsec
 }
 
+// ============================================================================
+// Platform-Specific Functions
+// ============================================================================
 
 windows_set_res_icon :: proc "contextless" (icon_resource_number:int) {
 	when ODIN_OS == .Windows {
@@ -341,8 +374,6 @@ exit :: proc "contextless" () {
 	}
 }
 
-
-//only for windows
 start_console :: proc() {
 	when ODIN_OS == .Windows {
 		windows.AllocConsole()
@@ -352,11 +383,6 @@ start_console :: proc() {
 		os.stderr = os.get_std_handle(uint(windows.STD_ERROR_HANDLE))
 	}
 }
-
-@private main_thread_id: int
-// Allocators
-temp_arena_allocator: mem.Allocator
-engine_def_allocator: mem.Allocator
 
 is_main_thread :: #force_inline proc "contextless" () -> bool {
 	return sync.current_thread_id() == main_thread_id

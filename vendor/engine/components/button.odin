@@ -1,10 +1,13 @@
 package components
 
-
-import vk "vendor:vulkan"
-import sys "../sys"
 import "core:math/linalg"
 import "core:mem"
+import sys "../sys"
+import vk "vendor:vulkan"
+
+// ============================================================================
+// Type Definitions
+// ============================================================================
 
 
 button_state :: enum {
@@ -108,6 +111,10 @@ __button :: struct {
     touch_move_callback: proc (self:^__button, touchPos:linalg.PointF, touchIdx:u8),
 }
 
+// ============================================================================
+// Button Types
+// ============================================================================
+
 shape_button :: struct {
     using _:__button,
 }
@@ -121,6 +128,10 @@ button_vtable :: struct {
     touch_up: proc (self:^__button, touchPos:linalg.PointF, touchIdx:u8),
     touch_move: proc (self:^__button, touchPos:linalg.PointF, touchIdx:u8),
 }
+
+// ============================================================================
+// Image Button Implementation
+// ============================================================================
 
 @private image_button_vtable :button_vtable = button_vtable {
     draw = auto_cast _super_image_button_draw,

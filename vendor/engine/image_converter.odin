@@ -2,6 +2,11 @@ package engine
 
 import "core:image"
 
+
+// ============================================================================
+// Image Converter Interface
+// ============================================================================
+
 image_converter_width :: proc {
     webp_converter_width,
     png_converter_width,

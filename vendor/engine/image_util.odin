@@ -1,10 +1,14 @@
 package engine
 
-import vk "vendor:vulkan"
-import "base:runtime"
 import "base:intrinsics"
+import "base:runtime"
 import "core:debug/trace"
+import vk "vendor:vulkan"
 
+
+// ============================================================================
+// Color Format Utilities
+// ============================================================================
 
 color_fmt_bit :: proc "contextless" (fmt: color_fmt) -> u32 {
     switch fmt {
@@ -25,6 +29,10 @@ color_fmt_bit :: proc "contextless" (fmt: color_fmt) -> u32 {
 default_color_fmt :: proc "contextless" () -> color_fmt {
     return texture_fmt_to_color_fmt(vk_fmt_to_texture_fmt(get_graphics_origin_format()))
 }
+
+// ============================================================================
+// Texture Format Utilities
+// ============================================================================
 
 @(require_results) texture_fmt_to_color_fmt :: proc "contextless" (t:texture_fmt) -> color_fmt {
 	#partial switch t {
@@ -86,6 +94,10 @@ default_color_fmt :: proc "contextless" () -> color_fmt {
 	}
     return get_graphics_origin_format()
 }
+
+// ============================================================================
+// Private Vulkan Format Conversion
+// ============================================================================
 
 @(require_results) @private vk_fmt_to_texture_fmt :: proc "contextless" (t:vk.Format) -> texture_fmt {
 	#partial switch t {

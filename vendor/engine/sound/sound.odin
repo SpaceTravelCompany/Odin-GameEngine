@@ -1,11 +1,15 @@
 package sound
 
-import "vendor:miniaudio"
-import "core:sync"
-import "core:thread"
-import "core:debug/trace"
 import "base:intrinsics"
 import "base:runtime"
+import "core:debug/trace"
+import "core:sync"
+import "core:thread"
+import "vendor:miniaudio"
+
+// ============================================================================
+// Type Definitions
+// ============================================================================
 
 @(private = "file") sound_private :: struct #packed {
     __miniaudio_sound:miniaudio.sound,
@@ -31,6 +35,10 @@ sound_src :: struct {
     decoder:miniaudio.decoder
 }
 
+// ============================================================================
+// Global Variables
+// ============================================================================
+
 @(private = "file") miniaudio_engine:miniaudio.engine
 
 @(private = "file") miniaudio_p_custom_backend_v_tables:[2]^miniaudio.decoding_backend_vtable
@@ -48,6 +56,10 @@ sound_src :: struct {
 
 @(private = "file") g_end_sounds:[dynamic]^sound
 @(private = "file") g_sounds:map[^sound]^sound
+
+// ============================================================================
+// Sound System Initialization
+// ============================================================================
 
 @private g_init :: proc() {
     g_sounds = make(map[^sound]^sound)

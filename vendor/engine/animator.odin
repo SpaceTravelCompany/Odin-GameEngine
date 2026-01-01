@@ -36,14 +36,13 @@ animate_player_update :: proc (self:^animate_player, _dt:f64) {
     }
 }
 
-
-animate_player_stop :: #force_inline proc "contextless" (self:^animate_player) {
-    self.playing = false
-}
-
 animate_player_play :: #force_inline proc "contextless" (self:^animate_player) {
     self.playing = true
     self.__playing_dt = 0.0
+}
+
+animate_player_stop :: #force_inline proc "contextless" (self:^animate_player) {
+    self.playing = false
 }
 
 animate_player_set_frame :: proc (self:^animate_player, _frame:u32) {
@@ -64,12 +63,17 @@ animate_player_next_frame :: proc (self:^animate_player) {
     }
 }
 
+// ============================================================================
+// IAnimate Object Functions
+// ============================================================================
+
 ianimate_object_get_frame_cnt :: #force_inline proc "contextless" (self:^ianimate_object) -> u32{
     return ((^ianimate_object_vtable)(self.vtable)).get_frame_cnt(self)
 }
 
-ianimate_object_update_frame :: #force_inline proc (self:^ianimate_object) {
-    buffer_resource_copy_update(&self.frame_uniform, &self.frame)
+ianimate_object_set_frame :: #force_inline proc (self:^ianimate_object, _frame:u32) {
+    self.frame = (_frame) % ianimate_object_get_frame_cnt(self)
+    ianimate_object_update_frame(self)
 }
 
 ianimate_object_next_frame :: #force_inline proc (self:^ianimate_object) {
@@ -82,7 +86,6 @@ ianimate_object_prev_frame :: #force_inline proc (self:^ianimate_object) {
     ianimate_object_update_frame(self)
 }
 
-ianimate_object_set_frame :: #force_inline proc (self:^ianimate_object, _frame:u32) {
-    self.frame = (_frame) % ianimate_object_get_frame_cnt(self)
-    ianimate_object_update_frame(self)
+ianimate_object_update_frame :: #force_inline proc (self:^ianimate_object) {
+    buffer_resource_copy_update(&self.frame_uniform, &self.frame)
 }

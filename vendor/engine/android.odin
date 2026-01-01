@@ -1,44 +1,62 @@
 package engine
 
-import "base:library"
-import "core:sys/android"
-import "core:thread"
-import "core:sync"
-import "core:fmt"
-import "core:c"
-import "core:sys/posix"
-import "core:strings"
-import "core:debug/trace"
 import "base:intrinsics"
+import "base:library"
 import "base:runtime"
+import "core:c"
+import "core:debug/trace"
+import "core:fmt"
 import "core:math/linalg"
+import "core:strings"
+import "core:sync"
+import "core:sys/android"
+import "core:sys/posix"
+import "core:thread"
 import vk "vendor:vulkan"
 
 
 when library.is_android {
+    // ============================================================================
+    // Private Variables
+    // ============================================================================
+    
     @(private="file") app : ^android.android_app
     @(private="file") app_inited := false
+    @(private="file") input_state:general_input_state
 
+    // ============================================================================
+    // Android App Setup
+    // ============================================================================
+    
     //must call start
     __android_set_app :: proc "contextless" (_app : ^android.android_app) {
         app = _app
     }
- 
+
+    // ============================================================================
+    // Android Device Information
+    // ============================================================================
+    
     android_get_asset_manager :: proc "contextless" () -> ^android.AAssetManager {
         return app.activity.assetManager
     }
+    
     android_get_device_width :: proc "contextless" () -> u32 {
         return auto_cast max(0, android.ANativeWindow_getWidth(app.window))
     }
+    
     android_get_device_height :: proc "contextless" () -> u32 {
         return auto_cast max(0, android.ANativeWindow_getHeight(app.window))
     }
+    
     // android_get_cache_dir :: proc "contextless" () -> string {
     //     return app.cacheDir
     // }
+    
     android_get_internal_data_path :: proc "contextless" () -> string {
         return string(app.activity.internalDataPath)
     }
+    
     android_print_current_config :: proc () {
         lang:[2]u8
         country:[2]u8
@@ -68,6 +86,10 @@ when library.is_android {
         )
     }
 
+    // ============================================================================
+    // Vulkan Surface
+    // ============================================================================
+    
     vulkan_android_start :: proc "contextless" () {
         if vk_surface != 0 {
             vk.DestroySurfaceKHR(vk_instance, vk_surface, nil)
@@ -81,8 +103,11 @@ when library.is_android {
             trace.panic_log(res)
         }
     }
-    @(private="file") input_state:general_input_state
 
+    // ============================================================================
+    // Input Handling
+    // ============================================================================
+    
     @(private="file") free_saved_state :: proc "contextless" () {
         //TODO (xfitgd)
     }
@@ -132,6 +157,7 @@ when library.is_android {
         general_input_callback(input_state)
         return true
     }
+    
     @(private="file") handle_input :: proc "c" (app:^android.android_app, evt : ^android.AInputEvent) -> c.int {
         MAX_POINTERS :: 20
         @static pointer_poses:[MAX_POINTERS]linalg.PointF
@@ -307,6 +333,11 @@ when library.is_android {
         }
         return 0
     }
+
+    // ============================================================================
+    // Android Command Handling
+    // ============================================================================
+    
     @(private="file") handle_cmd :: proc "c" (app:^android.android_app, cmd : android.AppCmd) {
         #partial switch cmd {
             case .SAVE_STATE:
@@ -349,6 +380,10 @@ when library.is_android {
         }
     }
 
+    // ============================================================================
+    // Android Main Loop
+    // ============================================================================
+    
     android_start :: proc () {
         app.userData = nil
         app.onAppCmd = handle_cmd

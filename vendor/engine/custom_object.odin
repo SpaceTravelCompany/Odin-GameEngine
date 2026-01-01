@@ -1,20 +1,24 @@
 //using custom shader
 package engine
 
-import "core:math"
-import "core:mem"
+import "base:intrinsics"
+import "base:runtime"
+import "core:debug/trace"
 import "core:fmt"
+import "core:math"
+import "core:math/linalg"
+import "core:mem"
+import "core:mem/virtual"
 import "core:slice"
 import "core:sync"
 import "core:thread"
-import "core:debug/trace"
-import "core:math/linalg"
-import "base:intrinsics"
-import "base:runtime"
 import vk "vendor:vulkan"
-import "core:mem/virtual"
-
 import "vendor:shaderc"
+
+
+// ============================================================================
+// Type Definitions
+// ============================================================================
 
 
 custom_object_draw_type :: enum {
@@ -54,24 +58,9 @@ custom_object :: struct {
     pipeline_p_sets:[]^descriptor_set
 }
 
-custom_object_pipeline_deinit :: proc(self:^custom_object_pipeline) {
-    mem.ICheckInit_Deinit(&self.check_init)
-
-    for l in self.__descriptor_set_layouts {
-        vk.DestroyDescriptorSetLayout(graphics_device, l, nil)
-    }
-    for p in self.__pool_binding {
-        delete(p, engine_def_allocator)
-    }
-    for p in self.pool_sizes {
-        delete(p, engine_def_allocator)
-    }
-    vk.DestroyPipelineLayout(graphics_device, self.__pipeline_layout, nil)
-    vk.DestroyPipeline(graphics_device, self.__pipeline, nil)
-    delete(self.pool_sizes, engine_def_allocator)
-    delete(self.__descriptor_set_layouts, engine_def_allocator)
-    delete(self.__pool_binding, engine_def_allocator)
-}
+// ============================================================================
+// Shader and Descriptor Types
+// ============================================================================
 
 shader_optimization_level :: shaderc.optimizationLevel
 
@@ -96,8 +85,30 @@ shader_lang :: enum {
     HLSL,
 }
 
-
 descriptor_set_layout_binding_init :: vk.DescriptorSetLayoutBindingInit
+
+// ============================================================================
+// Custom Object Pipeline Management
+// ============================================================================
+
+custom_object_pipeline_deinit :: proc(self:^custom_object_pipeline) {
+    mem.ICheckInit_Deinit(&self.check_init)
+
+    for l in self.__descriptor_set_layouts {
+        vk.DestroyDescriptorSetLayout(graphics_device, l, nil)
+    }
+    for p in self.__pool_binding {
+        delete(p, engine_def_allocator)
+    }
+    for p in self.pool_sizes {
+        delete(p, engine_def_allocator)
+    }
+    vk.DestroyPipelineLayout(graphics_device, self.__pipeline_layout, nil)
+    vk.DestroyPipeline(graphics_device, self.__pipeline, nil)
+    delete(self.pool_sizes, engine_def_allocator)
+    delete(self.__descriptor_set_layouts, engine_def_allocator)
+    delete(self.__pool_binding, engine_def_allocator)
+}
 
 custom_object_pipeline_init :: proc(self:^custom_object_pipeline,
     binding_set_layouts:[][]descriptor_set_layout_binding,
@@ -229,6 +240,10 @@ custom_object_pipeline_init :: proc(self:^custom_object_pipeline,
     return true
 }
 
+// ============================================================================
+// Custom Object Management
+// ============================================================================
+
 @private custom_object_vtable :iobject_vtable = iobject_vtable{
     draw = auto_cast _super_custom_object_draw,
     deinit = auto_cast _super_custom_object_deinit,
@@ -261,17 +276,19 @@ custom_object_init :: proc(self:^custom_object, $actual_type:typeid,
     iobject_init(self, actual_type, pos, rotation, scale, camera, projection, color_transform, pivot)
 }
 
-
-create_buffer_resource :: #force_inline proc(self:^buffer_resource, option:buffer_create_option, data:[]byte, is_copy:bool, allocator:Maybe(runtime.Allocator) = nil) {
-    buffer_resource_create_buffer(self, option, data, is_copy, allocator)
-}
-
+// ============================================================================
+// Custom Object Cleanup
+// ============================================================================
 
 _super_custom_object_deinit :: proc(self:^custom_object) {
     _super_iobject_deinit(auto_cast self)
 
     delete(self.pipeline_p_sets, engine_def_allocator)
 }
+
+// ============================================================================
+// Custom Object Drawing
+// ============================================================================
 
 _super_custom_object_draw :: proc(self:^custom_object, cmd:command_buffer) {
     mem.ICheckInit_Check(&self.check_init)
@@ -291,4 +308,12 @@ _super_custom_object_draw :: proc(self:^custom_object, cmd:command_buffer) {
     } else if self.p_pipeline.draw_method.type == .DrawIndexed {
         graphics_cmd_draw_indexed(cmd, self.p_pipeline.draw_method.index_count, self.p_pipeline.draw_method.instance_count, self.p_pipeline.draw_method.first_index, self.p_pipeline.draw_method.vertex_offset, self.p_pipeline.draw_method.first_instance)
     }
+}
+
+// ============================================================================
+// Buffer Resource Helper
+// ============================================================================
+
+create_buffer_resource :: #force_inline proc(self:^buffer_resource, option:buffer_create_option, data:[]byte, is_copy:bool, allocator:Maybe(runtime.Allocator) = nil) {
+    buffer_resource_create_buffer(self, option, data, is_copy, allocator)
 }

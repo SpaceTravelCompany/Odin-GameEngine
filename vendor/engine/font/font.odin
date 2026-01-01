@@ -1,21 +1,23 @@
 package font
 
-
-import "core:math"
-
+import "base:runtime"
 import "core:c"
+import "core:debug/trace"
+import "core:fmt"
+import "core:math"
+import "core:math/linalg"
 import "core:mem"
 import "core:slice"
-import "core:debug/trace"
-import "core:math/linalg"
-import "vendor:engine/geometry"
+import "core:sync"
 import "core:unicode"
 import "core:unicode/utf8"
-import "core:sync"
-import "core:fmt"
-import "base:runtime"
+import "vendor:engine/geometry"
 import "vendor:freetype"
 import "../"
+
+// ============================================================================
+// Type Definitions
+// ============================================================================
 
 
 @(private="file") char_data :: struct {
@@ -29,8 +31,6 @@ import "../"
 }
 
 font :: struct {}
-
-@(private="file") SCALE_DEFAULT : f32 : 256
 
 @(private) FONT_KEY :: struct #packed {
     char:rune,
@@ -46,6 +46,12 @@ font :: struct {}
     scale:f32,//default 256
     allocator:mem.Allocator,
 }
+
+@(private="file") SCALE_DEFAULT : f32 : 256
+
+// ============================================================================
+// Font Rendering Options
+// ============================================================================
 
 font_render_opt :: struct {
     scale:linalg.PointF,    //(0,0) -> (1,1)
@@ -70,7 +76,15 @@ font_render_range :: struct {
     len:uint,
 }
 
+// ============================================================================
+// Global Variables
+// ============================================================================
+
 @(private) freetype_lib:freetype.Library = nil
+
+// ============================================================================
+// FreeType Initialization
+// ============================================================================
 
 @(private) _init_freetype :: proc "contextless" () {
     err := freetype.init_free_type(&freetype_lib)
@@ -85,7 +99,15 @@ font_render_range :: struct {
     }
 }
 
+// ============================================================================
+// Type Aliases
+// ============================================================================
+
 freetype_err :: freetype.Error
+
+// ============================================================================
+// Font Management
+// ============================================================================
 
 font_init :: proc(_fontData:[]byte, #any_int _faceIdx:int = 0, allocator:mem.Allocator = context.allocator) -> (font : ^font = nil, err : freetype_err = .Ok)  {
     font_ := mem.new_non_zeroed(font_t, allocator)

@@ -1,33 +1,42 @@
 package engine
 
-import "vendor:glfw"
-import "core:reflect"
+import "base:intrinsics"
+import "base:library"
+import "base:runtime"
+import "core:bytes"
 import "core:c"
-import "core:mem"
-import "core:sync"
 import "core:debug/trace"
+import "core:fmt"
+import "core:mem"
 import "core:os"
+import "core:reflect"
+import "core:strings"
+import "core:sync"
 import "core:sys/linux"
 import "core:sys/posix"
 import "core:sys/windows"
-import "core:strings"
-import "core:bytes"
 import "core:thread"
-import "base:runtime"
-import "base:intrinsics"
-import "base:library"
 import vk "vendor:vulkan"
-import "core:fmt"
+import "vendor:glfw"
 
+// ============================================================================
+// Global Variables
+// ============================================================================
 
 
 when !library.is_mobile {
+    // ============================================================================
+    // Private Variables
+    // ============================================================================
+    
+    @(private="file") wnd:glfw.WindowHandle = nil
+    @(private="file") glfw_monitors:[dynamic]glfw.MonitorHandle
 
-@(private="file") wnd:glfw.WindowHandle = nil
-@(private="file") glfw_monitors:[dynamic]glfw.MonitorHandle
-
-
-glfw_start :: proc() {
+    // ============================================================================
+    // Window Management
+    // ============================================================================
+    
+    glfw_start :: proc() {
     when !is_console {
         //?default screen idx 0
         if __window_width == nil do __window_width = int(monitors[0].rect.size.x / 2)
@@ -70,8 +79,12 @@ glfw_start :: proc() {
     }
 }
 
-when ODIN_OS == .Windows {
-glfw_get_current_hmonitor :: proc "contextless" () -> windows.HMONITOR {
+    // ============================================================================
+    // Windows-Specific Functions
+    // ============================================================================
+    
+    when ODIN_OS == .Windows {
+        glfw_get_current_hmonitor :: proc "contextless" () -> windows.HMONITOR {
     if wnd == nil do trace.panic_log("glfw_get_current_hmonitor : wnd is nil")
     h_wnd := glfw.GetWin32Window(wnd)
     if h_wnd == nil do trace.panic_log("glfw_get_current_hmonitor : h_wnd is nil")
@@ -84,11 +97,15 @@ glfw_get_hwnd :: proc "contextless" () -> windows.HWND {
     h_wnd := glfw.GetWin32Window(wnd)
     if h_wnd == nil do trace.panic_log("glfw_get_hwnd : h_wnd is nil")
 
-    return h_wnd
-}
-}
+            return h_wnd
+        }
+    }
 
-glfw_set_full_screen_mode :: proc "contextless" (monitor:^monitor_info) {
+    // ============================================================================
+    // Screen Mode Management
+    // ============================================================================
+    
+    glfw_set_full_screen_mode :: proc "contextless" (monitor:^monitor_info) {
     for &m, i in monitors {
         if raw_data(m.name) == raw_data(monitor.name) {
             glfw.SetWindowMonitor(wnd, glfw_monitors[i], monitor.rect.pos.x,
@@ -119,11 +136,13 @@ glfw_set_window_mode :: proc "contextless" () {
         auto_cast prev_window_width,
         auto_cast prev_window_height,
        glfw.DONT_CARE)
-}
+    }
 
-
-
-@(private="file") glfw_init_monitors :: proc() {
+    // ============================================================================
+    // Monitor Management
+    // ============================================================================
+    
+    @(private="file") glfw_init_monitors :: proc() {
     glfw_monitors = mem.make_non_zeroed([dynamic]glfw.MonitorHandle)
     _monitors := glfw.GetMonitors()
 
@@ -154,18 +173,26 @@ glfw_set_window_mode :: proc "contextless" () {
         )
     }
 
-    non_zero_append(&monitors, info)
-    non_zero_append(&glfw_monitors, m)
-}
+        non_zero_append(&monitors, info)
+        non_zero_append(&glfw_monitors, m)
+    }
 
-glfw_vulkan_start :: proc "contextless" () {
+    // ============================================================================
+    // Vulkan Integration
+    // ============================================================================
+    
+    glfw_vulkan_start :: proc "contextless" () {
     if vk_surface != 0 do vk.DestroySurfaceKHR(vk_instance, vk_surface, nil)
 
     res := glfw.CreateWindowSurface(vk_instance, wnd, nil, &vk_surface)
-    if (res != .SUCCESS) do trace.panic_log("glfw_vulkan_start : ", res)
-}
+        if (res != .SUCCESS) do trace.panic_log("glfw_vulkan_start : ", res)
+    }
 
-glfw_system_init :: proc() {
+    // ============================================================================
+    // System Initialization
+    // ============================================================================
+    
+    glfw_system_init :: proc() {
     res := glfw.Init()
     if !res do trace.panic_log("glfw.Init : ", res)
 
@@ -242,17 +269,25 @@ glfw_system_init :: proc() {
         }
 	}
 
-    when is_log do glfw.SetErrorCallback(glfw_error_callback)
-}
+        when is_log do glfw.SetErrorCallback(glfw_error_callback)
+    }
 
-glfw_error_callback :: proc "c" (error: c.int, description: cstring) {
+    // ============================================================================
+    // Error Handling
+    // ============================================================================
+    
+    glfw_error_callback :: proc "c" (error: c.int, description: cstring) {
     when is_log {
         context = runtime.default_context()
-        fmt.println("XFIT SYSLOG : glfw", error, description)
+            fmt.println("XFIT SYSLOG : glfw", error, description)
+        }
     }
-}
 
-glfw_system_start :: proc() {
+    // ============================================================================
+    // System Startup
+    // ============================================================================
+    
+    glfw_system_start :: proc() {
     glfw_monitor_proc :: proc "c" (monitor: glfw.MonitorHandle, event: c.int) {
         sync.mutex_lock(&monitors_mtx)
         defer sync.mutex_unlock(&monitors_mtx)
@@ -285,18 +320,26 @@ glfw_system_start :: proc() {
     //Unless you will be using OpenGL or OpenGL ES with the same window as Vulkan, there is no need to create a context. You can disable context creation with the GLFW_CLIENT_API hint.
     glfw.WindowHint(glfw.CLIENT_API, glfw.NO_API)
 
-    glfw_init_monitors()
-    glfw.SetMonitorCallback(glfw_monitor_proc)
-}
+        glfw_init_monitors()
+        glfw.SetMonitorCallback(glfw_monitor_proc)
+    }
 
-glfw_destroy :: proc "contextless" () {
+    // ============================================================================
+    // Window Destruction
+    // ============================================================================
+    
+    glfw_destroy :: proc "contextless" () {
     when !is_console {
         if wnd != nil do glfw.SetWindowShouldClose(wnd, true)
-        //!glfw.DestroyWindow(wnd) 를 쓰지 않는다 왜냐하면 윈도우만 종료되고 윈도우 루프를 빠져나가지 않는다.
+            //!glfw.DestroyWindow(wnd) 를 쓰지 않는다 왜냐하면 윈도우만 종료되고 윈도우 루프를 빠져나가지 않는다.
+        }
     }
-}
 
-glfw_system_destroy :: proc() {
+    // ============================================================================
+    // System Cleanup
+    // ============================================================================
+    
+    glfw_system_destroy :: proc() {
     delete(glfw_monitors)
 
     when ODIN_OS == .Linux {
@@ -309,10 +352,14 @@ glfw_system_destroy :: proc() {
 		//TODO (xfitgd)
 	}
   
-    glfw.Terminate()
-}
+        glfw.Terminate()
+    }
 
-glfw_loop :: proc() {
+    // ============================================================================
+    // Main Loop
+    // ============================================================================
+    
+    glfw_loop :: proc() {
     glfw_key_proc :: proc "c" (window: glfw.WindowHandle, key, scancode, action, mods: c.int) {
         //glfw.KEY_SPACE
         if key > key_size-1 || key < 0 || !reflect.is_valid_enum_value(key_code, key) {
@@ -418,11 +465,14 @@ glfw_loop :: proc() {
     }
     __exiting = true
     wnd = nil
-   // thread.join(render_th)
-}
+       // thread.join(render_th)
+    }
 
-glfw_get_window :: proc "contextless" () -> glfw.WindowHandle {
-    return wnd
-}
-
+    // ============================================================================
+    // Utility Functions
+    // ============================================================================
+    
+    glfw_get_window :: proc "contextless" () -> glfw.WindowHandle {
+        return wnd
+    }
 }

@@ -1,28 +1,40 @@
 package engine
 
 import "base:intrinsics"
-import "core:fmt"
-import "core:math"
-import "core:math/linalg"
-import "core:os"
-import "core:mem"
-import "core:mem/virtual"
-import "core:io"
-import "core:reflect"
-import "core:thread"
-import "core:sync"
-import "core:strings"
 import "base:runtime"
 import "core:debug/trace"
-import "vendor:glfw"
+import "core:fmt"
+import "core:io"
+import "core:math"
+import "core:math/linalg"
+import "core:mem"
+import "core:mem/virtual"
+import "core:os"
+import "core:reflect"
+import "core:strings"
+import "core:sync"
 import "core:sys/android"
+import "core:thread"
+import "vendor:glfw"
 
+// ============================================================================
+// Constants
+// ============================================================================
 
 key_size :: 512
+
+// ============================================================================
+// Global Variables
+// ============================================================================
+
 keys : [key_size]bool = { 0..<key_size = false }
 __is_mouse_out:bool
 __mouse_pos:linalg.PointF
 scroll_dt:int
+
+// ============================================================================
+// Key Code Definitions
+// ============================================================================
 
 when is_mobile {
     key_code :: enum i32 {
@@ -277,26 +289,38 @@ when is_mobile {
     }
 }
 
+// ============================================================================
+// Mouse Button Constants
+// ============================================================================
 
 left_mouse_button_idx :: 0
 middle_mouse_button_idx :: 1
 right_mouse_button_idx :: 2
+
+// ============================================================================
+// Input Callbacks
+// ============================================================================
 
 key_down : #type proc (keycode:key_code) = proc (keycode:key_code) {}
 key_up : #type proc (keycode:key_code) = proc (keycode:key_code) {}
 key_repeat : #type proc (keycode:key_code) = proc (keycode:key_code) {}
 mouse_button_down : #type proc (button_idx:int, x:f32, y:f32) = proc (button_idx:int, x:f32, y:f32) {}
 mouse_button_up : #type proc (button_idx:int, x:f32, y:f32) = proc (button_idx:int, x:f32, y:f32) {}
+mouse_move : #type proc (x:f32, y:f32) = proc (x:f32, y:f32) {}
+mouse_scroll : #type proc (dt:int) = proc (dt:int) {}
+mouse_in : #type proc () = proc () {}
+mouse_out : #type proc () = proc () {}
 pointer_down : #type proc (pointer_idx:int, x:f32, y:f32) = proc (pointer_idx:int, x:f32, y:f32) {}
 pointer_up : #type proc (pointer_idx:int, x:f32, y:f32) = proc (pointer_idx:int, x:f32, y:f32) {}
 pointer_move : #type proc (pointer_idx:int, x:f32, y:f32) = proc (pointer_idx:int, x:f32, y:f32) {}
-mouse_scroll : #type proc (dt:int) = proc (dt:int) {}
-mouse_move : #type proc (x:f32, y:f32) = proc (x:f32, y:f32) {}
-mouse_in : #type proc () = proc () {}
-mouse_out : #type proc () = proc () {}
 
-is_mouse_out :: proc "contextless" () -> bool {return __is_mouse_out}
+// ============================================================================
+// Mouse Functions
+// ============================================================================
 
+is_mouse_out :: proc "contextless" () -> bool {
+    return __is_mouse_out
+}
 
 mouse_pos :: #force_inline proc "contextless" () -> linalg.PointF {
     return __mouse_pos
@@ -307,6 +331,10 @@ convert_mouse_pos :: proc "contextless" (pos:linalg.PointF) -> linalg.PointF {
     h := f32(window_height()) / 2.0
     return linalg.PointF{ pos.x - w, -pos.y + h }
 }
+
+// ============================================================================
+// Gamepad/Controller Input
+// ============================================================================
 
 general_input_state :: struct {
     handle:rawptr,

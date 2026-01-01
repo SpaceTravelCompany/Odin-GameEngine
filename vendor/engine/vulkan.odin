@@ -1,24 +1,40 @@
 #+private
 package engine
 
-import "base:runtime"
 import "base:library"
+import "base:runtime"
+import "core:debug/trace"
 import "core:dynlib"
 import "core:fmt"
 import "core:math"
-import "vendor:engine/geometry"
 import "core:math/linalg"
 import "core:mem"
-import "core:debug/trace"
-import "core:strings"
 import "core:reflect"
+import "core:strings"
 import "core:sync"
+import "core:sys/windows"
 import "core:thread"
+import "vendor:engine/geometry"
 import vk "vendor:vulkan"
 import "vendor:glfw"
-import "core:sys/windows"
 
+// ============================================================================
+// Constants
+// ============================================================================
 
+@(rodata)
+DEVICE_EXTENSIONS: [3]cstring = {vk.KHR_SWAPCHAIN_EXTENSION_NAME, vk.EXT_FULL_SCREEN_EXCLUSIVE_EXTENSION_NAME, vk.KHR_SHADER_CLOCK_EXTENSION_NAME}
+@(rodata)
+INSTANCE_EXTENSIONS: [2]cstring = {
+	vk.KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME,
+	vk.KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME,
+}
+@(rodata)
+LAYERS: [1]cstring = {"VK_LAYER_KHRONOS_validation"}
+
+// ============================================================================
+// Global Variables
+// ============================================================================
 
 vk_instance: vk.Instance
 vk_library: dynlib.Library
@@ -64,6 +80,14 @@ vk_get_instance_proc_addr: proc "system" (
 	_name: cstring,
 ) -> vk.ProcVoidFunction
 
+DEVICE_EXTENSIONS_CHECK: [len(DEVICE_EXTENSIONS)]bool
+INSTANCE_EXTENSIONS_CHECK: [len(INSTANCE_EXTENSIONS)]bool
+LAYERS_CHECK: [len(LAYERS)]bool
+
+// ============================================================================
+// Debug Callback
+// ============================================================================
+
 vk_debug_callback :: proc "system" (
 	messageSeverity: vk.DebugUtilsMessageSeverityFlagsEXT,
 	messageTypes: vk.DebugUtilsMessageTypeFlagsEXT,
@@ -83,18 +107,9 @@ vk_debug_callback :: proc "system" (
 	return false
 }
 
-@(rodata)
-DEVICE_EXTENSIONS: [3]cstring = {vk.KHR_SWAPCHAIN_EXTENSION_NAME, vk.EXT_FULL_SCREEN_EXCLUSIVE_EXTENSION_NAME, vk.KHR_SHADER_CLOCK_EXTENSION_NAME}
-@(rodata)
-INSTANCE_EXTENSIONS: [2]cstring = {
-	vk.KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME,
-	vk.KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME,
-}
-@(rodata)
-LAYERS: [1]cstring = {"VK_LAYER_KHRONOS_validation"}
-DEVICE_EXTENSIONS_CHECK: [len(DEVICE_EXTENSIONS)]bool
-INSTANCE_EXTENSIONS_CHECK: [len(INSTANCE_EXTENSIONS)]bool
-LAYERS_CHECK: [len(LAYERS)]bool
+// ============================================================================
+// Extension Support Checks
+// ============================================================================
 
 validation_layer_support :: #force_inline proc "contextless" () -> bool {return LAYERS_CHECK[0]}
 vk_khr_portability_enumeration_support :: #force_inline proc "contextless" () -> bool {return INSTANCE_EXTENSIONS_CHECK[1]}

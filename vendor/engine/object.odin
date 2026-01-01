@@ -1,16 +1,19 @@
 package engine
 
+import "base:intrinsics"
+import "base:runtime"
+import "core:debug/trace"
 import "core:math"
+import "core:math/linalg"
 import "core:mem"
 import "core:slice"
 import "core:sync"
 import "core:thread"
-import "core:debug/trace"
-import "core:math/linalg"
-import "base:intrinsics"
-import "base:runtime"
 import vk "vendor:vulkan"
 
+// ============================================================================
+// Type Definitions
+// ============================================================================
 
 iobject_vtable :: struct {
     get_uniform_resources: #type proc (self:^iobject) -> []union_resource,
@@ -40,6 +43,10 @@ __matrix_in :: struct {
     mat_uniform:buffer_resource,
     check_init: mem.ICheckInit,
 }
+
+// ============================================================================
+// Matrix Calculation Functions
+// ============================================================================
 
 @(require_results)
 __SRTC_2D_MATRIX :: proc "contextless" (t: linalg.Point3DF, s: linalg.PointF, r: f32, cp:linalg.PointF) -> linalg.Matrix4x4f32 {
@@ -158,6 +165,10 @@ SR_2D_MATRIX2 :: proc "contextless" (s: linalg.PointF, r: f32, cp:linalg.PointF)
     return nil
 }
 
+// ============================================================================
+// IObject Initialization
+// ============================================================================
+
 iobject_init :: proc(self:^iobject, $actual_type:typeid,
     pos:linalg.Point3DF, rotation:f32, scale:linalg.PointF = {1,1},
     _camera:^camera, _projection:^projection, _color_transform:^color_transform = nil, pivot:linalg.PointF = {0.0, 0.0})
@@ -183,6 +194,10 @@ iobject_init :: proc(self:^iobject, $actual_type:typeid,
     self.actual_type = actual_type
 }
 
+// ============================================================================
+// IObject Cleanup
+// ============================================================================
+
 _super_iobject_deinit :: #force_inline proc (self:^iobject) {
     mem.ICheckInit_Deinit(&self.check_init)
     clone_mat_uniform := new(buffer_resource, temp_arena_allocator)
@@ -201,6 +216,10 @@ iobject_init2 :: proc(self:^iobject, $actual_type:typeid,
 
     self.actual_type = actual_type
 }
+
+// ============================================================================
+// Uniform Resource Management
+// ============================================================================
 
 //!alloc result array in temp_allocator
 @private get_uniform_resources :: proc(self:^iobject) -> []union_resource {
@@ -254,6 +273,10 @@ iobject_init2 :: proc(self:^iobject, $actual_type:typeid,
     mem.copy_non_overlapping(&self.set.__resources[0], &resources[0], len(resources) * size_of(union_resource))
     update_descriptor_sets(mem.slice_ptr(&self.set, 1))
 }
+
+// ============================================================================
+// IObject Update Functions
+// ============================================================================
 
 iobject_update_transform :: proc(self:^iobject, pos:linalg.Point3DF, rotation:f32 = 0.0, scale:linalg.PointF = {1.0,1.0}, pivot:linalg.PointF = {0.0,0.0}) {
     mem.ICheckInit_Check(&self.check_init)
@@ -338,6 +361,10 @@ iobject_get_projection :: #force_inline proc "contextless" (self:^iobject) -> ^p
     return self.projection
 }
 
+// ============================================================================
+// IObject Accessors
+// ============================================================================
+
 iobject_get_actual_type :: #force_inline proc "contextless" (self:^iobject) -> typeid {
     return self.actual_type
 }
@@ -372,7 +399,9 @@ iobject_size :: proc(self:^iobject) {
     //Size Not Required Default
 }
 
-
+// ============================================================================
+// Render Settings
+// ============================================================================
 
 set_render_clear_color :: proc "contextless" (_color:linalg.Point3DwF) {
     g_clear_color = _color
@@ -452,6 +481,10 @@ set_render_clear_color :: proc "contextless" (_color:linalg.Point3DwF) {
 @private __index_buf_update :: #force_inline proc (self:^__index_buf, array:[]u32) {
     buffer_resource_map_update_slice(&self.buf, array, engine_def_allocator)
 }
+
+// ============================================================================
+// Buffer Type Definitions
+// ============================================================================
 
 @private __vertex_buf :: struct($NodeType:typeid) {
     buf:buffer_resource,

@@ -1,12 +1,16 @@
 package geometry
 
+import "base:intrinsics"
+import "base:runtime"
+import "core:debug/trace"
 import "core:math"
+import "core:math/linalg"
 import "core:math/poly2tri"
 import "core:mem"
-import "core:debug/trace"
-import "core:math/linalg"
-import "base:runtime"
-import "base:intrinsics"
+
+// ============================================================================
+// Type Definitions
+// ============================================================================
 
 // 스트로크 스타일 정의
 stroke_cap :: enum {
@@ -27,8 +31,6 @@ stroke_style :: struct {
     join: stroke_join,
     miter_limit: f32,  // Miter join에서 사용
 }
-
-
 
 shape_vertex2d :: struct #align(1) {
     pos: linalg.PointF,

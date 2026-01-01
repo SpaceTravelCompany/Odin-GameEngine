@@ -1,15 +1,19 @@
 package engine
 
+import "base:intrinsics"
+import "base:runtime"
+import "core:debug/trace"
 import "core:math"
+import "core:math/linalg"
 import "core:mem"
 import "core:slice"
 import "core:sync"
-import "core:debug/trace"
-import "core:math/linalg"
-import "base:intrinsics"
-import "base:runtime"
 import vk "vendor:vulkan"
 
+
+// ============================================================================
+// Type Definitions
+// ============================================================================
 
 image_center_pt_pos :: enum {
     Center,
@@ -22,7 +26,6 @@ image_center_pt_pos :: enum {
     Bottom,
     BottomRight,
 }
-
 
 texture_array :: struct {
     using _: texture,
@@ -48,6 +51,10 @@ tile_image :: struct {
     tile_idx:u32,
     src: ^tile_texture_array,
 }
+
+// ============================================================================
+// Type Checking
+// ============================================================================
 
 is_any_image_type :: #force_inline proc "contextless" ($any_image:typeid) -> bool {
     return intrinsics.type_is_subtype_of(any_image, iobject) && intrinsics.type_has_field(any_image, "src") && 
@@ -97,9 +104,17 @@ colorTransform:^color_transform = nil, vtable:^iobject_vtable = nil) where intri
     iobject_init2(self, actualType, camera, projection, colorTransform)
 }
 
+// ============================================================================
+// Image Cleanup
+// ============================================================================
+
 _super_image_deinit :: proc(self:^image) {
     _super_iobject_deinit(self)
 }
+
+// ============================================================================
+// Image Accessors
+// ============================================================================
 
 image_get_texture :: #force_inline proc "contextless" (self:^image) -> ^texture {
     return self.src
@@ -113,6 +128,11 @@ image_get_projection :: proc "contextless" (self:^image) -> ^projection {
 image_get_color_transform :: proc "contextless" (self:^image) -> ^color_transform {
     return iobject_get_color_transform(self)
 }
+
+// ============================================================================
+// Image Update Functions
+// ============================================================================
+
 image_update_transform :: #force_inline proc(self:^image, pos:linalg.Point3DF, rotation:f32 = 0.0, scale:linalg.PointF = {1,1}, pivot:linalg.PointF = {0.0,0.0}) {
     iobject_update_transform(self, pos, rotation, scale, pivot)
 }
@@ -132,6 +152,10 @@ image_change_color_transform :: #force_inline proc(self:^image, colorTransform:^
     iobject_change_color_transform(self, colorTransform)
 }
 
+// ============================================================================
+// Image Drawing
+// ============================================================================
+
 _super_image_draw :: proc (self:^image, cmd:command_buffer) {
     mem.ICheckInit_Check(&self.check_init)
     mem.ICheckInit_Check(&self.src.check_init)
@@ -147,6 +171,9 @@ _image_BindingSetsAndDraw :: proc "contextless" (cmd:command_buffer, imageSet:de
     graphics_cmd_draw(cmd, 6, 1, 0, 0)
 }
 
+// ============================================================================
+// Animate Image Management
+// ============================================================================
 
 @private animate_image_vtable :ianimate_object_vtable = ianimate_object_vtable {
     draw = auto_cast _super_animate_image_draw,
@@ -200,7 +227,11 @@ camera:^camera, projection:^projection, colorTransform:^color_transform = nil, v
     }, mem.ptr_to_bytes(&self.frame), true)
 
     iobject_init2(self, actualType, camera, projection, colorTransform)
-}   
+}
+
+// ============================================================================
+// Animate Image Cleanup
+// ============================================================================
 
 _super_animate_image_deinit :: proc(self:^animate_image) {
     clone_frame_uniform := new(buffer_resource, temp_arena_allocator)
@@ -210,6 +241,9 @@ _super_animate_image_deinit :: proc(self:^animate_image) {
     _super_iobject_deinit(auto_cast self)
 }
 
+// ============================================================================
+// Animate Image Accessors
+// ============================================================================
 
 animate_image_get_frame_cnt :: _super_animate_image_get_frame_cnt
 
@@ -220,6 +254,7 @@ _super_animate_image_get_frame_cnt :: proc "contextless" (self:^animate_image) -
 animate_image_get_texture_array :: #force_inline proc "contextless" (self:^animate_image) -> ^texture_array {
     return self.src
 }
+
 animate_image_get_camera :: proc "contextless" (self:^animate_image) -> ^camera {
     return self.camera
 }
@@ -229,6 +264,11 @@ animate_image_get_projection :: proc "contextless" (self:^animate_image) -> ^pro
 animate_image_get_color_transform :: proc "contextless" (self:^animate_image) -> ^color_transform {
     return self.color_transform
 }
+
+// ============================================================================
+// Animate Image Update Functions
+// ============================================================================
+
 animate_image_update_transform :: #force_inline proc(self:^animate_image, pos:linalg.Point3DF, rotation:f32, scale:linalg.PointF = {1,1}, pivot:linalg.PointF = {0.0,0.0}) {
     iobject_update_transform(self, pos, rotation, scale, pivot)
 }
@@ -247,6 +287,11 @@ animate_image_update_texture_array :: #force_inline proc "contextless" (self:^an
 animate_image_update_projection :: #force_inline proc(self:^animate_image, projection:^projection) {
     iobject_update_projection(self, projection)
 }
+
+// ============================================================================
+// Animate Image Drawing
+// ============================================================================
+
 _super_animate_image_draw :: proc (self:^animate_image, cmd:command_buffer) {
     mem.ICheckInit_Check(&self.check_init)
     mem.ICheckInit_Check(&self.src.check_init)
@@ -257,6 +302,10 @@ _super_animate_image_draw :: proc (self:^animate_image, cmd:command_buffer) {
 
     graphics_cmd_draw(cmd, 6, 1, 0, 0)
 }
+
+// ============================================================================
+// Tile Image Management
+// ============================================================================
 
 @private tile_image_vtable :iobject_vtable = iobject_vtable {
     draw = auto_cast _super_tile_image_draw,
@@ -302,7 +351,11 @@ camera:^camera, projection:^projection, colorTransform:^color_transform = nil, v
     if self.vtable.get_uniform_resources == nil do self.vtable.get_uniform_resources = auto_cast get_uniform_resources_tile_image
 
     iobject_init2(self, actualType, camera, projection, colorTransform)
-}   
+}
+
+// ============================================================================
+// Tile Image Cleanup
+// ============================================================================
 
 _super_tile_image_deinit :: proc(self:^tile_image) {
     clone_tile_uniform := new(buffer_resource, temp_arena_allocator)
@@ -312,24 +365,28 @@ _super_tile_image_deinit :: proc(self:^tile_image) {
     _super_iobject_deinit(auto_cast self)
 }
 
+// ============================================================================
+// Tile Image Accessors
+// ============================================================================
+
 tile_image_get_tile_texture_array :: #force_inline proc "contextless" (self:^tile_image) -> ^tile_texture_array {
     return self.src
 }
 tile_image_update_tile_texture_array :: #force_inline proc "contextless" (self:^tile_image, src:^tile_texture_array) {
     self.src = src
 }
-tile_image_update_transform :: #force_inline proc(self:^tile_image, pos:linalg.Point3DF, rotation:f32, scale:linalg.PointF = {1,1}, pivot:linalg.PointF = {0.0, 0.0}) {
-    iobject_update_transform(self, pos, rotation, scale, pivot)
-}
+
 tile_image_change_color_transform :: #force_inline proc(self:^tile_image, colorTransform:^color_transform) {
     iobject_change_color_transform(self, colorTransform)
 }
 tile_image_update_camera :: #force_inline proc(self:^tile_image, camera:^camera) {
     iobject_update_camera(self, camera)
 }
+
 tile_image_update_projection :: #force_inline proc(self:^tile_image, projection:^projection) {
     iobject_update_projection(self, projection)
 }
+
 tile_image_get_camera :: proc "contextless" (self:^tile_image) -> ^camera {
     return iobject_get_camera(self)
 }
@@ -339,6 +396,15 @@ tile_image_get_projection :: proc "contextless" (self:^tile_image) -> ^projectio
 tile_image_get_color_transform :: proc "contextless" (self:^tile_image) -> ^color_transform {
     return iobject_get_color_transform(self)
 }
+
+// ============================================================================
+// Tile Image Update Functions
+// ============================================================================
+
+tile_image_update_transform :: #force_inline proc(self:^tile_image, pos:linalg.Point3DF, rotation:f32, scale:linalg.PointF = {1,1}, pivot:linalg.PointF = {0.0, 0.0}) {
+    iobject_update_transform(self, pos, rotation, scale, pivot)
+}
+
 tile_image_update_transform_matrix_raw :: #force_inline proc(self:^tile_image, _mat:linalg.Matrix) {
     iobject_update_transform_matrix_raw(self, _mat)
 }
@@ -361,6 +427,9 @@ _super_tile_image_draw :: proc (self:^tile_image, cmd:command_buffer) {
     graphics_cmd_draw(cmd, 6, 1, 0, 0)
 }
 
+// ============================================================================
+// Texture Management
+// ============================================================================
 
 texture_init :: proc(
 	self: ^texture,
@@ -434,6 +503,10 @@ texture_init_grey :: proc(
 	self.set.__resources[0] = &self.texture
 	update_descriptor_sets(mem.slice_ptr(&self.set, 1))
 }
+
+// ============================================================================
+// Texture Specialized Initialization
+// ============================================================================
 
 //sampler nil default //TODO (xfitgd)
 // texture_init_r8 :: proc(self:^texture, width:u32, height:u32) {
@@ -575,6 +648,10 @@ texture_array_count :: #force_inline proc "contextless" (self:^texture_array) ->
     return self.texture.option.len
 }
 
+// ============================================================================
+// Color Format Conversion
+// ============================================================================
+
 color_fmt_convert_default :: proc "contextless" (pixels:[]byte, out:[]byte, inPixelFmt:color_fmt = .RGBA) {
     defcol := default_color_fmt()
     if defcol == inPixelFmt {
@@ -612,7 +689,6 @@ color_fmt_convert_default_overlap :: proc "contextless" (pixels:[]byte, out:[]by
         trace.printlnLog("color_fmt_convert_default: Unsupported pixel format: ", inPixelFmt)
     }
 }
-
 
 tile_texture_array_init :: proc(self:^tile_texture_array, tile_width:u32, tile_height:u32, width:u32, count:u32, pixels:[]byte, sampler:vk.Sampler = 0, 
 inPixelFmt:color_fmt = .RGBA) {
@@ -656,6 +732,7 @@ inPixelFmt:color_fmt = .RGBA) {
     self.set.__resources[0] = &self.texture
     update_descriptor_sets(mem.slice_ptr(&self.set, 1))
 }
+
 tile_texture_array_deinit :: #force_inline proc(self:^tile_texture_array) {
     mem.ICheckInit_Deinit(&self.check_init)
     clone_texture := new(texture_resource, temp_arena_allocator)
@@ -672,6 +749,9 @@ tile_texture_array_count :: #force_inline proc "contextless" (self:^tile_texture
     return self.texture.option.len
 }
 
+// ============================================================================
+// Image Utility Functions
+// ============================================================================
 
 image_pixel_perfect_point :: proc "contextless" (img:^$ANY_IMAGE, p:linalg.PointF, canvasW:f32, canvasH:f32, pivot:image_center_pt_pos) -> linalg.PointF where IsAnyimageType(ANY_IMAGE) {
     width := __windowWidth
