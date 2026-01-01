@@ -32,32 +32,32 @@ monitor_info :: struct {
 // Global Variables
 // ============================================================================
 
-__window_width: Maybe(int)
-__window_height: Maybe(int)
-__window_x: Maybe(int)
-__window_y: Maybe(int)
+@private __window_width: Maybe(int)
+@private __window_height: Maybe(int)
+@private __window_x: Maybe(int)
+@private __window_y: Maybe(int)
 
 prev_window_x: int
 prev_window_y: int
 prev_window_width: int
 prev_window_height: int
 
-__screen_idx: int = 0
-__screen_mode: screen_mode
-__window_title: cstring
-__screen_orientation:screen_orientation = .Unknown
+@private __screen_idx: int = 0
+@private __screen_mode: screen_mode
+@private __window_title: cstring
+@private __screen_orientation:screen_orientation = .Unknown
 
 monitors_mtx:sync.Mutex
 monitors: [dynamic]monitor_info
 primary_monitor: ^monitor_info
 current_monitor: ^monitor_info = nil
 
-__is_full_screen_ex := false
-__v_sync:v_sync
+@private __is_full_screen_ex := false
+@private __v_sync:v_sync
 monitor_locked:bool = false
 
-__paused := false
-__activated := false
+@private __paused := false
+@private __activated := false
 size_updated := false
 
 full_screen_mtx : sync.Mutex

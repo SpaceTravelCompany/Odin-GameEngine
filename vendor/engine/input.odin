@@ -28,8 +28,8 @@ key_size :: 512
 // ============================================================================
 
 keys : [key_size]bool = { 0..<key_size = false }
-__is_mouse_out:bool
-__mouse_pos:linalg.PointF
+@private __is_mouse_out:bool
+@private __mouse_pos:linalg.PointF
 scroll_dt:int
 
 // ============================================================================

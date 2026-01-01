@@ -62,7 +62,7 @@ qoi_converter_load :: proc (self:^qoi_converter, data:[]byte, out_fmt:color_fmt,
 }
 
 
-__Qoi_Error :: enum {
+@private __Qoi_Error :: enum {
     None,
     Encode_Size_Mismatch,
 }

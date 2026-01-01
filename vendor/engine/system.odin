@@ -193,8 +193,6 @@ engine_main :: proc(
 		}
 		__window_x = 0
 		__window_y = 0
-
-		__android_set_app(auto_cast android.get_android_app())
 	} else {
 		when !is_console {
 			__window_x = window_x

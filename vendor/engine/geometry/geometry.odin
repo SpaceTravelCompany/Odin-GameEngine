@@ -53,7 +53,7 @@ curve_type :: enum {
     Quadratic,
 }
 
-__ShapesError :: enum {
+@private __ShapesError :: enum {
     //!None, no need
 
     IsPointNotLine,

@@ -10,7 +10,7 @@ import vk "vendor:vulkan"
 MAX_FRAMES_IN_FLIGHT :: 2
 render_cmd :: struct {}
 
-__render_cmd :: struct {
+@private __render_cmd :: struct {
     scene: [dynamic]^iobject,
     scene_t: [dynamic]^iobject,
     refresh:[MAX_FRAMES_IN_FLIGHT]bool,
@@ -18,9 +18,9 @@ __render_cmd :: struct {
     obj_lock:sync.RW_Mutex
 }
 
-__g_render_cmd : [dynamic]^__render_cmd
-__g_main_render_cmd_idx : int = -1
-__g_render_cmd_mtx : sync.Mutex
+@private __g_render_cmd : [dynamic]^__render_cmd
+@private __g_main_render_cmd_idx : int = -1
+@private __g_render_cmd_mtx : sync.Mutex
 
 render_cmd_init :: proc() -> ^render_cmd {
     cmd := new(__render_cmd)
@@ -196,13 +196,13 @@ render_cmd_refresh_all :: proc "contextless" () {
     }
 }
 
-__render_cmd_clean :: proc () {
+@private __render_cmd_clean :: proc () {
     sync.mutex_lock(&__g_render_cmd_mtx)
     defer sync.mutex_unlock(&__g_render_cmd_mtx)
     delete(__g_render_cmd)
 }
 
-__render_cmd_create :: proc () {
+@private __render_cmd_create :: proc () {
     sync.mutex_lock(&__g_render_cmd_mtx)
     defer sync.mutex_unlock(&__g_render_cmd_mtx)
     __g_render_cmd = mem.make_non_zeroed([dynamic]^__render_cmd)

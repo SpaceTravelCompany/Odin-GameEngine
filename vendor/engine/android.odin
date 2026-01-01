@@ -28,10 +28,6 @@ when library.is_android {
     // Android App Setup
     // ============================================================================
     
-    //must call start
-    __android_set_app :: proc "contextless" (_app : ^android.android_app) {
-        app = _app
-    }
 
     // ============================================================================
     // Android Device Information
@@ -111,8 +107,8 @@ when library.is_android {
     @(private="file") free_saved_state :: proc "contextless" () {
         //TODO (xfitgd)
     }
-    @(private="file") handle_input_buttons :: proc (evt : ^android.AInputEvent, key_code:android.Keycode, up_down:bool) -> bool {
-        #partial switch key_code {
+    @(private="file") handle_input_buttons :: proc (evt : ^android.AInputEvent, key_code_:android.Keycode, up_down:bool) -> bool {
+        #partial switch key_code_ {
             case .BUTTON_A:
                 if up_down && input_state.buttons.a do return false //already set
                 input_state.buttons.a = up_down
@@ -288,43 +284,43 @@ when library.is_android {
                 return 1
             }
         } else if type == .KEY {
-            key_code := android.AKeyEvent_getKeyCode(evt)
+            key_code_ := android.AKeyEvent_getKeyCode(evt)
             act := android.AKeyEvent_getAction(evt)
 
             switch act {
                 case .DOWN:
                     if .JOYSTICK in transmute(android.InputSourceDevice)(src.device) || .GAMEPAD in transmute(android.InputSourceDevice)(src.device) {
-                        if handle_input_buttons(evt, key_code, true) do return 1
+                        if handle_input_buttons(evt, key_code_, true) do return 1
                     }
-                    if int(key_code) < key_size {
-                        if !keys[int(key_code)] {
-                            keys[int(key_code)] = true
-                            key_down(transmute(key_code)(key_code))
+                    if int(key_code_) < key_size {
+                        if !keys[int(key_code_)] {
+                            keys[int(key_code_)] = true
+                            key_down(transmute(key_code)(key_code_))
                         }
                     } else {
-                        fmt.print_custom_android("WARN OUT OF RANGE KeyDown: ", int(key_code), "\n", logPriority=.WARN, sep = "")
+                        fmt.print_custom_android("WARN OUT OF RANGE KeyDown: ", int(key_code_), "\n", logPriority=.WARN, sep = "")
                         return 0
                     }
                 case .UP:
                     if .JOYSTICK in transmute(android.InputSourceDevice)(src.device) || .GAMEPAD in transmute(android.InputSourceDevice)(src.device) {
-                        if handle_input_buttons(evt, key_code, false) do return 1
+                        if handle_input_buttons(evt, key_code_, false) do return 1
                     }
-                    if int(key_code) < key_size {
-                        keys[int(key_code)] = false
-                        key_up(transmute(key_code)(key_code))
+                    if int(key_code_) < key_size {
+                        keys[int(key_code_)] = false
+                        key_up(transmute(key_code)(key_code_))
                     } else {
-                        fmt.print_custom_android("WARN OUT OF RANGE KeyUp: ", int(key_code), "\n", logPriority=.WARN, sep = "")
+                        fmt.print_custom_android("WARN OUT OF RANGE KeyUp: ", int(key_code_), "\n", logPriority=.WARN, sep = "")
                         return 0
                     }
                 case .MULTIPLE:
-                    if int(key_code) < key_size {
+                    if int(key_code_) < key_size {
                         cnt := android.AKeyEvent_getRepeatCount(evt)
                         for i in 0 ..< cnt {
-                            key_down(transmute(key_code)(key_code))
-                            key_up(transmute(key_code)(key_code))
+                            key_down(transmute(key_code)(key_code_))
+                            key_up(transmute(key_code)(key_code_))
                         }
                     } else {
-                        fmt.print_custom_android("WARN OUT OF RANGE Key Multiple: ", int(key_code), "\n", logPriority=.WARN, sep = "")
+                        fmt.print_custom_android("WARN OUT OF RANGE Key Multiple: ", int(key_code_), "\n", logPriority=.WARN, sep = "")
                         return 0
                     }
             }
@@ -385,6 +381,7 @@ when library.is_android {
     // ============================================================================
     
     android_start :: proc () {
+        app = auto_cast android.get_android_app()
         app.userData = nil
         app.onAppCmd = handle_cmd
         app.onInputEvent = handle_input

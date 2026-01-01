@@ -38,7 +38,7 @@ iobject :: struct {
     vtable: ^iobject_vtable,
 }
 
-__matrix_in :: struct {
+@private __matrix_in :: struct {
     mat: linalg.Matrix,
     mat_uniform:buffer_resource,
     check_init: mem.ICheckInit,

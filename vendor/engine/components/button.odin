@@ -98,7 +98,7 @@ _super_button_touch_move :: proc (self:^__button, touchPos:linalg.PointF, touchI
     }
 }
 
-__button :: struct {
+@private __button :: struct {
     using _:iobject,
     area:linalg.AreaF,
     state : button_state,

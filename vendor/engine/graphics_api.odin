@@ -205,7 +205,7 @@ texture :: struct {
 // System State
 program_start := true
 loop_start := false
-__exiting := false
+@private __exiting := false
 max_frame: f64
 delta_time: u64
 processor_core_len: int
@@ -240,7 +240,7 @@ linear_sampler: vk.Sampler
 nearest_sampler: vk.Sampler
 
 // Default Color Transform
-__def_color_transform: color_transform
+@private __def_color_transform: color_transform
 
 
 
