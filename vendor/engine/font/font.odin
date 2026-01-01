@@ -458,11 +458,11 @@ allocator : runtime.Allocator) -> (rect:linalg.RectF, err:geometry.shape_error =
                 }
 
                 rawP : ^geometry.raw_shape
-                rawP , shapeErr = geometry.shapes_compute_polygon(&poly)//높은 부하 작업 High load operations
+                rawP , shapeErr = geometry.shapes_compute_polygon(&poly, self.allocator)//높은 부하 작업 High load operations
                 if shapeErr != .None do return
 
                 defer if shapeErr != .None {
-                    geometry.raw_shape_free(rawP)
+                    geometry.raw_shape_free(rawP, self.allocator)
                 }
                 if len(rawP.vertices) > 0 {
                     maxP :linalg.PointF = {min(f32), min(f32)}
