@@ -433,3 +433,7 @@ Area_PointIn :: #force_inline proc "contextless" (area:Area($T), pt:[2]T) -> boo
 	}
 	return false
 }
+
+xy_mirror_point :: #force_inline proc "contextless" (pivot : [2]$T, target : [2]T) -> [2]T where intrinsics.type_is_float(T) {
+	return [2]T{2,2} * pivot - target
+}

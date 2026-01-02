@@ -271,10 +271,10 @@ allocator : runtime.Allocator) -> (rect:linalg.RectF, err:geometry.shape_error =
         data.pen = linalg.PointF{f32(to.x) / (64 * data.scale), f32(to.y) / (64 * data.scale)}
 
         if data.idx > 0 {
-            data.polygon.nPolys[data.nPoly] = data.nPolyLen
+            data.polygon.n_polys[data.nPoly] = data.nPolyLen
             data.nPoly += 1
-            data.polygon.nTypes[data.nTypes] = data.nTypesLen
-            data.nTypes += 1
+            data.polygon.n_types[data.n_types] = data.nTypesLen
+            data.n_types += 1
             data.nPolyLen = 0
             data.nTypesLen = 0
         }
@@ -331,7 +331,7 @@ allocator : runtime.Allocator) -> (rect:linalg.RectF, err:geometry.shape_error =
         idx : u32,
         nPoly : u32,
         nPolyLen : u32,
-        nTypes : u32,
+        n_types : u32,
         nTypesLen : u32,
         typeIdx : u32,
         scale : f32,
@@ -383,8 +383,8 @@ allocator : runtime.Allocator) -> (rect:linalg.RectF, err:geometry.shape_error =
             }
         
             poly : geometry.shapes = {
-                nPolys = mem.make_non_zeroed([]u32, self.face.glyph.outline.n_contours, context.temp_allocator),//갯수는 후에 RESIZE 처리
-                nTypes = mem.make_non_zeroed([]u32, self.face.glyph.outline.n_contours, context.temp_allocator),
+                n_polys = mem.make_non_zeroed([]u32, self.face.glyph.outline.n_contours, context.temp_allocator),//갯수는 후에 RESIZE 처리
+                n_types = mem.make_non_zeroed([]u32, self.face.glyph.outline.n_contours, context.temp_allocator),
                 types = mem.make_non_zeroed([]geometry.curve_type, self.face.glyph.outline.n_points * 3, context.temp_allocator),
                 poly = mem.make_non_zeroed([]linalg.PointF, self.face.glyph.outline.n_points * 3, context.temp_allocator),
             }
@@ -397,8 +397,8 @@ allocator : runtime.Allocator) -> (rect:linalg.RectF, err:geometry.shape_error =
             }
 
             defer {
-                delete(poly.nPolys, context.temp_allocator)
-                delete(poly.nTypes, context.temp_allocator)
+                delete(poly.n_polys, context.temp_allocator)
+                delete(poly.n_types, context.temp_allocator)
                 delete(poly.types, context.temp_allocator)
                 delete(poly.poly, context.temp_allocator)
                 if poly.strokeColors != nil {
@@ -436,8 +436,8 @@ allocator : runtime.Allocator) -> (rect:linalg.RectF, err:geometry.shape_error =
                 sync.mutex_unlock(&self.mutex)// else 부분은 mutex 해제 후 작업 후 다시 잠금
                 defer sync.mutex_lock(&self.mutex)
                
-                poly.nPolys[data.nPoly] = data.nPolyLen
-                poly.nTypes[data.nTypes] = data.nTypesLen
+                poly.n_polys[data.nPoly] = data.nPolyLen
+                poly.n_types[data.n_types] = data.nTypesLen
                 poly.poly = mem.resize_non_zeroed_slice(poly.poly, data.idx, context.temp_allocator)
                 poly.types = mem.resize_non_zeroed_slice(poly.types, data.typeIdx, context.temp_allocator)
                 if thickness > 0.0 {
