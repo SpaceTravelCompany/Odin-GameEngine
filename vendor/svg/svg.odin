@@ -608,33 +608,55 @@ init_parse :: proc(svg_data: []u8, allocator: mem.Allocator = context.allocator)
 	}
 	parser.shapes = geometry.shapes{}
 
-	if len(shapes_.polys) > 0 {
-		parser.shapes.poly = mem.make_non_zeroed([]linalg.PointF, len(shapes_.polys), allocator)
-		mem.copy_non_overlapping(&parser.shapes.poly[0], &shapes_.polys[0], len(shapes_.polys) * size_of(linalg.PointF))
-	}
-	if len(shapes_.n_polys) > 0 {
-		parser.shapes.n_polys = mem.make_non_zeroed([]u32, len(shapes_.n_polys), allocator)
-		mem.copy_non_overlapping(&parser.shapes.n_polys[0], &shapes_.n_polys[0], len(shapes_.n_polys) * size_of(u32))
-	}
-	if len(shapes_.n_types) > 0 {
-		parser.shapes.n_types = mem.make_non_zeroed([]u32, len(shapes_.n_types), allocator)
-		mem.copy_non_overlapping(&parser.shapes.n_types[0], &shapes_.n_types[0], len(shapes_.n_types) * size_of(u32))
-	}
-	if len(shapes_.types) > 0 {
-		parser.shapes.types = mem.make_non_zeroed([]geometry.curve_type, len(shapes_.types), allocator)
-		mem.copy_non_overlapping(&parser.shapes.types[0], &shapes_.types[0], len(shapes_.types) * size_of(geometry.curve_type))
-	}
+	empty_color := true
 	if len(shapes_.colors) > 0 {
-		parser.shapes.colors = mem.make_non_zeroed([]linalg.Point3DwF, len(shapes_.colors), allocator)
-		mem.copy_non_overlapping(&parser.shapes.colors[0], &shapes_.colors[0], len(shapes_.colors) * size_of(linalg.Point3DwF))
+		for c in shapes_.colors {
+			if c.a > 0.0 {
+				empty_color = false
+				break
+			}
+		}
+		if !empty_color {
+			parser.shapes.colors = mem.make_non_zeroed([]linalg.Point3DwF, len(shapes_.colors), allocator)
+			mem.copy_non_overlapping(&parser.shapes.colors[0], &shapes_.colors[0], len(shapes_.colors) * size_of(linalg.Point3DwF))
+		}
 	}
-	if len(shapes_.strokeColors) > 0 {
+	
+	empty_stroke := true
+	if len(shapes_.thickness) > 0 {
+		for t in shapes_.thickness {
+			if t > 0.0 {
+				empty_stroke = false
+				break
+			}
+		}
+		if !empty_stroke {
+			parser.shapes.thickness = mem.make_non_zeroed([]f32, len(shapes_.thickness), allocator)
+			mem.copy_non_overlapping(&parser.shapes.thickness[0], &shapes_.thickness[0], len(shapes_.thickness) * size_of(f32))
+		}
+	}
+	if !empty_stroke &&len(shapes_.strokeColors) > 0 {
 		parser.shapes.strokeColors = mem.make_non_zeroed([]linalg.Point3DwF, len(shapes_.strokeColors), allocator)
 		mem.copy_non_overlapping(&parser.shapes.strokeColors[0], &shapes_.strokeColors[0], len(shapes_.strokeColors) * size_of(linalg.Point3DwF))
 	}
-	if len(shapes_.thickness) > 0 {
-		parser.shapes.thickness = mem.make_non_zeroed([]f32, len(shapes_.thickness), allocator)
-		mem.copy_non_overlapping(&parser.shapes.thickness[0], &shapes_.thickness[0], len(shapes_.thickness) * size_of(f32))
+
+	if !empty_color || !empty_stroke {
+		if len(shapes_.polys) > 0 {
+			parser.shapes.poly = mem.make_non_zeroed([]linalg.PointF, len(shapes_.polys), allocator)
+			mem.copy_non_overlapping(&parser.shapes.poly[0], &shapes_.polys[0], len(shapes_.polys) * size_of(linalg.PointF))
+		}
+		if len(shapes_.n_polys) > 0 {
+			parser.shapes.n_polys = mem.make_non_zeroed([]u32, len(shapes_.n_polys), allocator)
+			mem.copy_non_overlapping(&parser.shapes.n_polys[0], &shapes_.n_polys[0], len(shapes_.n_polys) * size_of(u32))
+		}
+		if len(shapes_.n_types) > 0 {
+			parser.shapes.n_types = mem.make_non_zeroed([]u32, len(shapes_.n_types), allocator)
+			mem.copy_non_overlapping(&parser.shapes.n_types[0], &shapes_.n_types[0], len(shapes_.n_types) * size_of(u32))
+		}
+		if len(shapes_.types) > 0 {
+			parser.shapes.types = mem.make_non_zeroed([]geometry.curve_type, len(shapes_.types), allocator)
+			mem.copy_non_overlapping(&parser.shapes.types[0], &shapes_.types[0], len(shapes_.types) * size_of(geometry.curve_type))
+		}
 	}
 	return parser, nil
 }
