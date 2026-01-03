@@ -18,6 +18,7 @@ foreign import freetype {
     "../compress/brotli" + brotli.BROTLI_ENC_LIB,
     "../compress/brotli" + brotli.BROTLI_COMMON_LIB,
     "../compress/bzip2" + bzip2.BZIP2_LIB,
+    "system:z",
 }
 
 Library       :: distinct rawptr
