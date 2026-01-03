@@ -2017,8 +2017,30 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 
 		// Disallow on wasm
 		bc->use_separate_modules = false;
-	} if(bc->metrics.arch == TargetArch_riscv64 && bc->cross_compiling) {
-		bc->link_flags = str_lit("-target riscv64 ");
+	}
+	//edited (xfitgd) : add cross-compilation support for linux !need vendor library for cross-compilation
+	if(bc->cross_compiling && bc->metrics.os == TargetOs_linux && subtarget == Subtarget_Default) {
+		switch (bc->metrics.arch) {
+		case TargetArch_riscv64:
+			bc->link_flags = str_lit("--target=riscv64-linux-gnu ");
+			break;
+		case TargetArch_arm64:
+			bc->link_flags = str_lit("--target=aarch64-linux-gnu ");
+			break;
+		case TargetArch_amd64:
+			bc->link_flags = str_lit("--target=x86_64-linux-gnu ");
+			break;
+		case TargetArch_i386:
+			bc->link_flags = str_lit("--target=i386-linux-gnu ");
+			break;
+		//case TargetArch_arm32: !not now
+		}
+	} else if(bc->cross_compiling && bc->metrics.os == TargetOs_darwin) {
+		switch (bc->metrics.arch) {
+		case TargetArch_riscv64:
+			bc->link_flags = str_lit("-target riscv64 ");
+			break;
+		}
 	} else {
 		// NOTE: for targets other than darwin, we don't specify a `-target` link flag.
 		// This is because we don't support cross-linking and clang is better at figuring

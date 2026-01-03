@@ -34,6 +34,17 @@
 				"resource": {
 					"type": "string",
 					"description": "Windows resource file path"
+				},
+				"target-arch": {
+					"type": "string",
+					"enum": [
+						"native",
+						"arm64",
+						"riscv64",
+						"amd64",
+						"i386"
+					],
+					"description": "Target architecture for cross-compilation (only supported for linux)"
 				}
 			},
 			"required": ["main-package", "out-path", "build-type"]

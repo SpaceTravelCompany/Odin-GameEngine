@@ -185,6 +185,26 @@ main :: proc() {
 			os2.remove("test.apk.idsig")
 		}	
 	} else {
+		target_arch :string = ""
+		if "target-arch" in setting && ODIN_OS == .Linux {
+			target_arch_str := setting["target-arch"].(json.String)
+			switch target_arch_str {
+			case "arm64":
+				target_arch = "-target:linux_arm64"
+			case "amd64":
+				target_arch = "-target:linux_amd64"
+			case "i386":
+				target_arch = "-target:linux_i386"
+			case "riscv64":
+				target_arch = "-target:linux_riscv64"
+			case "native":
+				target_arch = ""
+			case :
+				fmt.eprintln("Unsupported target architecture : ", target_arch_str)
+				return
+			}
+		}
+
 		when ODIN_OS == .Windows {
 			out_path := strings.join({"-out:", setting["out-path"].(json.String), ".exe"}, "")
 		} else {
@@ -208,7 +228,8 @@ main :: proc() {
 		setting["main-package"].(json.String), 
 		"-no-bounds-check" if !debug else ({}),
 		out_path, 
-		o, 
+		o,
+		target_arch if target_arch != "" else ({}),
 		"-debug" if debug else ({}),
 		//"-show-debug-messages",//!for debug
 		resource.? if resource != nil else ({}),

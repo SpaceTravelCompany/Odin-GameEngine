@@ -2,13 +2,13 @@
     "$schema": "https://raw.githubusercontent.com/xfitgd/Odin-GameEngine/master/build_tool.schema.json",
     "setting" : {
         "is-android" : false,
-        "main-package" : "vulkanexample",
+        "main-package" : "example",
         "out-path" : "bin/test",
         "build-type" : "minimal"
     },
     "android-paths" : {
         "ndk" : "/usr/local/Android/ndk/29.0.14206865",
         "sdk" : "/usr/local/Android",
-        "platform-version" : "35"
+        "platform-version" : "36"
     }
 }
