@@ -151,8 +151,23 @@ LPCOLESTR  :: LPCSTR
 LPFILETIME :: ^FILETIME
 LPWSABUF   :: ^WSABUF
 
-LPWSAOVERLAPPED :: distinct rawptr
-LPWSAOVERLAPPED_COMPLETION_ROUTINE :: distinct rawptr
+WSAEVENT :: HANDLE
+
+WSAOVERLAPPED :: struct {
+	Internal:     DWORD,
+	InternalHigh: DWORD,
+	Offset:       DWORD,
+	OffsetHigh:   DWORD,
+	hEvent:       WSAEVENT,
+}
+
+LPWSAOVERLAPPED :: ^WSAOVERLAPPED
+LPWSAOVERLAPPED_COMPLETION_ROUTINE :: #type proc "system" (
+	dwError:       DWORD,
+	cbTransferred: DWORD,
+	lpOverlapped:  LPWSAOVERLAPPED,
+	dwFlags:       DWORD,
+)
 
 LPCVOID :: rawptr
 SCODE   :: LONG
