@@ -131,7 +131,7 @@ foreign lua {
 	luaL_loadstring :: proc (L: ^lua_State , s: cstring) -> c.int ---;
 	luaL_newmetatable :: proc (L: ^lua_State , tname: cstring) -> c.int ---;
 	luaL_newstate :: proc () -> ^lua_State ---;
-	luaL_openlibs :: proc (L: ^lua_State) ---;
+	luaL_openselectedlibs :: proc (L: ^lua_State, load:c.int, preload:c.int) ---;
 	luaL_optinteger :: proc (L: ^lua_State , arg: c.int,def: lua_Integer ) -> lua_Integer ---;
 	luaL_optlstring :: proc (L: ^lua_State , arg: c.int , def: cstring, l: ^c.ptrdiff_t) -> cstring ---;
 	luaL_optnumber :: proc (L: ^lua_State , arg: c.int , def:lua_Number) -> lua_Number ---;
@@ -145,17 +145,21 @@ foreign lua {
 	luaL_where :: proc (L: ^lua_State , lvl: c.int ) ---;
 }
 
+luaL_openlibs :: proc "contextless" (L: ^lua_State) {
+	luaL_openselectedlibs(L, ~c.int(0), 0)
+}
+
 /*
 	CONSTANTS
 */
 LUA_VERSION_MAJOR ::	"5";
-LUA_VERSION_MINOR ::	"3";
-LUA_VERSION_NUM ::		503;
-LUA_VERSION_RELEASE ::	"5";
+LUA_VERSION_MINOR ::	"5";
+LUA_VERSION_NUM ::		550;
+LUA_VERSION_RELEASE ::	"0";
 
 LUA_VERSION ::	"Lua " + LUA_VERSION_MAJOR + "." + LUA_VERSION_MINOR;
 LUA_RELEASE ::	LUA_VERSION + "." + LUA_VERSION_RELEASE;
-LUA_COPYRIGHT ::	LUA_RELEASE + "  Copyright (C) 1994-2018 Lua.org, PUC-Rio";
+LUA_COPYRIGHT ::	LUA_RELEASE + "  Copyright (C) 1994-2025 Lua.org, PUC-Rio";
 LUA_AUTHORS ::	"R. Ierusalimschy, L. H. de Figueiredo, W. Celes";
 
 LUA_SIGNATURE :: "\x1bLua";
