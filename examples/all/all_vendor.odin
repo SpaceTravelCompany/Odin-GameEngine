@@ -9,6 +9,17 @@ package all
 @(require) import "vendor:glfw"
 //@(require) import "vendor:microui"
 @(require) import "vendor:miniaudio"
+@(require) import "vendor:compress/lz4"
+@(require) import "vendor:compress/brotli"
+@(require) import "vendor:compress/bzip2"
+@(require) import "vendor:freetype"
+@(require) import "vendor:opus"
+@(require) import "vendor:opusfile"
+@(require) import "vendor:vorbis"
+@(require) import "vendor:vorbisfile"
+@(require) import "vendor:ogg"
+@(require) import "vendor:webp"
+
 //@(require) import "vendor:portmidi"
 // @(require) import "vendor:raylib"
 // @(require) import "vendor:zlib"
@@ -41,7 +52,7 @@ package all
 @(require) import "vendor:directx/d3d11"
 @(require) import "vendor:directx/d3d12"
 @(require) import "vendor:directx/dxgi"
-// @(require) import "vendor:commonmark"
+@(require) import "vendor:commonmark"
 
 // @(require) import "vendor:stb/easy_font"
 // @(require) import stbi "vendor:stb/image"
@@ -49,7 +60,7 @@ package all
 // @(require) import "vendor:stb/truetype"
 // @(require) import "vendor:stb/vorbis"
 
-@(require) import "vendor:shaderc"
+@(require) import "vendor:glslang"
 @(require) import "vendor:gltf2"
 
 //engine

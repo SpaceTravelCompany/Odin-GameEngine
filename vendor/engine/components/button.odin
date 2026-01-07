@@ -2,7 +2,7 @@ package components
 
 import "core:math/linalg"
 import "core:mem"
-import sys "../sys"
+import engine ".."
 import vk "vendor:vulkan"
 
 // ============================================================================
@@ -16,9 +16,9 @@ button_state :: enum {
 
 image_button :: struct {
     using _:__button,
-    up_texture:^texture,
-    over_texture:^texture,
-    down_texture:^texture,
+    up_texture:^engine.texture,
+    over_texture:^engine.texture,
+    down_texture:^engine.texture,
 }
 
 _super_button_up :: proc (self:^__button, mousePos:linalg.PointF) {
@@ -99,7 +99,7 @@ _super_button_touch_move :: proc (self:^__button, touchPos:linalg.PointF, touchI
 }
 
 @private __button :: struct {
-    using _:iobject,
+    using _:engine.iobject,
     area:linalg.AreaF,
     state : button_state,
     touchIdx:Maybe(u8),
@@ -120,7 +120,7 @@ shape_button :: struct {
 }
 
 button_vtable :: struct {
-    using _: iobject_vtable,
+    using _: engine.iobject_vtable,
     button_up: proc (self:^__button, mousePos:linalg.PointF),
     button_down: proc (self:^__button, mousePos:linalg.PointF),
     button_move: proc (self:^__button, mousePos:linalg.PointF),
@@ -139,12 +139,12 @@ button_vtable :: struct {
 }
 
 _super_image_button_deinit :: proc(self:^image_button) {
-    _super_iobject_deinit(auto_cast self)
+    engine._super_iobject_deinit(auto_cast self)
 }
 
-_super_image_button_draw :: proc (self:^image_button, cmd:command_buffer) {
+_super_image_button_draw :: proc (self:^image_button, cmd:engine.command_buffer) {
     mem.ICheckInit_Check(&self.check_init)
-    texture :^texture
+    texture :^engine.texture
 
     switch self.state {
         case .UP:texture = self.up_texture
@@ -152,17 +152,17 @@ _super_image_button_draw :: proc (self:^image_button, cmd:command_buffer) {
         case .DOWN:texture = self.down_texture
     }
     when ODIN_DEBUG {
-        if texture == nil do panic_contextless("texture: uninitialized")
+        if texture == nil do panic_contextless("engine.texture: uninitialized")
         mem.ICheckInit_Check(&texture.check_init)
     }
 
-    _image_binding_sets_and_draw(cmd, self.set, texture.set)
+    engine.image_binding_sets_and_draw(cmd, self.set, texture.set)
 }
 
 image_button_init :: proc(self:^image_button, $actualType:typeid, pos:linalg.Point3DF,
-camera:^camera, projection:^projection,
-rotation:f32 = 0.0, scale:linalg.PointF = {1,1}, colorTransform:^color_transform = nil, pivot:linalg.PointF = {0.0, 0.0},
-up:^texture = nil, over:^texture = nil, down:^texture = nil, vtable:^button_vtable = nil) where intrinsics.type_is_subtype_of(actualType, image_button) {
+camera:^engine.camera, projection:^engine.projection,
+rotation:f32 = 0.0, scale:linalg.PointF = {1,1}, colorTransform:^engine.color_transform = nil, pivot:linalg.PointF = {0.0, 0.0},
+up:^engine.texture = nil, over:^engine.texture = nil, down:^engine.texture = nil, vtable:^button_vtable = nil) where intrinsics.type_is_subtype_of(actualType, image_button) {
     self.up_texture = up
     self.over_texture = over
     self.down_texture = down

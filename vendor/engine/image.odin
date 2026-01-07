@@ -160,10 +160,10 @@ _super_image_draw :: proc (self:^image, cmd:command_buffer) {
     mem.ICheckInit_Check(&self.check_init)
     mem.ICheckInit_Check(&self.src.check_init)
 
-   _image_BindingSetsAndDraw(cmd, self.set, self.src.set)
+   image_binding_sets_and_draw(cmd, self.set, self.src.set)
 }
 
-_image_BindingSetsAndDraw :: proc "contextless" (cmd:command_buffer, imageSet:descriptor_set, textureSet:descriptor_set) {
+image_binding_sets_and_draw :: proc "contextless" (cmd:command_buffer, imageSet:descriptor_set, textureSet:descriptor_set) {
     graphics_cmd_bind_pipeline(cmd, .GRAPHICS, tex_pipeline)
     graphics_cmd_bind_descriptor_sets(cmd, .GRAPHICS, tex_pipeline_layout, 0, 2,
         &([]vk.DescriptorSet{imageSet.__set, textureSet.__set})[0], 0, nil)
