@@ -24,6 +24,7 @@ enum TargetOsKind : u16 {
 	
 	TargetOs_wasi,
 	TargetOs_js,
+	TargetOs_orca,//Dummy
 
 	TargetOs_freestanding,
 

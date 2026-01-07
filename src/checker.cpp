@@ -1166,6 +1166,7 @@ gb_internal void init_universal(void) {
 			{"NetBSD",       TargetOs_netbsd},
 			{"WASI",         TargetOs_wasi},
 			{"JS",           TargetOs_js},
+			{"Orca",         TargetOs_orca},//Dummy
 			{"Freestanding", TargetOs_freestanding},
 		};
 

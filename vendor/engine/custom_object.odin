@@ -3,6 +3,7 @@ package engine
 
 import "base:intrinsics"
 import "base:runtime"
+import "core:c"
 import "core:debug/trace"
 import "core:fmt"
 import "core:math"
@@ -13,7 +14,7 @@ import "core:slice"
 import "core:sync"
 import "core:thread"
 import vk "vendor:vulkan"
-import "vendor:shaderc"
+import "vendor:glslang"
 
 
 // ============================================================================
@@ -62,8 +63,6 @@ custom_object :: struct {
 // Shader and Descriptor Types
 // ============================================================================
 
-shader_optimization_level :: shaderc.optimizationLevel
-
 descriptor_set_layout_binding :: vk.DescriptorSetLayoutBinding
 vertex_input_binding_description :: vk.VertexInputBindingDescription
 vertex_input_attribute_description :: vk.VertexInputAttributeDescription
@@ -72,7 +71,6 @@ shader_code :: struct {
     code : shader_code_fmt,
     entry_point : cstring,
     input_file_name : cstring,
-    optimize:shader_optimization_level,
 }
 
 shader_code_fmt :: union {
@@ -142,9 +140,9 @@ custom_object_pipeline_init :: proc(self:^custom_object_pipeline,
     }
 
     shaders := [?]Maybe(shader_code){vertex_shader, pixel_shader, geometry_shader}
-    shader_kinds := [?]shaderc.shaderKind{.VertexShader, .FragmentShader, .GeometryShader}
+    shader_kinds := [?]glslang.Shader_Stage{.VERTEX, .FRAGMENT, .GEOMETRY}
     shader_vkflags := [?]vk.ShaderStageFlags{{.VERTEX}, {.FRAGMENT}, {.GEOMETRY}}
-    shader_res : [len(shaders)]shaderc.compilationResultT
+    shader_programs : [len(shaders)]^glslang.Program
     shader_modules : [len(shaders)]vk.ShaderModule
     defer {
         for s in shader_modules {
@@ -157,45 +155,125 @@ custom_object_pipeline_init :: proc(self:^custom_object_pipeline,
     if vertex_shader == nil || pixel_shader == nil {
         trace.panic_log("custom_object_pipeline_init: vertex_shader and pixel_shader cannot be nil")
     }
-    defer #unroll for i in 0..<len(shader_res) {
-        if shader_res[i] != nil {
-            shaderc.result_release(shader_res[i])
+    
+    //!NEED TEST
+    // glslang 초기화 (한 번만 호출)
+    if glslang.initialize_process() == 0 {
+        trace.printlnLog("custom_object_pipeline_init: glslang initialization failed")
+        return false
+    }
+    defer glslang.finalize_process()
+    
+    defer for i in 0..<len(shader_programs) {
+        if shader_programs[i] != nil {
+            glslang.program_delete(shader_programs[i])
         }
     }
-    #unroll for i in 0..<len(shaders) {
+    for i in 0..<len(shaders) {
         shader_bytes:[]byte
         if shaders[i] != nil {
             switch s in shaders[i].?.code {
                 case cstring:
-                    shader_compiler := shaderc.compiler_initialize()
-                    shader_compiler_options := shaderc.compile_options_initialize()
-                    if shader_lang == .HLSL {
-                        shaderc.compile_options_set_source_language(shader_compiler_options, .Hlsl)
+                    // Input 구조체 설정
+                    input := glslang.Input{
+                        language = shader_lang == .HLSL ? glslang.Source.HLSL : glslang.Source.GLSL,
+                        stage = shader_kinds[i],
+                        client = glslang.Client.VULKAN,
+                        client_version = glslang.Target_Client_Version.VULKAN_1_2,
+                        target_language = glslang.Target_Language.SPV,
+                        target_language_version = glslang.Target_Language_Version.SPV_1_5,
+                        code = s,
+                        default_version = 100,
+                        default_profile = glslang.Profile.NO_PROFILE,
+                        force_default_version_and_profile = 0,
+                        forward_compatible = 0,
+                        messages = glslang.Messages.DEFAULT_BIT,
+                        resource = glslang.default_resource(),
+                        callbacks = {},
+                        callbacks_ctx = nil,
                     }
-                    if shaders[i].?.optimize != .Zero {
-                        shaderc.compile_options_set_optimization_level(shader_compiler_options, shaders[i].?.optimize)
-                    }
-                    defer shaderc.compile_options_release(shader_compiler_options)
-                    defer shaderc.compiler_release(shader_compiler)
                     
-                    result := shaderc.compile_into_spv(
-                        shader_compiler,
-                        s,
-                        len(s),
-                        shader_kinds[i],
-                        shaders[i].?.input_file_name,
-                        shaders[i].?.entry_point,
-                        shader_compiler_options,
-                    )
-                    if (shaderc.result_get_compilation_status(result) != shaderc.compilationStatus.Success) {
-                        trace.printlnLog(shaderc.result_get_error_message(result))
+                    // 셰이더 생성 및 파싱
+                    shader := glslang.shader_create(&input)
+                    if shader == nil {
+                        trace.printlnLog("custom_object_pipeline_init: failed to create shader")
                         return false
                     }
-
-                    lenn := shaderc.result_get_length(result)
-                    bytes := shaderc.result_get_bytes(result)
-                    shader_bytes = transmute([]byte)bytes[:lenn]
-                    shader_res[i] = result
+                    defer glslang.shader_delete(shader)
+                    
+                    // Entry point 설정
+                    if shaders[i].?.entry_point != nil {
+                        glslang.shader_set_entry_point(shader, shaders[i].?.entry_point)
+                    }
+                    
+                    // 파싱
+                    if glslang.shader_parse(shader, &input) == 0 {
+                        info_log := glslang.shader_get_info_log(shader)
+                        debug_log := glslang.shader_get_info_debug_log(shader)
+                        if info_log != nil {
+                            trace.printlnLog(info_log)
+                        }
+                        if debug_log != nil {
+                            trace.printlnLog(debug_log)
+                        }
+                        return false
+                    }
+                    
+                    // 프로그램 생성 및 링크
+                    program := glslang.program_create()
+                    if program == nil {
+                        trace.printlnLog("custom_object_pipeline_init: failed to create program")
+                        return false
+                    }
+                    glslang.program_add_shader(program, shader)
+                    
+                    link_messages := cast(c.int)(glslang.Messages.SPV_RULES_BIT) | cast(c.int)(glslang.Messages.VULKAN_RULES_BIT)
+                    if glslang.program_link(program, link_messages) == 0 {
+                        info_log := glslang.program_get_info_log(program)
+                        debug_log := glslang.program_get_info_debug_log(program)
+                        if info_log != nil {
+                            trace.printlnLog(info_log)
+                        }
+                        if debug_log != nil {
+                            trace.printlnLog(debug_log)
+                        }
+                        glslang.program_delete(program)
+                        return false
+                    }
+                    
+                    // SPIR-V 생성
+                    spv_options := glslang.SPV_Options{
+                        generate_debug_info = false,
+                        strip_debug_info = false,
+                        disable_optimizer = false,
+                        optimize_size = false,
+                        disassemble = false,
+                        validate = true,
+                        emit_nonsemantic_shader_debug_info = false,
+                        emit_nonsemantic_shader_debug_source = false,
+                        compile_only = false,
+                        optimize_allow_expanded_id_bound = false,
+                    }
+                    glslang.program_SPIRV_generate_with_options(program, shader_kinds[i], &spv_options)
+                    
+                    // SPIR-V 데이터 가져오기
+                    spirv_size := glslang.program_SPIRV_get_size(program)
+                    spirv_data, alloc_err := mem.alloc(cast(int)(size_of(u32) * spirv_size), align_of(u32), engine_def_allocator)
+                    if alloc_err != nil {
+                        trace.printlnLog("custom_object_pipeline_init: failed to allocate memory for SPIR-V")
+                        return false
+                    }
+                    defer mem.free(spirv_data, engine_def_allocator)
+                    glslang.program_SPIRV_get(program, cast(^c.uint)spirv_data)
+                    
+                    // SPIR-V 메시지 확인
+                    spirv_messages := glslang.program_SPIRV_get_messages(program)
+                    if spirv_messages != nil {
+                        trace.printlnLog(spirv_messages)
+                    }
+                    
+                    shader_bytes = transmute([]byte)(mem.slice_ptr(cast(^u32)spirv_data, cast(int)spirv_size))
+                    shader_programs[i] = program
                 case []byte:
                     shader_bytes = s
             }
