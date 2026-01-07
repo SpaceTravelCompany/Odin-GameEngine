@@ -12,14 +12,26 @@ when FREETYPE_SHARED {
 
 LIB :: library.LIBPATH + "/libfreetype" + library.ARCH_end
 
-foreign import freetype {
-    LIB,
-    "../compress/brotli" + brotli.BROTLI_DEC_LIB,
-    "../compress/brotli" + brotli.BROTLI_ENC_LIB,
-    "../compress/brotli" + brotli.BROTLI_COMMON_LIB,
-    "../compress/bzip2" + bzip2.BZIP2_LIB,
-    "system:z",
+when ODIN_OS == .Windows && !library.is_android {
+    foreign import freetype {
+        LIB,
+        "../compress/brotli" + brotli.BROTLI_DEC_LIB,
+        "../compress/brotli" + brotli.BROTLI_ENC_LIB,
+        "../compress/brotli" + brotli.BROTLI_COMMON_LIB,
+        "../compress/bzip2" + bzip2.BZIP2_LIB,
+
+    }
+} else {
+    foreign import freetype {
+        LIB,
+        "../compress/brotli" + brotli.BROTLI_DEC_LIB,
+        "../compress/brotli" + brotli.BROTLI_ENC_LIB,
+        "../compress/brotli" + brotli.BROTLI_COMMON_LIB,
+        "../compress/bzip2" + bzip2.BZIP2_LIB,
+        "system:z",
+    }
 }
+
 
 Library       :: distinct rawptr
 
