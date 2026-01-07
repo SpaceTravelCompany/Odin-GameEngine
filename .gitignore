@@ -298,6 +298,7 @@ build.sh
 tests/issues/build/*
 misc/featuregen/featuregen
 
+odin-doc
 ols
 build_tool
 
