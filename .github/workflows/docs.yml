@@ -60,9 +60,9 @@ jobs:
           # Generate the .odin-doc file.
           odin doc examples/all -all-packages -doc-format -out:all.odin-doc
 
+          mkdir docs
           cd docs
-
-          rm -rf *
+          # rm -rf *
 
           cp -r ../docs-resources .
 
