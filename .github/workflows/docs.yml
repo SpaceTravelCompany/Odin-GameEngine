@@ -38,9 +38,10 @@ jobs:
           sudo ln -sf /usr/bin/clang-20 /usr/bin/clang
           sudo ln -sf /usr/bin/clang++-20 /usr/bin/clang++
           make release
+          make tool
           echo "${{ github.workspace }}" >> $GITHUB_PATH
 
-      - name: Get commonmark
+      - name: Get Packages
         run: sudo apt-get install libcmark-dev
 
       - name: Get and build Odin docs generator
@@ -51,7 +52,7 @@ jobs:
           odin build . -out:odin-doc
           cp ./odin-doc ..
           cd ..
-
+          build_tool -s # build shaders only
 
       - name: Generate documentation
         run: |

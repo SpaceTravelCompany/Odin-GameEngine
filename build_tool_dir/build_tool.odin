@@ -38,6 +38,12 @@ riscv64-linux-gnu
 
 
 main :: proc() {
+	//shader compile only
+	if os2.args[1] == "-s" || os2.args[1] == "--shader" {
+		findGLSLFileAndRunCmd()
+		return
+	}
+
 	//fmt.println(os.args)
 	json_data:json.Value
 	ok :bool
