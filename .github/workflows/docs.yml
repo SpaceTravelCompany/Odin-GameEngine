@@ -64,10 +64,13 @@ jobs:
           cd docs
           # rm -rf *
 
-          cp -r ../docs-resources/* .
+          mkdir resources
+          cp -r ../docs-resources/* resources
 
           # Generate the website using the .odin-doc and the custom configuration.
-          odin-doc ../all.odin-doc odin-doc.json
+          odin-doc ../all.odin-doc resources/odin-doc.json
+
+          rm -rf resources
 
           # A requirement for GitHub pages with custom domains.
           # echo "your-custom-domain.example.com" > CNAME
