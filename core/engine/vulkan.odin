@@ -14,7 +14,7 @@ import "core:strings"
 import "core:sync"
 import "core:sys/windows"
 import "core:thread"
-import "vendor:engine/geometry"
+import "core:engine/geometry"
 import vk "vendor:vulkan"
 import "vendor:glfw"
 
@@ -184,13 +184,13 @@ vkNoBlending := vk.PipelineColorBlendStateCreateInfoInit(__vkNoBlendingState[:1]
 vkCopyBlending := vk.PipelineColorBlendStateCreateInfoInit(__vkNoBlendingState[:1])
 
 vk_init_shader_modules :: proc() {
-	vkShapeVertShader = vk.CreateShaderModule2(graphics_device, #load("shaders/shape.vert.spv"))
-	vkShapeFragShader = vk.CreateShaderModule2(graphics_device, #load("shaders/shape.frag.spv"))
-	when wire_mode do vkShapeWireFragShader = vk.CreateShaderModule2(graphics_device, #load("shaders/shape_wire.frag.spv"))
-	vkTexVertShader = vk.CreateShaderModule2(graphics_device, #load("shaders/tex.vert.spv"))
-	vkTexFragShader = vk.CreateShaderModule2(graphics_device, #load("shaders/tex.frag.spv"))
-	vkAnimateTexVertShader = vk.CreateShaderModule2(graphics_device, #load("shaders/animate_tex.vert.spv"))
-	vkAnimateTexFragShader = vk.CreateShaderModule2(graphics_device, #load("shaders/animate_tex.frag.spv"))
+	vkShapeVertShader = vk.CreateShaderModule2(graphics_device, #load("shaders/shape.vert.spv") or_else trace.panic_log("vkShapeVertShader load failed"))
+	vkShapeFragShader = vk.CreateShaderModule2(graphics_device, #load("shaders/shape.frag.spv") or_else trace.panic_log("vkShapeFragShader load failed"))
+	when wire_mode do vkShapeWireFragShader = vk.CreateShaderModule2(graphics_device, #load("shaders/shape_wire.frag.spv") or_else trace.panic_log("vkShapeWireFragShader load failed"))
+	vkTexVertShader = vk.CreateShaderModule2(graphics_device, #load("shaders/tex.vert.spv") or_else trace.panic_log("vkTexVertShader load failed"))
+	vkTexFragShader = vk.CreateShaderModule2(graphics_device, #load("shaders/tex.frag.spv") or_else trace.panic_log("vkTexFragShader load failed"))
+	vkAnimateTexVertShader = vk.CreateShaderModule2(graphics_device, #load("shaders/animate_tex.vert.spv") or_else trace.panic_log("vkAnimateTexVertShader load failed"))
+	vkAnimateTexFragShader = vk.CreateShaderModule2(graphics_device, #load("shaders/animate_tex.frag.spv") or_else trace.panic_log("vkAnimateTexFragShader load failed"))
 	//vkCopyScreenVertShader = vk.CreateShaderModule2(graphics_device, #load("shaders/screen_copy.vert.spv"))
 	//vkCopyScreenFragShader = vk.CreateShaderModule2(graphics_device, #load("shaders/screen_copy.frag.spv"))
 

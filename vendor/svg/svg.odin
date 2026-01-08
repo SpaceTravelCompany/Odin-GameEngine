@@ -12,7 +12,7 @@ import "core:fmt"
 import "core:slice"
 import "core:unicode"
 import "base:intrinsics"
-import "vendor:engine/geometry"
+import "core:engine/geometry"
 
 SVG :: struct {
 	width:  string,

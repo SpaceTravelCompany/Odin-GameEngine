@@ -11,7 +11,7 @@ import "core:slice"
 import "core:sync"
 import "core:unicode"
 import "core:unicode/utf8"
-import "vendor:engine/geometry"
+import "core:engine/geometry"
 import "vendor:freetype"
 import "../"
 

@@ -252,7 +252,9 @@ main :: proc() {
 }
 
 findGLSLFileAndRunCmd :: proc() -> bool {
-	dir, err := os2.open(filepath.join({ODIN_ROOT, "vendor/engine/shaders"}, context.temp_allocator))
+	SHADER_DIR :: "core/engine/shaders/"
+
+	dir, err := os2.open(filepath.join({ODIN_ROOT, SHADER_DIR}, context.temp_allocator))
 	if err != nil {
 		fmt.panicf("findGLSLFiles open ERR : %s", err)
 	}
@@ -278,8 +280,8 @@ findGLSLFileAndRunCmd :: proc() -> bool {
 
 		for vExt in glslExts {
 			if strings.compare(ext, vExt) == 0 {
-				spvFile := strings.join({ODIN_ROOT, "vendor/engine/shaders/", file.name, ".spv"}, "")
-				glslFile := strings.join({ODIN_ROOT, "vendor/engine/shaders/", file.name}, "")
+				spvFile := strings.join({ODIN_ROOT, SHADER_DIR, file.name, ".spv"}, "")
+				glslFile := strings.join({ODIN_ROOT, SHADER_DIR, file.name}, "")
 				defer delete(spvFile)
 				defer delete(glslFile)
 

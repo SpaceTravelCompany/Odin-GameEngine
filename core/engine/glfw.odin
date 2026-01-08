@@ -1,3 +1,4 @@
+#+private
 package engine
 
 import "base:intrinsics"

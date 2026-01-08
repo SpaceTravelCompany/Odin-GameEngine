@@ -158,5 +158,15 @@ package all
 @(require) import poly2tri "core:math/poly2tri"
 @(require) import collision "core:math/collision"
 
+//engine
+
+@(require) import engine "core:engine"
+@(require) import components "core:engine/components"
+@(require) import font "core:engine/font"
+@(require) import gui "core:engine/gui"
+@(require) import sound "core:engine/sound"
+@(require) import geometry "core:engine/geometry"
+
+
 main :: proc() {}
 

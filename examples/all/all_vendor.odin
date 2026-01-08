@@ -62,12 +62,3 @@ package all
 
 @(require) import "vendor:glslang"
 @(require) import "vendor:gltf2"
-
-//engine
-
-@(require) import engine "vendor:engine"
-@(require) import components "vendor:engine/components"
-@(require) import font "vendor:engine/font"
-@(require) import gui "vendor:engine/gui"
-@(require) import sound "vendor:engine/sound"
-@(require) import geometry "vendor:engine/geometry"
