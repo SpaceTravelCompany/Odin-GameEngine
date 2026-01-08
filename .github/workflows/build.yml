@@ -27,7 +27,6 @@ jobs:
 
           echo "${{ github.workspace }}" >> $GITHUB_PATH
 
-      - uses: ilammy/msvc-dev-cmd@v1
       - name: Build Odin
         run: |
           ./build_odin.sh release
@@ -65,6 +64,7 @@ jobs:
         run: |
           echo "${{ github.workspace }}" >> $GITHUB_PATH
 
+      - uses: ilammy/msvc-dev-cmd@v1
       - name: Build Odin
         shell: powershell
         run: |
