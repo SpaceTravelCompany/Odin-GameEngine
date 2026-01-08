@@ -48,7 +48,7 @@ jobs:
           git clone https://github.com/odin-lang/pkg.odin-lang.org odin-doc
           cd odin-doc
           odin build . -out:odin-doc
-          cp odin-doc ../odin-doc
+          cp ./odin-doc ..
           cd ..
 
 
