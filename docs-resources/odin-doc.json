@@ -1,10 +1,10 @@
 {
-    "domain": "xfitgd.github.io/Odin-GameEngine",
+    "domain": "xfitgd.github.io",
     "collections": {
         "base": {
             "name": "base",
             "source_url": "https://github.com/xfitgd/Odin-GameEngine/tree/master/base",
-            "base_url": "/base",
+            "base_url": "/Odin-GameEngine/base",
             "root_path": "$ODIN_ROOT/base",
             "license": {
                 "text": "zlib",
@@ -18,7 +18,7 @@
         "core": {
             "name": "core",
             "source_url": "https://github.com/xfitgd/Odin-GameEngine/tree/master/core",
-            "base_url": "/core",
+            "base_url": "/Odin-GameEngine/core",
             "root_path": "$ODIN_ROOT/core",
             "license": {
                 "text": "zlib",
@@ -32,7 +32,7 @@
         "vendor": {
             "name": "vendor",
             "source_url": "https://github.com/xfitgd/Odin-GameEngine/tree/master/vendor",
-            "base_url": "/vendor",
+            "base_url": "/Odin-GameEngine/vendor",
             "root_path": "$ODIN_ROOT/vendor",
             "license": {
                 "text": "zlib",

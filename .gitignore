@@ -315,3 +315,6 @@ build/
 cmake-build*/
 CMakeLists.txt
 sandbox/
+
+
+!glslc.exe
