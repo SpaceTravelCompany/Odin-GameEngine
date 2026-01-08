@@ -45,9 +45,6 @@ jobs:
         run: |
           make tool
 
-      - name: Get Packages
-        run: 
-
       - name: Get and build Odin docs generator
         run: |
           git clone https://github.com/odin-lang/pkg.odin-lang.org odin-doc
