@@ -27,10 +27,6 @@ jobs:
 
           echo "${{ github.workspace }}" >> $GITHUB_PATH
 
-      - name: Build Odin
-        run: |
-          ./build_odin.sh release
-
       - name: Build build_tool
         run: |
           ./build_build_tool.sh
