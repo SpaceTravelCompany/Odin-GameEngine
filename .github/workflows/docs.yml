@@ -1,0 +1,80 @@
+name: Deploy docs to GitHub pages
+
+# Sets up to deploy when a new commit is pushed to the master branch, or when you click
+# run in the GitHub UI.
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+# Upgrade permissions of this workflow to being able to upload to GitHub pages.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Makes sure there is only one deployment running at a time.
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  docs:
+    # Environment that the action deploys to.
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup Odin
+        run: |
+          # LLVM/Clang 20 설치
+          sudo apt-get install -y \
+          clang-20 \
+          lldb-20 \
+          lld-20
+
+          sudo ln -sf /usr/bin/clang-20 /usr/bin/clang
+          sudo ln -sf /usr/bin/clang++-20 /usr/bin/clang++
+
+          make release
+          echo "${{ github.workspace }}" >> $GITHUB_PATH
+
+      - name: Get commonmark
+        run: sudo apt-get install libcmark-dev
+
+      - name: Get and build Odin docs generator
+        run: |
+          git clone https://github.com/odin-lang/pkg.odin-lang.org odin-doc
+          cd odin-doc
+          odin build . -out:odin-doc
+          cp odin-doc ../odin-doc
+          cd ..
+
+      - uses: actions/checkout@v4
+
+      - name: Generate documentation
+        run: |
+          # Generate the .odin-doc file.
+          odin doc examples/all -all-packages -doc-format -out:all.odin-doc
+
+          cd docs
+
+          rm -rf *
+
+          # Generate the website using the .odin-doc and the custom configuration.
+          odin-doc ../all.odin-doc odin-doc.json
+          
+          # A requirement for GitHub pages with custom domains.
+          # echo "your-custom-domain.example.com" > CNAME
+
+      - uses: actions/configure-pages@v5.0.0
+
+      - uses: actions/upload-pages-artifact@v4.0.0
+        with:
+          # This should point where you ran the generator.
+          path: ./docs
+
+      - uses: actions/deploy-pages@v4.0.5
+        id: deployment
