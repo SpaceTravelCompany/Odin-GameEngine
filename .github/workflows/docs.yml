@@ -64,7 +64,7 @@ jobs:
           cd docs
           # rm -rf *
 
-          cp -r ../docs-resources .
+          cp -r ../docs-resources/* .
 
           # Generate the website using the .odin-doc and the custom configuration.
           odin-doc ../all.odin-doc odin-doc.json
