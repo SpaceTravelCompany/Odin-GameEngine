@@ -50,6 +50,10 @@ jobs:
           git clone https://github.com/odin-lang/pkg.odin-lang.org odin-doc
           mv odin-doc odin-doc-build
           cd odin-doc-build
+
+          rm -rf resources/*
+          cp -r ../docs-resources/* resources
+
           odin build . -out:odin-doc
           cp ./odin-doc ..
           cd ..
@@ -62,15 +66,9 @@ jobs:
 
           mkdir docs
           cd docs
-          # rm -rf *
-
-          mkdir resources
-          cp -r ../docs-resources/* resources
 
           # Generate the website using the .odin-doc and the custom configuration.
-          odin-doc ../all.odin-doc resources/odin-doc.json
-
-          rm -rf resources
+          odin-doc ../all.odin-doc ../docs-resources/odin-doc.json
 
           # A requirement for GitHub pages with custom domains.
           # echo "your-custom-domain.example.com" > CNAME
