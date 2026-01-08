@@ -650,50 +650,50 @@ gb_internal void report_backend_info() {
 }
 
 // NOTE(Jeroen): `odin report` prints some system information for easier bug reporting.
-gb_internal void print_bug_report_help() {
-	gb_printf("Where to find more information and get into contact when you encounter a bug:\n\n");
-	gb_printf("\tWebsite: https://xfitgd.github.io/Odin-GameEngine/\n");
-	gb_printf("\tGitHub:  https://github.com/xfitgd/Odin-GameEngine/\n");
-	/*
-		Uncomment and update URL once we have a Discord vanity URL. For now people can get here from the site.
-		gb_printf("\tDiscord: https://discord.com/invite/sVBPHEv\n");
-	*/
-	gb_printf("\n\n");
+// gb_internal void print_bug_report_help() {
+// 	gb_printf("Where to find more information and get into contact when you encounter a bug:\n\n");
+// 	gb_printf("\tWebsite: https://xfitgd.github.io/Odin-GameEngine/\n");
+// 	gb_printf("\tGitHub:  https://github.com/xfitgd/Odin-GameEngine/\n");
+// 	/*
+// 		Uncomment and update URL once we have a Discord vanity URL. For now people can get here from the site.
+// 		gb_printf("\tDiscord: https://discord.com/invite/sVBPHEv\n");
+// 	*/
+// 	gb_printf("\n\n");
 
-	gb_printf("Useful information to add to a bug report:\n\n");
+// 	gb_printf("Useful information to add to a bug report:\n\n");
 
-	gb_printf("\tOdin GameEngine:    %.*s", LIT(ODIN_VERSION));
+// 	gb_printf("\tOdin GameEngine:    %.*s", LIT(ODIN_VERSION));
 
-	#ifdef NIGHTLY
-	gb_printf("-nightly");
-	#endif
+// 	#ifdef NIGHTLY
+// 	gb_printf("-nightly");
+// 	#endif
 
-	String version = {};
+// 	String version = {};
 
-	#ifdef GIT_SHA
-	version.text = cast(u8 *)GIT_SHA;
-	version.len  = gb_strlen(GIT_SHA);
-	if (version != "") {
-		gb_printf(":%.*s", LIT(version));
-	}
-	#endif
+// 	#ifdef GIT_SHA
+// 	version.text = cast(u8 *)GIT_SHA;
+// 	version.len  = gb_strlen(GIT_SHA);
+// 	if (version != "") {
+// 		gb_printf(":%.*s", LIT(version));
+// 	}
+// 	#endif
 
-	gb_printf("\n");
+// 	gb_printf("\n");
 
-	/*
-		Print OS information.
-	*/
-	report_os_info();
+// 	/*
+// 		Print OS information.
+// 	*/
+// 	report_os_info();
 
-	/*
-		Now print CPU info.
-	*/
-	report_cpu_info();
+// 	/*
+// 		Now print CPU info.
+// 	*/
+// 	report_cpu_info();
 
-	/*
-		And RAM info.
-	*/
-	report_ram_info();
+// 	/*
+// 		And RAM info.
+// 	*/
+// 	report_ram_info();
 
-	report_backend_info();
-}
+// 	report_backend_info();
+// }
