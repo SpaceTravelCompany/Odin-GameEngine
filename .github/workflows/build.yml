@@ -1,0 +1,107 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - '*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup LLVM
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            clang-20 \
+            lldb-20 \
+            lld-20
+
+          sudo ln -sf /usr/bin/clang-20 /usr/bin/clang
+          sudo ln -sf /usr/bin/clang++-20 /usr/bin/clang++
+
+      - name: Build Odin
+        run: |
+          ./build_odin.sh release
+
+      - name: Build build_tool
+        run: |
+          ./build_build_tool.sh
+
+      - name: Create release package
+        run: |
+          mkdir -p release-package
+          cp odin release-package/
+          cp build_tool release-package/
+          cp -r base core vendor release-package/
+          cp LICENSE README.md release-package/
+          chmod +x release-package/odin
+          chmod +x release-package/build_tool
+          tar -czf odin-linux-amd64.tar.gz -C release-package .
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: odin-linux-amd64
+          path: odin-linux-amd64.tar.gz
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup MSVC
+        uses: microsoft/setup-msbuild@v1
+
+      - name: Build Odin
+        run: |
+          build.bat release
+
+      - name: Build build_tool
+        run: |
+          build_build_tool.bat
+
+      - name: Create release package
+        run: |
+          mkdir release-package
+          copy odin.exe release-package\
+          copy build_tool.exe release-package\
+          xcopy /E /I /Y base release-package\base
+          xcopy /E /I /Y core release-package\core
+          xcopy /E /I /Y vendor release-package\vendor
+          copy LICENSE release-package\
+          copy README.md release-package\
+          powershell Compress-Archive -Path release-package\* -DestinationPath odin-windows-amd64.zip -Force
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: odin-windows-amd64
+          path: odin-windows-amd64.zip
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build-linux, build-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: |
+            artifacts/odin-linux-amd64/odin-linux-amd64.tar.gz
+            artifacts/odin-windows-amd64/odin-windows-amd64.zip
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
