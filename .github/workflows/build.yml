@@ -1,6 +1,7 @@
 name: Build and Release
 
 on:
+  workflow_dispatch:
   push:
     tags:
       - '*'
@@ -41,7 +42,9 @@ jobs:
           mkdir -p release-package
           cp odin release-package/
           cp build_tool release-package/
-          cp -r base core vendor release-package/
+          rsync -av --exclude='.git*' base/ release-package/base/
+          rsync -av --exclude='.git*' core/ release-package/core/
+          rsync -av --exclude='.git*' vendor/ release-package/vendor/
           cp LICENSE README.md release-package/
           chmod +x release-package/odin
           chmod +x release-package/build_tool
@@ -81,12 +84,12 @@ jobs:
           mkdir release-package
           copy odin.exe release-package\
           copy build_tool.exe release-package\
-          xcopy /E /I /Y base release-package\base
-          xcopy /E /I /Y core release-package\core
-          xcopy /E /I /Y vendor release-package\vendor
+          robocopy base release-package\base /E /XD .git* /XF .git* /NFL /NDL /NJH /NJS
+          robocopy core release-package\core /E /XD .git* /XF .git* /NFL /NDL /NJH /NJS
+          robocopy vendor release-package\vendor /E /XD .git* /XF .git* /NFL /NDL /NJH /NJS
           copy LICENSE release-package\
           copy README.md release-package\
-          powershell Compress-Archive -Path release-package\* -DestinationPath odin-windows-amd64.zip -Force
+          Compress-Archive -Path release-package\* -DestinationPath odin-windows-amd64.zip -Force
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
