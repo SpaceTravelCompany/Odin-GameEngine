@@ -60,23 +60,18 @@ if "%2" == "1" (
 	set nightly=0
 )
 
-if %release_mode% equ 0 (
-	set V1=%curr_year%
-	set V2=%curr_month%
-	set V3=%curr_day%
-) else (
-	set V1=%curr_year%
-	set V2=%curr_month%
-	set V3=0
-)
+set V1=0
+set V2=0
+set V3=1
 set V4=0
+set /p version=<version.txt
 set odin_version_full="%V1%.%V2%.%V3%.%V4%"
-set odin_version_raw="dev-%V1%-%V2%"
+set odin_version_raw="dev-v0.0.1"
 set compiler_flags= -nologo -Oi -TP -fp:precise -Gm- -MP -FC -EHsc- -GR- -GF
 rem Parse source code as utf-8 even on shift-jis and other codepages
 rem See https://learn.microsoft.com/en-us/cpp/build/reference/utf-8-set-source-and-executable-character-sets-to-utf-8?view=msvc-170
 set compiler_flags= %compiler_flags% /utf-8
-set compiler_defines= -DODIN_VERSION_RAW=\"%odin_version_raw%\" -DGIT_SHA=\"%GIT_SHA%\"
+set compiler_defines= -DODIN_GAMEENGINE_VERSION_RAW=\"%odin_version_raw%\" -DGIT_SHA=\"%GIT_SHA%\"
 
 rem fileversion is defined as {Major,Minor,Build,Private: u16} so a bit limited
 set rc_flags=-nologo "-DGIT_SHA=%GIT_SHA% -DVP=dev-%V1%-%V2%:%GIT_SHA% nologo -DV1=%V1% -DV2=%V2% -DV3=%V3% -DV4=%V4% -DVF=%odin_version_full% -DNIGHTLY=%nightly%"

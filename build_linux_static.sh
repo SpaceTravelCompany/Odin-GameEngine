@@ -6,7 +6,7 @@ LLVM_CONFIG="llvm-config-20"
 
 DISABLED_WARNINGS="-Wno-switch -Wno-macro-redefined -Wno-unused-value"
 
-CPPFLAGS="-DODIN_VERSION_RAW=\"dev-$(date +"%Y-%m")\""
+CPPFLAGS="-DODIN_GAMEENGINE_VERSION_RAW=\"dev-v0.0.1\""
 CXXFLAGS="-std=c++14 $($LLVM_CONFIG --cxxflags --ldflags)"
 
 LDFLAGS="-static -lm -lzstd -lz -lffi -pthread -ldl -fuse-ld=mold"

@@ -652,8 +652,8 @@ gb_internal void report_backend_info() {
 // NOTE(Jeroen): `odin report` prints some system information for easier bug reporting.
 gb_internal void print_bug_report_help() {
 	gb_printf("Where to find more information and get into contact when you encounter a bug:\n\n");
-	gb_printf("\tWebsite: https://odin-lang.org\n");
-	gb_printf("\tGitHub:  https://github.com/odin-lang/Odin/issues\n");
+	gb_printf("\tWebsite: https://xfitgd.github.io/Odin-GameEngine/\n");
+	gb_printf("\tGitHub:  https://github.com/xfitgd/Odin-GameEngine/\n");
 	/*
 		Uncomment and update URL once we have a Discord vanity URL. For now people can get here from the site.
 		gb_printf("\tDiscord: https://discord.com/invite/sVBPHEv\n");
@@ -662,7 +662,7 @@ gb_internal void print_bug_report_help() {
 
 	gb_printf("Useful information to add to a bug report:\n\n");
 
-	gb_printf("\tOdin:    %.*s", LIT(ODIN_VERSION));
+	gb_printf("\tOdin GameEngine:    %.*s", LIT(ODIN_VERSION));
 
 	#ifdef NIGHTLY
 	gb_printf("-nightly");

@@ -12,14 +12,7 @@ LDFLAGS="$LDFLAGS -pthread -lm"
 OS_ARCH="$(uname -m)"
 OS_NAME="$(uname -s)"
 
-if [ -d ".git" ] && [ -n "$(command -v git)" ]; then
-	GIT_SHA=$(git show --pretty='%h' --no-patch --no-notes HEAD)
-	GIT_DATE=$(git show "--pretty=%cd" "--date=format:%Y-%m" --no-patch --no-notes HEAD)
-	CPPFLAGS="$CPPFLAGS -DGIT_SHA=\"$GIT_SHA\""
-else
-	GIT_DATE=$(date +"%Y-%m")
-fi
-CPPFLAGS="$CPPFLAGS -DODIN_VERSION_RAW=\"dev-$GIT_DATE\""
+CPPFLAGS="$CPPFLAGS -DODIN_GAMEENGINE_VERSION_RAW=\"dev-v0.0.1\""
 
 error() {
 	printf "ERROR: %s\n" "$1"

@@ -151,11 +151,11 @@ gb_global TargetEndianKind target_endians[TargetArch_COUNT] = {
 	TargetEndian_Little,
 };
 
-#ifndef ODIN_VERSION_RAW
-#define ODIN_VERSION_RAW "dev-unknown-unknown"
+#ifndef ODIN_GAMEENGINE_VERSION_RAW
+#define ODIN_GAMEENGINE_VERSION_RAW "dev-unknown-unknown"
 #endif
 
-gb_global String const ODIN_VERSION = str_lit(ODIN_VERSION_RAW);
+gb_global String const ODIN_VERSION = str_lit(ODIN_GAMEENGINE_VERSION_RAW);
 
 struct TargetMetrics {
 	TargetOsKind   os;
