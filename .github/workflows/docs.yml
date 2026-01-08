@@ -33,16 +33,20 @@ jobs:
           sudo apt-get install -y \
           clang-20 \
           lldb-20 \
-          lld-20
+          lld-20 \
+          libcmark-dev
 
           sudo ln -sf /usr/bin/clang-20 /usr/bin/clang
           sudo ln -sf /usr/bin/clang++-20 /usr/bin/clang++
           make release
           echo "${{ github.workspace }}" >> $GITHUB_PATH
+
+      - name: Build Tool
+        run: |
           make tool
 
       - name: Get Packages
-        run: sudo apt-get install libcmark-dev
+        run: 
 
       - name: Get and build Odin docs generator
         run: |
