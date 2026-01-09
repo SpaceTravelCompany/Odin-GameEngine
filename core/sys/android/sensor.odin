@@ -285,7 +285,7 @@ SensorStatus :: enum i8 {
     UNRELIABLE       = 0,
     ACCURACY_LOW     = 1,
     ACCURACY_MEDIUM  = 2,
-    ACCURACY_HIGH    = 3
+    ACCURACY_HIGH    = 3,
 }
 
 /**
@@ -296,7 +296,7 @@ SensorReportingMode :: enum i32 {
     CONTINUOUS = 0,
     ON_CHANGE = 1,
     ONE_SHOT = 2,
-    SPECIAL_TRIGGER = 3
+    SPECIAL_TRIGGER = 3,
 }
 
 /**
@@ -310,7 +310,7 @@ SensorReportingMode :: enum i32 {
     /** nominal 200Hz */
     FAST = 2,
     /** nominal 800Hz */
-    VERY_FAST = 3
+    VERY_FAST = 3,
 }
 
 /**
@@ -320,7 +320,7 @@ SensorReportingMode :: enum i32 {
     /** shared memory created by ASharedMemory_create */
     SHARED_MEMORY = 1,
     /** AHardwareBuffer */
-    HARDWARE_BUFFER = 2
+    HARDWARE_BUFFER = 2,
 }
 
 /**

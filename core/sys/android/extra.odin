@@ -6,7 +6,7 @@ import "core:mem"
 
 AssetFileError :: enum {
 	None,
-	Err
+	Err,
 }
 
 asset_read_file :: proc(path:string, allocator := context.allocator) -> (data:[]u8, err:AssetFileError = .None) {

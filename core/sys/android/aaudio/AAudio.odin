@@ -25,7 +25,7 @@ AAudioDirection :: enum i32 {
     /**
      * Audio data will travel into the device, for example from a microphone.
      */
-    INPUT
+    INPUT,
 }
 
 AAudioFormat :: enum i32 {
@@ -72,7 +72,7 @@ AAudioFormat :: enum i32 {
      *
      * Available since API level 31.
      */
-    PCM_I32
+    PCM_I32,
 }
 
 /**
@@ -162,7 +162,7 @@ AAudioResult :: enum i32 {
     /**
      * The requested sample rate was not supported.
      */
-    ERROR_INVALID_RATE
+    ERROR_INVALID_RATE,
 }
 
 /**
@@ -226,7 +226,7 @@ AAudioStreamState :: enum i32 {
     /**
      * The stream is disconnected from audio device.
      */
-    DISCONNECTED
+    DISCONNECTED,
 }
 
 
@@ -241,7 +241,7 @@ AAudioSharingMode :: enum i32 {
      * Multiple applications will be mixed by the AAudio Server.
      * This will have higher latency than the EXCLUSIVE mode.
      */
-	 SHARED
+	 SHARED,
 }
 
 
@@ -262,7 +262,7 @@ AAudioPerformanceMode :: enum i32 {
     /**
      * Reducing latency is more important than battery life.
      */
-    LOW_LATENCY
+    LOW_LATENCY,
 }
 
 /**
@@ -398,7 +398,7 @@ AAudioContentType :: enum i32 {
      * Use this for sound is designed to accompany a user action,
      * such as a click or beep sound made when the user presses a button.
      */
-    SONIFICATION = 4
+    SONIFICATION = 4,
 }
 
 AAudioSpatializationBehavior :: enum i32 {

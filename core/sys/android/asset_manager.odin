@@ -14,7 +14,7 @@ AssetOpenMode :: enum c.int {
     /** Read sequentially, with an occasional forward seek. */
     STREAMING    = 2,
     /** Caller plans to ask for a read-only buffer with all data. */
-    BUFFER       = 3
+    BUFFER       = 3,
 }
 
 // Same as sys/linux but this is i32 instead of i16

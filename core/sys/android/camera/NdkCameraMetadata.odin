@@ -24,7 +24,7 @@ CameraDataType :: enum u8 {
     /// A 64-bit fraction (ACameraMetadata_rational)
     RATIONAL = 5,
     /// Number of type fields
-    TYPES
+    TYPES,
 }
 
 

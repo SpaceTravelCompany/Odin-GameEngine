@@ -29,7 +29,7 @@ cryptoinfo_mode_t :: enum {
     CLEAR = 0,
     AES_CTR = 1,
     AES_WV = 2,
-    AES_CBC = 3
+    AES_CBC = 3,
 }
 
 AMediaCodec :: struct{}

@@ -36,7 +36,7 @@ ErrorStateCallbackError :: enum i32 {
      * CameraDevice and the CameraManager, and trying to acquire all resources
      * again from scratch.</p>
      */
-    CAMERA_SERVICE = 5
+    CAMERA_SERVICE = 5,
 }
 
 /**

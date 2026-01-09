@@ -21,7 +21,7 @@ AMidiOpcode :: enum i32 {
 AMidiDeviceType :: enum i32 {
     USB = 1,      /* A MIDI device connected to the Android USB port */
     VIRTUAL = 2,  /* A software object implementing MidiDeviceService */
-    BLUETOOTH = 3 /* A MIDI device connected via BlueTooth */
+    BLUETOOTH = 3, /* A MIDI device connected via BlueTooth */
 }
 
 /*
@@ -93,7 +93,7 @@ AMidiDevice_Protocol :: enum i32 {
      * UMP is defined in "Universal MIDI Packet (UMP) Format and MIDI 2.0 Protocol" spec.
      * MIDI-CI is defined in "MIDI Capability Inquiry (MIDI-CI)" spec.
      */
-    UNKNOWN = -1
+    UNKNOWN = -1,
 }
 
 AMidiDevice :: struct{}

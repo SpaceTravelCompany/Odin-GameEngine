@@ -52,7 +52,7 @@ ANativeWindow_FrameRateCompatibility :: enum i8 {
 	* stuttering) than it would be if the system had chosen the app's requested
 	* frame rate. This value should be used for video content.
 	*/
-	FIXED_SOURCE = 1
+	FIXED_SOURCE = 1,
 }
 
 /** Change frame rate strategy value for ANativeWindow_setFrameRate. */
@@ -66,7 +66,7 @@ ANativeWindow_ChangeFrameRateStrategy :: enum i8 {
 	* Change the frame rate even if the transition is going to be non-seamless,
 	* i.e. with visual interruptions for the user.
 	*/
-	ALWAYS = 1
+	ALWAYS = 1,
 }
 
 /**

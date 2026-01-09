@@ -8,7 +8,7 @@ foreign import mediandk "system:mediandk"
 SeekMode :: enum {
 	PREVIOUS_SYNC,
 	NEXT_SYNC,
-	CLOSEST_SYNC
+	CLOSEST_SYNC,
 }
 
 SampleFlags :: enum u32 {

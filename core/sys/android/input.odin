@@ -18,7 +18,7 @@ KeyState :: enum {
     DOWN = 1,
 
     /** The key is down but is a virtual key press that is being emulated by the system. */
-    VIRTUAL = 2
+    VIRTUAL = 2,
 }
 
 /**
@@ -90,7 +90,7 @@ KeyEventAction :: enum i32 {
      * of the key event contains the number of times the given key
      * code should be executed.
      */
-    MULTIPLE = 2
+    MULTIPLE = 2,
 }
 
 /**

@@ -90,7 +90,7 @@ LogId :: enum i32 {
   MAX,
 
   /** Let the logging function choose the best log target. */
-  DEFAULT = 0x7FFFFFFF
+  DEFAULT = 0x7FFFFFFF,
 }
 
 /**

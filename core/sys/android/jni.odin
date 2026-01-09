@@ -72,7 +72,7 @@ jobjectRefType :: enum c.int {
     JNIInvalidRefType = 0,
     JNILocalRefType = 1,
     JNIGlobalRefType = 2,
-    JNIWeakGlobalRefType = 3
+    JNIWeakGlobalRefType = 3,
 }
 
 JNINativeMethod :: struct {

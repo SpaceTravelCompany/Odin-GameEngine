@@ -35,7 +35,7 @@ FontWeight :: enum u16 {
     BLACK = 900,
 
     /** The maximum value for the font weight value. */
-    MAX = 1000
+    MAX = 1000,
 }
 
 /**

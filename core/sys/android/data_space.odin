@@ -522,6 +522,6 @@ ADataSpace :: enum i32 {
      *
      * Embedded depth metadata following the dynamic depth specification.
      */
-    DYNAMIC_DEPTH = 4098
+    DYNAMIC_DEPTH = 4098,
 }
 

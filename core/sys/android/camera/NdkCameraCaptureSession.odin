@@ -14,11 +14,11 @@ CaptureFailureReason :: enum i32 {
     /**
      * The capture session has dropped this frame due to an error in the framework.
      */
-    ERROR
+    ERROR,
 }
 
 CaptureSequenceId :: enum i32 {
-    NONE = -1
+    NONE = -1,
 }
 
 /**

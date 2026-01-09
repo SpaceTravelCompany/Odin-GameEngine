@@ -35,7 +35,7 @@ acamera_metadata_section_t :: enum {
     ACAMERA_AUTOMOTIVE_LENS,
     ACAMERA_SECTION_COUNT,
 
-    ACAMERA_VENDOR = 0x8000
+    ACAMERA_VENDOR = 0x8000,
 }
 
 /**
@@ -74,7 +74,7 @@ acamera_metadata_section_start_t :: enum {
     ACAMERA_HEIC_INFO_START        = int(acamera_metadata_section_t.ACAMERA_HEIC_INFO)        << 16,
     ACAMERA_AUTOMOTIVE_START       = int(acamera_metadata_section_t.ACAMERA_AUTOMOTIVE)       << 16,
     ACAMERA_AUTOMOTIVE_LENS_START  = int(acamera_metadata_section_t.ACAMERA_AUTOMOTIVE_LENS)  << 16,
-    ACAMERA_VENDOR_START           = int(acamera_metadata_section_t.ACAMERA_VENDOR)           << 16
+    ACAMERA_VENDOR_START           = int(acamera_metadata_section_t.ACAMERA_VENDOR)           << 16,
 }
 
 /**
@@ -7273,7 +7273,7 @@ acamera_metadata_tag_t :: enum u32 {
      * @see ACAMERA_LENS_POSE_ROTATION
      * @see ACAMERA_LENS_POSE_TRANSLATION
      */
-    ACAMERA_AUTOMOTIVE_LENS_FACING =                            // byte[n] (acamera_metadata_enum_android_automotive_lens_facing_t)
+    ACAMERA_AUTOMOTIVE_LENS_FACING =,// byte[n] (acamera_metadata_enum_android_automotive_lens_facing_t)
             u32(acamera_metadata_section_start_t.ACAMERA_AUTOMOTIVE_LENS_START),
     ACAMERA_AUTOMOTIVE_LENS_END,
 

@@ -94,7 +94,7 @@ AMediaDrmKeyType :: enum {
     /**
      * This key request type specifies that previously saved offline keys should be released.
      */
-    RELEASE = 3
+    RELEASE = 3,
 }
 
 /**
@@ -129,7 +129,7 @@ AMediaDrmKeyRequestType :: enum i32 {
      * Keys have been loaded but an additional license request is needed
      * to update their values.
      */
-    UPDATE
+    UPDATE,
 }
 
 /**

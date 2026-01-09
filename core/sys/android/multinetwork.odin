@@ -33,7 +33,7 @@ addrinfo :: struct {
 	ai_addrlen: socklen_t,	/* length of ai_addr */
 	ai_canonname: cstring,	/* canonical name for hostname */
 	ai_addr: ^sockaddr,	/* binary address */
-	ai_next: ^addrinfo,	/* next structure in linked list */
+	ai_next: ^addrinfo,	/* next structure in linked list */,
 }
 
 
