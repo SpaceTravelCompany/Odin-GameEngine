@@ -1,6 +1,6 @@
 package libc
 
-import "core:c"
+@(require) import "core:c"
 
 // 7.22 General utilities
 
@@ -12,8 +12,7 @@ when ODIN_OS == .Windows {
 	foreign import libc "system:c"
 }
 
-@(require)
-import "base:runtime"
+@(require) import "base:runtime"
 
 when ODIN_OS == .Windows {
 	RAND_MAX :: 0x7fff

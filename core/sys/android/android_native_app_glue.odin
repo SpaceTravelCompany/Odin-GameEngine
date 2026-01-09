@@ -2,7 +2,7 @@
 package android
 
 import "core:c"
-import "base:runtime"
+@(require) import "base:runtime"
 import "base:intrinsics"
 import "core:sys/posix"
 
