@@ -21,16 +21,16 @@ import "vendor:glfw"
 // Constants
 // ============================================================================
 
-key_size :: 512
+@private key_size :: 512
 
 // ============================================================================
 // Global Variables
 // ============================================================================
 
-keys : [key_size]bool = { 0..<key_size = false }
+@private keys : [key_size]bool = { 0..<key_size = false }
 @private __is_mouse_out:bool
 @private __mouse_pos:linalg.PointF
-scroll_dt:int
+//@private scroll_dt:int
 
 // ============================================================================
 // Key Code Definitions

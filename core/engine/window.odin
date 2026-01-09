@@ -37,30 +37,30 @@ monitor_info :: struct {
 @private __window_x: Maybe(int)
 @private __window_y: Maybe(int)
 
-prev_window_x: int
-prev_window_y: int
-prev_window_width: int
-prev_window_height: int
+@private prev_window_x: int
+@private prev_window_y: int
+@private prev_window_width: int
+@private prev_window_height: int
 
 @private __screen_idx: int = 0
 @private __screen_mode: screen_mode
 @private __window_title: cstring
 @private __screen_orientation:screen_orientation = .Unknown
 
-monitors_mtx:sync.Mutex
-monitors: [dynamic]monitor_info
-primary_monitor: ^monitor_info
-current_monitor: ^monitor_info = nil
+@private monitors_mtx:sync.Mutex
+@private monitors: [dynamic]monitor_info
+@private primary_monitor: ^monitor_info
+@private current_monitor: ^monitor_info = nil
 
 @private __is_full_screen_ex := false
 @private __v_sync:v_sync
-monitor_locked:bool = false
+@private monitor_locked:bool = false
 
 @private __paused := false
 @private __activated := false
-size_updated := false
+@private size_updated := false
 
-full_screen_mtx : sync.Mutex
+@private full_screen_mtx : sync.Mutex
 
 // ============================================================================
 // Utility Functions
@@ -173,7 +173,7 @@ set_window_icon :: #force_inline proc "contextless" (icons:[]icon_image) {
 // Window State Management
 // ============================================================================
 
-save_prev_window :: proc "contextless" () {
+@private save_prev_window :: proc "contextless" () {
 	prev_window_x = __window_x.?
     prev_window_y = __window_y.?
     prev_window_width = __window_width.?

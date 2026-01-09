@@ -114,8 +114,8 @@ when library.is_android {
 }
 
 @private main_thread_id: int
-temp_arena_allocator: mem.Allocator
-engine_def_allocator: mem.Allocator
+@private temp_arena_allocator: mem.Allocator
+@private engine_def_allocator: mem.Allocator
 
 @private @thread_local track_allocator:mem.Tracking_Allocator
 

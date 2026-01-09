@@ -17,7 +17,7 @@ import vk "vendor:vulkan"
 
 msaa_count :: 4
 wire_mode :: false
-swap_img_cnt : u32 = 3
+@private swap_img_cnt : u32 = 3
 
 // ============================================================================
 // Type Definitions
@@ -203,41 +203,41 @@ texture :: struct {
 // ============================================================================
 
 // System State
-program_start := true
-loop_start := false
+@private program_start := true
+@private loop_start := false
 @private __exiting := false
-max_frame: f64
-delta_time: u64
-processor_core_len: int
+@private max_frame: f64
+@private delta_time: u64
+@private processor_core_len: int
 
 // Graphics State
-g_clear_color: [4]f32 = {0.0, 0.0, 0.0, 1.0}
-graphics_device: vk.Device
-rotation_matrix: linalg.Matrix
-depth_fmt: texture_fmt
+@private g_clear_color: [4]f32 = {0.0, 0.0, 0.0, 1.0}
+@private graphics_device: vk.Device
+@private rotation_matrix: linalg.Matrix
+@private depth_fmt: texture_fmt
 
 // Pipeline Layouts
-shape_pipeline_layout: vk.PipelineLayout
-tex_pipeline_layout: vk.PipelineLayout
-animate_tex_pipeline_layout: vk.PipelineLayout
+@private shape_pipeline_layout: vk.PipelineLayout
+@private tex_pipeline_layout: vk.PipelineLayout
+@private animate_tex_pipeline_layout: vk.PipelineLayout
 // copy_screen_pipeline_layout: vk.PipelineLayout
 
 // Pipelines
-shape_pipeline: vk.Pipeline
-tex_pipeline: vk.Pipeline
-animate_tex_pipeline: vk.Pipeline
+@private shape_pipeline: vk.Pipeline
+@private tex_pipeline: vk.Pipeline
+@private animate_tex_pipeline: vk.Pipeline
 // copy_screen_pipeline: vk.Pipeline
 
 // Descriptor Set Layouts
-shape_descriptor_set_layout: vk.DescriptorSetLayout
-tex_descriptor_set_layout: vk.DescriptorSetLayout
-tex_descriptor_set_layout2: vk.DescriptorSetLayout  // used animate tex
-animate_tex_descriptor_set_layout: vk.DescriptorSetLayout
+@private shape_descriptor_set_layout: vk.DescriptorSetLayout
+@private tex_descriptor_set_layout: vk.DescriptorSetLayout
+@private tex_descriptor_set_layout2: vk.DescriptorSetLayout  // used animate tex
+@private animate_tex_descriptor_set_layout: vk.DescriptorSetLayout
 // copy_screen_descriptor_set_layout: vk.DescriptorSetLayout
 
 // Samplers
-linear_sampler: vk.Sampler
-nearest_sampler: vk.Sampler
+@private linear_sampler: vk.Sampler
+@private nearest_sampler: vk.Sampler
 
 // Default Color Transform
 @private __def_color_transform: color_transform
