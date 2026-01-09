@@ -277,7 +277,7 @@ custom_object_pipeline_init :: proc(self:^custom_object_pipeline,
                 case []byte:
                     shader_bytes = s
             }
-            shader_modules[i] = vk.CreateShaderModule2(graphics_device, shader_bytes)
+            shader_modules[i] = vk.CreateShaderModule2(graphics_device, shader_bytes) or_else trace.panic_log("custom_object_pipeline_init: CreateShaderModule2")
         }
     }
     shaderCreateInfo : [len(shaders)]vk.PipelineShaderStageCreateInfo
