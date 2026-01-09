@@ -38,7 +38,7 @@ jobs:
 
           sudo ln -sf /usr/bin/clang-20 /usr/bin/clang
           sudo ln -sf /usr/bin/clang++-20 /usr/bin/clang++
-          make release
+          make
           echo "${{ github.workspace }}" >> $GITHUB_PATH
 
       # - name: Build Tool
