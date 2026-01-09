@@ -143,7 +143,7 @@ when library.is_android {
 // System Initialization & Cleanup
 // ============================================================================
 
-system_start :: #force_inline proc() {
+@private system_start :: #force_inline proc() {
 	engine_def_allocator = context.allocator
 	start_tracking_allocator()
 
@@ -155,7 +155,7 @@ system_start :: #force_inline proc() {
 	}
 }
 
-system_after_destroy :: #force_inline proc() {
+@private system_after_destroy :: #force_inline proc() {
 	delete(monitors)
 }
 
@@ -236,7 +236,7 @@ engine_main :: proc(
 	}
 }
 
-system_loop :: proc() {
+@private system_loop :: proc() {
 	when is_android {
 	} else {
 		glfw_loop()
@@ -247,14 +247,14 @@ system_loop :: proc() {
 // Window Management
 // ============================================================================
 
-window_start :: proc() {
+@private window_start :: proc() {
 	when is_android {
 	} else {
 		glfw_start()
 	}
 }
 
-system_destroy :: proc() {
+@private system_destroy :: proc() {
 	when is_android {
 	} else {
 		glfw_destroy()
@@ -419,7 +419,7 @@ is_main_thread :: #force_inline proc "contextless" () -> bool {
 	}
 }
 
-render_loop :: proc() {
+@private render_loop :: proc() {
 	paused_ := paused()
 
 	calc_frame_time(paused_)

@@ -86,7 +86,7 @@ when library.is_android {
     // Vulkan Surface
     // ============================================================================
     
-    vulkan_android_start :: proc "contextless" () {
+    @private vulkan_android_start :: proc "contextless" () {
         if vk_surface != 0 {
             vk.DestroySurfaceKHR(vk_instance, vk_surface, nil)
         }
@@ -380,7 +380,7 @@ when library.is_android {
     // Android Main Loop
     // ============================================================================
     
-    android_start :: proc () {
+    @private android_start :: proc () {
         app = auto_cast android.get_android_app()
         app.userData = nil
         app.onAppCmd = handle_cmd

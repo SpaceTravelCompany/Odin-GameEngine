@@ -249,12 +249,12 @@ nearest_sampler: vk.Sampler
 // ============================================================================
 
 // Graphics API 초기화
-graphics_init :: #force_inline proc() {
+@private graphics_init :: #force_inline proc() {
 	vk_start()
 }
 
 // Graphics API 정리
-graphics_destroy :: #force_inline proc() {
+@private graphics_destroy :: #force_inline proc() {
 	vk_destroy()
 }
 
@@ -263,7 +263,7 @@ graphics_destroy :: #force_inline proc() {
 // ============================================================================
 
 // 프레임 렌더링
-graphics_draw_frame :: #force_inline proc() {
+@private graphics_draw_frame :: #force_inline proc() {
 	vk_draw_frame()
 }
 
