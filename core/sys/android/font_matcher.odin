@@ -71,7 +71,7 @@ FamilyVariant :: enum u32 {
      * The elegant font family may have larger vertical metrics than Latin font.
      */
     ELEGANT = 2,
-};
+}
 
 /**
  * AFontMatcher performs match operation on given parameters and available font files.

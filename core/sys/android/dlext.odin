@@ -121,7 +121,7 @@ AllDLextFlags :: DLextFlags{
 	.USE_LIBRARY_FD_OFFSET,
 	.FORCE_LOAD,
 	.USE_NAMESPACE,
-	.RESERVED_ADDRESS_RECURSIVE
+	.RESERVED_ADDRESS_RECURSIVE,
 }
 
 android_namespace_t :: struct{}
