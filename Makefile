@@ -1,4 +1,4 @@
-all: default tool
+all: release tool
 
 demo:
 	./odin run examples/demo/demo.odin -file

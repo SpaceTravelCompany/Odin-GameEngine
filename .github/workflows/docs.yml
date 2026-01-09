@@ -38,12 +38,8 @@ jobs:
 
           sudo ln -sf /usr/bin/clang-20 /usr/bin/clang
           sudo ln -sf /usr/bin/clang++-20 /usr/bin/clang++
-          make
+          make debug
           echo "${{ github.workspace }}" >> $GITHUB_PATH
-
-      # - name: Build Tool
-      #   run: |
-      #     make tool
 
       - name: Get and build Odin docs generator
         run: |
@@ -57,7 +53,6 @@ jobs:
           odin build . -out:odin-doc
           cp ./odin-doc ..
           cd ..
-          # build_tool -s # build shaders only
 
       - name: Generate documentation
         run: |
