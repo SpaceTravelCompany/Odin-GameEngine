@@ -661,7 +661,7 @@ Example:
 	}
 	
 	init :: proc() {
-    	qoiD :^engine.qoi_converter = new(engine.qoi_converter, engine.def_allocator())
+		qoiD := new(engine.qoi_converter, engine.def_allocator())
 		
 		imgData, errCode := engine.image_converter_load(qoiD, panda_img, .RGBA)
 		if errCode != nil {
