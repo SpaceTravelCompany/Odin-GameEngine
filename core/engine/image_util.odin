@@ -3,8 +3,9 @@ package engine
 import "base:intrinsics"
 import "base:runtime"
 import "core:debug/trace"
+import "core:mem"
 import vk "vendor:vulkan"
-
+import "core:math/rand"
 
 // ============================================================================
 // Color Format Utilities
@@ -115,4 +116,38 @@ default_color_fmt :: proc "contextless" () -> color_fmt {
 			return .R8Unorm
 	}
 	trace.panic_log("unsupport format vk_fmt_to_texture_fmt : ", t)
+}
+
+// 랜덤 RGBA 텍스처 생성 함수
+create_random_texture :: proc(width, height: u32, out_texture:^texture) {
+    channels :: 4 // RGBA
+    
+    // 텍스처 데이터 배열 생성
+    texture_data := mem.make_non_zeroed([]u8, width * height * channels, engine_def_allocator)
+    
+    // 각 픽셀에 랜덤 RGBA 값 할당
+    for y in 0..<height {
+        for x in 0..<width {
+            pixel_index := (y * width + x) * channels
+            
+            // 각 채널에 랜덤 값 할당
+            texture_data[pixel_index + 0] = u8(rand.uint32() % 256) // R
+            texture_data[pixel_index + 1] = u8(rand.uint32() % 256) // G  
+            texture_data[pixel_index + 2] = u8(rand.uint32() % 256) // B
+            texture_data[pixel_index + 3] = u8(rand.uint32() % 256) // A
+        }
+    }
+    
+    // 텍스처 생성
+    texture_init(out_texture, width, height, texture_data, engine_def_allocator)
+}
+
+
+create_random_texture_grey :: proc(width, height: u32, out_texture:^texture) {
+    texture_data := mem.make_non_zeroed([]u8, width * height, engine_def_allocator)
+
+    for i in 0..<len(texture_data) {
+        texture_data[i] = u8(rand.uint32() % 256)
+    }
+    texture_init_grey(out_texture, width, height, texture_data, engine_def_allocator)
 }

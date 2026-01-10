@@ -436,6 +436,7 @@ texture_init :: proc(
 	width: u32,
 	height: u32,
 	pixels: []byte,
+    pixels_allocator: Maybe(runtime.Allocator) = nil,
 	sampler: vk.Sampler = 0,
 	resource_usage: resource_usage = .GPU,
 	in_pixel_fmt: color_fmt = .RGBA,
@@ -447,8 +448,7 @@ texture_init :: proc(
 	self.set.layout = tex_descriptor_set_layout2
 	self.set.__set = 0
 
-	alloc_pixels := mem.make_non_zeroed_slice([]byte, width * height * 4, engine_def_allocator)
-	color_fmt_convert_default(pixels, alloc_pixels, in_pixel_fmt)
+	color_fmt_convert_default_overlap(pixels, pixels, in_pixel_fmt)
 
 	buffer_resource_create_texture(&self.texture, {
 		width = width,
@@ -461,7 +461,7 @@ texture_init :: proc(
 		type = .TEX2D,
 		resource_usage = resource_usage,
 		single = false,
-	}, self.sampler, alloc_pixels, false, engine_def_allocator)
+	}, self.sampler, pixels, false, pixels_allocator)
 
 	self.set.__resources = mem.make_non_zeroed_slice([]union_resource, 1, temp_arena_allocator)
 	self.set.__resources[0] = &self.texture
@@ -473,6 +473,7 @@ texture_init_grey :: proc(
 	width: u32,
 	height: u32,
 	pixels: []byte,
+	pixels_allocator: Maybe(runtime.Allocator) = nil,
 	sampler: vk.Sampler = 0,
 	resource_usage: resource_usage = .GPU,
 ) {
@@ -482,9 +483,6 @@ texture_init_grey :: proc(
 	self.set.size = __single_sampler_pool_sizes[:]
 	self.set.layout = tex_descriptor_set_layout2
 	self.set.__set = 0
-
-	alloc_pixels := mem.make_non_zeroed_slice([]byte, width * height, engine_def_allocator)
-	mem.copy_non_overlapping(&alloc_pixels[0], &pixels[0], len(pixels))
 
 	buffer_resource_create_texture(&self.texture, {
 		width = width,
@@ -497,7 +495,7 @@ texture_init_grey :: proc(
 		type = .TEX2D,
 		resource_usage = resource_usage,
 		single = false,
-	}, self.sampler, alloc_pixels, false, engine_def_allocator)
+	}, self.sampler, pixels, false, pixels_allocator)
 
 	self.set.__resources = mem.make_non_zeroed_slice([]union_resource, 1, temp_arena_allocator)
 	self.set.__resources[0] = &self.texture
@@ -671,7 +669,7 @@ color_fmt_convert_default :: proc "contextless" (pixels:[]byte, out:[]byte, inPi
 color_fmt_convert_default_overlap :: proc "contextless" (pixels:[]byte, out:[]byte, inPixelFmt:color_fmt = .RGBA) {
     defcol := default_color_fmt()
     if defcol == inPixelFmt {
-        mem.copy(&out[0], &pixels[0], len(pixels))
+        if &pixels[0] != &out[0] do mem.copy(&out[0], &pixels[0], len(pixels))
     } else if inPixelFmt == .RGBA || inPixelFmt == .BGRA { //convert pixel format
         for i in 0..<len(pixels)/4 {//TODO SIMD (xfigd)
             temp:[4]byte

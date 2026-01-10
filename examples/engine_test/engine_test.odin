@@ -7,6 +7,7 @@ import "core:math"
 import "core:math/rand"
 import "core:math/linalg"
 import "core:reflect"
+import "base:runtime"
 import "core:os/os2"
 import "core:sys/android"
 import "core:engine"
@@ -51,6 +52,18 @@ GUI_Image :: struct {
 }
 
 panda_img : []u8 = #load("res/panda.qoi")
+
+panda_img_allocator_proc :: proc(allocator_data: rawptr, mode: runtime.Allocator_Mode,
+                            size, alignment: int,
+                            old_memory: rawptr, old_size: int, loc := #caller_location) -> ([]byte, runtime.Allocator_Error) {
+	#partial switch mode {
+	case .Free:
+		 qoiD :^engine.qoi_converter = auto_cast allocator_data
+		 engine.qoi_converter_deinit(qoiD)
+         free(qoiD, engine.def_allocator())
+	}
+	return nil, nil
+}
 
 Init ::proc() {
     renderCmd = engine.render_cmd_init()
@@ -160,16 +173,20 @@ Init ::proc() {
     //
 
     //Image Test
-    qoiD :engine.qoi_converter
-    defer engine.qoi_converter_deinit(&qoiD)
+    qoiD :^engine.qoi_converter = new(engine.qoi_converter, engine.def_allocator())
 
     //imgData, errCode := engine.image_converter_load_file(qoiD, "res/panda.qoi", .RGBA)
-    imgData, errCode := engine.image_converter_load(&qoiD, panda_img, .RGBA)
+    imgData, errCode := engine.image_converter_load(qoiD, panda_img, .RGBA)
     if errCode != nil {
         trace.panic_log(errCode)
     }
 
-    engine.texture_init(&texture, u32(engine.image_converter_width(&qoiD)), u32(engine.image_converter_height(&qoiD)), imgData)
+    engine.texture_init(&texture,
+         u32(engine.image_converter_width(qoiD)), u32(engine.image_converter_height(qoiD)),
+          imgData, runtime.Allocator{
+            procedure= panda_img_allocator_proc,
+            data= auto_cast qoiD,
+          })
 
     img: ^GUI_Image = new(GUI_Image, engine.def_allocator())
     img.com.gui_scale = {0.7,0.7}
@@ -177,7 +194,7 @@ Init ::proc() {
     img.com.gui_align_x = .left
     img.com.gui_pos.x = 200.0
 
-    fmt.printfln("texture width: %d, height: %d", engine.image_converter_width(&qoiD), engine.image_converter_height(&qoiD))
+    fmt.printfln("texture width: %d, height: %d", engine.image_converter_width(qoiD), engine.image_converter_height(qoiD))
     
     GUI_Image_Init(img, &texture,  &camera, &proj)
     
