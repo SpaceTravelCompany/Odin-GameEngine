@@ -14,6 +14,11 @@ import vk "vendor:vulkan"
 // Type Definitions
 // ============================================================================
 
+/*
+Projection structure for projection matrix management
+
+Contains the projection matrix and uniform buffer for rendering
+*/
 projection :: struct {
     using _: __matrix_in,
 }
@@ -22,22 +27,77 @@ projection :: struct {
 // Projection Initialization
 // ============================================================================
 
+/*
+Initializes an orthographic projection matrix
+
+Inputs:
+- self: Pointer to the projection to initialize
+- left: Left plane coordinate
+- right: Right plane coordinate
+- bottom: Bottom plane coordinate
+- top: Top plane coordinate
+- near: Near plane distance (default: 0.1)
+- far: Far plane distance (default: 100)
+- flip_z_axis_for_vulkan: Whether to flip Z axis for Vulkan (default: true)
+
+Returns:
+- None
+*/
 projection_init_matrix_ortho :: proc (self:^projection, left:f32, right:f32, bottom:f32, top:f32, near:f32 = 0.1, far:f32 = 100, flip_z_axis_for_vulkan := true) {
     __projection_update_ortho(self, left, right, bottom, top, near, far, flip_z_axis_for_vulkan)
     __projection_init(self)
 }
 
+/*
+Initializes an orthographic projection matrix based on window dimensions
+
+Inputs:
+- self: Pointer to the projection to initialize
+- width: Window width
+- height: Window height
+- near: Near plane distance (default: 0.1)
+- far: Far plane distance (default: 100)
+- flip_z_axis_for_vulkan: Whether to flip Z axis for Vulkan (default: true)
+
+Returns:
+- None
+*/
 projection_init_matrix_ortho_window :: proc (self:^projection, width:f32, height:f32, near:f32 = 0.1, far:f32 = 100, flip_z_axis_for_vulkan := true) {
     __projection_update_ortho_window(self, width, height, near, far, flip_z_axis_for_vulkan)
     __projection_init(self)
 }
 
-//! aspect is 0 means use window aspect
+/*
+Initializes a perspective projection matrix
+
+**Note:** If `aspect` is 0, the window aspect ratio will be used
+
+Inputs:
+- self: Pointer to the projection to initialize
+- fov: Field of view angle in radians
+- aspect: Aspect ratio (width/height). If 0, uses window aspect (default: 0)
+- near: Near plane distance (default: 0.1)
+- far: Far plane distance (default: 100)
+- flip_z_axis_for_vulkan: Whether to flip Z axis for Vulkan (default: true)
+
+Returns:
+- None
+*/
 projection_init_matrix_perspective :: proc (self:^projection, fov:f32, aspect:f32 = 0, near:f32 = 0.1, far:f32 = 100, flip_z_axis_for_vulkan := true) {
     __projection_update_perspective(self, fov, aspect, near, far, flip_z_axis_for_vulkan)
     __projection_init(self)
 }
 
+/*
+Initializes a projection with a raw matrix
+
+Inputs:
+- self: Pointer to the projection to initialize
+- mat: The projection matrix to use
+
+Returns:
+- None
+*/
 projection_init_matrix_raw :: proc (self:^projection, mat:linalg.Matrix) {
     self.mat = mat
     __projection_init(self)
@@ -47,6 +107,22 @@ projection_init_matrix_raw :: proc (self:^projection, mat:linalg.Matrix) {
 // Projection Update
 // ============================================================================
 
+/*
+Updates an orthographic projection matrix
+
+Inputs:
+- self: Pointer to the projection to update
+- left: Left plane coordinate
+- right: Right plane coordinate
+- bottom: Bottom plane coordinate
+- top: Top plane coordinate
+- near: Near plane distance (default: 0.1)
+- far: Far plane distance (default: 100)
+- flip_z_axis_for_vulkan: Whether to flip Z axis for Vulkan (default: true)
+
+Returns:
+- None
+*/
 projection_update_ortho :: #force_inline proc(self:^projection,  left:f32, right:f32, bottom:f32, top:f32, near:f32 = 0.1, far:f32 = 100, flip_z_axis_for_vulkan := true) {
     __projection_update_ortho(self, left, right, bottom, top, near, far, flip_z_axis_for_vulkan)
     projection_update_matrix_raw(self, self.mat)
@@ -62,6 +138,16 @@ projection_update_perspective :: #force_inline proc(self:^projection, fov:f32, a
     projection_update_matrix_raw(self, self.mat)
 }
 
+/*
+Updates the projection with a raw matrix
+
+Inputs:
+- self: Pointer to the projection to update
+- _mat: The new projection matrix
+
+Returns:
+- None
+*/
 projection_update_matrix_raw :: proc(self:^projection, _mat:linalg.Matrix) {
     mem.ICheckInit_Check(&self.check_init)
     mat : linalg.Matrix
@@ -73,10 +159,6 @@ projection_update_matrix_raw :: proc(self:^projection, _mat:linalg.Matrix) {
     self.mat = _mat
     buffer_resource_copy_update(&self.mat_uniform, &mat)
 }
-
-// ============================================================================
-// Private Helper Functions
-// ============================================================================
 
 @private __projection_update_ortho :: #force_inline proc(self:^projection, left:f32, right:f32, bottom:f32, top:f32, near:f32 = 0.1, far:f32 = 100, flip_z_axis_for_vulkan := true) {
     self.mat = linalg.matrix_ortho3d_f32(left, right, bottom, top, near, far, flip_z_axis_for_vulkan)
@@ -142,6 +224,15 @@ projection_update_matrix_raw :: proc(self:^projection, _mat:linalg.Matrix) {
 // Projection Cleanup
 // ============================================================================
 
+/*
+Deinitializes and cleans up projection resources
+
+Inputs:
+- self: Pointer to the projection to deinitialize
+
+Returns:
+- None
+*/
 projection_deinit :: proc(self:^projection) {
     mem.ICheckInit_Deinit(&self.check_init)
 

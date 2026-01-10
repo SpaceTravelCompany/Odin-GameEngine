@@ -112,6 +112,15 @@ sound_src :: struct {
     }
 }
 
+/*
+Deinitializes and cleans up sound resources
+
+Inputs:
+- self: Pointer to the sound to deinitialize
+
+Returns:
+- None
+*/
 sound_deinit :: proc(self:^sound) {
     sync.mutex_lock(&g_sounds_mtx)
     defer sync.mutex_unlock(&g_sounds_mtx)
@@ -155,6 +164,15 @@ sound_deinit :: proc(self:^sound) {
     delete(g_sounds)
 }
 
+/*
+Deinitializes a sound source and all sounds using it
+
+Inputs:
+- self: Pointer to the sound source to deinitialize
+
+Returns:
+- None
+*/
 sound_src_deinit :: proc(self:^sound_src) {
     sync.mutex_lock(&g_sounds_mtx)
     for key in g_sounds {
@@ -165,6 +183,18 @@ sound_src_deinit :: proc(self:^sound_src) {
     free(self)
 }
 
+/*
+Plays a sound from memory using a sound source
+
+Inputs:
+- self: Pointer to the sound source
+- volume: Volume level (0.0 to 1.0)
+- loop: Whether to loop the sound
+
+Returns:
+- Pointer to the playing sound
+- An error if playback failed
+*/
 sound_src_play_sound_memory :: proc(self:^sound_src, volume:f32, loop:bool) -> (snd: ^sound, err: sound_error) {
     if !intrinsics.atomic_load_explicit(&started, .Acquire) do trace.panic_log("sound_src_play_sound_memory : sound not started.")
 

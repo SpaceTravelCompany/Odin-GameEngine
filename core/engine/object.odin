@@ -28,6 +28,11 @@ ianimate_object_vtable :: struct {
     get_frame_cnt: #type proc "contextless" (self:^ianimate_object) -> u32,
 }
 
+/*
+Base object interface structure for all renderable objects
+
+Contains transformation matrix, descriptor set, camera, projection, and vtable for polymorphic behavior
+*/
 iobject :: struct {
     using _: __matrix_in,
     set:descriptor_set,
@@ -169,6 +174,23 @@ SR_2D_MATRIX2 :: proc "contextless" (s: linalg.PointF, r: f32, cp:linalg.PointF)
 // IObject Initialization
 // ============================================================================
 
+/*
+Initializes an iobject with transformation parameters
+
+Inputs:
+- self: Pointer to the object to initialize
+- actual_type: The actual type of the object (must be a subtype of iobject)
+- pos: Position of the object
+- rotation: Rotation angle in radians
+- scale: Scale factors (default: {1, 1})
+- _camera: Pointer to the camera
+- _projection: Pointer to the projection
+- _color_transform: Pointer to color transform (default: nil)
+- pivot: Pivot point for transformations (default: {0.0, 0.0})
+
+Example:
+	iobject_init(&obj, MyObject, {0, 0, 0}, 0.0, {1, 1}, &cam, &proj)
+*/
 iobject_init :: proc(self:^iobject, $actual_type:typeid,
     pos:linalg.Point3DF, rotation:f32, scale:linalg.PointF = {1,1},
     _camera:^camera, _projection:^projection, _color_transform:^color_transform = nil, pivot:linalg.PointF = {0.0, 0.0})
@@ -278,6 +300,19 @@ iobject_init2 :: proc(self:^iobject, $actual_type:typeid,
 // IObject Update Functions
 // ============================================================================
 
+/*
+Updates the object's transformation matrix
+
+Inputs:
+- self: Pointer to the object
+- pos: New position
+- rotation: New rotation angle in radians (default: 0.0)
+- scale: New scale factors (default: {1.0, 1.0})
+- pivot: Pivot point for transformations (default: {0.0, 0.0})
+
+Returns:
+- None
+*/
 iobject_update_transform :: proc(self:^iobject, pos:linalg.Point3DF, rotation:f32 = 0.0, scale:linalg.PointF = {1.0,1.0}, pivot:linalg.PointF = {0.0,0.0}) {
     mem.ICheckInit_Check(&self.check_init)
     self.mat = SRT_2D_MATRIX2(pos, scale, rotation, pivot)
@@ -369,6 +404,16 @@ iobject_get_actual_type :: #force_inline proc "contextless" (self:^iobject) -> t
     return self.actual_type
 }
 
+/*
+Draws the object using its vtable draw function
+
+Inputs:
+- self: Pointer to the object
+- cmd: Command buffer to record draw commands
+
+Returns:
+- None
+*/
 iobject_draw :: proc (self:^iobject, cmd:command_buffer) {
     if self.vtable != nil && self.vtable.draw != nil {
         self.vtable.draw(self, cmd)
@@ -377,6 +422,15 @@ iobject_draw :: proc (self:^iobject, cmd:command_buffer) {
     }
 }
 
+/*
+Deinitializes and cleans up object resources
+
+Inputs:
+- self: Pointer to the object to deinitialize
+
+Returns:
+- None
+*/
 iobject_deinit :: proc(self:^iobject) {
     if self.vtable != nil && self.vtable.deinit != nil {
         self.vtable.deinit(self)
@@ -407,8 +461,7 @@ set_render_clear_color :: proc "contextless" (_color:linalg.Point3DwF) {
     g_clear_color = _color
 }
 
-//AUTO DELETE USE engine_def_allocator
-@private __vertex_buf_init :: proc (self:^__vertex_buf($NodeType), array:[]NodeType, _flag:resource_usage, _useGPUMem := false) {
+@private __vertex_buf_init :: proc (self:^__vertex_buf($NodeType), array:[]NodeType, _flag:resource_usage, _useGPUMem := false, allocator :Maybe(runtime.Allocator) = nil) {
     mem.ICheckInit_Init(&self.check_init)
     if len(array) == 0 do trace.panic_log("vertex_buf_init: array is empty")
     buffer_resource_create_buffer(&self.buf, {
@@ -417,7 +470,7 @@ set_render_clear_color :: proc "contextless" (_color:linalg.Point3DwF) {
         resource_usage = _flag,
         single = false,
         use_gcpu_mem = _useGPUMem,
-    }, mem.slice_to_bytes(array), false, engine_def_allocator)
+    }, mem.slice_to_bytes(array), false, allocator)
 }
 
 @private __vertex_buf_deinit :: proc (self:^__vertex_buf($NodeType)) {
@@ -428,11 +481,10 @@ set_render_clear_color :: proc "contextless" (_color:linalg.Point3DwF) {
     buffer_resource_deinit(clone_buf)
 }
 
-@private __vertex_buf_update :: proc (self:^__vertex_buf($NodeType), array:[]NodeType) {
-    buffer_resource_map_update_slice(&self.buf, array, engine_def_allocator)
+@private __vertex_buf_update :: proc (self:^__vertex_buf($NodeType), array:[]NodeType, allocator :Maybe(runtime.Allocator) = nil) {
+    buffer_resource_map_update_slice(&self.buf, array, allocator)
 }
 
-//AUTO DELETE USE engine_def_allocator
 @private __storage_buf_init :: proc (self:^__storage_buf($NodeType), array:[]NodeType, _flag:resource_usage, _useGPUMem := false) {
     mem.ICheckInit_Init(&self.check_init)
     if len(array) == 0 do trace.panic_log("storage_buf_init: array is empty")
@@ -457,8 +509,7 @@ set_render_clear_color :: proc "contextless" (_color:linalg.Point3DwF) {
     buffer_resource_map_update_slice(&self.buf, array, engine_def_allocator)
 }
 
-//AUTO DELETE USE engine_def_allocator
-@private __index_buf_init :: proc (self:^__index_buf, array:[]u32, _flag:resource_usage, _useGPUMem := false) {
+@private __index_buf_init :: proc (self:^__index_buf, array:[]u32, _flag:resource_usage, _useGPUMem := false, allocator :Maybe(runtime.Allocator) = nil) {
     mem.ICheckInit_Init(&self.check_init)
     if len(array) == 0 do trace.panic_log("index_buf_init: array is empty")
     buffer_resource_create_buffer(&self.buf, {
@@ -466,7 +517,7 @@ set_render_clear_color :: proc "contextless" (_color:linalg.Point3DwF) {
         type = .INDEX,
         resource_usage = _flag,
         use_gcpu_mem = _useGPUMem,
-    }, mem.slice_to_bytes(array), false, engine_def_allocator)
+    }, mem.slice_to_bytes(array), false, allocator)
 }
 
 
@@ -478,8 +529,8 @@ set_render_clear_color :: proc "contextless" (_color:linalg.Point3DwF) {
     buffer_resource_deinit(clone_buf)
 }
 
-@private __index_buf_update :: #force_inline proc (self:^__index_buf, array:[]u32) {
-    buffer_resource_map_update_slice(&self.buf, array, engine_def_allocator)
+@private __index_buf_update :: #force_inline proc (self:^__index_buf, array:[]u32, allocator :Maybe(runtime.Allocator) = nil) {
+    buffer_resource_map_update_slice(&self.buf, array, allocator)
 }
 
 // ============================================================================

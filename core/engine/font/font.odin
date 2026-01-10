@@ -109,6 +109,18 @@ freetype_err :: freetype.Error
 // Font Management
 // ============================================================================
 
+/*
+Initializes a font from font data
+
+Inputs:
+- _fontData: Font file data as bytes
+- _faceIdx: Face index in the font file (default: 0)
+- allocator: Allocator to use (default: context.allocator)
+
+Returns:
+- Pointer to the initialized font, or nil on error
+- An error if initialization failed
+*/
 font_init :: proc(_fontData:[]byte, #any_int _faceIdx:int = 0, allocator:mem.Allocator = context.allocator) -> (font : ^font = nil, err : freetype_err = .Ok)  {
     font_ := mem.new_non_zeroed(font_t, allocator)
     defer if err != .Ok do free(font_, allocator)
@@ -138,6 +150,15 @@ font_init :: proc(_fontData:[]byte, #any_int _faceIdx:int = 0, allocator:mem.All
     return
 }
 
+/*
+Deinitializes and cleans up font resources
+
+Inputs:
+- self: Pointer to the font to deinitialize
+
+Returns:
+- An error if deinitialization failed
+*/
 font_deinit :: proc(self:^font) -> (err : freetype.Error = .Ok) {
     self_:^font_t = auto_cast self
     sync.mutex_lock(&self_.mutex)
@@ -155,6 +176,16 @@ font_deinit :: proc(self:^font) -> (err : freetype.Error = .Ok) {
     return
 }
 
+/*
+Sets the scale of the font
+
+Inputs:
+- self: Pointer to the font
+- scale: Scale factor for the font
+
+Returns:
+- None
+*/
 font_set_scale :: proc(self:^font, scale:f32) {
     self_:^font_t = auto_cast self
     sync.mutex_lock(&self_.mutex)
@@ -539,6 +570,19 @@ font_render_string2 :: proc(_str:string, _renderOpt:font_render_opt2, allocator 
 }
 
 
+/*
+Renders a string using the font
+
+Inputs:
+- self: Pointer to the font
+- _str: String to render
+- _renderOpt: Rendering options
+- allocator: Allocator to use (default: context.allocator)
+
+Returns:
+- Pointer to the raw shape containing the rendered geometry
+- An error if rendering failed
+*/
 font_render_string :: proc(self:^font, _str:string, _renderOpt:font_render_opt, allocator := context.allocator) -> (res:^geometry.raw_shape, err:geometry.shape_error = nil) {
     vertList := make([dynamic]geometry.shape_vertex2d, allocator)
     indList := make([dynamic]u32, allocator)

@@ -315,6 +315,16 @@ graphics_end_single_time_cmd :: #force_inline proc "contextless" (cmd: command_b
 	vk_end_single_time_cmd(cmd.__handle)
 }
 
+/*
+Allocates command buffers from the command pool
+
+Inputs:
+- p_cmd_buffer: Pointer to the array of command buffers to allocate
+- count: Number of command buffers to allocate
+
+Returns:
+- None
+*/
 allocate_command_buffers :: proc(p_cmd_buffer: [^]command_buffer, count: u32) {
 	alloc_info := vk.CommandBufferAllocateInfo{
 		sType = vk.StructureType.COMMAND_BUFFER_ALLOCATE_INFO,
@@ -326,6 +336,16 @@ allocate_command_buffers :: proc(p_cmd_buffer: [^]command_buffer, count: u32) {
 	if res != .SUCCESS do trace.panic_log("res = vk.AllocateCommandBuffers(graphics_device, &alloc_info, &cmd.cmds[i][0]) : ", res)
 }
 
+/*
+Frees command buffers back to the command pool
+
+Inputs:
+- p_cmd_buffer: Pointer to the array of command buffers to free
+- count: Number of command buffers to free
+
+Returns:
+- None
+*/
 free_command_buffers :: proc(p_cmd_buffer: [^]command_buffer, count: u32) {
 	vk.FreeCommandBuffers(graphics_device, vk_cmd_pool, count, auto_cast p_cmd_buffer)
 }
@@ -462,6 +482,16 @@ update_descriptor_sets :: #force_inline proc(descriptor_sets: []descriptor_set) 
 // Color Transform
 // ============================================================================
 
+/*
+Initializes a color transform with a raw matrix
+
+Inputs:
+- self: Pointer to the color transform to initialize
+- mat: The color transform matrix (default: identity matrix)
+
+Returns:
+- None
+*/
 color_transform_init_matrix_raw :: proc(self: ^color_transform, mat: linalg.Matrix = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1}) {
 	self.mat = mat
 	__color_transform_init(self)
@@ -476,6 +506,15 @@ color_transform_init_matrix_raw :: proc(self: ^color_transform, mat: linalg.Matr
 	}, mem.ptr_to_bytes(&self.mat), true)
 }
 
+/*
+Deinitializes and cleans up color transform resources
+
+Inputs:
+- self: Pointer to the color transform to deinitialize
+
+Returns:
+- None
+*/
 color_transform_deinit :: proc(self: ^color_transform) {
 	mem.ICheckInit_Deinit(&self.check_init)
 	clone_mat_uniform := new(buffer_resource, temp_arena_allocator)
@@ -483,6 +522,16 @@ color_transform_deinit :: proc(self: ^color_transform) {
 	buffer_resource_deinit(clone_mat_uniform)
 }
 
+/*
+Updates the color transform with a raw matrix
+
+Inputs:
+- self: Pointer to the color transform to update
+- _mat: The new color transform matrix
+
+Returns:
+- None
+*/
 color_transform_update_matrix_raw :: proc(self: ^color_transform, _mat: linalg.Matrix) {
 	mem.ICheckInit_Check(&self.check_init)
 	self.mat = _mat
@@ -501,6 +550,19 @@ color_transform_update_matrix_raw :: proc(self: ^color_transform, _mat: linalg.M
 // Pipeline Creation
 // ============================================================================
 
+/*
+Creates a graphics pipeline for a custom object
+
+Inputs:
+- self: Pointer to the custom object pipeline
+- stages: Shader stage create info array
+- depth_stencil_state: Depth stencil state create info
+- viewport_state: Viewport state create info
+- vertex_input_state: Vertex input state create info
+
+Returns:
+- `true` if pipeline creation succeeded, `false` otherwise
+*/
 create_graphics_pipeline :: proc(
 	self: ^custom_object_pipeline,
 	stages: []vk.PipelineShaderStageCreateInfo,
@@ -531,6 +593,12 @@ create_graphics_pipeline :: proc(
 // Utility Functions
 // ============================================================================
 
+/*
+Gets the graphics origin format
+
+Returns:
+- The Vulkan format used as the graphics origin format
+*/
 get_graphics_origin_format :: proc "contextless" () -> vk.Format {
 	return vk_fmt.format
 }

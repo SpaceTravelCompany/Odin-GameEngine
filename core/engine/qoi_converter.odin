@@ -11,11 +11,25 @@ import "core:os/os2"
 import "core:sys/android"
 
 
+/*
+QOI image converter structure
+
+Stores the loaded image and allocator for memory management
+*/
 qoi_converter :: struct {
     img : ^image.Image,
     allocator:runtime.Allocator,
 }
 
+/*
+Gets the width of the loaded QOI image
+
+Inputs:
+- self: Pointer to the QOI converter
+
+Returns:
+- The width of the image in pixels, or 0 if no image is loaded
+*/
 qoi_converter_width :: proc "contextless" (self:^qoi_converter) -> u32 {
     if self.img != nil {
         return u32(self.img.width)
@@ -23,6 +37,15 @@ qoi_converter_width :: proc "contextless" (self:^qoi_converter) -> u32 {
     return 0
 }
 
+/*
+Gets the height of the loaded QOI image
+
+Inputs:
+- self: Pointer to the QOI converter
+
+Returns:
+- The height of the image in pixels, or 0 if no image is loaded
+*/
 qoi_converter_height :: proc "contextless" (self:^qoi_converter) -> u32 {
     if self.img != nil {
         return u32(self.img.height)
@@ -30,6 +53,15 @@ qoi_converter_height :: proc "contextless" (self:^qoi_converter) -> u32 {
     return 0
 }
 
+/*
+Gets the size in bytes of the loaded QOI image
+
+Inputs:
+- self: Pointer to the QOI converter
+
+Returns:
+- The size of the image data in bytes, or 0 if no image is loaded
+*/
 qoi_converter_size :: proc "contextless" (self:^qoi_converter) -> u32 {
     if self.img != nil {
         return u32((self.img.depth >> 3) * self.img.width * self.img.height)
@@ -39,6 +71,22 @@ qoi_converter_size :: proc "contextless" (self:^qoi_converter) -> u32 {
 
 qoi_converter_deinit :: image_converter_deinit
 
+/*
+Loads a QOI image from byte data
+
+Inputs:
+- self: Pointer to the QOI converter
+- data: The QOI image data as bytes
+- out_fmt: The desired output color format
+- allocator: The allocator to use (default: context.allocator)
+
+Returns:
+- The decoded image data as bytes
+- An error if loading failed
+
+Example:
+	data, err := qoi_converter_load(&converter, file_data, .RGBA)
+*/
 qoi_converter_load :: proc (self:^qoi_converter, data:[]byte, out_fmt:color_fmt, allocator := context.allocator) -> ([]byte, Qoi_Error) {
     qoi_converter_deinit(self)
 
@@ -72,6 +120,22 @@ Qoi_Error :: union #shared_nil {
     __Qoi_Error,
 }
 
+/*
+Loads a QOI image from a file
+
+Inputs:
+- self: Pointer to the QOI converter
+- file_path: Path to the QOI image file
+- out_fmt: The desired output color format
+- allocator: The allocator to use (default: context.allocator)
+
+Returns:
+- The decoded image data as bytes
+- An error if loading failed
+
+Example:
+	data, err := qoi_converter_load_file(&converter, "image.qoi", .RGBA)
+*/
 qoi_converter_load_file :: proc (self:^qoi_converter, file_path:string, out_fmt:color_fmt, allocator := context.allocator) -> ([]byte, Qoi_Error) {
     imgFileData:[]byte
     when is_android {
@@ -92,6 +156,24 @@ qoi_converter_load_file :: proc (self:^qoi_converter, file_path:string, out_fmt:
     return qoi_converter_load(self, imgFileData, out_fmt, allocator)
 }
 
+/*
+Encodes image data to QOI format
+
+Inputs:
+- self: Pointer to the QOI converter
+- data: The image pixel data
+- in_fmt: The input color format
+- width: The width of the image
+- height: The height of the image
+- allocator: The allocator to use (default: context.allocator)
+
+Returns:
+- The encoded QOI data as bytes
+- An error if encoding failed
+
+Example:
+	encoded, err := qoi_converter_encode(&converter, pixel_data, .RGBA, 256, 256)
+*/
 qoi_converter_encode :: proc (self:^qoi_converter, data:[]byte, in_fmt:color_fmt, width:u32, height:u32, allocator := context.allocator) -> ([]byte, Qoi_Error) {
     qoi_converter_deinit(self)
 
@@ -138,6 +220,23 @@ qoi_converter_encode :: proc (self:^qoi_converter, data:[]byte, in_fmt:color_fmt
     return bytes.buffer_to_bytes(&out), nil
 }
 
+/*
+Encodes image data to QOI format and saves it to a file
+
+Inputs:
+- self: Pointer to the QOI converter
+- data: The image pixel data
+- in_fmt: The input color format
+- width: The width of the image
+- height: The height of the image
+- save_file_path: Path where to save the QOI file
+
+Returns:
+- An error if encoding or saving failed
+
+Example:
+	err := qoi_converter_encode_file(&converter, pixel_data, .RGBA, 256, 256, "output.qoi")
+*/
 qoi_converter_encode_file :: proc (self:^qoi_converter, data:[]byte, in_fmt:color_fmt, width:u32, height:u32, save_file_path:string) -> Qoi_Error {
     out, err := qoi_converter_encode(self, data, in_fmt, width, height, context.temp_allocator)
     if err != nil do return err

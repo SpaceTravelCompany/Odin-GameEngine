@@ -39,6 +39,16 @@ gui_component :: struct {
     return engine.SR_2D_MATRIX2(self_component.gui_scale, self_component.gui_rotation, self_component.gui_center_pt * mul)
 }
 
+/*
+Initializes a GUI component with alignment and positioning
+
+Inputs:
+- self: Pointer to the object to initialize (must be a subtype of iobject)
+- self_component: Pointer to the GUI component with positioning and alignment data
+
+Returns:
+- None
+*/
  gui_component_init :: proc (self:^$T, self_component:^gui_component)
     where intrinsics.type_is_subtype_of(T, engine.iobject)  {
     
@@ -90,6 +100,16 @@ gui_component :: struct {
     self.mat = base != nil ? linalg.mul(mat, base.?) : mat
 }
 
+/*
+Initializes a GUI component and updates its transform matrix
+
+Inputs:
+- self: Pointer to the object (must be a subtype of iobject)
+- self_component: Pointer to the GUI component
+
+Returns:
+- None
+*/
 gui_component_size ::  proc (self:^$T, self_component:^gui_component)
     where intrinsics.type_is_subtype_of(T, engine.iobject) {
     gui_component_init(self, self_component)

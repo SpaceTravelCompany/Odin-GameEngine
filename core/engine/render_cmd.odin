@@ -8,6 +8,12 @@ import vk "vendor:vulkan"
 
 
 MAX_FRAMES_IN_FLIGHT :: 2
+
+/*
+Render command structure for managing render objects
+
+Manages a collection of objects to be rendered and their command buffers
+*/
 render_cmd :: struct {}
 
 @private __render_cmd :: struct {
@@ -22,6 +28,15 @@ render_cmd :: struct {}
 @private __g_main_render_cmd_idx : int = -1
 @private __g_render_cmd_mtx : sync.Mutex
 
+/*
+Initializes a new render command structure
+
+Returns:
+- Pointer to the initialized render command
+
+Example:
+	cmd := render_cmd_init()
+*/
 render_cmd_init :: proc() -> ^render_cmd {
     cmd := new(__render_cmd)
     cmd.scene = mem.make_non_zeroed([dynamic]^iobject)
@@ -39,6 +54,15 @@ render_cmd_init :: proc() -> ^render_cmd {
     return (^render_cmd)(cmd)
 }
 
+/*
+Deinitializes and cleans up render command resources
+
+Inputs:
+- cmd: Pointer to the render command to deinitialize
+
+Returns:
+- None
+*/
 render_cmd_deinit :: proc(cmd: ^render_cmd) {
     cmd_ :^__render_cmd = (^__render_cmd)(cmd)
     for i in 0..<MAX_FRAMES_IN_FLIGHT {
@@ -60,6 +84,15 @@ render_cmd_deinit :: proc(cmd: ^render_cmd) {
     free(cmd)
 }
 
+/*
+Sets the render command as the main one to display
+
+Inputs:
+- _cmd: Pointer to the render command to show
+
+Returns:
+- `true` if successful, `false` if the command was not found
+*/
 render_cmd_show :: proc (_cmd: ^render_cmd) -> bool {
     sync.mutex_lock(&__g_render_cmd_mtx)
     defer sync.mutex_unlock(&__g_render_cmd_mtx)
@@ -73,6 +106,16 @@ render_cmd_show :: proc (_cmd: ^render_cmd) -> bool {
     return false
 }
 
+/*
+Adds an object to the render command's scene
+
+Inputs:
+- cmd: Pointer to the render command
+- obj: Pointer to the object to add
+
+Returns:
+- None
+*/
 render_cmd_add_object :: proc(cmd: ^render_cmd, obj: ^iobject) {
     cmd_ :^__render_cmd = (^__render_cmd)(cmd)
     sync.rw_mutex_shared_lock(&cmd_.obj_lock)
@@ -88,6 +131,16 @@ render_cmd_add_object :: proc(cmd: ^render_cmd, obj: ^iobject) {
     render_cmd_refresh(cmd)
 }
 
+/*
+Adds multiple objects to the render command's scene
+
+Inputs:
+- cmd: Pointer to the render command
+- objs: Variable number of object pointers to add
+
+Returns:
+- None
+*/
 render_cmd_add_objects :: proc(cmd: ^render_cmd, objs: ..^iobject) {
     cmd_ :^__render_cmd = (^__render_cmd)(cmd)
     sync.rw_mutex_shared_lock(&cmd_.obj_lock)
@@ -106,6 +159,16 @@ render_cmd_add_objects :: proc(cmd: ^render_cmd, objs: ..^iobject) {
 }
 
 
+/*
+Removes an object from the render command's scene
+
+Inputs:
+- cmd: Pointer to the render command
+- obj: Pointer to the object to remove
+
+Returns:
+- None
+*/
 render_cmd_remove_object :: proc(cmd: ^render_cmd, obj: ^iobject) {
     cmd_ :^__render_cmd = (^__render_cmd)(cmd)
     sync.rw_mutex_shared_lock(&cmd_.obj_lock)
@@ -120,6 +183,15 @@ render_cmd_remove_object :: proc(cmd: ^render_cmd, obj: ^iobject) {
     }
 }
 
+/*
+Removes all objects from the render command's scene
+
+Inputs:
+- cmd: Pointer to the render command
+
+Returns:
+- None
+*/
 render_cmd_remove_all :: proc(cmd: ^render_cmd) {
     cmd_ :^__render_cmd = (^__render_cmd)(cmd)
     sync.rw_mutex_shared_lock(&cmd_.obj_lock)
@@ -129,6 +201,16 @@ render_cmd_remove_all :: proc(cmd: ^render_cmd) {
     if obj_len > 0 do render_cmd_refresh(cmd)
 }
 
+/*
+Checks if an object is in the render command's scene
+
+Inputs:
+- cmd: Pointer to the render command
+- obj: Pointer to the object to check
+
+Returns:
+- `true` if the object is in the scene, `false` otherwise
+*/
 render_cmd_has_object :: proc "contextless"(cmd: ^render_cmd, obj: ^iobject) -> bool {
     cmd_ :^__render_cmd = (^__render_cmd)(cmd)
     sync.rw_mutex_shared_lock(&cmd_.obj_lock)
@@ -142,6 +224,15 @@ render_cmd_has_object :: proc "contextless"(cmd: ^render_cmd, obj: ^iobject) -> 
     return false
 }
 
+/*
+Gets the number of objects in the render command's scene
+
+Inputs:
+- cmd: Pointer to the render command
+
+Returns:
+- The number of objects in the scene
+*/
 render_cmd_get_object_len :: proc "contextless" (cmd: ^render_cmd) -> int {
     cmd_ :^__render_cmd = (^__render_cmd)(cmd)
     sync.rw_mutex_shared_lock(&cmd_.obj_lock)
@@ -149,6 +240,16 @@ render_cmd_get_object_len :: proc "contextless" (cmd: ^render_cmd) -> int {
     return len(cmd_.scene)
 }
 
+/*
+Gets an object from the render command's scene by index
+
+Inputs:
+- cmd: Pointer to the render command
+- index: The index of the object to get
+
+Returns:
+- Pointer to the object at the specified index
+*/
 render_cmd_get_object :: proc "contextless" (cmd: ^render_cmd, index: int) -> ^iobject {
     cmd_ :^__render_cmd = (^__render_cmd)(cmd)
     sync.rw_mutex_shared_lock(&cmd_.obj_lock)
@@ -156,6 +257,16 @@ render_cmd_get_object :: proc "contextless" (cmd: ^render_cmd, index: int) -> ^i
     return cmd_.scene[index]
 }
 
+/*
+Gets the index of an object in the render command's scene
+
+Inputs:
+- cmd: Pointer to the render command
+- obj: Pointer to the object to find
+
+Returns:
+- The index of the object, or -1 if not found
+*/
 render_cmd_get_object_idx :: proc "contextless"(cmd: ^render_cmd, obj: ^iobject) -> int {
     cmd_ :^__render_cmd = (^__render_cmd)(cmd)
     sync.rw_mutex_shared_lock(&cmd_.obj_lock)
@@ -168,6 +279,20 @@ render_cmd_get_object_idx :: proc "contextless"(cmd: ^render_cmd, obj: ^iobject)
     return -1
 }
 
+/*
+Gets all objects from the render command's scene
+
+**Note:** This function is not thread-safe
+
+Inputs:
+- cmd: Pointer to the render command
+
+Returns:
+- A slice of all objects in the scene
+
+Example:
+	objects := render_cmd_get_objects(cmd)
+*/
 //! thread non safe
 render_cmd_get_objects :: proc(cmd: ^render_cmd) -> []^iobject {
     cmd_ :^__render_cmd = (^__render_cmd)(cmd)
@@ -179,6 +304,15 @@ render_cmd_get_objects :: proc(cmd: ^render_cmd) -> []^iobject {
     return cmd_.scene_t[:]
 }
 
+/*
+Marks the render command for refresh on all frames in flight
+
+Inputs:
+- cmd: Pointer to the render command
+
+Returns:
+- None
+*/
 render_cmd_refresh :: proc "contextless" (cmd: ^render_cmd) {
     cmd_ :^__render_cmd = (^__render_cmd)(cmd)
     for &b in cmd_.refresh {
@@ -186,6 +320,12 @@ render_cmd_refresh :: proc "contextless" (cmd: ^render_cmd) {
     }
 }
 
+/*
+Marks all render commands for refresh on all frames in flight
+
+Returns:
+- None
+*/
 render_cmd_refresh_all :: proc "contextless" () {
     sync.mutex_lock(&__g_render_cmd_mtx)
     defer sync.mutex_unlock(&__g_render_cmd_mtx)

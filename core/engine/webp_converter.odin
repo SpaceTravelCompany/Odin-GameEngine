@@ -13,6 +13,11 @@ import "vendor:webp"
     webp.WebPAnimDecoderOptions,
 }
 
+/*
+WebP image converter structure
+
+Supports both static images and animated WebP images
+*/
 webp_converter :: struct {
     anim_dec:^webp.WebPAnimDecoder,
     anim_info:webp.WebPAnimInfo,
@@ -21,6 +26,15 @@ webp_converter :: struct {
     allocator:runtime.Allocator,
 }
 
+/*
+Gets the width of the loaded WebP image
+
+Inputs:
+- self: Pointer to the WebP converter
+
+Returns:
+- The width of the image in pixels, or 0 if no image is loaded
+*/
 webp_converter_width :: proc "contextless" (self:^webp_converter) -> u32 {
     if self.config != nil {
         switch &t in self.config {
@@ -33,6 +47,15 @@ webp_converter_width :: proc "contextless" (self:^webp_converter) -> u32 {
     return 0
 }
 
+/*
+Gets the height of the loaded WebP image
+
+Inputs:
+- self: Pointer to the WebP converter
+
+Returns:
+- The height of the image in pixels, or 0 if no image is loaded
+*/
 webp_converter_height :: proc "contextless" (self:^webp_converter) -> u32 {
     if self.config != nil {
         switch &t in self.config {
@@ -45,6 +68,17 @@ webp_converter_height :: proc "contextless" (self:^webp_converter) -> u32 {
     return 0
 }
 
+/*
+Gets the size in bytes of the loaded WebP image
+
+For animated WebP, returns the total size of all frames
+
+Inputs:
+- self: Pointer to the WebP converter
+
+Returns:
+- The size of the image data in bytes, or 0 if no image is loaded
+*/
 webp_converter_size :: proc "contextless" (self:^webp_converter) -> u32 {
     if self.config != nil {
         switch &t in self.config {
@@ -57,6 +91,15 @@ webp_converter_size :: proc "contextless" (self:^webp_converter) -> u32 {
     return 0
 }
 
+/*
+Gets the number of frames in the WebP image
+
+Inputs:
+- self: Pointer to the WebP converter
+
+Returns:
+- The number of frames (1 for static images), or -1 if no image is loaded
+*/
 webp_converter_frame_cnt :: proc "contextless" (self:^webp_converter) -> int {
     if self.config != nil {
         switch &t in self.config {
@@ -82,6 +125,24 @@ webp_converter_deinit :: proc (self:^webp_converter) {
     }
 }
 
+/*
+Loads a WebP image from byte data
+
+Supports both static and animated WebP images
+
+Inputs:
+- self: Pointer to the WebP converter
+- data: The WebP image data as bytes
+- out_fmt: The desired output color format
+- allocator: The allocator to use (default: context.allocator)
+
+Returns:
+- The decoded image data as bytes (all frames for animated images)
+- An error if loading failed
+
+Example:
+	data, err := webp_converter_load(&converter, file_data, .RGBA)
+*/
 webp_converter_load :: proc (self:^webp_converter, data:[]byte, out_fmt:color_fmt, allocator := context.allocator) -> ([]byte, WebP_Error) {
     webp_converter_deinit(self)
 
@@ -188,6 +249,22 @@ WebP_Error :: union #shared_nil {
     os2.Error,
 }
 
+/*
+Loads a WebP image from a file
+
+Inputs:
+- self: Pointer to the WebP converter
+- file_path: Path to the WebP image file
+- out_fmt: The desired output color format
+- allocator: The allocator to use (default: context.allocator)
+
+Returns:
+- The decoded image data as bytes
+- An error if loading failed
+
+Example:
+	data, err := webp_converter_load_file(&converter, "image.webp", .RGBA)
+*/
 webp_converter_load_file :: proc (self:^webp_converter, file_path:string, out_fmt:color_fmt, allocator := context.allocator) -> ([]byte, WebP_Error) {
     imgFileData:[]byte
     when is_android {

@@ -11,6 +11,11 @@ import "base:runtime"
 import vk "vendor:vulkan"
    
 
+/*
+Shape source structure containing vertex and index buffers
+
+**Note:** `vertexBuf` and `indexBuf` have `check_init: ICheckInit`, so no separate initialization check is needed
+*/
 shape_src :: struct {
     //?vertexBuf, indexBuf에 check_init: ICheckInit 있으므로 따로 필요없음
     vertexBuf:__vertex_buf(geometry.shape_vertex2d),
@@ -18,6 +23,11 @@ shape_src :: struct {
     rect:linalg.RectF,
 }
 
+/*
+Shape object structure for rendering geometric shapes
+
+Extends iobject with shape source data
+*/
 shape :: struct {
     using object:iobject,
     src: ^shape_src,
@@ -34,8 +44,8 @@ camera:^camera, projection:^projection,  rotation:f32 = 0.0, scale:linalg.PointF
  where intrinsics.type_is_subtype_of(actualType, shape) {
     self.src = src
 
-    self.set.bindings = __transform_uniform_pool_binding[:]
-    self.set.size = __transform_uniform_pool_sizes[:]
+    self.set.bindings = descriptor_set_binding__transform_uniform_pool[:]
+    self.set.size = descriptor_pool_size__transform_uniform_pool[:]
     self.set.layout = shape_descriptor_set_layout
 
     self.vtable = vtable == nil ? &shape_vtable : vtable
@@ -52,8 +62,8 @@ camera:^camera, projection:^projection, colorTransform:^color_transform = nil, v
  where intrinsics.type_is_subtype_of(actualType, shape) {
     self.src = src
 
-    self.set.bindings = __transform_uniform_pool_binding[:]
-    self.set.size = __transform_uniform_pool_sizes[:]
+    self.set.bindings = descriptor_set_binding__transform_uniform_pool[:]
+    self.set.size = descriptor_pool_size__transform_uniform_pool[:]
     self.set.layout = shape_descriptor_set_layout
 
     self.vtable = vtable == nil ? &shape_vtable : vtable
@@ -116,35 +126,55 @@ _super_shape_draw :: proc (self:^shape, cmd:command_buffer) {
     graphics_cmd_draw_indexed(cmd, auto_cast (self.src.indexBuf.buf.option.len / size_of(u32)), 1, 0, 0, 0)
 }
 
-shape_src_init_raw :: proc(self:^shape_src, raw:^geometry.raw_shape, flag:resource_usage = .GPU, colorFlag:resource_usage = .CPU) {
-    rawC := geometry.raw_shape_clone(raw, engine_def_allocator)
-    defer free(rawC, engine_def_allocator)
-    __vertex_buf_init(&self.vertexBuf, rawC.vertices, flag)
-    __index_buf_init(&self.indexBuf, rawC.indices, flag)
+shape_src_init_raw :: proc(self:^shape_src, raw:^geometry.raw_shape, flag:resource_usage = .GPU, colorFlag:resource_usage = .CPU, allocator :Maybe(runtime.Allocator) = nil) {
+    __vertex_buf_init(&self.vertexBuf, raw.vertices, flag, allocator=allocator)
+    __index_buf_init(&self.indexBuf, raw.indices, flag, allocator=allocator)
 
-    self.rect = rawC.rect
+    self.rect = raw.rect
 }
 
-@require_results shape_src_init :: proc(self:^shape_src, shapes:^geometry.shapes, flag:resource_usage = .GPU, colorFlag:resource_usage = .CPU) -> (err:geometry.shape_error = .None) {
+/*
+Initializes shape source from geometry shapes
+
+**Note:** `allocator` is used to allocate the raw shape and delete this when shape_src init is done. (async)
+
+Inputs:
+- self: Pointer to the shape source to initialize
+- shapes: Pointer to the geometry shapes
+- flag: Resource usage flag for buffers (default: .GPU)
+- colorFlag: Resource usage flag for colors (default: .CPU)
+
+Returns:
+- An error if initialization failed
+*/
+@require_results shape_src_init :: proc(self:^shape_src, shapes:^geometry.shapes, flag:resource_usage = .GPU, colorFlag:resource_usage = .CPU, allocator :runtime.Allocator = context.allocator) -> (err:geometry.shape_error = .None) {
     raw : ^geometry.raw_shape
-    raw, err = geometry.shapes_compute_polygon(shapes, engine_def_allocator)
+    raw, err = geometry.shapes_compute_polygon(shapes, allocator)
     if err != .None do return
 
-    __vertex_buf_init(&self.vertexBuf, raw.vertices, flag)
-    __index_buf_init(&self.indexBuf, raw.indices, flag)
+    __vertex_buf_init(&self.vertexBuf, raw.vertices, flag, allocator=allocator)
+    __index_buf_init(&self.indexBuf, raw.indices, flag, allocator=allocator)
 
     self.rect = raw.rect
 
-    defer free(raw)
+    //only delete raw single pointer
+    defer free(raw, allocator)
     return
 }
 
-shape_src_update_raw :: proc(self:^shape_src, raw:^geometry.raw_shape) {
-    rawC := geometry.raw_shape_clone(raw, engine_def_allocator)
-    __vertex_buf_update(&self.vertexBuf, rawC.vertices)
-    __index_buf_update(&self.indexBuf, rawC.indices)
+/*
+Updates the shape source with a new raw shape
 
-    defer free(rawC)
+**Note:** `allocator` is used to delete raw when shape_src update is done. (async) If allocator is nil, not delete raw.
+
+Inputs:
+- self: Pointer to the shape source to update
+- raw: Pointer to the new raw shape
+- allocator: The allocator to use for the raw shape
+*/
+shape_src_update_raw :: proc(self:^shape_src, raw:^geometry.raw_shape, allocator :Maybe(runtime.Allocator) = nil) {
+    __vertex_buf_update(&self.vertexBuf, raw.vertices, allocator)
+    __index_buf_update(&self.indexBuf, raw.indices, allocator)
 }
 
 @require_results shape_src_update :: proc(self:^shape_src, shapes:^geometry.shapes) -> (err:geometry.shape_error = .None) {
@@ -159,6 +189,12 @@ shape_src_update_raw :: proc(self:^shape_src, raw:^geometry.raw_shape) {
     return
 }
 
+/*
+Deinitializes and cleans up shape source resources
+
+Inputs:
+- self: Pointer to the shape source to deinitialize
+*/
 shape_src_deinit :: proc(self:^shape_src) {
     __vertex_buf_deinit(&self.vertexBuf)
     __index_buf_deinit(&self.indexBuf)

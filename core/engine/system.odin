@@ -34,8 +34,28 @@ size: #type proc() = proc () {}
 activate: #type proc "contextless" () = proc "contextless" () {}
 close: #type proc "contextless" () -> bool = proc "contextless" () -> bool{ return true }
 
+/*
+Gets the delta time in seconds
+
+Returns:
+- Delta time in seconds
+*/
 dt :: #force_inline proc "contextless" () -> f64 { return f64(delta_time) / 1000000000.0 }
+
+/*
+Gets the delta time in nanoseconds as u64
+
+Returns:
+- Delta time in nanoseconds
+*/
 dt_u64 :: #force_inline proc "contextless" () -> u64 { return delta_time }
+
+/*
+Gets the number of processor cores
+
+Returns:
+- The number of processor cores
+*/
 get_processor_core_len :: #force_inline proc "contextless" () -> int { return processor_core_len }
 
 android_api_level :: enum u32 {
@@ -123,6 +143,12 @@ when library.is_android {
 // Utility Functions
 // ============================================================================
 
+/*
+Checks if the engine is exiting
+
+Returns:
+- `true` if the engine is exiting, `false` otherwise
+*/
 exiting :: #force_inline proc  "contextless"() -> bool {return __exiting}
 
 when library.is_android {
@@ -159,6 +185,12 @@ when library.is_android {
 	delete(monitors)
 }
 
+/*
+Gets the default engine allocator
+
+Returns:
+- The default engine allocator
+*/
 def_allocator :: #force_inline proc "contextless" () -> mem.Allocator {
 	return engine_def_allocator
 }
@@ -167,6 +199,22 @@ def_allocator :: #force_inline proc "contextless" () -> mem.Allocator {
 // Main Entry Point
 // ============================================================================
 
+/*
+Main entry point for the engine
+
+Initializes the engine, creates a window, and runs the main loop
+
+Inputs:
+- window_title: Title of the window (default: "xfit")
+- window_x: X position of the window (default: nil)
+- window_y: Y position of the window (default: nil)
+- window_width: Width of the window (default: nil)
+- window_height: Height of the window (default: nil)
+- v_sync: Vertical sync mode (default: .Double)
+
+Returns:
+- None
+*/
 engine_main :: proc(
 	window_title:cstring = "xfit",
 	window_x:Maybe(int) = nil,
@@ -266,6 +314,12 @@ engine_main :: proc(
 // Memory Tracking
 // ============================================================================
 
+/*
+Starts tracking memory allocations for debugging
+
+Returns:
+- None
+*/
 start_tracking_allocator :: proc() {
 	when ODIN_DEBUG {
 		mem.tracking_allocator_init(&track_allocator, context.allocator)
@@ -329,16 +383,37 @@ destroy_tracking_allocator :: proc() {
 // Frame Management
 // ============================================================================
 
+/*
+Gets the maximum frame rate limit
+
+Returns:
+- Maximum frame rate in frames per second, or 0 if unlimited
+*/
 get_max_frame :: #force_inline proc "contextless" () -> f64 {
 	return intrinsics.atomic_load_explicit(&max_frame,.Relaxed)
 }
 
 
+/*
+Gets the current frames per second
+
+Returns:
+- Current FPS, or 0 if delta time is 0
+*/
 get_fps :: #force_inline proc "contextless" () -> f64 {
 	if delta_time == 0 do return 0
 	return 1.0 / dt()
 }
 
+/*
+Sets the maximum frame rate limit
+
+Inputs:
+- _maxframe: Maximum frame rate in frames per second (0 for unlimited)
+
+Returns:
+- None
+*/
 set_max_frame :: #force_inline proc "contextless" (_maxframe: f64) {
 	intrinsics.atomic_store_explicit(&max_frame, _maxframe, .Relaxed)
 }
@@ -365,6 +440,12 @@ windows_set_res_icon :: proc "contextless" (icon_resource_number:int) {
 	}
 }
 
+/*
+Exits the engine and cleans up resources
+
+Returns:
+- None
+*/
 exit :: proc "contextless" () {
 	when is_mobile {
 	} else {
@@ -382,6 +463,12 @@ start_console :: proc() {
 	}
 }
 
+/*
+Checks if the current thread is the main thread
+
+Returns:
+- `true` if the current thread is the main thread, `false` otherwise
+*/
 is_main_thread :: #force_inline proc "contextless" () -> bool {
 	return sync.current_thread_id() == main_thread_id
 }

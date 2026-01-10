@@ -318,14 +318,35 @@ pointer_move : #type proc (pointer_idx:int, x:f32, y:f32) = proc (pointer_idx:in
 // Mouse Functions
 // ============================================================================
 
+/*
+Checks if the mouse is outside the window
+
+Returns:
+- `true` if the mouse is outside the window, `false` otherwise
+*/
 is_mouse_out :: proc "contextless" () -> bool {
     return __is_mouse_out
 }
 
+/*
+Gets the current mouse position
+
+Returns:
+- Current mouse position in window coordinates
+*/
 mouse_pos :: #force_inline proc "contextless" () -> linalg.PointF {
     return __mouse_pos
 }
 
+/*
+Converts mouse position from window coordinates to centered coordinates
+
+Inputs:
+- pos: Mouse position in window coordinates
+
+Returns:
+- Mouse position in centered coordinates (origin at window center)
+*/
 convert_mouse_pos :: proc "contextless" (pos:linalg.PointF) -> linalg.PointF {
     w := f32(window_width()) / 2.0
     h := f32(window_height()) / 2.0

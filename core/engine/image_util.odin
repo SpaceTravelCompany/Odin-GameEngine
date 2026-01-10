@@ -11,6 +11,15 @@ import "core:math/rand"
 // Color Format Utilities
 // ============================================================================
 
+/*
+Returns the bit size of the given color format
+
+Inputs:
+- fmt: The color format to get the bit size for
+
+Returns:
+- The number of bits per pixel for the given format
+*/
 color_fmt_bit :: proc "contextless" (fmt: color_fmt) -> u32 {
     switch fmt {
         case .RGB, .BGR : return 24
@@ -27,6 +36,12 @@ color_fmt_bit :: proc "contextless" (fmt: color_fmt) -> u32 {
 	return 0
 }
 
+/*
+Returns the default color format based on the graphics origin format
+
+Returns:
+- The default color format for the current graphics system
+*/
 default_color_fmt :: proc "contextless" () -> color_fmt {
     return texture_fmt_to_color_fmt(vk_fmt_to_texture_fmt(get_graphics_origin_format()))
 }
@@ -35,6 +50,15 @@ default_color_fmt :: proc "contextless" () -> color_fmt {
 // Texture Format Utilities
 // ============================================================================
 
+/*
+Converts a texture format to a color format
+
+Inputs:
+- t: The texture format to convert
+
+Returns:
+- The corresponding color format, or `.Unknown` if unsupported
+*/
 @(require_results) texture_fmt_to_color_fmt :: proc "contextless" (t:texture_fmt) -> color_fmt {
 	#partial switch t {
 		case .DefaultColor:
@@ -48,6 +72,15 @@ default_color_fmt :: proc "contextless" () -> color_fmt {
     return .Unknown
 }
 
+/*
+Checks if the given texture format is a depth format
+
+Inputs:
+- t: The texture format to check
+
+Returns:
+- `true` if the format is a depth format, `false` otherwise
+*/
 @(require_results) texture_fmt_is_depth :: proc  "contextless" (t:texture_fmt) -> bool {
 	#partial switch(t) {
 		case .D24UnormS8Uint, .D32SfloatS8Uint, .D16UnormS8Uint, .DefaultDepth:
@@ -56,6 +89,15 @@ default_color_fmt :: proc "contextless" () -> color_fmt {
 	return false
 }
 
+/*
+Returns the bit size of the given texture format
+
+Inputs:
+- fmt: The texture format to get the bit size for
+
+Returns:
+- The number of bits per pixel for the given format
+*/
 @(require_results) texture_fmt_bit_size :: proc  "contextless" (fmt:texture_fmt) -> u32 {
     switch (fmt) {
         case .DefaultColor : return texture_fmt_bit_size(vk_fmt_to_texture_fmt(get_graphics_origin_format()))
@@ -74,6 +116,15 @@ default_color_fmt :: proc "contextless" () -> color_fmt {
     return 4
 }
 
+/*
+Converts a texture format to a Vulkan format
+
+Inputs:
+- t: The texture format to convert
+
+Returns:
+- The corresponding Vulkan format
+*/
 @(require_results) texture_fmt_to_vk_fmt :: proc "contextless" (t:texture_fmt) -> vk.Format {
 	switch t {
 		case .DefaultColor:
@@ -118,12 +169,23 @@ default_color_fmt :: proc "contextless" () -> color_fmt {
 	trace.panic_log("unsupport format vk_fmt_to_texture_fmt : ", t)
 }
 
-// 랜덤 RGBA 텍스처 생성 함수
-create_random_texture :: proc(width, height: u32, out_texture:^texture) {
+/*
+Creates a random RGBA texture with the specified dimensions
+
+Inputs:
+- width: The width of the texture in pixels
+- height: The height of the texture in pixels
+- out_texture: Pointer to the texture structure to initialize
+- allocator: The allocator to use for the texture data
+
+Returns:
+- None
+*/
+create_random_texture :: proc(width, height: u32, out_texture:^texture, allocator := context.allocator) {
     channels :: 4 // RGBA
     
     // 텍스처 데이터 배열 생성
-    texture_data := mem.make_non_zeroed([]u8, width * height * channels, engine_def_allocator)
+    texture_data := mem.make_non_zeroed([]u8, width * height * channels, allocator)
     
     // 각 픽셀에 랜덤 RGBA 값 할당
     for y in 0..<height {
@@ -139,15 +201,27 @@ create_random_texture :: proc(width, height: u32, out_texture:^texture) {
     }
     
     // 텍스처 생성
-    texture_init(out_texture, width, height, texture_data, engine_def_allocator)
+    texture_init(out_texture, width, height, texture_data, allocator)
 }
 
 
-create_random_texture_grey :: proc(width, height: u32, out_texture:^texture) {
-    texture_data := mem.make_non_zeroed([]u8, width * height, engine_def_allocator)
+/*
+Creates a random grayscale texture with the specified dimensions
+
+Inputs:
+- width: The width of the texture in pixels
+- height: The height of the texture in pixels
+- out_texture: Pointer to the texture structure to initialize
+- allocator: The allocator to use for the texture data
+
+Returns:
+- None
+*/
+create_random_texture_grey :: proc(width, height: u32, out_texture:^texture, allocator := context.allocator) {
+    texture_data := mem.make_non_zeroed([]u8, width * height, allocator)
 
     for i in 0..<len(texture_data) {
         texture_data[i] = u8(rand.uint32() % 256)
     }
-    texture_init_grey(out_texture, width, height, texture_data, engine_def_allocator)
+    texture_init_grey(out_texture, width, height, texture_data, allocator)
 }

@@ -40,6 +40,11 @@ custom_object_draw_method :: struct {
     first_index:u32,
 }
 
+/*
+Custom object pipeline structure for managing custom shader pipelines
+
+Contains pipeline, layout, descriptor sets, and draw method configuration
+*/
 custom_object_pipeline :: struct {
     check_init: mem.ICheckInit,
 
@@ -52,6 +57,11 @@ custom_object_pipeline :: struct {
     pool_sizes:[][]descriptor_pool_size,
 }
 
+/*
+Custom object structure for rendering with custom shaders
+
+Extends iobject with custom pipeline and descriptor sets
+*/
 custom_object :: struct {
     using _:iobject,
     p_pipeline:^custom_object_pipeline,
@@ -89,6 +99,15 @@ descriptor_set_layout_binding_init :: vk.DescriptorSetLayoutBindingInit
 // Custom Object Pipeline Management
 // ============================================================================
 
+/*
+Deinitializes and cleans up custom object pipeline resources
+
+Inputs:
+- self: Pointer to the pipeline to deinitialize
+
+Returns:
+- None
+*/
 custom_object_pipeline_deinit :: proc(self:^custom_object_pipeline) {
     mem.ICheckInit_Deinit(&self.check_init)
 
@@ -108,6 +127,25 @@ custom_object_pipeline_deinit :: proc(self:^custom_object_pipeline) {
     delete(self.__pool_binding, engine_def_allocator)
 }
 
+/*
+Initializes a custom object pipeline with shaders
+
+Inputs:
+- self: Pointer to the pipeline to initialize
+- binding_set_layouts: Descriptor set layout bindings
+- vertex_input_binding: Vertex input binding descriptions
+- vertex_input_attribute: Vertex input attribute descriptions
+- draw_method: Draw method configuration
+- pool_sizes: Descriptor pool sizes
+- vertex_shader: Vertex shader code
+- pixel_shader: Pixel shader code
+- geometry_shader: Geometry shader code (default: nil)
+- shader_lang: Shader language (default: .GLSL)
+- depth_stencil_state: Depth stencil state (default: nil)
+
+Returns:
+- `true` if initialization succeeded, `false` otherwise
+*/
 custom_object_pipeline_init :: proc(self:^custom_object_pipeline,
     binding_set_layouts:[][]descriptor_set_layout_binding,
     vertex_input_binding:Maybe([]vertex_input_binding_description),
@@ -327,6 +365,27 @@ custom_object_pipeline_init :: proc(self:^custom_object_pipeline,
     deinit = auto_cast _super_custom_object_deinit,
 }
 
+/*
+Initializes a custom object
+
+Inputs:
+- self: Pointer to the custom object to initialize
+- actual_type: The actual type of the object (must be a subtype of custom_object)
+- p_pipeline: Pointer to the custom pipeline
+- pipeline_p_sets: Array of descriptor sets for the pipeline
+- pipeline_set_idx: Index of the pipeline set to use (default: 0)
+- pos: Position of the object
+- rotation: Rotation angle in radians
+- scale: Scale factors (default: {1, 1})
+- camera: Pointer to the camera
+- projection: Pointer to the projection
+- color_transform: Pointer to color transform (default: nil)
+- pivot: Pivot point for transformations (default: {0.0, 0.0})
+- vtable: Custom vtable (default: nil, uses default custom_object vtable)
+
+Returns:
+- None
+*/
 custom_object_init :: proc(self:^custom_object, $actual_type:typeid,
     p_pipeline:^custom_object_pipeline,
     pipeline_p_sets:[]^descriptor_set,
@@ -392,6 +451,19 @@ _super_custom_object_draw :: proc(self:^custom_object, cmd:command_buffer) {
 // Buffer Resource Helper
 // ============================================================================
 
+/*
+Creates a buffer resource
+
+Inputs:
+- self: Pointer to the buffer resource to initialize
+- option: Buffer creation options
+- data: Initial data for the buffer
+- is_copy: Whether to copy the data
+- allocator: Optional allocator (default: nil)
+
+Returns:
+- None
+*/
 create_buffer_resource :: #force_inline proc(self:^buffer_resource, option:buffer_create_option, data:[]byte, is_copy:bool, allocator:Maybe(runtime.Allocator) = nil) {
     buffer_resource_create_buffer(self, option, data, is_copy, allocator)
 }

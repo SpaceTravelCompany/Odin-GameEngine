@@ -159,6 +159,27 @@ _super_image_button_draw :: proc (self:^image_button, cmd:engine.command_buffer)
     engine.image_binding_sets_and_draw(cmd, self.set, texture.set)
 }
 
+/*
+Initializes an image button
+
+Inputs:
+- self: Pointer to the image button to initialize
+- actualType: The actual type of the button (must be a subtype of image_button)
+- pos: Position of the button
+- camera: Pointer to the camera
+- projection: Pointer to the projection
+- rotation: Rotation angle in radians (default: 0.0)
+- scale: Scale factors (default: {1, 1})
+- colorTransform: Pointer to color transform (default: nil)
+- pivot: Pivot point for transformations (default: {0.0, 0.0})
+- up: Texture for the up state (default: nil)
+- over: Texture for the over state (default: nil)
+- down: Texture for the down state (default: nil)
+- vtable: Custom vtable (default: nil)
+
+Returns:
+- None
+*/
 image_button_init :: proc(self:^image_button, $actualType:typeid, pos:linalg.Point3DF,
 camera:^engine.camera, projection:^engine.projection,
 rotation:f32 = 0.0, scale:linalg.PointF = {1,1}, colorTransform:^engine.color_transform = nil, pivot:linalg.PointF = {0.0, 0.0},

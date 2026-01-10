@@ -33,14 +33,32 @@ when library.is_android {
     // Android Device Information
     // ============================================================================
     
+    /*
+    Gets the Android asset manager
+
+    Returns:
+    - Pointer to the Android asset manager
+    */
     android_get_asset_manager :: proc "contextless" () -> ^android.AAssetManager {
         return app.activity.assetManager
     }
     
+    /*
+    Gets the device width in pixels
+
+    Returns:
+    - Device width in pixels
+    */
     android_get_device_width :: proc "contextless" () -> u32 {
         return auto_cast max(0, android.ANativeWindow_getWidth(app.window))
     }
     
+    /*
+    Gets the device height in pixels
+
+    Returns:
+    - Device height in pixels
+    */
     android_get_device_height :: proc "contextless" () -> u32 {
         return auto_cast max(0, android.ANativeWindow_getHeight(app.window))
     }
@@ -49,6 +67,12 @@ when library.is_android {
     //     return app.cacheDir
     // }
     
+    /*
+    Gets the internal data path for the Android app
+
+    Returns:
+    - Internal data path as a string
+    */
     android_get_internal_data_path :: proc "contextless" () -> string {
         return string(app.activity.internalDataPath)
     }

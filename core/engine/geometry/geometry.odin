@@ -90,6 +90,16 @@ CvtQuadraticToCubic1 :: #force_inline proc "contextless" (_end : linalg.PointF, 
     return CvtQuadraticToCubic0(_end, _control)
 }
 
+/*
+Frees a raw shape and its resources
+
+Inputs:
+- self: Pointer to the raw shape to free
+- allocator: Allocator used for the shape (default: context.allocator)
+
+Returns:
+- None
+*/
 raw_shape_free :: proc (self:^raw_shape, allocator := context.allocator) {
     if self == nil do return
     delete(self.vertices, allocator)
@@ -97,6 +107,16 @@ raw_shape_free :: proc (self:^raw_shape, allocator := context.allocator) {
     free(self, allocator)
 }
 
+/*
+Clones a raw shape
+
+Inputs:
+- self: Pointer to the raw shape to clone
+- allocator: Allocator to use for the clone (default: context.allocator)
+
+Returns:
+- Pointer to the cloned raw shape
+*/
 raw_shape_clone :: proc (self:^raw_shape, allocator := context.allocator) -> (res:^raw_shape = nil) {
     res = new(raw_shape, allocator)
     res.vertices = mem.make_non_zeroed_slice([]shape_vertex2d, len(self.vertices), allocator)
@@ -524,6 +544,17 @@ LineSplitLine :: proc "contextless" (pts:[2][$N]$T, t:T) -> (outPts1:[2][N]T, ou
     isCurve:bool,
 }
 
+/*
+Computes a polygon from shapes data
+
+Inputs:
+- poly: Pointer to the shapes data
+- allocator: Allocator to use (default: context.allocator)
+
+Returns:
+- Pointer to the computed raw shape
+- An error if computation failed
+*/
 shapes_compute_polygon :: proc(poly:^shapes, allocator := context.allocator) -> (res:^raw_shape = nil, err:shape_error = nil) {
     vertList:[dynamic]shape_vertex2d = mem.make_non_zeroed_dynamic_array([dynamic]shape_vertex2d, context.temp_allocator)
     indList:[dynamic]u32 = mem.make_non_zeroed_dynamic_array([dynamic]u32, context.temp_allocator)
