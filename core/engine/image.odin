@@ -642,39 +642,39 @@ Returns:
 - None
 
 Example:
-    package image_test
+	package image_test
 
-    import "core:debug/trace"
-    import "base:runtime"
-    import "core:engine"
+	import "core:debug/trace"
+	import "base:runtime"
+	import "core:engine"
 
-    panda_img : []u8 = #load("res/panda.qoi")
+	panda_img : []u8 = #load("res/panda.qoi")
 
-    panda_img_allocator_proc :: proc(allocator_data:rawptr, mode: runtime.Allocator_Mode, size:int, alignment:int, old_memory:rawptr, old_size:int, loc := #caller_location) -> ([]byte, runtime.Allocator_Error) {
-        #partial switch mode {
-        case .Free:
-            qoiD :^engine.qoi_converter = auto_cast allocator_data
-            engine.qoi_converter_deinit(qoiD)
-            free(qoiD, engine.def_allocator())
-        }
-        return nil, nil
-    }
-
-    init :: proc() {
-        qoiD :^engine.qoi_converter = new(engine.qoi_converter, engine.def_allocator())
-
-        imgData, errCode := engine.image_converter_load(qoiD, panda_img, .RGBA)
-        if errCode != nil {
-            trace.panic_log(errCode)
-        }
-
-        engine.texture_init(&texture,
-        u32(engine.image_converter_width(qoiD)), u32(engine.image_converter_height(qoiD)),
-        imgData, runtime.Allocator{
-            procedure = panda_img_allocator_proc,
-            data = auto_cast qoiD,
-        })
-    }
+	panda_img_allocator_proc :: proc(allocator_data:rawptr, mode: runtime.Allocator_Mode, size:int, alignment:int, old_memory:rawptr, old_size:int, loc := #caller_location) -> ([]byte, runtime.Allocator_Error) {
+		#partial switch mode {
+		case .Free:
+			qoiD :^engine.qoi_converter = auto_cast allocator_data
+			engine.qoi_converter_deinit(qoiD)
+			free(qoiD, engine.def_allocator())
+		}
+		return nil, nil
+	}
+	
+	init :: proc() {
+    	qoiD :^engine.qoi_converter = new(engine.qoi_converter, engine.def_allocator())
+		
+		imgData, errCode := engine.image_converter_load(qoiD, panda_img, .RGBA)
+		if errCode != nil {
+			trace.panic_log(errCode)
+		}
+		
+		engine.texture_init(&texture,
+		u32(engine.image_converter_width(qoiD)), u32(engine.image_converter_height(qoiD)), imgData,
+		runtime.Allocator{
+			procedure = panda_img_allocator_proc,
+			data = auto_cast qoiD,
+		})
+	}
 */
 texture_init :: proc(
 	self: ^texture,
