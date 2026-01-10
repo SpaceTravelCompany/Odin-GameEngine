@@ -139,9 +139,6 @@ Inputs:
 Returns:
 - The decoded image data as bytes (all frames for animated images)
 - An error if loading failed
-
-Example:
-	data, err := webp_converter_load(&converter, file_data, .RGBA)
 */
 webp_converter_load :: proc (self:^webp_converter, data:[]byte, out_fmt:color_fmt, allocator := context.allocator) -> ([]byte, WebP_Error) {
     webp_converter_deinit(self)
@@ -261,9 +258,7 @@ Inputs:
 Returns:
 - The decoded image data as bytes
 - An error if loading failed
-
-Example:
-	data, err := webp_converter_load_file(&converter, "image.webp", .RGBA)
+- An error if loading failed
 */
 webp_converter_load_file :: proc (self:^webp_converter, file_path:string, out_fmt:color_fmt, allocator := context.allocator) -> ([]byte, WebP_Error) {
     imgFileData:[]byte

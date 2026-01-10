@@ -58,8 +58,6 @@ Polymorphic procedure that works with different converter types
 Inputs:
 - self: Pointer to the converter to deinitialize
 
-Example:
-	image_converter_deinit(&converter)
 */
 image_converter_deinit :: proc (self:^$T) where T == webp_converter || T == qoi_converter || T == png_converter {
     when T == webp_converter {

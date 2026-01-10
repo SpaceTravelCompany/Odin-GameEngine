@@ -642,11 +642,15 @@ Returns:
 - None
 
 Example:
+    package image_test
+
+    import "core:debug/trace"
+    import "base:runtime"
+    import "core:engine"
+
     panda_img : []u8 = #load("res/panda.qoi")
 
-    panda_img_allocator_proc :: proc(allocator_data: rawptr, mode: runtime.Allocator_Mode,
-                                size, alignment: int,
-                                old_memory: rawptr, old_size: int, loc := #caller_location) -> ([]byte, runtime.Allocator_Error) {
+    panda_img_allocator_proc :: proc(allocator_data:rawptr, mode: runtime.Allocator_Mode, size:int, alignment:int, old_memory:rawptr, old_size:int, loc := #caller_location) -> ([]byte, runtime.Allocator_Error) {
         #partial switch mode {
         case .Free:
             qoiD :^engine.qoi_converter = auto_cast allocator_data

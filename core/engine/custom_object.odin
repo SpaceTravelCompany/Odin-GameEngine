@@ -1,4 +1,3 @@
-//using custom shader
 package engine
 
 import "base:intrinsics"
