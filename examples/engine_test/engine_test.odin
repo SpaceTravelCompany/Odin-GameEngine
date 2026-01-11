@@ -11,8 +11,10 @@ import "base:runtime"
 import "core:os/os2"
 import "core:sys/android"
 import "core:engine"
+import "core:image/qoi"
 import "core:engine/font"
 import "core:engine/sound"
+import "core:engine/shape"
 import "core:engine/geometry"
 import "core:engine/gui"
 import "core:debug/trace"
@@ -21,7 +23,7 @@ is_android :: engine.is_android// TODO ANDROID SUPPORT
 
 renderCmd : ^engine.render_cmd
 
-shapeSrc: engine.shape_src
+shapeSrc: shape.shape_src
 texture:engine.texture
 
 camera: engine.camera
@@ -58,8 +60,8 @@ panda_img_allocator_proc :: proc(allocator_data: rawptr, mode: runtime.Allocator
                             old_memory: rawptr, old_size: int, loc := #caller_location) -> ([]byte, runtime.Allocator_Error) {
 	#partial switch mode {
 	case .Free:
-		 qoiD :^engine.qoi_converter = auto_cast allocator_data
-		 engine.qoi_converter_deinit(qoiD)
+		 qoiD :^qoi.qoi_converter = auto_cast allocator_data
+		 qoi.qoi_converter_deinit(qoiD)
          free(qoiD, engine.def_allocator())
 	}
 	return nil, nil
@@ -72,7 +74,7 @@ Init ::proc() {
     engine.projection_init_matrix_ortho_window(&proj, CANVAS_W, CANVAS_H)
 
     //Font Test
-    shape: ^engine.shape = new(engine.shape, engine.def_allocator())
+    shape_obj: ^shape.shape = new(shape.shape, engine.def_allocator())
 
     fontFileData:[]u8
     defer delete(fontFileData, context.temp_allocator)
@@ -111,12 +113,12 @@ Init ::proc() {
     }
     defer geometry.raw_shape_free(rawText, context.temp_allocator)
 
-    engine.shape_src_init_raw(&shapeSrc, rawText)
+    shape.shape_src_init_raw(&shapeSrc, rawText)
 
-    engine.shape_init(shape, engine.shape, &shapeSrc, {-0.0, 0, 10}, &camera, &proj, math.to_radians_f32(45.0), {3, 3},
+    shape.shape_init(shape_obj, shape.shape, &shapeSrc, {-0.0, 0, 10}, &camera, &proj, math.to_radians_f32(45.0), {3, 3},
     pivot = {0.0, 0.0})
 
-    engine.render_cmd_add_object(renderCmd, shape)
+    engine.render_cmd_add_object(renderCmd, shape_obj)
 
     //Sound Test
     // when is_android {
@@ -173,16 +175,16 @@ Init ::proc() {
     //
 
     //Image Test
-    qoiD :^engine.qoi_converter = new(engine.qoi_converter, engine.def_allocator())
+    qoiD :^qoi.qoi_converter = new(qoi.qoi_converter, engine.def_allocator())
 
     //imgData, errCode := engine.image_converter_load_file(qoiD, "res/panda.qoi", .RGBA)
-    imgData, errCode := engine.image_converter_load(qoiD, panda_img, .RGBA)
+    imgData, errCode := qoi.qoi_converter_load(qoiD, panda_img, .RGBA)
     if errCode != nil {
         trace.panic_log(errCode)
     }
 
     engine.texture_init(&texture,
-         u32(engine.image_converter_width(qoiD)), u32(engine.image_converter_height(qoiD)),
+         u32(qoi.qoi_converter_width(qoiD)), u32(qoi.qoi_converter_height(qoiD)),
           imgData, runtime.Allocator{
             procedure= panda_img_allocator_proc,
             data= auto_cast qoiD,
@@ -194,7 +196,7 @@ Init ::proc() {
     img.com.gui_align_x = .left
     img.com.gui_pos.x = 200.0
 
-    fmt.printfln("texture width: %d, height: %d", engine.image_converter_width(qoiD), engine.image_converter_height(qoiD))
+    fmt.printfln("texture width: %d, height: %d", qoi.qoi_converter_width(qoiD), qoi.qoi_converter_height(qoiD))
     
     GUI_Image_Init(img, &texture,  &camera, &proj)
     
@@ -223,7 +225,7 @@ Size :: proc() {
     gui.gui_component_size(gui_img, &gui_img.com)
 }
 Destroy ::proc() {
-    engine.shape_src_deinit(&shapeSrc)
+    shape.shape_src_deinit(&shapeSrc)
     engine.texture_deinit(&texture)
     len := engine.render_cmd_get_object_len(renderCmd)
     for i in 0..<len {

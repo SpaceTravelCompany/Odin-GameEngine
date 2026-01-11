@@ -55,7 +55,7 @@ camera:^engine.camera, projection:^engine.projection,  rotation:f32 = 0.0, scale
 
     if self.vtable.get_uniform_resources == nil do self.vtable.get_uniform_resources = auto_cast engine.get_uniform_resources_default
 
-    iobject_init(self, actualType, pos, rotation, scale, camera, projection, colorTransform, pivot)
+    engine.iobject_init(self, actualType, pos, rotation, scale, camera, projection, colorTransform, pivot)
 }
 
 shape_init2 :: proc(self:^shape, $actualType:typeid, src:^shape_src,
