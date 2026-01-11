@@ -8,6 +8,7 @@ import "core:image"
 import "core:bytes"
 import "core:os/os2"
 import "core:sys/android"
+import "base:library"
 
 
 /*
@@ -89,9 +90,9 @@ qoi_converter_load :: proc (self:^qoi_converter, data:[]byte, out_fmt:image.colo
 
     err : image.Error = nil
     #partial switch out_fmt {
-        case .RGBA, .RGBA16: self.img, err = qoi.load_from_bytes(data, qoi.Options{.alpha_add_if_missing}, allocator = allocator)
-        case .RGB, .RGB16: self.img, err = qoi.load_from_bytes(data, qoi.Options{.alpha_drop_if_present}, allocator = allocator)
-        case .Unknown: self.img, err = qoi.load_from_bytes(data, allocator = allocator)
+        case .RGBA, .RGBA16: self.img, err = load_from_bytes(data, Options{.alpha_add_if_missing}, allocator = allocator)
+        case .RGB, .RGB16: self.img, err = load_from_bytes(data, Options{.alpha_drop_if_present}, allocator = allocator)
+        case .Unknown: self.img, err = load_from_bytes(data, allocator = allocator)
         case : trace.panic_log("unsupport option")
     }
     
@@ -135,7 +136,7 @@ Example:
 */
 qoi_converter_load_file :: proc (self:^qoi_converter, file_path:string, out_fmt:image.color_fmt, allocator := context.allocator) -> ([]byte, Qoi_Error) {
     imgFileData:[]byte
-    when is_android {
+    when library.is_android {
         imgFileReadErr : android.AssetFileError
         imgFileData, imgFileReadErr = android.asset_read_file(file_path, context.temp_allocator)
         if imgFileReadErr != .None {
@@ -208,7 +209,7 @@ qoi_converter_encode :: proc (self:^qoi_converter, data:[]byte, in_fmt:image.col
     
 
     out:bytes.Buffer
-    err : image.Error = qoi.save_to_buffer(&out, self.img, allocator = allocator)
+    err : image.Error = save_to_buffer(&out, self.img, allocator = allocator)
     if err != nil {
         ok = false
         return nil, err
@@ -242,7 +243,7 @@ qoi_converter_encode_file :: proc (self:^qoi_converter, data:[]byte, in_fmt:imag
         delete(out, context.temp_allocator)
     }
 
-    when is_android {
+    when library.is_android {
         //TODO (xfitgd)
         panic("")
     } else {
