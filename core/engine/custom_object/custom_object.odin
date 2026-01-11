@@ -1,4 +1,4 @@
-package object
+package custom_object
 
 import "base:intrinsics"
 import "base:runtime"

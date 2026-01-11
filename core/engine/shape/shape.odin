@@ -1,4 +1,4 @@
-package object
+package shape
 
 import "core:math"
 import "core:engine/geometry"
