@@ -1,19 +1,15 @@
 package engine
 
+import "core:math/rand"
 import "base:intrinsics"
 import "base:runtime"
 import "core:debug/trace"
 import "core:math"
+import img "core:image"
 import "core:math/linalg"
 import "core:mem"
-import "core:slice"
-import "core:sync"
 import vk "vendor:vulkan"
 
-
-// ============================================================================
-// Type Definitions
-// ============================================================================
 
 image_center_pt_pos :: enum {
     Center,
@@ -45,15 +41,7 @@ image :: struct {
     src: ^texture,
 }
 
-/*
-Animated image object structure for rendering animated textures
 
-Extends ianimate_object with texture array source data
-*/
-animate_image :: struct {
-    using _:ianimate_object,
-    src: ^texture_array,
-}
 
 /*
 Tile image object structure for rendering tiled textures
@@ -252,185 +240,6 @@ image_binding_sets_and_draw :: proc "contextless" (cmd:command_buffer, imageSet:
     graphics_cmd_bind_pipeline(cmd, .GRAPHICS, tex_pipeline)
     graphics_cmd_bind_descriptor_sets(cmd, .GRAPHICS, tex_pipeline_layout, 0, 2,
         &([]vk.DescriptorSet{imageSet.__set, textureSet.__set})[0], 0, nil)
-
-    graphics_cmd_draw(cmd, 6, 1, 0, 0)
-}
-
-// ============================================================================
-// Animate Image Management
-// ============================================================================
-
-@private animate_image_vtable :ianimate_object_vtable = ianimate_object_vtable {
-    draw = auto_cast _super_animate_image_draw,
-    deinit = auto_cast _super_animate_image_deinit,
-    get_frame_cnt = auto_cast _super_animate_image_get_frame_cnt,
-}
-
-animate_image_init :: proc(self:^animate_image, $actualType:typeid, src:^texture_array, pos:linalg.Point3DF, rotation:f32, scale:linalg.PointF = {1,1}, 
-camera:^camera, projection:^projection, colorTransform:^color_transform = nil, pivot:linalg.PointF = {0.0, 0.0}, vtable:^ianimate_object_vtable = nil) where intrinsics.type_is_subtype_of(actualType, animate_image) {
-    self.src = src
-    
-    self.set.bindings = descriptor_set_binding__animate_image_uniform_pool[:]
-    self.set.size = descriptor_pool_size__animate_image_uniform_pool[:]
-    self.set.layout = animate_tex_descriptor_set_layout
-
-    self.vtable = auto_cast (vtable == nil ? &animate_image_vtable : vtable)
-    if self.vtable.draw == nil do self.vtable.draw = auto_cast _super_animate_image_draw
-    if self.vtable.deinit == nil do self.vtable.deinit = auto_cast _super_animate_image_deinit
-    if ((^ianimate_object_vtable)(self.vtable)).get_frame_cnt == nil do ((^ianimate_object_vtable)(self.vtable)).get_frame_cnt = auto_cast _super_animate_image_get_frame_cnt
-
-    if self.vtable.get_uniform_resources == nil do self.vtable.get_uniform_resources = auto_cast get_uniform_resources_animate_image
-
-    buffer_resource_create_buffer(&self.frame_uniform, {
-        len = size_of(u32),
-        type = .UNIFORM,
-        resource_usage = .CPU,
-    }, mem.ptr_to_bytes(&self.frame), true)
-
-    iobject_init(self, actualType, pos, rotation, scale, camera, projection, colorTransform, pivot)
-}
-
-animate_image_init2 :: proc(self:^animate_image, $actualType:typeid, src:^texture_array,
-camera:^camera, projection:^projection, colorTransform:^color_transform = nil, vtable:^ianimate_object_vtable = nil) where intrinsics.type_is_subtype_of(actualType, animate_image) {
-    self.src = src
-    
-    self.set.bindings = descriptor_set_binding__animate_image_uniform_pool[:]
-    self.set.size = descriptor_pool_size__animate_image_uniform_pool[:]
-    self.set.layout = animate_tex_descriptor_set_layout
-
-    self.vtable = auto_cast (vtable == nil ? &animate_image_vtable : vtable)
-    if self.vtable.draw == nil do self.vtable.draw = auto_cast _super_animate_image_draw
-    if self.vtable.deinit == nil do self.vtable.deinit = auto_cast _super_animate_image_deinit
-    if ((^ianimate_object_vtable)(self.vtable)).get_frame_cnt == nil do ((^ianimate_object_vtable)(self.vtable)).get_frame_cnt = auto_cast _super_animate_image_get_frame_cnt
-
-    if self.vtable.get_uniform_resources == nil do self.vtable.get_uniform_resources = auto_cast get_uniform_resources_animate_image
-
-    buffer_resource_create_buffer(&self.frame_uniform, {
-        len = size_of(u32),
-        type = .UNIFORM,
-        resource_usage = .CPU,
-    }, mem.ptr_to_bytes(&self.frame), true)
-
-    iobject_init2(self, actualType, camera, projection, colorTransform)
-}
-
-// ============================================================================
-// Animate Image Cleanup
-// ============================================================================
-
-_super_animate_image_deinit :: proc(self:^animate_image) {
-    clone_frame_uniform := new(buffer_resource, temp_arena_allocator)
-    clone_frame_uniform^ = self.frame_uniform
-    buffer_resource_deinit(clone_frame_uniform)
-
-    _super_iobject_deinit(auto_cast self)
-}
-
-// ============================================================================
-// Animate Image Accessors
-// ============================================================================
-
-animate_image_get_frame_cnt :: _super_animate_image_get_frame_cnt
-
-/*
-Gets the total number of frames for the animated image
-
-Inputs:
-- self: Pointer to the animated image
-
-Returns:
-- The total number of frames in the texture array
-*/
-_super_animate_image_get_frame_cnt :: proc "contextless" (self:^animate_image) -> u32 {
-    return self.src.texture.option.len
-}
-
-/*
-Gets the texture array source of the animated image
-
-Inputs:
-- self: Pointer to the animated image
-
-Returns:
-- Pointer to the texture array source
-*/
-animate_image_get_texture_array :: #force_inline proc "contextless" (self:^animate_image) -> ^texture_array {
-    return self.src
-}
-
-/*
-Gets the camera of the animated image
-
-Inputs:
-- self: Pointer to the animated image
-
-Returns:
-- Pointer to the camera
-*/
-animate_image_get_camera :: proc "contextless" (self:^animate_image) -> ^camera {
-    return self.camera
-}
-
-/*
-Gets the projection of the animated image
-
-Inputs:
-- self: Pointer to the animated image
-
-Returns:
-- Pointer to the projection
-*/
-animate_image_get_projection :: proc "contextless" (self:^animate_image) -> ^projection {
-    return self.projection
-}
-
-/*
-Gets the color transform of the animated image
-
-Inputs:
-- self: Pointer to the animated image
-
-Returns:
-- Pointer to the color transform
-*/
-animate_image_get_color_transform :: proc "contextless" (self:^animate_image) -> ^color_transform {
-    return self.color_transform
-}
-
-// ============================================================================
-// Animate Image Update Functions
-// ============================================================================
-
-animate_image_update_transform :: #force_inline proc(self:^animate_image, pos:linalg.Point3DF, rotation:f32, scale:linalg.PointF = {1,1}, pivot:linalg.PointF = {0.0,0.0}) {
-    iobject_update_transform(self, pos, rotation, scale, pivot)
-}
-animate_image_update_transform_matrix_raw :: #force_inline proc(self:^animate_image, _mat:linalg.Matrix) {
-    iobject_update_transform_matrix_raw(self, _mat)
-}
-animate_image_change_color_transform :: #force_inline proc(self:^animate_image, colorTransform:^color_transform) {
-    iobject_change_color_transform(self, colorTransform)
-}
-animate_image_update_camera :: #force_inline proc(self:^animate_image, camera:^camera) {
-    iobject_update_camera(self, camera)
-}
-animate_image_update_texture_array :: #force_inline proc "contextless" (self:^animate_image, src:^texture_array) {
-    self.src = src
-}
-animate_image_update_projection :: #force_inline proc(self:^animate_image, projection:^projection) {
-    iobject_update_projection(self, projection)
-}
-
-// ============================================================================
-// Animate Image Drawing
-// ============================================================================
-
-_super_animate_image_draw :: proc (self:^animate_image, cmd:command_buffer) {
-    mem.ICheckInit_Check(&self.check_init)
-    mem.ICheckInit_Check(&self.src.check_init)
-
-    graphics_cmd_bind_pipeline(cmd, .GRAPHICS, animate_tex_pipeline)
-    graphics_cmd_bind_descriptor_sets(cmd, .GRAPHICS, animate_tex_pipeline_layout, 0, 2,
-        &([]vk.DescriptorSet{self.set.__set, self.src.set.__set})[0], 0, nil)
 
     graphics_cmd_draw(cmd, 6, 1, 0, 0)
 }
@@ -653,23 +462,23 @@ Example:
 	panda_img_allocator_proc :: proc(allocator_data:rawptr, mode: runtime.Allocator_Mode, size:int, alignment:int, old_memory:rawptr, old_size:int, loc := #caller_location) -> ([]byte, runtime.Allocator_Error) {
 		#partial switch mode {
 		case .Free:
-			qoiD :^engine.qoi_converter = auto_cast allocator_data
-			engine.qoi_converter_deinit(qoiD)
-			free(qoiD, engine.def_allocator())
+			qoiD :^qoi_converter = auto_cast allocator_data
+			qoi_converter_deinit(qoiD)
+			free(qoiD, def_allocator())
 		}
 		return nil, nil
 	}
 	
 	init :: proc() {
-		qoiD := new(engine.qoi_converter, engine.def_allocator())
+		qoiD := new(qoi_converter, def_allocator())
 		
-		imgData, errCode := engine.image_converter_load(qoiD, panda_img, .RGBA)
+		imgData, errCode := image_converter_load(qoiD, panda_img, .RGBA)
 		if errCode != nil {
 			trace.panic_log(errCode)
 		}
 		
-		engine.texture_init(&texture,
-		u32(engine.image_converter_width(qoiD)), u32(engine.image_converter_height(qoiD)), imgData,
+		texture_init(&texture,
+		u32(image_converter_width(qoiD)), u32(image_converter_height(qoiD)), imgData,
 		runtime.Allocator{
 			procedure = panda_img_allocator_proc,
 			data = auto_cast qoiD,
@@ -684,7 +493,7 @@ texture_init :: proc(
     pixels_allocator: Maybe(runtime.Allocator) = nil,
 	sampler: vk.Sampler = 0,
 	resource_usage: resource_usage = .GPU,
-	in_pixel_fmt: color_fmt = .RGBA,
+	in_pixel_fmt: img.color_fmt = .RGBA,
 ) {
 	mem.ICheckInit_Init(&self.check_init)
 	self.sampler = sampler == 0 ? linear_sampler : sampler
@@ -958,7 +767,7 @@ Inputs:
 Returns:
 - None
 */
-texture_array_init :: proc(self:^texture_array, width:u32, height:u32, count:u32, pixels:[]byte, sampler:vk.Sampler = 0, inPixelFmt:color_fmt = .RGBA) {
+texture_array_init :: proc(self:^texture_array, width:u32, height:u32, count:u32, pixels:[]byte, sampler:vk.Sampler = 0, inPixelFmt:img.color_fmt = .RGBA) {
     mem.ICheckInit_Init(&self.check_init)
     self.sampler = sampler == 0 ? linear_sampler : sampler
     self.set.bindings = descriptor_set_binding__single_pool[:]
@@ -1055,7 +864,7 @@ Inputs:
 Returns:
 - None
 */
-color_fmt_convert_default :: proc "contextless" (pixels:[]byte, out:[]byte, inPixelFmt:color_fmt = .RGBA) {
+color_fmt_convert_default :: proc "contextless" (pixels:[]byte, out:[]byte, inPixelFmt:img.color_fmt = .RGBA) {
     defcol := default_color_fmt()
     if defcol == inPixelFmt {
         mem.copy_non_overlapping(&out[0], &pixels[0], len(pixels))
@@ -1082,7 +891,7 @@ Inputs:
 Returns:
 - None
 */
-color_fmt_convert_default_overlap :: proc "contextless" (pixels:[]byte, out:[]byte, inPixelFmt:color_fmt = .RGBA) {
+color_fmt_convert_default_overlap :: proc "contextless" (pixels:[]byte, out:[]byte, inPixelFmt:img.color_fmt = .RGBA) {
     defcol := default_color_fmt()
     if defcol == inPixelFmt {
         if &pixels[0] != &out[0] do mem.copy(&out[0], &pixels[0], len(pixels))
@@ -1121,7 +930,7 @@ Returns:
 - None
 */
 tile_texture_array_init :: proc(self:^tile_texture_array, tile_width:u32, tile_height:u32, width:u32, count:u32, pixels:[]byte, sampler:vk.Sampler = 0, 
-inPixelFmt:color_fmt = .RGBA) {
+inPixelFmt:img.color_fmt = .RGBA) {
     mem.ICheckInit_Init(&self.check_init)
     self.sampler = sampler == 0 ? linear_sampler : sampler
     self.set.bindings = descriptor_set_binding__single_pool[:]
@@ -1259,4 +1068,165 @@ where is_any_image_type(ANY_IMAGE) {
             if img.src.texture.option.width % 2 != 0 do p.x += 0.5
     }
     return p
+}
+
+
+
+/*
+Returns the default color format based on the graphics origin format
+
+Returns:
+- The default color format for the current graphics system
+*/
+default_color_fmt :: proc "contextless" () -> img.color_fmt {
+    return texture_fmt_to_color_fmt(vk_fmt_to_texture_fmt(get_graphics_origin_format()))
+}
+
+// ============================================================================
+// Texture Format Utilities
+// ============================================================================
+
+/*
+Converts a texture format to a color format
+
+Inputs:
+- t: The texture format to convert
+
+Returns:
+- The corresponding color format, or `.Unknown` if unsupported
+*/
+@(require_results) texture_fmt_to_color_fmt :: proc "contextless" (t:texture_fmt) -> img.color_fmt {
+	#partial switch t {
+		case .DefaultColor:
+			return texture_fmt_to_color_fmt(vk_fmt_to_texture_fmt(get_graphics_origin_format()))
+		case .R8G8B8A8Unorm:
+			return .RGBA
+		case .B8G8R8A8Unorm:
+			return .BGRA
+	}
+    trace.printlnLog("unsupport format texture_fmt_to_color_fmt : ", t)
+    return .Unknown
+}
+
+/*
+Checks if the given texture format is a depth format
+
+Inputs:
+- t: The texture format to check
+
+Returns:
+- `true` if the format is a depth format, `false` otherwise
+*/
+@(require_results) texture_fmt_is_depth :: proc  "contextless" (t:texture_fmt) -> bool {
+	#partial switch(t) {
+		case .D24UnormS8Uint, .D32SfloatS8Uint, .D16UnormS8Uint, .DefaultDepth:
+		return true
+	}
+	return false
+}
+
+/*
+Returns the bit size of the given texture format
+
+Inputs:
+- fmt: The texture format to get the bit size for
+
+Returns:
+- The number of bits per pixel for the given format
+*/
+@(require_results) texture_fmt_bit_size :: proc  "contextless" (fmt:texture_fmt) -> u32 {
+    switch (fmt) {
+        case .DefaultColor : return texture_fmt_bit_size(vk_fmt_to_texture_fmt(get_graphics_origin_format()))
+        case .DefaultDepth : return texture_fmt_bit_size(depth_fmt)
+        case .R8G8B8A8Unorm:
+		case .B8G8R8A8Unorm:
+		case .D24UnormS8Uint:
+            return 4
+		case .D16UnormS8Uint:
+            return 3
+		case .D32SfloatS8Uint:
+            return 5
+		case .R8Unorm:
+			return 1
+    }
+    return 4
+}
+
+// ============================================================================
+// Private Vulkan Format Conversion
+// ============================================================================
+
+@(require_results) @private vk_fmt_to_texture_fmt :: proc "contextless" (t:vk.Format) -> texture_fmt {
+	#partial switch t {
+		case .R8G8B8A8_UNORM:
+			return .R8G8B8A8Unorm
+		case .B8G8R8A8_UNORM:
+			return .B8G8R8A8Unorm
+		case .D24_UNORM_S8_UINT:
+			return .D24UnormS8Uint
+		case .D16_UNORM_S8_UINT:
+			return .D16UnormS8Uint
+		case .D32_SFLOAT_S8_UINT:
+			return .D32SfloatS8Uint
+		case .R8_UNORM:
+			return .R8Unorm
+	}
+	trace.panic_log("unsupport format vk_fmt_to_texture_fmt : ", t)
+}
+
+/*
+Creates a random RGBA texture with the specified dimensions
+
+Inputs:
+- width: The width of the texture in pixels
+- height: The height of the texture in pixels
+- out_texture: Pointer to the texture structure to initialize
+- allocator: The allocator to use for the texture data
+
+Returns:
+- None
+*/
+create_random_texture :: proc(width, height: u32, out_texture:^texture, allocator := context.allocator) {
+    channels :: 4 // RGBA
+    
+    // 텍스처 데이터 배열 생성
+    texture_data := mem.make_non_zeroed([]u8, width * height * channels, allocator)
+    
+    // 각 픽셀에 랜덤 RGBA 값 할당
+    for y in 0..<height {
+        for x in 0..<width {
+            pixel_index := (y * width + x) * channels
+            
+            // 각 채널에 랜덤 값 할당
+            texture_data[pixel_index + 0] = u8(rand.uint32() % 256) // R
+            texture_data[pixel_index + 1] = u8(rand.uint32() % 256) // G  
+            texture_data[pixel_index + 2] = u8(rand.uint32() % 256) // B
+            texture_data[pixel_index + 3] = u8(rand.uint32() % 256) // A
+        }
+    }
+    
+    // 텍스처 생성
+    texture_init(out_texture, width, height, texture_data, allocator)
+}
+
+
+/*
+Creates a random grayscale texture with the specified dimensions
+
+Inputs:
+- width: The width of the texture in pixels
+- height: The height of the texture in pixels
+- out_texture: Pointer to the texture structure to initialize
+- allocator: The allocator to use for the texture data
+
+Returns:
+- None
+*/
+create_random_texture_grey :: proc(width, height: u32, out_texture:^texture, allocator := context.allocator) {
+    texture_data := mem.make_non_zeroed([]u8, width * height, allocator)
+
+    for i in 0..<len(texture_data) {
+        texture_data[i] = u8(rand.uint32() % 256)
+    }
+    texture_init_grey(out_texture, width, height, texture_data, allocator)
 }

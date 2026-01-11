@@ -1,10 +1,9 @@
-package engine
+package qoi
 
 import "core:mem"
 import "core:debug/trace"
 import "base:intrinsics"
 import "base:runtime"
-import "core:image/qoi"
 import "core:image"
 import "core:bytes"
 import "core:os/os2"
@@ -69,8 +68,6 @@ qoi_converter_size :: proc "contextless" (self:^qoi_converter) -> u32 {
     return 0
 }
 
-qoi_converter_deinit :: image_converter_deinit
-
 /*
 Loads a QOI image from byte data
 
@@ -87,7 +84,7 @@ Returns:
 Example:
 	data, err := qoi_converter_load(&converter, file_data, .RGBA)
 */
-qoi_converter_load :: proc (self:^qoi_converter, data:[]byte, out_fmt:color_fmt, allocator := context.allocator) -> ([]byte, Qoi_Error) {
+qoi_converter_load :: proc (self:^qoi_converter, data:[]byte, out_fmt:image.color_fmt, allocator := context.allocator) -> ([]byte, Qoi_Error) {
     qoi_converter_deinit(self)
 
     err : image.Error = nil
@@ -136,7 +133,7 @@ Returns:
 Example:
 	data, err := qoi_converter_load_file(&converter, "image.qoi", .RGBA)
 */
-qoi_converter_load_file :: proc (self:^qoi_converter, file_path:string, out_fmt:color_fmt, allocator := context.allocator) -> ([]byte, Qoi_Error) {
+qoi_converter_load_file :: proc (self:^qoi_converter, file_path:string, out_fmt:image.color_fmt, allocator := context.allocator) -> ([]byte, Qoi_Error) {
     imgFileData:[]byte
     when is_android {
         imgFileReadErr : android.AssetFileError
@@ -174,7 +171,7 @@ Returns:
 Example:
 	encoded, err := qoi_converter_encode(&converter, pixel_data, .RGBA, 256, 256)
 */
-qoi_converter_encode :: proc (self:^qoi_converter, data:[]byte, in_fmt:color_fmt, width:u32, height:u32, allocator := context.allocator) -> ([]byte, Qoi_Error) {
+qoi_converter_encode :: proc (self:^qoi_converter, data:[]byte, in_fmt:image.color_fmt, width:u32, height:u32, allocator := context.allocator) -> ([]byte, Qoi_Error) {
     qoi_converter_deinit(self)
 
     ok:bool
@@ -237,7 +234,7 @@ Returns:
 Example:
 	err := qoi_converter_encode_file(&converter, pixel_data, .RGBA, 256, 256, "output.qoi")
 */
-qoi_converter_encode_file :: proc (self:^qoi_converter, data:[]byte, in_fmt:color_fmt, width:u32, height:u32, save_file_path:string) -> Qoi_Error {
+qoi_converter_encode_file :: proc (self:^qoi_converter, data:[]byte, in_fmt:image.color_fmt, width:u32, height:u32, save_file_path:string) -> Qoi_Error {
     out, err := qoi_converter_encode(self, data, in_fmt, width, height, context.temp_allocator)
     if err != nil do return err
 
@@ -261,4 +258,15 @@ qoi_converter_encode_file :: proc (self:^qoi_converter, data:[]byte, in_fmt:colo
     }
 
     return nil
+}
+
+qoi_converter_deinit :: proc (self:^qoi_converter) {
+    if self.img != nil {
+        if self.img.pixels.buf != nil {
+            image.destroy(self.img, self.allocator)
+        } else {
+            free(self.img, self.allocator)
+        }
+        self.img = nil
+    }
 }

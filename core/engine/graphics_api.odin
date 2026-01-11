@@ -7,214 +7,27 @@ import "core:math/linalg"
 import "core:mem"
 import "core:sync"
 import "core:time"
+import "core:engine"
+
 import vk "vendor:vulkan"
 
 
+MAX_FRAMES_IN_FLIGHT :: #config(MAX_FRAMES_IN_FLIGHT, 2)
 
-// ============================================================================
-// Constants
-// ============================================================================
-
-msaa_count :: 4
-wire_mode :: false
+wire_mode :: #config(WIRE_MODE, false)
 @private swap_img_cnt : u32 = 3
 
-// ============================================================================
-// Type Definitions
-// ============================================================================
 
-// Enums
-resource_usage :: enum {
-	GPU,
-	CPU,
+graphics_device :: #force_inline proc "contextless" () -> vk.Device {
+	return vk_device
 }
-
-texture_type :: enum {
-	TEX2D,
-	// TEX3D,
-}
-
-texture_usage :: enum {
-	IMAGE_RESOURCE,
-	FRAME_BUFFER,
-	__INPUT_ATTACHMENT,
-	__TRANSIENT_ATTACHMENT,
-	__STORAGE_IMAGE,
-}
-texture_usages :: bit_set[texture_usage]
-
-color_fmt :: enum {
-	Unknown,
-	RGB,
-	BGR,
-	RGBA,
-	BGRA,
-	ARGB,
-	ABGR,
-	Gray,
-	RGB16,
-	BGR16,
-	RGBA16,
-	BGRA16,
-	ARGB16,
-	ABGR16,
-	Gray16,
-	RGB32,
-	BGR32,
-	RGBA32,
-	BGRA32,
-	ARGB32,
-	ABGR32,
-	Gray32,
-	RGB32F,
-	BGR32F,
-	RGBA32F,
-	BGRA32F,
-	ARGB32F,
-	ABGR32F,
-	Gray32F,
-}
-
-texture_fmt :: enum {
-	DefaultColor,
-	DefaultDepth,
-	R8G8B8A8Unorm,
-	B8G8R8A8Unorm,
-	// B8G8R8A8Srgb,
-	// R8G8B8A8Srgb,
-	D24UnormS8Uint,
-	D32SfloatS8Uint,
-	D16UnormS8Uint,
-	R8Unorm,
-}
-
-buffer_type :: enum {
-	VERTEX,
-	INDEX,
-	UNIFORM,
-	STORAGE,
-	__STAGING,
-}
-
-descriptor_type :: enum {
-	SAMPLER,  // vk.DescriptorType.COMBINED_IMAGE_SAMPLER
-	UNIFORM_DYNAMIC,  // vk.DescriptorType.UNIFORM_BUFFER_DYNAMIC
-	UNIFORM,  // vk.DescriptorType.UNIFORM_BUFFER
-	STORAGE,
-	STORAGE_IMAGE,  // TODO (xfitgd)
-}
-
-// Type Aliases
-graphics_size :: vk.DeviceSize
-resource_range :: rawptr
-
-// Structs
-resource_data :: struct {
-	data: []byte,
-	allocator: Maybe(runtime.Allocator),
-	is_creating_modifing: bool,
-}
-
-base_resource :: struct {
-	data: resource_data,
-	g_uniform_indices: [4]graphics_size,
-	idx: resource_range,  // unused uniform buffer
-	mem_buffer: ^vk_mem_buffer,
-}
-
-buffer_resource :: struct {
-	using _: base_resource,
-	option: buffer_create_option,
-	__resource: vk.Buffer,
-}
-
-texture_resource :: struct {
-	using _: base_resource,
-	img_view: vk.ImageView,
-	sampler: vk.Sampler,
-	option: texture_create_option,
-	__resource: vk.Image,
-}
-
-union_resource :: union #no_nil {
-	^buffer_resource,
-	^texture_resource,
-}
-
-buffer_create_option :: struct {
-	len: graphics_size,
-	type: buffer_type,
-	resource_usage: resource_usage,
-	single: bool,
-	use_gcpu_mem: bool,
-}
-
-texture_create_option :: struct {
-	len: u32,
-	width: u32,
-	height: u32,
-	type: texture_type,
-	texture_usage: texture_usages,
-	resource_usage: resource_usage,
-	format: texture_fmt,
-	samples: u8,
-	single: bool,
-	use_gcpu_mem: bool,
-}
-
-descriptor_pool_size :: struct {
-	type: descriptor_type,
-	cnt: u32,
-}
-
-descriptor_pool_mem :: struct {
-	pool: vk.DescriptorPool,
-	cnt: u32,
-}
-
-descriptor_set :: struct {
-	layout: vk.DescriptorSetLayout,
-	/// created inside update_descriptor_sets call
-	__set: vk.DescriptorSet,
-	size: []descriptor_pool_size,
-	bindings: []u32,
-	__resources: []union_resource,
-}
-
-command_buffer :: struct #packed {
-	__handle: vk.CommandBuffer,
-}
-
-color_transform :: struct {
-	mat: linalg.Matrix,
-	mat_uniform: buffer_resource,
-	check_init: mem.ICheckInit,
-}
-
-texture :: struct {
-	texture: texture_resource,
-	set: descriptor_set,
-	sampler: vk.Sampler,
-	check_init: mem.ICheckInit,
-}
-
-// ============================================================================
-// Global Variables
-// ============================================================================
-
-// System State
-@private program_start := true
-@private loop_start := false
-@private __exiting := false
-@private max_frame: f64
-@private delta_time: u64
-@private processor_core_len: int
 
 // Graphics State
 @private g_clear_color: [4]f32 = {0.0, 0.0, 0.0, 1.0}
-@private graphics_device: vk.Device
 @private rotation_matrix: linalg.Matrix
 @private depth_fmt: texture_fmt
+
+
 
 // Pipeline Layouts
 @private shape_pipeline_layout: vk.PipelineLayout
@@ -242,11 +55,43 @@ texture :: struct {
 // Default Color Transform
 @private __def_color_transform: color_transform
 
+def_color_transform :: #force_inline proc "contextless" () -> ^color_transform {
+	return &__def_color_transform
+}
+get_shape_pipeline_layout :: #force_inline proc "contextless" () -> vk.PipelineLayout {
+	return shape_pipeline_layout
+}
+get_tex_pipeline_layout :: #force_inline proc "contextless" () -> vk.PipelineLayout {
+	return tex_pipeline_layout
+}
+get_animate_tex_pipeline_layout :: #force_inline proc "contextless" () -> vk.PipelineLayout {
+	return animate_tex_pipeline_layout
+}
+get_shape_pipeline :: #force_inline proc "contextless" () -> vk.Pipeline {
+	return shape_pipeline
+}
+get_tex_pipeline :: #force_inline proc "contextless" () -> vk.Pipeline {
+	return tex_pipeline
+}
+get_animate_tex_pipeline :: #force_inline proc "contextless" () -> vk.Pipeline {
+	return animate_tex_pipeline
+}
+get_shape_descriptor_set_layout :: #force_inline proc "contextless" () -> vk.DescriptorSetLayout {
+	return shape_descriptor_set_layout
+}
+get_tex_descriptor_set_layout :: #force_inline proc "contextless" () -> vk.DescriptorSetLayout {
+	return tex_descriptor_set_layout
+}
+get_animate_tex_descriptor_set_layout :: #force_inline proc "contextless" () -> vk.DescriptorSetLayout {
+	return animate_tex_descriptor_set_layout
+}
+get_linear_sampler :: #force_inline proc "contextless" () -> vk.Sampler {
+	return linear_sampler
+}
+get_nearest_sampler :: #force_inline proc "contextless" () -> vk.Sampler {	
+	return nearest_sampler
+}
 
-
-// ============================================================================
-// Graphics API Lifecycle
-// ============================================================================
 
 // Graphics API 초기화
 @private graphics_init :: #force_inline proc() {
@@ -301,9 +146,6 @@ graphics_execute_ops_destroy :: #force_inline proc() {
 	vk_op_execute_destroy()
 }
 
-// ============================================================================
-// Command Buffer Operations
-// ============================================================================
 
 // 단일 시간 명령 버퍼 시작
 graphics_begin_single_time_cmd :: #force_inline proc "contextless" () -> command_buffer {
@@ -332,8 +174,8 @@ allocate_command_buffers :: proc(p_cmd_buffer: [^]command_buffer, count: u32) {
 		level = vk.CommandBufferLevel.PRIMARY,
 		commandBufferCount = count,
 	}
-	res := vk.AllocateCommandBuffers(graphics_device, &alloc_info, auto_cast p_cmd_buffer)
-	if res != .SUCCESS do trace.panic_log("res = vk.AllocateCommandBuffers(graphics_device, &alloc_info, &cmd.cmds[i][0]) : ", res)
+	res := vk.AllocateCommandBuffers(graphics_device(), &alloc_info, auto_cast p_cmd_buffer)
+	if res != .SUCCESS do trace.panic_log("res = vk.AllocateCommandBuffers(graphics_device(), &alloc_info, &cmd.cmds[i][0]) : ", res)
 }
 
 /*
@@ -347,7 +189,7 @@ Returns:
 - None
 */
 free_command_buffers :: proc(p_cmd_buffer: [^]command_buffer, count: u32) {
-	vk.FreeCommandBuffers(graphics_device, vk_cmd_pool, count, auto_cast p_cmd_buffer)
+	vk.FreeCommandBuffers(graphics_device(), vk_cmd_pool, count, auto_cast p_cmd_buffer)
 }
 
 // ============================================================================
@@ -430,10 +272,6 @@ graphics_set_fullscreen_exclusive :: #force_inline proc() {
 graphics_release_fullscreen_exclusive :: #force_inline proc() {
 	vk_release_full_screen_ex()
 }
-
-// ============================================================================
-// Resource Management
-// ============================================================================
 
 // Buffer Resource Operations
 buffer_resource_create_buffer :: #force_inline proc(
@@ -564,7 +402,7 @@ Returns:
 - `true` if pipeline creation succeeded, `false` otherwise
 */
 create_graphics_pipeline :: proc(
-	self: ^custom_object_pipeline,
+	self: ^object_pipeline,
 	stages: []vk.PipelineShaderStageCreateInfo,
 	depth_stencil_state: ^vk.PipelineDepthStencilStateCreateInfo,
 	viewport_state: ^vk.PipelineViewportStateCreateInfo,
@@ -581,7 +419,7 @@ create_graphics_pipeline :: proc(
 		pColorBlendState = &vk.DefaultPipelineColorBlendStateCreateInfo,
 	)
 
-	res := vk.CreateGraphicsPipelines(graphics_device, 0, 1, &pipeline_create_info, nil, &self.__pipeline)
+	res := vk.CreateGraphicsPipelines(graphics_device(), 0, 1, &pipeline_create_info, nil, &self.__pipeline)
 	if res != .SUCCESS {
 		trace.printlnLog("create_graphics_pipeline: Failed to create graphics pipeline:", res)
 		return false
@@ -589,9 +427,6 @@ create_graphics_pipeline :: proc(
 	return true
 }
 
-// ============================================================================
-// Utility Functions
-// ============================================================================
 
 /*
 Gets the graphics origin format
@@ -604,30 +439,7 @@ get_graphics_origin_format :: proc "contextless" () -> vk.Format {
 }
 
 
-// ============================================================================
-// Private Swapchain Operations
-// ============================================================================
-
-// 스왑체인 재생성
-@(private)
-graphics_recreate_swapchain :: #force_inline proc() {
-	vk_recreate_swap_chain()
-}
-
-// 서페이스 재생성
-@(private)
-graphics_recreate_surface :: #force_inline proc() {
-	vk_recreate_surface()
-}
-
-// 메모리 할당자 초기화
-@(private)
-graphics_allocator_init :: #force_inline proc() {
-	vk_allocator_init()
-}
-
-// 메모리 할당자 정리
-@(private)
-graphics_allocator_destroy :: #force_inline proc() {
-	vk_allocator_destroy()
-}
+@(private) graphics_recreate_swapchain :: #force_inline proc() {vk_recreate_swap_chain()}
+@(private) graphics_recreate_surface :: #force_inline proc() {vk_recreate_surface()}
+@(private) graphics_allocator_init :: #force_inline proc() {vk_allocator_init()}
+@(private) graphics_allocator_destroy :: #force_inline proc() {vk_allocator_destroy()}

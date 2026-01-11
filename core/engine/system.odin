@@ -1,38 +1,17 @@
 package engine
 
-import "base:intrinsics"
 import "base:library"
+import "core:sys/windows"
 import "base:runtime"
-import "core:c"
-import "core:c/libc"
-import "core:debug/trace"
-import "core:fmt"
-import "core:io"
-import "core:math"
-import "core:math/linalg"
 import "core:mem"
 import "core:mem/virtual"
-import "core:os"
-import "core:os/os2"
-import "core:reflect"
-import "core:strings"
 import "core:sync"
-import "core:sys/android"
-import "core:sys/windows"
-import "core:thread"
 import "core:time"
-import "vendor:glfw"
-
-// ============================================================================
-// Type Definitions
-// ============================================================================
-
-init: #type proc()
-update: #type proc()
-destroy: #type proc()
-size: #type proc() = proc () {}
-activate: #type proc "contextless" () = proc "contextless" () {}
-close: #type proc "contextless" () -> bool = proc "contextless" () -> bool{ return true }
+import "core:debug/trace"
+import "core:fmt"
+import "core:math/linalg"
+import "core:os"
+import "base:intrinsics"
 
 /*
 Gets the delta time in seconds
@@ -58,72 +37,20 @@ Returns:
 */
 get_processor_core_len :: #force_inline proc "contextless" () -> int { return processor_core_len }
 
-android_api_level :: enum u32 {
-	Nougat = 24,
-	Nougat_MR1 = 25,
-	Oreo = 26,
-	Oreo_MR1 = 27,
-	Pie = 28,
-	Q = 29,
-	R = 30,
-	S = 31,
-	S_V2 = 32,
-	Tiramisu = 33,
-	UpsideDownCake = 34,
-	VanillaIceCream = 35,
-	Baklava = 36,
-	Unknown = 0,
-}
-
-windows_version :: enum {
-	Windows7,
-	WindowsServer2008R2,
-	Windows8,
-	WindowsServer2012,
-	Windows8Point1,
-	WindowsServer2012R2,
-	Windows10,
-	WindowsServer2016,
-	Windows11,
-	WindowsServer2019,
-	WindowsServer2022,
-	Unknown,
-}
-
-windows_platform_version :: struct {
-	version:windows_version,
-	build_number:u32,
-	service_pack:u32,
-}
-android_platform_version :: struct {
-	api_level:android_api_level,
-}
-linux_platform_version :: struct {
-	sys_name:string,
-	node_name:string,
-	release:string,
-	version:string,
-	machine:string,
-}
-
-// ============================================================================
-// Platform Detection
-// ============================================================================
 
 is_android :: ODIN_PLATFORM_SUBTARGET == .Android
 is_mobile :: is_android
 is_log :: #config(__log__, false)
 is_console :: #config(__console__, false)
 
-icon_image :: glfw.Image
-
-// ============================================================================
-// Global Variables
-// ============================================================================
+init: #type proc()
+update: #type proc()
+destroy: #type proc()
+size: #type proc() = proc () {}
+activate: #type proc "contextless" () = proc "contextless" () {}
+close: #type proc "contextless" () -> bool = proc "contextless" () -> bool{ return true }
 
 @(private="file") inited := false
-
-@(private) windows_h_instance:windows.HINSTANCE
 
 when library.is_android {
 	android_platform:android_platform_version
@@ -134,22 +61,13 @@ when library.is_android {
 }
 
 @private main_thread_id: int
-@private temp_arena_allocator: mem.Allocator
-@private engine_def_allocator: mem.Allocator
+@private engine_def_allocator: runtime.Allocator
+@(private = "file") __tempArena: virtual.Arena
 
 @private @thread_local track_allocator:mem.Tracking_Allocator
 
-// ============================================================================
-// Utility Functions
-// ============================================================================
+@private __exiting := false
 
-/*
-Checks if the engine is exiting
-
-Returns:
-- `true` if the engine is exiting, `false` otherwise
-*/
-exiting :: #force_inline proc  "contextless"() -> bool {return __exiting}
 
 when library.is_android {
 	get_platform_version :: #force_inline proc "contextless" () -> android_platform_version {
@@ -165,39 +83,14 @@ when library.is_android {
 	}
 }
 
-// ============================================================================
-// System Initialization & Cleanup
-// ============================================================================
 
-@private system_start :: #force_inline proc() {
-	engine_def_allocator = context.allocator
-	start_tracking_allocator()
+@private windows_h_instance:windows.HINSTANCE
+@private program_start := true
+@private loop_start := false
+@private max_frame: f64
+@private delta_time: u64
+@private processor_core_len: int
 
-    monitors = mem.make_non_zeroed([dynamic]monitor_info)
-	when library.is_android {
-	} else {
-		glfw_system_init()
-		glfw_system_start()
-	}
-}
-
-@private system_after_destroy :: #force_inline proc() {
-	delete(monitors)
-}
-
-/*
-Gets the default engine allocator
-
-Returns:
-- The default engine allocator
-*/
-def_allocator :: #force_inline proc "contextless" () -> mem.Allocator {
-	return engine_def_allocator
-}
-
-// ============================================================================
-// Main Entry Point
-// ============================================================================
 
 /*
 Main entry point for the engine
@@ -284,16 +177,32 @@ engine_main :: proc(
 	}
 }
 
+
+@private system_start :: #force_inline proc() {
+	engine_def_allocator = context.allocator
+	main_thread_id = sync.current_thread_id()
+	start_tracking_allocator()
+
+    monitors = mem.make_non_zeroed([dynamic]monitor_info)
+	when library.is_android {
+	} else {
+		glfw_system_init()
+		glfw_system_start()
+	}
+}
+
+@private system_after_destroy :: #force_inline proc() {
+	delete(monitors)
+	virtual.arena_free_all(&__tempArena)
+}
+
+
 @private system_loop :: proc() {
 	when is_android {
 	} else {
 		glfw_loop()
 	}
 }
-
-// ============================================================================
-// Window Management
-// ============================================================================
 
 @private window_start :: proc() {
 	when is_android {
@@ -309,6 +218,207 @@ engine_main :: proc(
 		glfw_system_destroy()
 	}
 }
+
+
+/*
+Gets the maximum frame rate limit
+
+Returns:
+- Maximum frame rate in frames per second, or 0 if unlimited
+*/
+get_max_frame :: #force_inline proc "contextless" () -> f64 {
+	return intrinsics.atomic_load_explicit(&max_frame,.Relaxed)
+}
+
+
+/*
+Gets the current frames per second
+
+Returns:
+- Current FPS, or 0 if delta time is 0
+*/
+get_fps :: #force_inline proc "contextless" () -> f64 {
+	if delta_time == 0 do return 0
+	return 1.0 / dt()
+}
+
+/*
+Sets the maximum frame rate limit
+
+Inputs:
+- _maxframe: Maximum frame rate in frames per second (0 for unlimited)
+
+Returns:
+- None
+*/
+set_max_frame :: #force_inline proc "contextless" (_maxframe: f64) {
+	intrinsics.atomic_store_explicit(&max_frame, _maxframe, .Relaxed)
+}
+
+//_int * 1000000000 + _dec
+second_to_nano_second :: #force_inline proc "contextless" (_int: $T, _dec: T) -> T where intrinsics.type_is_integer(T) {
+    return _int * 1000000000 + _dec
+}
+
+second_to_nano_second2 :: #force_inline proc "contextless" (_sec: $T, _milisec: T, _usec: T, _nsec: T) -> T where intrinsics.type_is_integer(T) {
+    return _sec * 1000000000 + _milisec * 1000000 + _usec * 1000 + _nsec
+}
+
+windows_set_res_icon :: proc "contextless" (icon_resource_number:int) {
+	when ODIN_OS == .Windows {
+		h_wnd := glfw_get_hwnd()
+		icon := windows.LPARAM(uintptr(windows.LoadIconW(windows_h_instance, auto_cast windows.MAKEINTRESOURCEW(icon_resource_number))))
+		windows.SendMessageW(h_wnd, windows.WM_SETICON, 1, icon)
+		windows.SendMessageW(h_wnd, windows.WM_SETICON, 0, icon)
+	}
+}
+
+/*
+Exits the engine and cleans up resources
+
+Returns:
+- None
+*/
+exit :: proc "contextless" () {
+	when is_mobile {
+	} else {
+		glfw_destroy()
+	}
+}
+
+// ============================================================================
+// Render Loop
+// ============================================================================
+
+@private calc_frame_time :: proc(paused_: bool) {
+	@static start: time.Time
+	@static now: time.Time
+
+	if !loop_start {
+		loop_start = true
+		start = time.now()
+		now = start
+	} else {
+		max_frame_ := get_max_frame()
+		if paused_ && max_frame_ == 0 {
+			max_frame_ = 60
+		}
+		n := time.now()
+		delta := n._nsec - now._nsec
+
+		if max_frame_ > 0 {
+			max_f := u64(1 * (1 / max_frame_)) * 1000000000
+			if max_f > auto_cast delta {
+				time.sleep(auto_cast (i64(max_f) - delta))
+				n = time.now()
+				delta = n._nsec - now._nsec
+			}
+		}
+		now = n
+		delta_time = auto_cast delta
+	}
+}
+
+@private render_loop :: proc() {
+	paused_ := paused()
+
+	calc_frame_time(paused_)
+
+	update()
+	if __g_main_render_cmd_idx >= 0 {
+		for obj in __g_render_cmd[__g_main_render_cmd_idx].scene {
+			iobject_update(auto_cast obj)
+		}
+	}
+
+	if !paused_ {
+		graphics_draw_frame()
+	}
+}
+
+/*
+Converts mouse position from window coordinates to centered coordinates
+
+Inputs:
+- pos: Mouse position in window coordinates
+
+Returns:
+- Mouse position in centered coordinates (origin at window center)
+*/
+convert_mouse_pos :: proc "contextless" (pos:linalg.PointF) -> linalg.PointF {
+    w := f32(window_width()) / 2.0
+    h := f32(window_height()) / 2.0
+    return linalg.PointF{ pos.x - w, -pos.y + h }
+}
+
+android_api_level :: enum u32 {
+	Nougat = 24,
+	Nougat_MR1 = 25,
+	Oreo = 26,
+	Oreo_MR1 = 27,
+	Pie = 28,
+	Q = 29,
+	R = 30,
+	S = 31,
+	S_V2 = 32,
+	Tiramisu = 33,
+	UpsideDownCake = 34,
+	VanillaIceCream = 35,
+	Baklava = 36,
+	Unknown = 0,
+}
+
+windows_version :: enum {
+	Windows7,
+	WindowsServer2008R2,
+	Windows8,
+	WindowsServer2012,
+	Windows8Point1,
+	WindowsServer2012R2,
+	Windows10,
+	WindowsServer2016,
+	Windows11,
+	WindowsServer2019,
+	WindowsServer2022,
+	Unknown,
+}
+
+windows_platform_version :: struct {
+	version:windows_version,
+	build_number:u32,
+	service_pack:u32,
+}
+android_platform_version :: struct {
+	api_level:android_api_level,
+}
+linux_platform_version :: struct {
+	sys_name:string,
+	node_name:string,
+	release:string,
+	version:string,
+	machine:string,
+}
+
+
+/*
+Checks if the engine is exiting
+
+Returns:
+- `true` if the engine is exiting, `false` otherwise
+*/
+exiting :: #force_inline proc  "contextless"() -> bool {return __exiting}
+
+/*
+Gets the default engine allocator
+
+Returns:
+- The default engine allocator
+*/
+def_allocator :: #force_inline proc "contextless" () -> runtime.Allocator {
+	return engine_def_allocator
+}
+
+
 
 // ============================================================================
 // Memory Tracking
@@ -379,79 +489,6 @@ destroy_tracking_allocator :: proc() {
 // 	vkDestory()
 // }
 
-// ============================================================================
-// Frame Management
-// ============================================================================
-
-/*
-Gets the maximum frame rate limit
-
-Returns:
-- Maximum frame rate in frames per second, or 0 if unlimited
-*/
-get_max_frame :: #force_inline proc "contextless" () -> f64 {
-	return intrinsics.atomic_load_explicit(&max_frame,.Relaxed)
-}
-
-
-/*
-Gets the current frames per second
-
-Returns:
-- Current FPS, or 0 if delta time is 0
-*/
-get_fps :: #force_inline proc "contextless" () -> f64 {
-	if delta_time == 0 do return 0
-	return 1.0 / dt()
-}
-
-/*
-Sets the maximum frame rate limit
-
-Inputs:
-- _maxframe: Maximum frame rate in frames per second (0 for unlimited)
-
-Returns:
-- None
-*/
-set_max_frame :: #force_inline proc "contextless" (_maxframe: f64) {
-	intrinsics.atomic_store_explicit(&max_frame, _maxframe, .Relaxed)
-}
-
-//_int * 1000000000 + _dec
-second_to_nano_second :: #force_inline proc "contextless" (_int: $T, _dec: T) -> T where intrinsics.type_is_integer(T) {
-    return _int * 1000000000 + _dec
-}
-
-second_to_nano_second2 :: #force_inline proc "contextless" (_sec: $T, _milisec: T, _usec: T, _nsec: T) -> T where intrinsics.type_is_integer(T) {
-    return _sec * 1000000000 + _milisec * 1000000 + _usec * 1000 + _nsec
-}
-
-// ============================================================================
-// Platform-Specific Functions
-// ============================================================================
-
-windows_set_res_icon :: proc "contextless" (icon_resource_number:int) {
-	when ODIN_OS == .Windows {
-		h_wnd := glfw_get_hwnd()
-		icon := windows.LPARAM(uintptr(windows.LoadIconW(windows_h_instance, auto_cast windows.MAKEINTRESOURCEW(icon_resource_number))))
-		windows.SendMessageW(h_wnd, windows.WM_SETICON, 1, icon)
-		windows.SendMessageW(h_wnd, windows.WM_SETICON, 0, icon)
-	}
-}
-
-/*
-Exits the engine and cleans up resources
-
-Returns:
-- None
-*/
-exit :: proc "contextless" () {
-	when is_mobile {
-	} else {
-		glfw_destroy()
-	}
-}
 
 start_console :: proc() {
 	when ODIN_OS == .Windows {
@@ -473,52 +510,3 @@ is_main_thread :: #force_inline proc "contextless" () -> bool {
 	return sync.current_thread_id() == main_thread_id
 }
 
-// ============================================================================
-// Render Loop
-// ============================================================================
-
-@private calc_frame_time :: proc(paused_: bool) {
-	@static start: time.Time
-	@static now: time.Time
-
-	if !loop_start {
-		loop_start = true
-		start = time.now()
-		now = start
-	} else {
-		max_frame_ := get_max_frame()
-		if paused_ && max_frame_ == 0 {
-			max_frame_ = 60
-		}
-		n := time.now()
-		delta := n._nsec - now._nsec
-
-		if max_frame_ > 0 {
-			max_f := u64(1 * (1 / max_frame_)) * 1000000000
-			if max_f > auto_cast delta {
-				time.sleep(auto_cast (i64(max_f) - delta))
-				n = time.now()
-				delta = n._nsec - now._nsec
-			}
-		}
-		now = n
-		delta_time = auto_cast delta
-	}
-}
-
-@private render_loop :: proc() {
-	paused_ := paused()
-
-	calc_frame_time(paused_)
-
-	update()
-	if __g_main_render_cmd_idx >= 0 {
-		for obj in __g_render_cmd[__g_main_render_cmd_idx].scene {
-			iobject_update(auto_cast obj)
-		}
-	}
-
-	if !paused_ {
-		graphics_draw_frame()
-	}
-}

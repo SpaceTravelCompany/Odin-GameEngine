@@ -4,11 +4,10 @@ import "core:debug/trace"
 import "core:math/linalg"
 import "core:sync"
 import "core:sys/windows"
+import "vendor:glfw"
+import "base:library"
 
-// ============================================================================
-// Type Definitions
-// ============================================================================
-
+icon_image :: glfw.Image
 v_sync :: enum {Double, Triple, None}
 
 screen_mode :: enum {Window, Borderless, Fullscreen}
@@ -100,7 +99,7 @@ Returns:
 - None
 */
 set_full_screen_mode :: proc "contextless" (monitor:^monitor_info) {
-	when !is_mobile {
+	when !library.is_mobile {
 		sync.mutex_lock(&full_screen_mtx)
 		defer sync.mutex_unlock(&full_screen_mtx)
 		save_prev_window()
@@ -118,7 +117,7 @@ Returns:
 - None
 */
 set_borderless_screen_mode :: proc "contextless" (monitor:^monitor_info) {
-	when !is_mobile {
+	when !library.is_mobile {
 		sync.mutex_lock(&full_screen_mtx)
 		defer sync.mutex_unlock(&full_screen_mtx)
 		save_prev_window()
@@ -133,7 +132,7 @@ Returns:
 - None
 */
 set_window_mode :: proc "contextless" () {
-	when !is_mobile {
+	when !library.is_mobile {
 		sync.mutex_lock(&full_screen_mtx)
 		defer sync.mutex_unlock(&full_screen_mtx)
 		save_prev_window()
@@ -243,14 +242,10 @@ get_v_sync :: proc "contextless" () -> v_sync {
 }
 
 set_window_icon :: #force_inline proc "contextless" (icons:[]icon_image) {
-	when !is_mobile {
-		glfw_set_window_icon(auto_cast icons)
+	when !library.is_mobile {
+		glfw_set_window_icon(icons)
 	}
 }
-
-// ============================================================================
-// Window State Management
-// ============================================================================
 
 @private save_prev_window :: proc "contextless" () {
 	prev_window_x = __window_x.?

@@ -9,7 +9,6 @@ import "core:slice"
 import "core:sync"
 import vk "vendor:vulkan"
 
-
 // ============================================================================
 // Type Definitions
 // ============================================================================
@@ -103,9 +102,6 @@ projection_init_matrix_raw :: proc (self:^projection, mat:linalg.Matrix) {
     __projection_init(self)
 }
 
-// ============================================================================
-// Projection Update
-// ============================================================================
 
 /*
 Updates an orthographic projection matrix
@@ -123,16 +119,44 @@ Inputs:
 Returns:
 - None
 */
-projection_update_ortho :: #force_inline proc(self:^projection,  left:f32, right:f32, bottom:f32, top:f32, near:f32 = 0.1, far:f32 = 100, flip_z_axis_for_vulkan := true) {
+projection_update_ortho :: #force_inline proc(self:^projection, left:f32, right:f32, bottom:f32, top:f32, near:f32 = 0.1, far:f32 = 100, flip_z_axis_for_vulkan := true) {
     __projection_update_ortho(self, left, right, bottom, top, near, far, flip_z_axis_for_vulkan)
     projection_update_matrix_raw(self, self.mat)
 }
 
+/*
+Updates an orthographic projection matrix based on window dimensions
+
+Inputs:
+- self: Pointer to the projection to update
+- width: Window width
+- height: Window height
+- near: Near plane distance (default: 0.1)
+- far: Far plane distance (default: 100)
+- flip_z_axis_for_vulkan: Whether to flip Z axis for Vulkan (default: true)
+
+Returns:
+- None
+*/
 projection_update_ortho_window :: #force_inline proc(self:^projection, width:f32, height:f32, near:f32 = 0.1, far:f32 = 100, flip_z_axis_for_vulkan := true) {
     __projection_update_ortho_window(self, width, height, near, far, flip_z_axis_for_vulkan)
     projection_update_matrix_raw(self, self.mat)
 }
 
+/*
+Updates a perspective projection matrix
+
+Inputs:
+- self: Pointer to the projection to update
+- fov: Field of view angle in radians
+- aspect: Aspect ratio (width/height). If 0, uses window aspect (default: 0)
+- near: Near plane distance (default: 0.1)
+- far: Far plane distance (default: 100)
+- flip_axis_for_vulkan: Whether to flip axis for Vulkan (default: true)
+
+Returns:
+- None
+*/
 projection_update_perspective :: #force_inline proc(self:^projection, fov:f32, aspect:f32 = 0, near:f32 = 0.1, far:f32 = 100, flip_axis_for_vulkan := true) {
     __projection_update_perspective(self, fov, aspect, near, far, flip_axis_for_vulkan)
     projection_update_matrix_raw(self, self.mat)
@@ -220,9 +244,6 @@ projection_update_matrix_raw :: proc(self:^projection, _mat:linalg.Matrix) {
     }, mem.ptr_to_bytes(&mat), true)
 }
 
-// ============================================================================
-// Projection Cleanup
-// ============================================================================
 
 /*
 Deinitializes and cleans up projection resources

@@ -6,9 +6,6 @@ import "core:sync"
 import vk "vendor:vulkan"
 
 
-
-MAX_FRAMES_IN_FLIGHT :: 2
-
 /*
 Render command structure for managing render objects
 
@@ -33,9 +30,6 @@ Initializes a new render command structure
 
 Returns:
 - Pointer to the initialized render command
-
-Example:
-	cmd := render_cmd_init()
 */
 render_cmd_init :: proc() -> ^render_cmd {
     cmd := new(__render_cmd)
@@ -289,11 +283,7 @@ Inputs:
 
 Returns:
 - A slice of all objects in the scene
-
-Example:
-	objects := render_cmd_get_objects(cmd)
 */
-//! thread non safe
 render_cmd_get_objects :: proc(cmd: ^render_cmd) -> []^iobject {
     cmd_ :^__render_cmd = (^__render_cmd)(cmd)
 
@@ -336,14 +326,15 @@ render_cmd_refresh_all :: proc "contextless" () {
     }
 }
 
-@private __render_cmd_clean :: proc () {
+__render_cmd_clean :: proc () {
     sync.mutex_lock(&__g_render_cmd_mtx)
     defer sync.mutex_unlock(&__g_render_cmd_mtx)
     delete(__g_render_cmd)
 }
 
-@private __render_cmd_create :: proc () {
+__render_cmd_create :: proc () {
     sync.mutex_lock(&__g_render_cmd_mtx)
     defer sync.mutex_unlock(&__g_render_cmd_mtx)
     __g_render_cmd = mem.make_non_zeroed([dynamic]^__render_cmd)
 }
+

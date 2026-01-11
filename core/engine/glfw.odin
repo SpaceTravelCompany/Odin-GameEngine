@@ -20,23 +20,11 @@ import "core:thread"
 import vk "vendor:vulkan"
 import "vendor:glfw"
 
-// ============================================================================
-// Global Variables
-// ============================================================================
-
 
 when !library.is_mobile {
-    // ============================================================================
-    // Private Variables
-    // ============================================================================
-    
     @(private="file") wnd:glfw.WindowHandle = nil
     @(private="file") glfw_monitors:[dynamic]glfw.MonitorHandle
 
-    // ============================================================================
-    // Window Management
-    // ============================================================================
-    
     glfw_start :: proc() {
     when !is_console {
         //?default screen idx 0
@@ -361,118 +349,113 @@ glfw_set_window_mode :: proc "contextless" () {
     // ============================================================================
     
     glfw_loop :: proc() {
-    glfw_key_proc :: proc "c" (window: glfw.WindowHandle, key, scancode, action, mods: c.int) {
-        //glfw.KEY_SPACE
-        if key > key_size-1 || key < 0 || !reflect.is_valid_enum_value(key_code, key) {
-            return
-        }
-        context = runtime.default_context()
-        switch action {
-            case glfw.PRESS:
-                if !keys[key] {
-                    keys[key] = true
-                    key_down(key_code(key))
-                }
-            case glfw.RELEASE:
-                keys[key] = false
-                key_up(key_code(key))
-            case glfw.REPEAT:
-                key_repeat(key_code(key))
-        }
-    }
-    glfw_mouse_button_proc :: proc "c" (window: glfw.WindowHandle, button, action, mods: c.int) {
-        context = runtime.default_context()
-        switch action {
-            case glfw.PRESS:
-                mouse_button_down(auto_cast button, __mouse_pos.x, __mouse_pos.y)
-            case glfw.RELEASE:
-                mouse_button_up(auto_cast button, __mouse_pos.x, __mouse_pos.y)
-        }
-    }
-    glfw_cursor_pos_proc :: proc "c" (window: glfw.WindowHandle, xpos,  ypos: f64) {
-        context = runtime.default_context()
-        __mouse_pos.x = auto_cast xpos
-        __mouse_pos.y = auto_cast ypos
-        mouse_move(__mouse_pos.x, __mouse_pos.y)
-    }
-    glfw_cursor_enter_proc :: proc "c" (window: glfw.WindowHandle, entered: c.int) {
-        context = runtime.default_context()
-        if b32(entered) {
-            __is_mouse_out = false
-            mouse_in()
-        } else {
-            __is_mouse_out = true
-            mouse_out()
-        }
-    }
-    glfw_char_proc :: proc "c"  (window: glfw.WindowHandle, codepoint: rune) {
-        //TODO (xfitgd)
-    }
-    glfw_joystick_proc :: proc "c" (joy, event: c.int) {
-        //TODO (xfitgd)
-    }
-    glfw_window_size_proc :: proc "c" (window: glfw.WindowHandle, width, height: c.int) {
-        __window_width = int(width)
-        __window_height = int(height)
+		glfw_key_proc :: proc "c" (window: glfw.WindowHandle, key, scancode, action, mods: c.int) {
+			//glfw.KEY_SPACE
+			if key > key_size-1 || key < 0 || !reflect.is_valid_enum_value(key_code, key) {
+				return
+			}
+			context = runtime.default_context()
+			switch action {
+				case glfw.PRESS:
+					if !keys[key] {
+						keys[key] = true
+						key_down(key_code(key))
+					}
+				case glfw.RELEASE:
+					keys[key] = false
+					key_up(key_code(key))
+				case glfw.REPEAT:
+					key_repeat(key_code(key))
+			}
+		}
+		glfw_mouse_button_proc :: proc "c" (window: glfw.WindowHandle, button, action, mods: c.int) {
+			context = runtime.default_context()
+			switch action {
+				case glfw.PRESS:
+					mouse_button_down(auto_cast button, __mouse_pos.x, __mouse_pos.y)
+				case glfw.RELEASE:
+					mouse_button_up(auto_cast button, __mouse_pos.x, __mouse_pos.y)
+			}
+		}
+		glfw_cursor_pos_proc :: proc "c" (window: glfw.WindowHandle, xpos,  ypos: f64) {
+			context = runtime.default_context()
+			__mouse_pos.x = auto_cast xpos
+			__mouse_pos.y = auto_cast ypos
+			mouse_move(__mouse_pos.x, __mouse_pos.y)
+		}
+		glfw_cursor_enter_proc :: proc "c" (window: glfw.WindowHandle, entered: c.int) {
+			context = runtime.default_context()
+			if b32(entered) {
+				__is_mouse_out = false
+				mouse_in()
+			} else {
+				__is_mouse_out = true
+				mouse_out()
+			}
+		}
+		glfw_char_proc :: proc "c"  (window: glfw.WindowHandle, codepoint: rune) {
+			//TODO (xfitgd)
+		}
+		glfw_joystick_proc :: proc "c" (joy, event: c.int) {
+			//TODO (xfitgd)
+		}
+		glfw_window_size_proc :: proc "c" (window: glfw.WindowHandle, width, height: c.int) {
+			__window_width = int(width)
+			__window_height = int(height)
 
-        if loop_start {
-            size_updated = true
-        }
-    }
-    glfw_window_pos_proc :: proc "c" (window: glfw.WindowHandle, xpos, ypos: c.int) {
-        __window_x = int(xpos)
-        __window_y = int(ypos)
-    }
-    glfw_window_close_proc :: proc "c" (window: glfw.WindowHandle) {
-        glfw.SetWindowShouldClose(window, auto_cast close())
-    }
-    glfw_window_focus_proc :: proc "c" (window: glfw.WindowHandle, focused: c.int) {
-        if focused != 0 {
-            sync.atomic_store_explicit(&__paused, false, .Relaxed)
-            __activated = true
-        } else {
-            __activated = false
+			if loop_start {
+				size_updated = true
+			}
+		}
+		glfw_window_pos_proc :: proc "c" (window: glfw.WindowHandle, xpos, ypos: c.int) {
+			__window_x = int(xpos)
+			__window_y = int(ypos)
+		}
+		glfw_window_close_proc :: proc "c" (window: glfw.WindowHandle) {
+			glfw.SetWindowShouldClose(window, auto_cast close())
+		}
+		glfw_window_focus_proc :: proc "c" (window: glfw.WindowHandle, focused: c.int) {
+			if focused != 0 {
+				sync.atomic_store_explicit(&__paused, false, .Relaxed)
+				__activated = true
+			} else {
+				__activated = false
 
-            for &k in keys {
-                k = false
-            }
-        }
-        activate()
-    }
-    glfw_window_refresh_proc :: proc "c" (window: glfw.WindowHandle) {
-        //! no need
-        // if !__paused() {
-        //     context = runtime.default_context()
-        //     vk_draw_frame()
-        // }
-    }
-    glfw.SetKeyCallback(wnd, glfw_key_proc)
-    glfw.SetMouseButtonCallback(wnd, glfw_mouse_button_proc)
-    glfw.SetCharCallback(wnd, glfw_char_proc)
-    glfw.SetCursorPosCallback(wnd, glfw_cursor_pos_proc)
-    glfw.SetCursorEnterCallback(wnd, glfw_cursor_enter_proc)
-    //glfw.SetJoystickCallback(glfw_joystick_proc)
-    glfw.SetWindowCloseCallback(wnd, glfw_window_close_proc)
-    glfw.SetWindowFocusCallback(wnd, glfw_window_focus_proc)
-    glfw.SetFramebufferSizeCallback(wnd, glfw_window_size_proc)
-    glfw.SetWindowPosCallback(wnd, glfw_window_pos_proc)
-    glfw.SetWindowRefreshCallback(wnd, glfw_window_refresh_proc)
+				for &k in keys {
+					k = false
+				}
+			}
+			activate()
+		}
+		glfw_window_refresh_proc :: proc "c" (window: glfw.WindowHandle) {
+			//! no need
+			// if !__paused() {
+			//     context = runtime.default_context()
+			//     vk_draw_frame()
+			// }
+		}
+		glfw.SetKeyCallback(wnd, glfw_key_proc)
+		glfw.SetMouseButtonCallback(wnd, glfw_mouse_button_proc)
+		glfw.SetCharCallback(wnd, glfw_char_proc)
+		glfw.SetCursorPosCallback(wnd, glfw_cursor_pos_proc)
+		glfw.SetCursorEnterCallback(wnd, glfw_cursor_enter_proc)
+		//glfw.SetJoystickCallback(glfw_joystick_proc)
+		glfw.SetWindowCloseCallback(wnd, glfw_window_close_proc)
+		glfw.SetWindowFocusCallback(wnd, glfw_window_focus_proc)
+		glfw.SetFramebufferSizeCallback(wnd, glfw_window_size_proc)
+		glfw.SetWindowPosCallback(wnd, glfw_window_pos_proc)
+		glfw.SetWindowRefreshCallback(wnd, glfw_window_refresh_proc)
 
-    x, y: c.int
-    x, y = glfw.GetWindowPos(wnd)
-    for !glfw.WindowShouldClose(wnd) {
-        glfw.PollEvents()
-        render_loop()
-    }
-    __exiting = true
-    wnd = nil
+		x, y: c.int
+		x, y = glfw.GetWindowPos(wnd)
+		for !glfw.WindowShouldClose(wnd) {
+			glfw.PollEvents()
+			render_loop()
+		}
+		__exiting = true
+		wnd = nil
        // thread.join(render_th)
     }
-
-    // ============================================================================
-    // Utility Functions
-    // ============================================================================
-    
     glfw_get_window :: proc "contextless" () -> glfw.WindowHandle {
         return wnd
     }

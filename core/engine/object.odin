@@ -10,10 +10,9 @@ import "core:slice"
 import "core:sync"
 import "core:thread"
 import vk "vendor:vulkan"
+import img "core:image"
 
-// ============================================================================
-// Type Definitions
-// ============================================================================
+
 
 iobject_vtable :: struct {
     get_uniform_resources: #type proc (self:^iobject) -> []union_resource,
@@ -23,10 +22,7 @@ iobject_vtable :: struct {
     size: #type proc (self:^iobject),
 }
 
-ianimate_object_vtable :: struct {
-    using _: iobject_vtable,
-    get_frame_cnt: #type proc "contextless" (self:^ianimate_object) -> u32,
-}
+
 
 /*
 Base object interface structure for all renderable objects
@@ -36,7 +32,7 @@ Contains transformation matrix, descriptor set, camera, projection, and vtable f
 iobject :: struct {
     using _: __matrix_in,
     set:descriptor_set,
-    camera: ^camera,
+    camera: ^camera,	
     projection: ^projection,
     color_transform: ^color_transform,
     actual_type: typeid,
@@ -171,9 +167,6 @@ Inputs:
 - _projection: Pointer to the projection
 - _color_transform: Pointer to color transform (default: nil)
 - pivot: Pivot point for transformations (default: {0.0, 0.0})
-
-Example:
-	iobject_init(&obj, MyObject, {0, 0, 0}, 0.0, {1, 1}, &cam, &proj)
 */
 iobject_init :: proc(self:^iobject, $actual_type:typeid,
     pos:linalg.Point3DF, rotation:f32, scale:linalg.PointF = {1,1},
@@ -218,7 +211,7 @@ iobject_init2 :: proc(self:^iobject, $actual_type:typeid,
     mem.ICheckInit_Init(&self.check_init)
     self.camera = _camera
     self.projection = _projection
-    self.color_transform = _color_transform == nil ? &__def_color_transform : _color_transform
+    self.color_transform = _color_transform == nil ? def_color_transform() : _color_transform
 
     self.actual_type = actual_type
 }
@@ -236,17 +229,6 @@ iobject_init2 :: proc(self:^iobject, $actual_type:typeid,
     }
 }
 
-@private get_uniform_resources_animate_image :: #force_inline proc(self:^iobject) -> []union_resource {
-    res := mem.make_non_zeroed([]union_resource, 5, context.temp_allocator)
-    res[0] = &self.mat_uniform
-    res[1] = &self.camera.mat_uniform
-    res[2] = &self.projection.mat_uniform
-    res[3] = &self.color_transform.mat_uniform
-
-    animate_image_ : ^animate_image = auto_cast self
-    res[4] = &animate_image_.frame_uniform
-    return res[:]
-}
 
 @private get_uniform_resources_tile_image :: #force_inline proc(self:^iobject) -> []union_resource {
     res := mem.make_non_zeroed([]union_resource, 5, context.temp_allocator)
@@ -260,7 +242,7 @@ iobject_init2 :: proc(self:^iobject, $actual_type:typeid,
     return res[:]
 }
 
-@private get_uniform_resources_default :: #force_inline proc(self:^iobject) -> []union_resource {
+get_uniform_resources_default :: #force_inline proc(self:^iobject) -> []union_resource {
     res := mem.make_non_zeroed([]union_resource, 4, context.temp_allocator)
     res[0] = &self.mat_uniform
     res[1] = &self.camera.mat_uniform
@@ -279,10 +261,6 @@ iobject_init2 :: proc(self:^iobject, $actual_type:typeid,
     mem.copy_non_overlapping(&self.set.__resources[0], &resources[0], len(resources) * size_of(union_resource))
     update_descriptor_sets(mem.slice_ptr(&self.set, 1))
 }
-
-// ============================================================================
-// IObject Update Functions
-// ============================================================================
 
 /*
 Updates the object's transformation matrix
@@ -445,7 +423,7 @@ set_render_clear_color :: proc "contextless" (_color:linalg.Point3DwF) {
     g_clear_color = _color
 }
 
-@private __vertex_buf_init :: proc (self:^__vertex_buf($NodeType), array:[]NodeType, _flag:resource_usage, _useGPUMem := false, allocator :Maybe(runtime.Allocator) = nil) {
+__vertex_buf_init :: proc (self:^__vertex_buf($NodeType), array:[]NodeType, _flag:resource_usage, _useGPUMem := false, allocator :Maybe(runtime.Allocator) = nil) {
     mem.ICheckInit_Init(&self.check_init)
     if len(array) == 0 do trace.panic_log("vertex_buf_init: array is empty")
     buffer_resource_create_buffer(&self.buf, {
@@ -457,7 +435,7 @@ set_render_clear_color :: proc "contextless" (_color:linalg.Point3DwF) {
     }, mem.slice_to_bytes(array), false, allocator)
 }
 
-@private __vertex_buf_deinit :: proc (self:^__vertex_buf($NodeType)) {
+__vertex_buf_deinit :: proc (self:^__vertex_buf($NodeType)) {
     mem.ICheckInit_Deinit(&self.check_init)
 
     clone_buf := new(buffer_resource, temp_arena_allocator)
@@ -465,11 +443,11 @@ set_render_clear_color :: proc "contextless" (_color:linalg.Point3DwF) {
     buffer_resource_deinit(clone_buf)
 }
 
-@private __vertex_buf_update :: proc (self:^__vertex_buf($NodeType), array:[]NodeType, allocator :Maybe(runtime.Allocator) = nil) {
+__vertex_buf_update :: proc (self:^__vertex_buf($NodeType), array:[]NodeType, allocator :Maybe(runtime.Allocator) = nil) {
     buffer_resource_map_update_slice(&self.buf, array, allocator)
 }
 
-@private __storage_buf_init :: proc (self:^__storage_buf($NodeType), array:[]NodeType, _flag:resource_usage, _useGPUMem := false) {
+__storage_buf_init :: proc (self:^__storage_buf($NodeType), array:[]NodeType, _flag:resource_usage, _useGPUMem := false) {
     mem.ICheckInit_Init(&self.check_init)
     if len(array) == 0 do trace.panic_log("storage_buf_init: array is empty")
     buffer_resource_create_buffer(&self.buf, {
@@ -481,7 +459,7 @@ set_render_clear_color :: proc "contextless" (_color:linalg.Point3DwF) {
     }, mem.slice_to_bytes(array), false, engine_def_allocator)
 }
 
-@private __storage_buf_deinit :: proc (self:^__storage_buf($NodeType)) {
+__storage_buf_deinit :: proc (self:^__storage_buf($NodeType)) {
     mem.ICheckInit_Deinit(&self.check_init)
 
     clone_buf := new(buffer_resource, temp_arena_allocator)
@@ -489,11 +467,11 @@ set_render_clear_color :: proc "contextless" (_color:linalg.Point3DwF) {
     buffer_resource_deinit(clone_buf)
 }
 
-@private __storage_buf_update :: proc (self:^__storage_buf($NodeType), array:[]NodeType) {
+__storage_buf_update :: proc (self:^__storage_buf($NodeType), array:[]NodeType) {
     buffer_resource_map_update_slice(&self.buf, array, engine_def_allocator)
 }
 
-@private __index_buf_init :: proc (self:^__index_buf, array:[]u32, _flag:resource_usage, _useGPUMem := false, allocator :Maybe(runtime.Allocator) = nil) {
+__index_buf_init :: proc (self:^__index_buf, array:[]u32, _flag:resource_usage, _useGPUMem := false, allocator :Maybe(runtime.Allocator) = nil) {
     mem.ICheckInit_Init(&self.check_init)
     if len(array) == 0 do trace.panic_log("index_buf_init: array is empty")
     buffer_resource_create_buffer(&self.buf, {
@@ -505,7 +483,7 @@ set_render_clear_color :: proc "contextless" (_color:linalg.Point3DwF) {
 }
 
 
-@private __index_buf_deinit :: proc (self:^__index_buf) {
+__index_buf_deinit :: proc (self:^__index_buf) {
     mem.ICheckInit_Deinit(&self.check_init)
 
     clone_buf := new(buffer_resource, temp_arena_allocator)
@@ -513,21 +491,17 @@ set_render_clear_color :: proc "contextless" (_color:linalg.Point3DwF) {
     buffer_resource_deinit(clone_buf)
 }
 
-@private __index_buf_update :: #force_inline proc (self:^__index_buf, array:[]u32, allocator :Maybe(runtime.Allocator) = nil) {
+__index_buf_update :: #force_inline proc (self:^__index_buf, array:[]u32, allocator :Maybe(runtime.Allocator) = nil) {
     buffer_resource_map_update_slice(&self.buf, array, allocator)
 }
 
-// ============================================================================
-// Buffer Type Definitions
-// ============================================================================
-
-@private __vertex_buf :: struct($NodeType:typeid) {
+__vertex_buf :: struct($NodeType:typeid) {
     buf:buffer_resource,
     check_init: mem.ICheckInit,
 }
 
-@private __index_buf :: distinct __vertex_buf(u32)
-@private __storage_buf :: struct($NodeType:typeid) {
+__index_buf :: distinct __vertex_buf(u32)
+__storage_buf :: struct($NodeType:typeid) {
     buf:buffer_resource,
     check_init: mem.ICheckInit,
 }

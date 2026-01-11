@@ -1,4 +1,4 @@
-package engine
+package image
 
 import "core:mem"
 import "core:debug/trace"
@@ -7,6 +7,7 @@ import "core:sys/android"
 import "base:intrinsics"
 import "base:runtime"
 import "vendor:webp"
+import "base:library"
 
 @private webp_config :: union {
     webp.WebPDecoderConfig,
@@ -262,7 +263,7 @@ Returns:
 */
 webp_converter_load_file :: proc (self:^webp_converter, file_path:string, out_fmt:color_fmt, allocator := context.allocator) -> ([]byte, WebP_Error) {
     imgFileData:[]byte
-    when is_android {
+    when library.is_android {
         imgFileReadErr : android.AssetFileError
         imgFileData, imgFileReadErr = android.asset_read_file(file_path, context.temp_allocator)
         if imgFileReadErr != .None {

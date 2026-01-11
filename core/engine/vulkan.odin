@@ -18,9 +18,7 @@ import "core:engine/geometry"
 import vk "vendor:vulkan"
 import "vendor:glfw"
 
-// ============================================================================
-// Constants
-// ============================================================================
+import "core:c"
 
 @(rodata)
 DEVICE_EXTENSIONS: [3]cstring = {vk.KHR_SWAPCHAIN_EXTENSION_NAME, vk.EXT_FULL_SCREEN_EXCLUSIVE_EXTENSION_NAME, vk.KHR_SHADER_CLOCK_EXTENSION_NAME}
@@ -32,10 +30,8 @@ INSTANCE_EXTENSIONS: [2]cstring = {
 @(rodata)
 LAYERS: [1]cstring = {"VK_LAYER_KHRONOS_validation"}
 
-// ============================================================================
-// Global Variables
-// ============================================================================
 
+vk_device: vk.Device
 vk_instance: vk.Instance
 vk_library: dynlib.Library
 vk_swapchain: vk.SwapchainKHR
@@ -132,9 +128,10 @@ animateTexShaderStages: [2]vk.PipelineShaderStageCreateInfo
 //copyScreenShaderStages: [2]vk.PipelineShaderStageCreateInfo
 
 
-
 vk_cmd_pool:vk.CommandPool
 vk_cmd_buffer:[MAX_FRAMES_IN_FLIGHT]vk.CommandBuffer
+
+msaa_count :: #config(MSAA_COUNT, 4)
 
 when msaa_count == 4 {
 	VK_SAMPLE_COUNT_FLAGS :: vk.SampleCountFlags{._4}
@@ -184,15 +181,15 @@ vkNoBlending := vk.PipelineColorBlendStateCreateInfoInit(__vkNoBlendingState[:1]
 vkCopyBlending := vk.PipelineColorBlendStateCreateInfoInit(__vkNoBlendingState[:1])
 
 vk_init_shader_modules :: proc() {
-	vkShapeVertShader = vk.CreateShaderModule2(graphics_device, #load("shaders/shape.vert.spv") or_else []byte{}) or_else trace.panic_log("vkShapeVertShader load failed")
-	vkShapeFragShader = vk.CreateShaderModule2(graphics_device, #load("shaders/shape.frag.spv") or_else []byte{}) or_else trace.panic_log("vkShapeFragShader load failed")
-	when wire_mode do vkShapeWireFragShader = vk.CreateShaderModule2(graphics_device, #load("shaders/shape_wire.frag.spv") or_else []byte{}) or_else trace.panic_log("vkShapeWireFragShader load failed")
-	vkTexVertShader = vk.CreateShaderModule2(graphics_device, #load("shaders/tex.vert.spv") or_else []byte{}) or_else trace.panic_log("vkTexVertShader load failed")
-	vkTexFragShader = vk.CreateShaderModule2(graphics_device, #load("shaders/tex.frag.spv") or_else []byte{}) or_else trace.panic_log("vkTexFragShader load failed")
-	vkAnimateTexVertShader = vk.CreateShaderModule2(graphics_device, #load("shaders/animate_tex.vert.spv") or_else []byte{}) or_else trace.panic_log("vkAnimateTexVertShader load failed")
-	vkAnimateTexFragShader = vk.CreateShaderModule2(graphics_device, #load("shaders/animate_tex.frag.spv") or_else []byte{}) or_else trace.panic_log("vkAnimateTexFragShader load failed")
-	//vkCopyScreenVertShader = vk.CreateShaderModule2(graphics_device, #load("shaders/screen_copy.vert.spv") or_else []byte{}) or_else trace.panic_log("vkCopyScreenVertShader load failed")
-	//vkCopyScreenFragShader = vk.CreateShaderModule2(graphics_device, #load("shaders/screen_copy.frag.spv") or_else []byte{}) or_else trace.panic_log("vkCopyScreenFragShader load failed")
+	vkShapeVertShader = vk.CreateShaderModule2(vk_device, #load("shaders/shape.vert.spv") or_else []byte{}) or_else trace.panic_log("vkShapeVertShader load failed")
+	vkShapeFragShader = vk.CreateShaderModule2(vk_device, #load("shaders/shape.frag.spv") or_else []byte{}) or_else trace.panic_log("vkShapeFragShader load failed")
+	when wire_mode do vkShapeWireFragShader = vk.CreateShaderModule2(vk_device, #load("shaders/shape_wire.frag.spv") or_else []byte{}) or_else trace.panic_log("vkShapeWireFragShader load failed")
+	vkTexVertShader = vk.CreateShaderModule2(vk_device, #load("shaders/tex.vert.spv") or_else []byte{}) or_else trace.panic_log("vkTexVertShader load failed")
+	vkTexFragShader = vk.CreateShaderModule2(vk_device, #load("shaders/tex.frag.spv") or_else []byte{}) or_else trace.panic_log("vkTexFragShader load failed")
+	vkAnimateTexVertShader = vk.CreateShaderModule2(vk_device, #load("shaders/animate_tex.vert.spv") or_else []byte{}) or_else trace.panic_log("vkAnimateTexVertShader load failed")
+	vkAnimateTexFragShader = vk.CreateShaderModule2(vk_device, #load("shaders/animate_tex.frag.spv") or_else []byte{}) or_else trace.panic_log("vkAnimateTexFragShader load failed")
+	//vkCopyScreenVertShader = vk.CreateShaderModule2(vk_device, #load("shaders/screen_copy.vert.spv") or_else []byte{}) or_else trace.panic_log("vkCopyScreenVertShader load failed")
+	//vkCopyScreenFragShader = vk.CreateShaderModule2(vk_device, #load("shaders/screen_copy.frag.spv") or_else []byte{}) or_else trace.panic_log("vkCopyScreenFragShader load failed")
 
 	shapeShaderStages = vk.CreateShaderStages(vkShapeVertShader, vkShapeFragShader)
 	when wire_mode do shapeWireShaderStages = vk.CreateShaderStages(vkShapeVertShader, vkShapeWireFragShader)
@@ -202,21 +199,21 @@ vk_init_shader_modules :: proc() {
 }
 
 vk_clean_shader_modules :: proc() {
-	vk.DestroyShaderModule(graphics_device, vkShapeVertShader, nil)
-	vk.DestroyShaderModule(graphics_device, vkShapeFragShader, nil)
-	when wire_mode do vk.DestroyShaderModule(graphics_device, vkShapeWireFragShader, nil)
-	vk.DestroyShaderModule(graphics_device, vkTexVertShader, nil)
-	vk.DestroyShaderModule(graphics_device, vkTexFragShader, nil)
-	vk.DestroyShaderModule(graphics_device, vkAnimateTexVertShader, nil)
-	vk.DestroyShaderModule(graphics_device, vkAnimateTexFragShader, nil)
-	//vk.DestroyShaderModule(graphics_device, vkCopyScreenVertShader, nil)
-	//vk.DestroyShaderModule(graphics_device, vkCopyScreenFragShader, nil)
+	vk.DestroyShaderModule(vk_device, vkShapeVertShader, nil)
+	vk.DestroyShaderModule(vk_device, vkShapeFragShader, nil)
+	when wire_mode do vk.DestroyShaderModule(vk_device, vkShapeWireFragShader, nil)
+	vk.DestroyShaderModule(vk_device, vkTexVertShader, nil)
+	vk.DestroyShaderModule(vk_device, vkTexFragShader, nil)
+	vk.DestroyShaderModule(vk_device, vkAnimateTexVertShader, nil)
+	vk.DestroyShaderModule(vk_device, vkAnimateTexFragShader, nil)
+	//vk.DestroyShaderModule(vk_device, vkCopyScreenVertShader, nil)
+	//vk.DestroyShaderModule(vk_device, vkCopyScreenFragShader, nil)
 }
 
 vk_init_pipelines :: proc() {
 	//vk.InitVulkanTemplate()
 
-	shape_descriptor_set_layout = vk.DescriptorSetLayoutInit(graphics_device,
+	shape_descriptor_set_layout = vk.DescriptorSetLayoutInit(vk_device,
 		[]vk.DescriptorSetLayoutBinding {
 			vk.DescriptorSetLayoutBindingInit(0, 1, stageFlags = {.VERTEX}),
 			vk.DescriptorSetLayoutBindingInit(1, 1, stageFlags = {.VERTEX}),
@@ -224,34 +221,34 @@ vk_init_pipelines :: proc() {
 			vk.DescriptorSetLayoutBindingInit(3, 1, stageFlags = {.FRAGMENT}),
 		}
 	)
-	shape_pipeline_layout = vk.PipelineLayoutInit(graphics_device,
+	shape_pipeline_layout = vk.PipelineLayoutInit(vk_device,
 		[]vk.DescriptorSetLayout{shape_descriptor_set_layout},
 	)
 
-	// vk_copy_screen_descriptor_set_layout = vk.DescriptorSetLayoutInit(graphics_device,
+	// vk_copy_screen_descriptor_set_layout = vk.DescriptorSetLayoutInit(vk_device,
 	// 	[]vk.DescriptorSetLayoutBinding {
 	// 		vk.DescriptorSetLayoutBindingInit(0, 1, descriptorType = .INPUT_ATTACHMENT, stageFlags = {.FRAGMENT}),},
 	// )
-	// vk_copy_screen_pipeline_layout = vk.PipelineLayoutInit(graphics_device,
+	// vk_copy_screen_pipeline_layout = vk.PipelineLayoutInit(vk_device,
 	// 	[]vk.DescriptorSetLayout{vk_copy_screen_descriptor_set_layout},
 	// )
 
-	tex_descriptor_set_layout = vk.DescriptorSetLayoutInit(graphics_device,
+	tex_descriptor_set_layout = vk.DescriptorSetLayoutInit(vk_device,
 		[]vk.DescriptorSetLayoutBinding {
 			vk.DescriptorSetLayoutBindingInit(0, 1),
 			vk.DescriptorSetLayoutBindingInit(1, 1),
 			vk.DescriptorSetLayoutBindingInit(2, 1),
 			vk.DescriptorSetLayoutBindingInit(3, 1, stageFlags = {.FRAGMENT}),},
 	)
-	tex_descriptor_set_layout2 = vk.DescriptorSetLayoutInit(graphics_device,
+	tex_descriptor_set_layout2 = vk.DescriptorSetLayoutInit(vk_device,
 		[]vk.DescriptorSetLayoutBinding {
 			vk.DescriptorSetLayoutBindingInit(0, 1, descriptorType = .COMBINED_IMAGE_SAMPLER),},
 	)
-	tex_pipeline_layout = vk.PipelineLayoutInit(graphics_device,
+	tex_pipeline_layout = vk.PipelineLayoutInit(vk_device,
 		[]vk.DescriptorSetLayout{tex_descriptor_set_layout, tex_descriptor_set_layout2},
 	)
 
-	animate_tex_descriptor_set_layout = vk.DescriptorSetLayoutInit(graphics_device,
+	animate_tex_descriptor_set_layout = vk.DescriptorSetLayoutInit(vk_device,
 		[]vk.DescriptorSetLayoutBinding {
 			vk.DescriptorSetLayoutBindingInit(0, 1),
 			vk.DescriptorSetLayoutBindingInit(1, 1),
@@ -259,16 +256,16 @@ vk_init_pipelines :: proc() {
 			vk.DescriptorSetLayoutBindingInit(3, 1, stageFlags = {.FRAGMENT}),
 			vk.DescriptorSetLayoutBindingInit(4, 1, stageFlags = {.FRAGMENT}),},
 	)
-	animate_tex_pipeline_layout = vk.PipelineLayoutInit(graphics_device,
+	animate_tex_pipeline_layout = vk.PipelineLayoutInit(vk_device,
 		[]vk.DescriptorSetLayout{animate_tex_descriptor_set_layout, tex_descriptor_set_layout2},
 	)
 
-	// vkCopyScreenDescriptorSetLayout = vk.DescriptorSetLayoutInit(graphics_device,
+	// vkCopyScreenDescriptorSetLayout = vk.DescriptorSetLayoutInit(vk_device,
 	// 	[]vk.DescriptorSetLayoutBinding {
 	// 		vk.DescriptorSetLayoutBindingInit(
 	// 			0, 1, descriptorType = .INPUT_ATTACHMENT, stageFlags = {.FRAGMENT}),},
 	// )
-	//vkCopyScreenPipelineLayout = vk.PipelineLayoutInit(graphics_device,
+	//vkCopyScreenPipelineLayout = vk.PipelineLayoutInit(vk_device,
 	//	[]vk.DescriptorSetLayout{vkCopyScreenDescriptorSetLayout},
 	//)
 
@@ -365,7 +362,7 @@ vk_init_pipelines :: proc() {
 	// 	pColorBlendState = &vkCopyBlending,
 	// 	pViewportState = &viewportState,
 	// )
-	res := vk.CreateGraphicsPipelines(graphics_device, 0, len(pipelines), raw_data(pipelineCreateInfos[:]), nil, raw_data(pipelines[:]))
+	res := vk.CreateGraphicsPipelines(vk_device, 0, len(pipelines), raw_data(pipelineCreateInfos[:]), nil, raw_data(pipelines[:]))
 	if res != .SUCCESS {
 		trace.panic_log(res)
 	}
@@ -376,58 +373,22 @@ vk_init_pipelines :: proc() {
 	//vk_copy_screen_pipeline = pipelines[3]
 }
 
-vk_begin_single_time_cmd :: proc "contextless" () -> vk.CommandBuffer {
-	cmd:vk.CommandBuffer
-	res := vk.AllocateCommandBuffers(graphics_device, &vk.CommandBufferAllocateInfo{
-		sType = vk.StructureType.COMMAND_BUFFER_ALLOCATE_INFO,
-		commandPool = vk_cmd_pool,
-		level = vk.CommandBufferLevel.PRIMARY,
-		commandBufferCount = 1,
-	}, &cmd)
-	if res != .SUCCESS do trace.panic_log("vk_begin_single_time_cmd vk.AllocateCommandBuffers(&cmd) : ", res)
-
-	beginInfo := vk.CommandBufferBeginInfo {
-		flags = {.ONE_TIME_SUBMIT},
-		sType = vk.StructureType.COMMAND_BUFFER_BEGIN_INFO,
-	}
-	vk.BeginCommandBuffer(cmd, &beginInfo)
-
-	return cmd
-}
-
-vk_end_single_time_cmd :: proc "contextless" (_cmd:vk.CommandBuffer)  {
-	cmd := _cmd
-	vk.EndCommandBuffer(cmd)
-
-	submitInfo := vk.SubmitInfo {
-		commandBufferCount = 1,
-		pCommandBuffers    = &cmd,
-		sType              = .SUBMIT_INFO,
-	}
-	res := vk.QueueSubmit(vk_graphics_queue, 1, &submitInfo, 0)
-	if res != .SUCCESS do trace.panic_log("vk_end_single_time_cmd res := vk.QueueSubmit(vk_graphics_queue, 1, &submitInfo, 0) : ", res)
-
-	vk_wait_graphics_idle()
-
-	vk.FreeCommandBuffers(graphics_device, vk_cmd_pool, 1, &cmd)
-}
-
 vk_clean_pipelines :: proc() {
-	vk.DestroyDescriptorSetLayout(graphics_device, shape_descriptor_set_layout, nil)
-	vk.DestroyDescriptorSetLayout(graphics_device, tex_descriptor_set_layout, nil)
-	vk.DestroyDescriptorSetLayout(graphics_device, tex_descriptor_set_layout2, nil)
-	vk.DestroyDescriptorSetLayout(graphics_device, animate_tex_descriptor_set_layout, nil)
-	//vk.DestroyDescriptorSetLayout(graphics_device, copy_screen_descriptor_set_layout, nil)
+	vk.DestroyDescriptorSetLayout(vk_device, shape_descriptor_set_layout, nil)
+	vk.DestroyDescriptorSetLayout(vk_device, tex_descriptor_set_layout, nil)
+	vk.DestroyDescriptorSetLayout(vk_device, tex_descriptor_set_layout2, nil)
+	vk.DestroyDescriptorSetLayout(vk_device, animate_tex_descriptor_set_layout, nil)
+	//vk.DestroyDescriptorSetLayout(vk_device, copy_screen_descriptor_set_layout, nil)
 
-	vk.DestroyPipelineLayout(graphics_device, shape_pipeline_layout, nil)
-	vk.DestroyPipelineLayout(graphics_device, tex_pipeline_layout, nil)
-	vk.DestroyPipelineLayout(graphics_device, animate_tex_pipeline_layout, nil)
-	//vk.DestroyPipelineLayout(graphics_device, copy_screen_pipeline_layout, nil)
+	vk.DestroyPipelineLayout(vk_device, shape_pipeline_layout, nil)
+	vk.DestroyPipelineLayout(vk_device, tex_pipeline_layout, nil)
+	vk.DestroyPipelineLayout(vk_device, animate_tex_pipeline_layout, nil)
+	//vk.DestroyPipelineLayout(vk_device, copy_screen_pipeline_layout, nil)
 
-	vk.DestroyPipeline(graphics_device, shape_pipeline, nil)
-	vk.DestroyPipeline(graphics_device, tex_pipeline, nil)
-	vk.DestroyPipeline(graphics_device, animate_tex_pipeline, nil)
-	//vk.DestroyPipeline(graphics_device, copy_screen_pipeline, nil)
+	vk.DestroyPipeline(vk_device, shape_pipeline, nil)
+	vk.DestroyPipeline(vk_device, tex_pipeline, nil)
+	vk.DestroyPipeline(vk_device, animate_tex_pipeline, nil)
+	//vk.DestroyPipeline(vk_device, copy_screen_pipeline, nil)
 }
 
 vk_fmts:[]vk.SurfaceFormatKHR
@@ -644,15 +605,15 @@ vk_create_swap_chain_and_image_views :: proc() -> bool {
 		swapChainCreateInfo.pQueueFamilyIndices = raw_data(queueFamiliesIndices[:])
 	}
 
-	res := vk.CreateSwapchainKHR(graphics_device, &swapChainCreateInfo, nil, &vk_swapchain)
+	res := vk.CreateSwapchainKHR(vk_device, &swapChainCreateInfo, nil, &vk_swapchain)
 	if res != .SUCCESS {
 		return false
 	}
 
-	vk.GetSwapchainImagesKHR(graphics_device, vk_swapchain, &swap_img_cnt, nil)
+	vk.GetSwapchainImagesKHR(vk_device, vk_swapchain, &swap_img_cnt, nil)
 	swapImgs:= mem.make_non_zeroed([]vk.Image, swap_img_cnt, context.temp_allocator)
 	defer delete(swapImgs, context.temp_allocator)
-	vk.GetSwapchainImagesKHR(graphics_device, vk_swapchain, &swap_img_cnt, &swapImgs[0])
+	vk.GetSwapchainImagesKHR(vk_device, vk_swapchain, &swap_img_cnt, &swapImgs[0])
 
 	vk_frame_buffers = mem.make_non_zeroed([]vk.Framebuffer, swap_img_cnt)
 	//vk_clear_frame_buffers = mem.make_non_zeroed([]vk.Framebuffer, swapImgCnt)
@@ -686,8 +647,8 @@ vk_create_swap_chain_and_image_views :: proc() -> bool {
 				layerCount = 1,
 			},
 		}
-		res = vk.CreateImageView(graphics_device, &imageViewCreateInfo, nil, &vk_frame_buffer_image_views[i])
-		if res != .SUCCESS do trace.panic_log("res = vk.CreateImageView(graphics_device, &imageViewCreateInfo, nil, &vk_frame_buffer_image_views[i]) : ", res)
+		res = vk.CreateImageView(vk_device, &imageViewCreateInfo, nil, &vk_frame_buffer_image_views[i])
+		if res != .SUCCESS do trace.panic_log("res = vk.CreateImageView(vk_device, &imageViewCreateInfo, nil, &vk_frame_buffer_image_views[i]) : ", res)
 
 		when msaa_count == 1 {
 			frameBufferCreateInfo := vk.FramebufferCreateInfo{
@@ -710,12 +671,12 @@ vk_create_swap_chain_and_image_views :: proc() -> bool {
 				layers = 1,
 			}
 		}
-		res = vk.CreateFramebuffer(graphics_device, &frameBufferCreateInfo, nil, &vk_frame_buffers[i])
-		if res != .SUCCESS do trace.panic_log("res = vk.CreateFramebuffer(graphics_device, &frameBufferCreateInfo, nil, &vk_frame_buffers[i]) : ", res)
+		res = vk.CreateFramebuffer(vk_device, &frameBufferCreateInfo, nil, &vk_frame_buffers[i])
+		if res != .SUCCESS do trace.panic_log("res = vk.CreateFramebuffer(vk_device, &frameBufferCreateInfo, nil, &vk_frame_buffers[i]) : ", res)
 
 		// frameBufferCreateInfo.renderPass = vkRenderPassClear
-		// res = vk.CreateFramebuffer(graphics_device, &frameBufferCreateInfo, nil, &vkClearFrameBuffers[i])
-		// if res != .SUCCESS do trace.panic_log("res = vk.CreateFramebuffer(graphics_device, &frameBufferCreateInfo, nil, &vkClearFrameBuffers[i]) : ", res)
+		// res = vk.CreateFramebuffer(vk_device, &frameBufferCreateInfo, nil, &vkClearFrameBuffers[i])
+		// if res != .SUCCESS do trace.panic_log("res = vk.CreateFramebuffer(vk_device, &frameBufferCreateInfo, nil, &vkClearFrameBuffers[i]) : ", res)
 	}
 
 	return true
@@ -958,29 +919,29 @@ vk_start :: proc() {
 		ppEnabledExtensionNames = &deviceExtNames[0],
 		enabledExtensionCount   = auto_cast len(deviceExtNames),
 	}
-	res = vk.CreateDevice(vk_physical_device, &deviceCreateInfo, nil, &graphics_device)
-	if (res != vk.Result.SUCCESS) do trace.panic_log("res = vk.CreateDevice(vk_physical_device, &deviceCreateInfo, nil, &graphics_device) : ", res)
-	vk.load_proc_addresses_device(graphics_device)
+	res = vk.CreateDevice(vk_physical_device, &deviceCreateInfo, nil, &vk_device)
+	if (res != vk.Result.SUCCESS) do trace.panic_log("res = vk.CreateDevice(vk_physical_device, &deviceCreateInfo, nil, &vk_device) : ", res)
+	vk.load_proc_addresses_device(vk_device)
 
 	vk.GetPhysicalDeviceMemoryProperties(vk_physical_device, &vk_physical_mem_prop)
 	vk.GetPhysicalDeviceProperties(vk_physical_device, &vk_physical_prop)
 
 	if vk_graphics_family_index == vk_present_family_index {
-		vk.GetDeviceQueue(graphics_device, vk_graphics_family_index, 0, &vk_graphics_queue)
+		vk.GetDeviceQueue(vk_device, vk_graphics_family_index, 0, &vk_graphics_queue)
 		vk_present_queue = vk_graphics_queue
 	} else {
-		vk.GetDeviceQueue(graphics_device, vk_graphics_family_index, 0, &vk_graphics_queue)
-		vk.GetDeviceQueue(graphics_device, vk_present_family_index, 0, &vk_present_queue)
+		vk.GetDeviceQueue(vk_device, vk_graphics_family_index, 0, &vk_graphics_queue)
+		vk.GetDeviceQueue(vk_device, vk_present_family_index, 0, &vk_present_queue)
 	}
 
-	res = vk.CreateCommandPool(graphics_device, &vk.CommandPoolCreateInfo{
+	res = vk.CreateCommandPool(vk_device, &vk.CommandPoolCreateInfo{
 		sType = vk.StructureType.COMMAND_POOL_CREATE_INFO,
 		flags = vk.CommandPoolCreateFlags{.RESET_COMMAND_BUFFER},
 		queueFamilyIndex = vk_graphics_family_index,
 	}, nil, &vk_cmd_pool)
 	if res != .SUCCESS do trace.panic_log("vk.CreateCommandPool(&vk_cmd_pool) : ", res)
 
-	res = vk.AllocateCommandBuffers(graphics_device, &vk.CommandBufferAllocateInfo{
+	res = vk.AllocateCommandBuffers(vk_device, &vk.CommandBufferAllocateInfo{
 		sType = vk.StructureType.COMMAND_BUFFER_ALLOCATE_INFO,
 		commandPool = vk_cmd_pool,
 		level = vk.CommandBufferLevel.PRIMARY,
@@ -1015,11 +976,11 @@ vk_start :: proc() {
 		maxAnisotropy           = vk_physical_prop.limits.maxSamplerAnisotropy,
 		borderColor             = .INT_OPAQUE_WHITE,
 	}
-	vk.CreateSampler(graphics_device, &samplerInfo, nil, &linear_sampler)
+	vk.CreateSampler(vk_device, &samplerInfo, nil, &linear_sampler)
 	samplerInfo.mipmapMode = .NEAREST
 	samplerInfo.magFilter = .NEAREST
 	samplerInfo.minFilter = .NEAREST
-	vk.CreateSampler(graphics_device, &samplerInfo, nil, &nearest_sampler)
+	vk.CreateSampler(vk_device, &samplerInfo, nil, &nearest_sampler)
 
 	vk_depth_fmt := texture_fmt_to_vk_fmt(depth_fmt)
 	depthAttachmentSample := vk.AttachmentDescriptionInit(
@@ -1166,7 +1127,7 @@ vk_start :: proc() {
 		)
 	}
 	
-	vk.CreateRenderPass(graphics_device, &renderPassInfo, nil, &vk_render_pass)
+	vk.CreateRenderPass(vk_device, &renderPassInfo, nil, &vk_render_pass)
 
 
 	// renderPassClearInfo := vk.RenderPassCreateInfoInit(
@@ -1174,7 +1135,7 @@ vk_start :: proc() {
 	// 	pSubpasses = []vk.SubpassDescription{subpassDesc},
 	// 	pDependencies = []vk.SubpassDependency{subpassDependency},
 	// )
-	// vk.CreateRenderPass(graphics_device, &renderPassClearInfo, nil, &vkRenderPassClear)
+	// vk.CreateRenderPass(vk_device, &renderPassClearInfo, nil, &vkRenderPassClear)
 
 	//TODO (xfitgd)
 	renderPassCopyInfo := vk.RenderPassCreateInfoInit(
@@ -1182,7 +1143,7 @@ vk_start :: proc() {
 		pSubpasses = []vk.SubpassDescription{subpassCopyDesc},
 		pDependencies = []vk.SubpassDependency{subpassDependencyCopy},
 	)
-	vk.CreateRenderPass(graphics_device, &renderPassCopyInfo, nil, &vk_render_pass_copy)
+	vk.CreateRenderPass(vk_device, &renderPassCopyInfo, nil, &vk_render_pass_copy)
 
 
 	vk_init_shader_modules()
@@ -1205,14 +1166,14 @@ vk_destroy :: proc() {
 
 	vk_allocator_destroy()
 
-	vk.DestroyCommandPool(graphics_device, vk_cmd_pool, nil)
+	vk.DestroyCommandPool(vk_device, vk_cmd_pool, nil)
 
-	vk.DestroySampler(graphics_device, linear_sampler, nil)
-	vk.DestroySampler(graphics_device, nearest_sampler, nil)
+	vk.DestroySampler(vk_device, linear_sampler, nil)
+	vk.DestroySampler(vk_device, nearest_sampler, nil)
 
-	vk.DestroyRenderPass(graphics_device, vk_render_pass, nil)
-	vk.DestroyRenderPass(graphics_device, vk_render_pass_copy, nil)
-	// vk.DestroyRenderPass(graphics_device, vkRenderPassClear, nil)
+	vk.DestroyRenderPass(vk_device, vk_render_pass, nil)
+	vk.DestroyRenderPass(vk_device, vk_render_pass_copy, nil)
+	// vk.DestroyRenderPass(vk_device, vkRenderPassClear, nil)
 
 	delete(vk_fmts)
 	delete(vkPresentModes)
@@ -1220,7 +1181,7 @@ vk_destroy :: proc() {
 
 	vk.DestroySurfaceKHR(vk_instance, vk_surface, nil)
 
-	vk.DestroyDevice(graphics_device, nil)
+	vk.DestroyDevice(vk_device, nil)
 	when ODIN_DEBUG {
 		if vk_debug_utils_messenger != 0 {
 			vk.DestroyDebugUtilsMessengerEXT(vk_instance, vk_debug_utils_messenger, nil)
@@ -1233,7 +1194,7 @@ vk_destroy :: proc() {
 }
 
 vk_wait_device_idle :: proc "contextless" () {
-	res := vk.DeviceWaitIdle(graphics_device)
+	res := vk.DeviceWaitIdle(vk_device)
 	if res != .SUCCESS do trace.panic_log("vk_wait_device_idle : ", res )
 }
 
@@ -1248,7 +1209,7 @@ vk_wait_present_idle :: proc "contextless" () {
 }
 
 vk_recreate_swap_chain :: proc() {
-	if graphics_device == nil || vk_swapchain == 0 {
+	if vk_device == nil || vk_swapchain == 0 {
 		return
 	}
 	sync.mutex_lock(&full_screen_mtx)
@@ -1290,7 +1251,7 @@ vk_create_surface :: vk_recreate_surface
 vk_set_full_screen_ex :: proc() {
 	when ODIN_OS == .Windows {
 		if VK_EXT_full_screen_exclusive_support() && __is_full_screen_ex {
-			res := vk.AcquireFullScreenExclusiveModeEXT(graphics_device, vk_swapchain)
+			res := vk.AcquireFullScreenExclusiveModeEXT(vk_device, vk_swapchain)
 			if res != .SUCCESS do trace.panic_log("AcquireFullScreenExclusiveModeEXT : ", res)
 			is_released_full_screen_ex = false
 		}
@@ -1300,7 +1261,7 @@ vk_set_full_screen_ex :: proc() {
 vk_release_full_screen_ex :: proc() {
 	when ODIN_OS == .Windows {
 		if VK_EXT_full_screen_exclusive_support() && !is_released_full_screen_ex {
-			res := vk.ReleaseFullScreenExclusiveModeEXT(graphics_device, vk_swapchain)
+			res := vk.ReleaseFullScreenExclusiveModeEXT(vk_device, vk_swapchain)
 			if res != .SUCCESS do trace.panic_log("ReleaseFullScreenExclusiveModeEXT : ", res)
 			is_released_full_screen_ex = true
 		}
@@ -1312,65 +1273,6 @@ vk_recreate_surface :: proc() {
 		vulkan_android_start()
 	} else {// !ismobile
 		glfw_vulkan_start()
-	}
-}
-
-vk_record_command_buffer :: proc(cmd:^__render_cmd, frame:int) {
-	clsColor :vk.ClearValue = {color = {float32 = g_clear_color}}
-	clsDepthStencil :vk.ClearValue = {depthStencil = {depth = 1.0, stencil = 0}}
-	clsZero :vk.ClearValue = {depthStencil = {depth = 1.0, stencil = 0}}
-
-	for &c, i in cmd.cmds[frame] {
-		beginInfo := vk.CommandBufferBeginInfo {
-			sType = vk.StructureType.COMMAND_BUFFER_BEGIN_INFO,
-			flags = {},
-		}
-		res := vk.BeginCommandBuffer(c.__handle, &beginInfo)
-		if res != .SUCCESS do trace.panic_log("BeginCommandBuffer : ", res)
-
-		renderPassBeginInfo := vk.RenderPassBeginInfo {
-			sType = vk.StructureType.RENDER_PASS_BEGIN_INFO,
-			renderPass = vk_render_pass,
-			framebuffer = vk_frame_buffers[i],
-			renderArea = {
-				offset = {x = 0, y = 0},
-				extent = vk_extent_rotation,
-			},
-			clearValueCount = 2,
-			pClearValues = &([]vk.ClearValue{clsColor, clsDepthStencil})[0],
-		}
-
-		vk.CmdBeginRenderPass(c.__handle, &renderPassBeginInfo, vk.SubpassContents.INLINE)
-		
-		viewport := vk.Viewport {
-			x = 0.0,
-			y = 0.0,
-			width = f32(vk_extent_rotation.width),
-			height = f32(vk_extent_rotation.height),
-			minDepth = 0.0,
-			maxDepth = 1.0,
-		}
-		vk.CmdSetViewport(c.__handle, 0, 1, &viewport)
-
-		scissor := vk.Rect2D {
-			offset = {x = 0, y = 0},
-			extent = vk_extent_rotation,
-		}
-		vk.CmdSetScissor(c.__handle, 0, 1, &scissor)
-
-		sync.rw_mutex_lock(&cmd.obj_lock)
-		objs := mem.make_non_zeroed_slice([]^iobject, len(cmd.scene), context.temp_allocator)
-		copy_slice(objs, cmd.scene[:])
-		sync.rw_mutex_unlock(&cmd.obj_lock)
-		defer delete(objs, context.temp_allocator)
-		
-		for obj in objs {
-			iobject_draw(auto_cast obj, c)
-		}
-
-		vk.CmdEndRenderPass(c.__handle)
-		res = vk.EndCommandBuffer(c.__handle)
-		if res != .SUCCESS do trace.panic_log("EndCommandBuffer : ", res)
 	}
 }
 
@@ -1386,12 +1288,12 @@ vk_draw_frame :: proc() {
 		return
 	}
 
-	res := vk.WaitForFences(graphics_device, 1, &vk_in_flight_fence[frame], true, max(u64))
+	res := vk.WaitForFences(vk_device, 1, &vk_in_flight_fence[frame], true, max(u64))
 	if res != .SUCCESS do trace.panic_log("WaitForFences : ", res)
 
 
 	imageIndex: u32
-	res = vk.AcquireNextImageKHR(graphics_device, vk_swapchain, max(u64), vk_image_available_semaphore[frame], 0, &imageIndex)
+	res = vk.AcquireNextImageKHR(vk_device, vk_swapchain, max(u64), vk_image_available_semaphore[frame], 0, &imageIndex)
 	if res == .ERROR_OUT_OF_DATE_KHR {
 		vk_recreate_swap_chain()
 		frame = 0
@@ -1421,7 +1323,7 @@ vk_draw_frame :: proc() {
 			pSignalSemaphores = &vk_render_finished_semaphore[frame][imageIndex],
 		}
 
-		res = vk.ResetFences(graphics_device, 1, &vk_in_flight_fence[frame])
+		res = vk.ResetFences(vk_device, 1, &vk_in_flight_fence[frame])
 		if res != .SUCCESS do trace.panic_log("ResetFences : ", res)
 
 		res = vk.QueueSubmit(vk_graphics_queue, 1, &submitInfo, vk_in_flight_fence[frame])
@@ -1467,7 +1369,7 @@ vk_draw_frame :: proc() {
 			pSignalSemaphores = &vk_render_finished_semaphore[frame][imageIndex],
 		}
 
-		res = vk.ResetFences(graphics_device, 1, &vk_in_flight_fence[frame])
+		res = vk.ResetFences(vk_device, 1, &vk_in_flight_fence[frame])
 		if res != .SUCCESS do trace.panic_log("ResetFences : ", res)
 
 		res = vk.QueueSubmit(vk_graphics_queue, 1, &submitInfo, 	vk_in_flight_fence[frame])
@@ -1532,18 +1434,18 @@ vk_refresh_pre_matrix :: proc() {
 
 vk_create_sync_object :: proc() {
 	for i in 0..<MAX_FRAMES_IN_FLIGHT {
-		vk.CreateSemaphore(graphics_device, &vk.SemaphoreCreateInfo{
+		vk.CreateSemaphore(vk_device, &vk.SemaphoreCreateInfo{
 			sType = vk.StructureType.SEMAPHORE_CREATE_INFO,
 		}, nil, &vk_image_available_semaphore[i])
 
 		vk_render_finished_semaphore[i] = mem.make_non_zeroed([]vk.Semaphore, int(swap_img_cnt))
 		for j in 0..<int(swap_img_cnt) {
-			vk.CreateSemaphore(graphics_device, &vk.SemaphoreCreateInfo{
+			vk.CreateSemaphore(vk_device, &vk.SemaphoreCreateInfo{
 				sType = vk.StructureType.SEMAPHORE_CREATE_INFO,
 			}, nil, &vk_render_finished_semaphore[i][j])
 		}
 
-		vk.CreateFence(graphics_device, &vk.FenceCreateInfo{
+		vk.CreateFence(vk_device, &vk.FenceCreateInfo{
 			sType = vk.StructureType.FENCE_CREATE_INFO,
 			flags = {vk.FenceCreateFlag.SIGNALED},
 		}, nil, &vk_in_flight_fence[i])
@@ -1552,21 +1454,21 @@ vk_create_sync_object :: proc() {
 
 vk_clean_sync_object :: proc() {
 	for i in 0..<MAX_FRAMES_IN_FLIGHT {
-		vk.DestroySemaphore(graphics_device, vk_image_available_semaphore[i], nil)
+		vk.DestroySemaphore(vk_device, vk_image_available_semaphore[i], nil)
 		for j in 0..<int(swap_img_cnt) {
-			vk.DestroySemaphore(graphics_device, vk_render_finished_semaphore[i][j], nil)
+			vk.DestroySemaphore(vk_device, vk_render_finished_semaphore[i][j], nil)
 		}
 		delete(vk_render_finished_semaphore[i])
-		vk.DestroyFence(graphics_device, vk_in_flight_fence[i], nil)
+		vk.DestroyFence(vk_device, vk_in_flight_fence[i], nil)
 	}
 }
 
 vk_clean_swap_chain :: proc() {
 	if vk_swapchain != 0 {
 		for _, i in vk_frame_buffers {
-			vk.DestroyFramebuffer(graphics_device, vk_frame_buffers[i], nil)
-			//vk.DestroyFramebuffer(graphics_device, vkClearFrameBuffers[i], nil)
-			vk.DestroyImageView(graphics_device, vk_frame_buffer_image_views[i], nil)
+			vk.DestroyFramebuffer(vk_device, vk_frame_buffers[i], nil)
+			//vk.DestroyFramebuffer(vk_device, vkClearFrameBuffers[i], nil)
+			vk.DestroyImageView(vk_device, vk_frame_buffer_image_views[i], nil)
 		}
 
 		texture_deinit(&vk_frame_depth_stencil_texture)
@@ -1579,7 +1481,7 @@ vk_clean_swap_chain :: proc() {
 		//delete(vkClearFrameBuffers)
 		delete(vk_frame_buffer_image_views)
 
-		vk.DestroySwapchainKHR(graphics_device, vk_swapchain, nil)
+		vk.DestroySwapchainKHR(vk_device, vk_swapchain, nil)
 		vk_swapchain = 0
 	}
 }
@@ -1643,4 +1545,99 @@ vk_transition_image_layout :: proc(cmd:vk.CommandBuffer, image:vk.Image, mip_lev
 	nil,
 	1,
 	&barrier)
+}
+
+vk_begin_single_time_cmd :: proc "contextless" () -> vk.CommandBuffer {
+	cmd:vk.CommandBuffer
+	res := vk.AllocateCommandBuffers(vk_device, &vk.CommandBufferAllocateInfo{
+		sType = vk.StructureType.COMMAND_BUFFER_ALLOCATE_INFO,
+		commandPool = vk_cmd_pool,
+		level = vk.CommandBufferLevel.PRIMARY,
+		commandBufferCount = 1,
+	}, &cmd)
+	if res != .SUCCESS do trace.panic_log("vk_begin_single_time_cmd vk.AllocateCommandBuffers(&cmd) : ", res)
+
+	beginInfo := vk.CommandBufferBeginInfo {
+		flags = {.ONE_TIME_SUBMIT},
+		sType = vk.StructureType.COMMAND_BUFFER_BEGIN_INFO,
+	}
+	vk.BeginCommandBuffer(cmd, &beginInfo)
+
+	return cmd
+}
+
+vk_end_single_time_cmd :: proc "contextless" (_cmd:vk.CommandBuffer)  {
+	cmd := _cmd
+	vk.EndCommandBuffer(cmd)
+
+	submitInfo := vk.SubmitInfo {
+		commandBufferCount = 1,
+		pCommandBuffers    = &cmd,
+		sType              = .SUBMIT_INFO,
+	}
+	res := vk.QueueSubmit(vk_graphics_queue, 1, &submitInfo, 0)
+	if res != .SUCCESS do trace.panic_log("vk_end_single_time_cmd res := vk.QueueSubmit(vk_graphics_queue, 1, &submitInfo, 0) : ", res)
+
+	vk_wait_graphics_idle()
+
+	vk.FreeCommandBuffers(vk_device, vk_cmd_pool, 1, &cmd)
+}
+
+vk_record_command_buffer :: proc(cmd:^__render_cmd, frame:int) {
+	clsColor :vk.ClearValue = {color = {float32 = g_clear_color}}
+	clsDepthStencil :vk.ClearValue = {depthStencil = {depth = 1.0, stencil = 0}}
+	clsZero :vk.ClearValue = {depthStencil = {depth = 1.0, stencil = 0}}
+
+	for &c, i in cmd.cmds[frame] {
+		beginInfo := vk.CommandBufferBeginInfo {
+			sType = vk.StructureType.COMMAND_BUFFER_BEGIN_INFO,
+			flags = {},
+		}
+		res := vk.BeginCommandBuffer(c.__handle, &beginInfo)
+		if res != .SUCCESS do trace.panic_log("BeginCommandBuffer : ", res)
+
+		renderPassBeginInfo := vk.RenderPassBeginInfo {
+			sType = vk.StructureType.RENDER_PASS_BEGIN_INFO,
+			renderPass = vk_render_pass,
+			framebuffer = vk_frame_buffers[i],
+			renderArea = {
+				offset = {x = 0, y = 0},
+				extent = vk_extent_rotation,
+			},
+			clearValueCount = 2,
+			pClearValues = &([]vk.ClearValue{clsColor, clsDepthStencil})[0],
+		}
+
+		vk.CmdBeginRenderPass(c.__handle, &renderPassBeginInfo, vk.SubpassContents.INLINE)
+		
+		viewport := vk.Viewport {
+			x = 0.0,
+			y = 0.0,
+			width = f32(vk_extent_rotation.width),
+			height = f32(vk_extent_rotation.height),
+			minDepth = 0.0,
+			maxDepth = 1.0,
+		}
+		vk.CmdSetViewport(c.__handle, 0, 1, &viewport)
+
+		scissor := vk.Rect2D {
+			offset = {x = 0, y = 0},
+			extent = vk_extent_rotation,
+		}
+		vk.CmdSetScissor(c.__handle, 0, 1, &scissor)
+
+		sync.rw_mutex_lock(&cmd.obj_lock)
+		objs := mem.make_non_zeroed_slice([]^iobject, len(cmd.scene), context.temp_allocator)
+		copy_slice(objs, cmd.scene[:])
+		sync.rw_mutex_unlock(&cmd.obj_lock)
+		defer delete(objs, context.temp_allocator)
+		
+		for obj in objs {
+			iobject_draw(auto_cast obj, c)
+		}
+
+		vk.CmdEndRenderPass(c.__handle)
+		res = vk.EndCommandBuffer(c.__handle)
+		if res != .SUCCESS do trace.panic_log("EndCommandBuffer : ", res)
+	}
 }

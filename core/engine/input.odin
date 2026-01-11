@@ -1,6 +1,7 @@
 package engine
 
 import "base:intrinsics"
+import "base:library"
 import "base:runtime"
 import "core:debug/trace"
 import "core:fmt"
@@ -36,7 +37,7 @@ import "vendor:glfw"
 // Key Code Definitions
 // ============================================================================
 
-when is_mobile {
+when library.is_mobile {
     key_code :: enum i32 {
         KEY_SPACE = auto_cast android.Keycode.SPACE,
         KEY_APOSTROPHE = auto_cast android.Keycode.APOSTROPHE,    /* ' */
@@ -338,20 +339,7 @@ mouse_pos :: #force_inline proc "contextless" () -> linalg.PointF {
     return __mouse_pos
 }
 
-/*
-Converts mouse position from window coordinates to centered coordinates
 
-Inputs:
-- pos: Mouse position in window coordinates
-
-Returns:
-- Mouse position in centered coordinates (origin at window center)
-*/
-convert_mouse_pos :: proc "contextless" (pos:linalg.PointF) -> linalg.PointF {
-    w := f32(window_width()) / 2.0
-    h := f32(window_height()) / 2.0
-    return linalg.PointF{ pos.x - w, -pos.y + h }
-}
 
 // ============================================================================
 // Gamepad/Controller Input

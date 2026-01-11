@@ -1,4 +1,4 @@
-package engine
+package object
 
 import "base:intrinsics"
 import "base:runtime"
@@ -14,47 +14,9 @@ import "core:sync"
 import "core:thread"
 import vk "vendor:vulkan"
 import "vendor:glslang"
+import "core:engine"
 
 
-// ============================================================================
-// Type Definitions
-// ============================================================================
-
-
-custom_object_draw_type :: enum {
-    Draw,
-    DrawIndexed,
-}
-
-custom_object_draw_method :: struct {
-    type:custom_object_draw_type,
-    vertex_count:u32,
-    instance_count:u32,
-    index_count:u32,
-    using _:struct #raw_union {
-        first_vertex:u32,
-        vertex_offset:i32,
-    },
-    first_instance:u32,
-    first_index:u32,
-}
-
-/*
-Custom object pipeline structure for managing custom shader pipelines
-
-Contains pipeline, layout, descriptor sets, and draw method configuration
-*/
-custom_object_pipeline :: struct {
-    check_init: mem.ICheckInit,
-
-    __pipeline:vk.Pipeline,
-    __pipeline_layout:vk.PipelineLayout,
-    __descriptor_set_layouts:[]vk.DescriptorSetLayout,
-    __pool_binding:[][]u32,//! auto generate inside, engine_def_allocator
-
-    draw_method:custom_object_draw_method,
-    pool_sizes:[][]descriptor_pool_size,
-}
 
 /*
 Custom object structure for rendering with custom shaders
@@ -62,15 +24,11 @@ Custom object structure for rendering with custom shaders
 Extends iobject with custom pipeline and descriptor sets
 */
 custom_object :: struct {
-    using _:iobject,
-    p_pipeline:^custom_object_pipeline,
-    pipeline_set_idx:int, // The index of the pipeline set to use for this object.
-    pipeline_p_sets:[]^descriptor_set
+    using _:engine.iobject,
+    p_pipeline:^engine.object_pipeline,
+    pipeline_set_idx:int, // The index of the pipeline set to use for this 
+    pipeline_p_sets:[]^engine.descriptor_set
 }
-
-// ============================================================================
-// Shader and Descriptor Types
-// ============================================================================
 
 descriptor_set_layout_binding :: vk.DescriptorSetLayoutBinding
 vertex_input_binding_description :: vk.VertexInputBindingDescription
@@ -107,23 +65,23 @@ Inputs:
 Returns:
 - None
 */
-custom_object_pipeline_deinit :: proc(self:^custom_object_pipeline) {
+custom_object_pipeline_deinit :: proc(self:^engine.object_pipeline) {
     mem.ICheckInit_Deinit(&self.check_init)
 
     for l in self.__descriptor_set_layouts {
-        vk.DestroyDescriptorSetLayout(graphics_device, l, nil)
+        vk.DestroyDescriptorSetLayout(engine.graphics_device(), l, nil)
     }
     for p in self.__pool_binding {
-        delete(p, engine_def_allocator)
+        delete(p, engine.def_allocator())
     }
     for p in self.pool_sizes {
-        delete(p, engine_def_allocator)
+        delete(p, engine.def_allocator())
     }
-    vk.DestroyPipelineLayout(graphics_device, self.__pipeline_layout, nil)
-    vk.DestroyPipeline(graphics_device, self.__pipeline, nil)
-    delete(self.pool_sizes, engine_def_allocator)
-    delete(self.__descriptor_set_layouts, engine_def_allocator)
-    delete(self.__pool_binding, engine_def_allocator)
+    vk.DestroyPipelineLayout(engine.graphics_device(), self.__pipeline_layout, nil)
+    vk.DestroyPipeline(engine.graphics_device(), self.__pipeline, nil)
+    delete(self.pool_sizes, engine.def_allocator())
+    delete(self.__descriptor_set_layouts, engine.def_allocator())
+    delete(self.__pool_binding, engine.def_allocator())
 }
 
 /*
@@ -145,12 +103,12 @@ Inputs:
 Returns:
 - `true` if initialization succeeded, `false` otherwise
 */
-custom_object_pipeline_init :: proc(self:^custom_object_pipeline,
+custom_object_pipeline_init :: proc(self:^engine.object_pipeline,
     binding_set_layouts:[][]descriptor_set_layout_binding,
     vertex_input_binding:Maybe([]vertex_input_binding_description),
     vertex_input_attribute:Maybe([]vertex_input_attribute_description),
-    draw_method:custom_object_draw_method,
-    pool_sizes:[][]descriptor_pool_size,
+    draw_method:engine.object_draw_method,
+    pool_sizes:[][]engine.descriptor_pool_size,
     vertex_shader:Maybe(shader_code),
     pixel_shader:Maybe(shader_code),
     geometry_shader:Maybe(shader_code) = nil,
@@ -159,15 +117,15 @@ custom_object_pipeline_init :: proc(self:^custom_object_pipeline,
     mem.ICheckInit_Init(&self.check_init)
 
     self.draw_method = draw_method
-    self.pool_sizes = mem.make_non_zeroed_slice([][]descriptor_pool_size, len(pool_sizes), engine_def_allocator)
+    self.pool_sizes = mem.make_non_zeroed_slice([][]engine.descriptor_pool_size, len(pool_sizes), engine.def_allocator())
     for &p, i in self.pool_sizes {
-        p = mem.make_non_zeroed_slice([]descriptor_pool_size, len(pool_sizes[i]), engine_def_allocator)
-        mem.copy_non_overlapping(&self.pool_sizes[i][0], &pool_sizes[i][0], len(pool_sizes[i]) * size_of(descriptor_pool_size))
+        p = mem.make_non_zeroed_slice([]engine.descriptor_pool_size, len(pool_sizes[i]), engine.def_allocator())
+        mem.copy_non_overlapping(&self.pool_sizes[i][0], &pool_sizes[i][0], len(pool_sizes[i]) * size_of(engine.descriptor_pool_size))
     }
     
-    self.__pool_binding = mem.make_non_zeroed_slice([][]u32, len(pool_sizes), engine_def_allocator)
+    self.__pool_binding = mem.make_non_zeroed_slice([][]u32, len(pool_sizes), engine.def_allocator())
     for &b, i in self.__pool_binding {
-        b = mem.make_non_zeroed_slice([]u32, len(pool_sizes[i]), engine_def_allocator)
+        b = mem.make_non_zeroed_slice([]u32, len(pool_sizes[i]), engine.def_allocator())
         b[0] = 0 // The first binding is always 0, as it is the default binding for the descriptor set.
         pool_idx :u32 = 0
         for j in 1..<len(pool_sizes[i]) {
@@ -184,7 +142,7 @@ custom_object_pipeline_init :: proc(self:^custom_object_pipeline,
     defer {
         for s in shader_modules {
             if s != 0 {
-                vk.DestroyShaderModule(graphics_device, s, nil)
+                vk.DestroyShaderModule(engine.graphics_device(), s, nil)
             }
         }
     }
@@ -295,12 +253,12 @@ custom_object_pipeline_init :: proc(self:^custom_object_pipeline,
                     
                     // SPIR-V 데이터 가져오기
                     spirv_size := glslang.program_SPIRV_get_size(program)
-                    spirv_data, alloc_err := mem.alloc(cast(int)(size_of(u32) * spirv_size), align_of(u32), engine_def_allocator)
+                    spirv_data, alloc_err := mem.alloc(cast(int)(size_of(u32) * spirv_size), align_of(u32), engine.def_allocator())
                     if alloc_err != nil {
                         trace.printlnLog("custom_object_pipeline_init: failed to allocate memory for SPIR-V")
                         return false
                     }
-                    defer mem.free(spirv_data, engine_def_allocator)
+                    defer mem.free(spirv_data, engine.def_allocator())
                     glslang.program_SPIRV_get(program, cast(^c.uint)spirv_data)
                     
                     // SPIR-V 메시지 확인
@@ -314,7 +272,7 @@ custom_object_pipeline_init :: proc(self:^custom_object_pipeline,
                 case []byte:
                     shader_bytes = s
             }
-            shader_modules[i] = vk.CreateShaderModule2(graphics_device, shader_bytes) or_else trace.panic_log("custom_object_pipeline_init: CreateShaderModule2")
+            shader_modules[i] = vk.CreateShaderModule2(engine.graphics_device(), shader_bytes) or_else trace.panic_log("custom_object_pipeline_init: CreateShaderModule2")
         }
     }
     shaderCreateInfo : [len(shaders)]vk.PipelineShaderStageCreateInfo
@@ -332,11 +290,11 @@ custom_object_pipeline_init :: proc(self:^custom_object_pipeline,
     depth_stencil_state2 := depth_stencil_state == nil ? vk.PipelineDepthStencilStateCreateInfoInit() : depth_stencil_state.?
     viewportState := vk.PipelineViewportStateCreateInfoInit()
 
-    self.__descriptor_set_layouts = mem.make_non_zeroed_slice([]vk.DescriptorSetLayout, len(binding_set_layouts), engine_def_allocator)
+    self.__descriptor_set_layouts = mem.make_non_zeroed_slice([]vk.DescriptorSetLayout, len(binding_set_layouts), engine.def_allocator())
     for &l, i in self.__descriptor_set_layouts {
-        l = vk.DescriptorSetLayoutInit(graphics_device, binding_set_layouts[i])
+        l = vk.DescriptorSetLayoutInit(engine.graphics_device(), binding_set_layouts[i])
     }
-    self.__pipeline_layout = vk.PipelineLayoutInit(graphics_device, self.__descriptor_set_layouts)
+    self.__pipeline_layout = vk.PipelineLayoutInit(engine.graphics_device(), self.__descriptor_set_layouts)
 
     vertexInputState:Maybe(vk.PipelineVertexInputStateCreateInfo)
     if vertex_input_binding != nil && vertex_input_attribute != nil {
@@ -345,7 +303,7 @@ custom_object_pipeline_init :: proc(self:^custom_object_pipeline,
         vertexInputState = nil
     }
 
-    if !create_graphics_pipeline(self,
+    if !engine.create_graphics_pipeline(self,
         shaderCreateInfo[:shaderCreateInfoLen],
         &depth_stencil_state2,
         &viewportState,
@@ -359,7 +317,7 @@ custom_object_pipeline_init :: proc(self:^custom_object_pipeline,
 // Custom Object Management
 // ============================================================================
 
-@private custom_object_vtable :iobject_vtable = iobject_vtable{
+@private custom_object_vtable :engine.iobject_vtable = engine.iobject_vtable{
     draw = auto_cast _super_custom_object_draw,
     deinit = auto_cast _super_custom_object_deinit,
 }
@@ -386,14 +344,14 @@ Returns:
 - None
 */
 custom_object_init :: proc(self:^custom_object, $actual_type:typeid,
-    p_pipeline:^custom_object_pipeline,
-    pipeline_p_sets:[]^descriptor_set,
+    p_pipeline:^engine.object_pipeline,
+    pipeline_p_sets:[]^engine.descriptor_set,
     pipeline_set_idx:int = 0,
     pos:linalg.Point3DF, rotation:f32, scale:linalg.PointF = {1,1},
-    camera:^camera, projection:^projection, color_transform:^color_transform = nil, pivot:linalg.PointF = {0.0, 0.0}, vtable:^iobject_vtable = nil)
+    camera:^engine.camera, projection:^engine.projection, color_transform:^engine.color_transform = nil, pivot:linalg.PointF = {0.0, 0.0}, vtable:^engine.iobject_vtable = nil)
     where intrinsics.type_is_subtype_of(actual_type, custom_object) {
 
-    self.pipeline_p_sets = mem.make_non_zeroed_slice([]^descriptor_set, len(pipeline_p_sets), engine_def_allocator)
+    self.pipeline_p_sets = mem.make_non_zeroed_slice([]^engine.descriptor_set, len(pipeline_p_sets), engine.def_allocator())
     mem.copy_non_overlapping(&self.pipeline_p_sets[0], &pipeline_p_sets[0], len(pipeline_p_sets) * size_of(^descriptor_set))
 
     self.p_pipeline = p_pipeline
@@ -417,32 +375,32 @@ custom_object_init :: proc(self:^custom_object, $actual_type:typeid,
 // ============================================================================
 
 _super_custom_object_deinit :: proc(self:^custom_object) {
-    _super_iobject_deinit(auto_cast self)
+    engine._super_iobject_deinit(auto_cast self)
 
-    delete(self.pipeline_p_sets, engine_def_allocator)
+    delete(self.pipeline_p_sets, engine.def_allocator())
 }
 
 // ============================================================================
 // Custom Object Drawing
 // ============================================================================
 
-_super_custom_object_draw :: proc(self:^custom_object, cmd:command_buffer) {
+_super_custom_object_draw :: proc(self:^custom_object, cmd:engine.command_buffer) {
     mem.ICheckInit_Check(&self.check_init)
 
-    sets := mem.make_non_zeroed_slice([]vk.DescriptorSet, len(self.pipeline_p_sets), engine_def_allocator)
-    defer delete(sets, engine_def_allocator)
+    sets := mem.make_non_zeroed_slice([]vk.DescriptorSet, len(self.pipeline_p_sets), engine.def_allocator())
+    defer delete(sets, engine.def_allocator())
     for i in 0..<len(self.pipeline_p_sets) {
         sets[i] = self.pipeline_p_sets[i].__set
     }
 
-    graphics_cmd_bind_pipeline(cmd, .GRAPHICS, self.p_pipeline.__pipeline)
-    graphics_cmd_bind_descriptor_sets(cmd, .GRAPHICS, self.p_pipeline.__pipeline_layout, 0, auto_cast len(self.pipeline_p_sets),
+    engine.graphics_cmd_bind_pipeline(cmd, .GRAPHICS, self.p_pipeline.__pipeline)
+    engine.graphics_cmd_bind_descriptor_sets(cmd, .GRAPHICS, self.p_pipeline.__pipeline_layout, 0, auto_cast len(self.pipeline_p_sets),
         &sets[0], 0, nil)
 
     if self.p_pipeline.draw_method.type == .Draw {
-        graphics_cmd_draw(cmd, self.p_pipeline.draw_method.vertex_count, self.p_pipeline.draw_method.instance_count, self.p_pipeline.draw_method.first_vertex, self.p_pipeline.draw_method.first_instance)
+        engine.graphics_cmd_draw(cmd, self.p_pipeline.draw_method.vertex_count, self.p_pipeline.draw_method.instance_count, self.p_pipeline.draw_method.first_vertex, self.p_pipeline.draw_method.first_instance)
     } else if self.p_pipeline.draw_method.type == .DrawIndexed {
-        graphics_cmd_draw_indexed(cmd, self.p_pipeline.draw_method.index_count, self.p_pipeline.draw_method.instance_count, self.p_pipeline.draw_method.first_index, self.p_pipeline.draw_method.vertex_offset, self.p_pipeline.draw_method.first_instance)
+        engine.graphics_cmd_draw_indexed(cmd, self.p_pipeline.draw_method.index_count, self.p_pipeline.draw_method.instance_count, self.p_pipeline.draw_method.first_index, self.p_pipeline.draw_method.vertex_offset, self.p_pipeline.draw_method.first_instance)
     }
 }
 
@@ -463,6 +421,6 @@ Inputs:
 Returns:
 - None
 */
-create_buffer_resource :: #force_inline proc(self:^buffer_resource, option:buffer_create_option, data:[]byte, is_copy:bool, allocator:Maybe(runtime.Allocator) = nil) {
-    buffer_resource_create_buffer(self, option, data, is_copy, allocator)
+create_buffer_resource :: #force_inline proc(self:^engine.buffer_resource, option:engine.buffer_create_option, data:[]byte, is_copy:bool, allocator:Maybe(runtime.Allocator) = nil) {
+    engine.buffer_resource_create_buffer(self, option, data, is_copy, allocator)
 }

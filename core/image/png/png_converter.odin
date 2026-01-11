@@ -1,10 +1,9 @@
-package engine
+package png
 
 import "core:mem"
 import "core:debug/trace"
 import "base:intrinsics"
 import "base:runtime"
-import "core:image/png"
 import "core:image"
 import "core:bytes"
 import "core:os/os2"
@@ -70,8 +69,6 @@ png_converter_size :: proc "contextless" (self:^png_converter) -> u32 {
     return 0
 }
 
-png_converter_deinit :: image_converter_deinit
-
 /*
 Loads a PNG image from byte data
 
@@ -88,7 +85,7 @@ Returns:
 Example:
 	data, err := png_converter_load(&converter, file_data, .RGBA)
 */
-png_converter_load :: proc (self:^png_converter, data:[]byte, out_fmt:color_fmt, allocator := context.allocator) -> ([]byte, png_error) {
+png_converter_load :: proc (self:^png_converter, data:[]byte, out_fmt:image.color_fmt, allocator := context.allocator) -> ([]byte, png_error) {
     png_converter_deinit(self)
 
     err : image.Error = nil
@@ -131,7 +128,7 @@ Returns:
 Example:
 	data, err := png_converter_load_file(&converter, "image.png", .RGBA)
 */
-png_converter_load_file :: proc (self:^png_converter, file_path:string, out_fmt:color_fmt, allocator := context.allocator) -> ([]byte, png_error) {
+png_converter_load_file :: proc (self:^png_converter, file_path:string, out_fmt:image.color_fmt, allocator := context.allocator) -> ([]byte, png_error) {
     imgFileData:[]byte
     when is_android {
         imgFileReadErr : android.AssetFileError
@@ -149,4 +146,15 @@ png_converter_load_file :: proc (self:^png_converter, file_path:string, out_fmt:
     defer delete(imgFileData, context.temp_allocator)
 
     return png_converter_load(self, imgFileData, out_fmt, allocator)
+}
+
+png_converter_deinit :: proc (self:^png_converter) {
+    if self.img != nil {
+        if self.img.pixels.buf != nil {
+            image.destroy(self.img, self.allocator)
+        } else {
+            free(self.img, self.allocator)
+        }
+        self.img = nil
+    }
 }
