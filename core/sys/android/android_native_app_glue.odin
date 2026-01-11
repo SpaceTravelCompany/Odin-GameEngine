@@ -3,8 +3,8 @@ package android
 
 import "core:c"
 @(require) import "base:runtime"
-import "base:intrinsics"
-import "core:sys/posix"
+@(require) import "base:intrinsics"
+@(require) import "core:sys/posix"
 
 foreign import android "system:android"
 
