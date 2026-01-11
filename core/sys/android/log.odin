@@ -1,4 +1,4 @@
-//#+build linux //referenced by fmt/fmt_os.odin
+// //referenced by fmt/fmt_os.odin
 package android
 
 import "core:c"

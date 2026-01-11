@@ -1,4 +1,4 @@
-#+build linux
+
 package android
 
 import "core:c"
@@ -127,6 +127,16 @@ android_poll_source :: struct {
     process: #type proc "c" (app: ^android_app, source: ^android_poll_source),
 }
 
+when ODIN_PLATFORM_SUBTARGET == .Android {
+	@private pthread_mutex_t :: posix.pthread_mutex_t
+	@private pthread_cond_t :: posix.pthread_cond_t
+	@private pthread_t :: posix.pthread_t
+} else {//dummy for other platforms build
+	@private pthread_mutex_t :: distinct rawptr
+	@private pthread_cond_t :: distinct rawptr
+	@private pthread_t :: distinct rawptr
+}
+
 android_app :: struct {
     // The application can place a pointer to its own state object
     // here if it likes.
@@ -184,13 +194,13 @@ android_app :: struct {
     // -------------------------------------------------
     // Below are "private" implementation of the glue code.
 
-    mutex: posix.pthread_mutex_t,
-    cond: posix.pthread_cond_t,
+    mutex: pthread_mutex_t,
+    cond: pthread_cond_t,
 
     msgread: c.int,
     msgwrite: c.int,
 
-    thread: posix.pthread_t,
+    thread: pthread_t,
 
     cmdPollSource: android_poll_source,
     inputPollSource: android_poll_source,

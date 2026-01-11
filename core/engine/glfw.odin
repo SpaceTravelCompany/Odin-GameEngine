@@ -25,285 +25,285 @@ when !library.is_mobile {
     @(private="file") wnd:glfw.WindowHandle = nil
     @(private="file") glfw_monitors:[dynamic]glfw.MonitorHandle
 
-    glfw_start :: proc() {
-    when !is_console {
-        //?default screen idx 0
-        if __window_width == nil do __window_width = int(monitors[0].rect.size.x / 2)
-        if __window_height == nil do __window_height = int(monitors[0].rect.size.y / 2)
-        if __window_x == nil do __window_x = int(monitors[0].rect.pos.x + monitors[0].rect.size.x / 4)
-        if __window_y == nil do __window_y = int(monitors[0].rect.pos.y + monitors[0].rect.size.y / 4)
+	glfw_start :: proc() {
+		when !is_console {
+			//?default screen idx 0
+			if __window_width == nil do __window_width = int(monitors[0].rect.size.x / 2)
+			if __window_height == nil do __window_height = int(monitors[0].rect.size.y / 2)
+			if __window_x == nil do __window_x = int(monitors[0].rect.pos.x + monitors[0].rect.size.x / 4)
+			if __window_y == nil do __window_y = int(monitors[0].rect.pos.y + monitors[0].rect.size.y / 4)
 
-        save_prev_window()
+			save_prev_window()
 
-        //? change use glfw.SetWindowAttrib()
-        if __screen_mode ==.Borderless {
-            glfw.WindowHint (glfw.DECORATED, glfw.FALSE)
-            glfw.WindowHint(glfw.FLOATING, glfw.TRUE)
+			//? change use glfw.SetWindowAttrib()
+			if __screen_mode ==.Borderless {
+				glfw.WindowHint (glfw.DECORATED, glfw.FALSE)
+				glfw.WindowHint(glfw.FLOATING, glfw.TRUE)
 
-            wnd = glfw.CreateWindow(monitors[__screen_idx].rect.size.x,
-                monitors[__screen_idx].rect.size.y,
-                __window_title,
-                nil,
-                nil)
+				wnd = glfw.CreateWindow(monitors[__screen_idx].rect.size.x,
+					monitors[__screen_idx].rect.size.y,
+					__window_title,
+					nil,
+					nil)
 
-            glfw.SetWindowPos(wnd, monitors[__screen_idx].rect.pos.x, monitors[__screen_idx].rect.pos.y)
-            glfw.SetWindowSize(wnd, monitors[__screen_idx].rect.size.x, monitors[__screen_idx].rect.size.y)
-        } else if __screen_mode == .Fullscreen {
-            wnd = glfw.CreateWindow(monitors[__screen_idx].rect.size.x,
-                monitors[__screen_idx].rect.size.y,
-                __window_title,
-                glfw_monitors[__screen_idx],
-                nil)
-        } else {
-            wnd = glfw.CreateWindow(auto_cast __window_width.?,
-                auto_cast __window_height.?,
-                __window_title,
-                nil,
-                nil)
+				glfw.SetWindowPos(wnd, monitors[__screen_idx].rect.pos.x, monitors[__screen_idx].rect.pos.y)
+				glfw.SetWindowSize(wnd, monitors[__screen_idx].rect.size.x, monitors[__screen_idx].rect.size.y)
+			} else if __screen_mode == .Fullscreen {
+				wnd = glfw.CreateWindow(monitors[__screen_idx].rect.size.x,
+					monitors[__screen_idx].rect.size.y,
+					__window_title,
+					glfw_monitors[__screen_idx],
+					nil)
+			} else {
+				wnd = glfw.CreateWindow(auto_cast __window_width.?,
+					auto_cast __window_height.?,
+					__window_title,
+					nil,
+					nil)
 
-            glfw.SetWindowPos(wnd, auto_cast __window_x.?, auto_cast __window_y.?)
-        }
+				glfw.SetWindowPos(wnd, auto_cast __window_x.?, auto_cast __window_y.?)
+			}
 
-        //CreateRenderFuncThread()
-    }
-}
-
-    when ODIN_OS == .Windows {
-        glfw_get_current_hmonitor :: proc "contextless" () -> windows.HMONITOR {
-    if wnd == nil do trace.panic_log("glfw_get_current_hmonitor : wnd is nil")
-    h_wnd := glfw.GetWin32Window(wnd)
-    if h_wnd == nil do trace.panic_log("glfw_get_current_hmonitor : h_wnd is nil")
-
-    return windows.MonitorFromWindow(h_wnd, windows.Monitor_From_Flags.MONITOR_DEFAULTTONEAREST)
-}
-
-glfw_get_hwnd :: proc "contextless" () -> windows.HWND {
-    if wnd == nil do trace.panic_log("glfw_get_hwnd : wnd is nil")
-    h_wnd := glfw.GetWin32Window(wnd)
-    if h_wnd == nil do trace.panic_log("glfw_get_hwnd : h_wnd is nil")
-
-            return h_wnd
-        }
-    }
-
-    glfw_set_full_screen_mode :: proc "contextless" (monitor:^monitor_info) {
-    for &m, i in monitors {
-        if raw_data(m.name) == raw_data(monitor.name) {
-            glfw.SetWindowMonitor(wnd, glfw_monitors[i], monitor.rect.pos.x,
-                 monitor.rect.pos.y,
-                monitor.rect.size.x,
-                monitor.rect.size.y,
-                glfw.DONT_CARE)
-            return
-        }
-    }
-}
-
-glfw_set_window_icon :: #force_inline  proc "contextless" (icons:[]glfw.Image) {
-    glfw.SetWindowIcon(wnd, icons)
-}
-
-glfw_set_borderless_screen_mode :: proc "contextless" (monitor:^monitor_info) {
-    glfw.SetWindowMonitor(wnd, nil, monitor.rect.pos.x,
-        monitor.rect.pos.y,
-       monitor.rect.size.x,
-       monitor.rect.size.y,
-       glfw.DONT_CARE)
-}
-
-glfw_set_window_mode :: proc "contextless" () {
-    glfw.SetWindowMonitor(wnd, nil, auto_cast prev_window_x,
-        auto_cast prev_window_y,
-        auto_cast prev_window_width,
-        auto_cast prev_window_height,
-       glfw.DONT_CARE)
-    }
-
-    @(private="file") glfw_init_monitors :: proc() {
-    glfw_monitors = mem.make_non_zeroed([dynamic]glfw.MonitorHandle)
-    _monitors := glfw.GetMonitors()
-
-    for m in _monitors {
-        glfw_append_monitor(m)
-    }
-}
-
-@(private="file") glfw_append_monitor :: proc(m:glfw.MonitorHandle) {
-    info:monitor_info
-    info.name = glfw.GetMonitorName(m)
-    info.rect.pos.x, info.rect.pos.y, info.rect.size.x, info.rect.size.y = glfw.GetMonitorWorkarea(m)
-    info.is_primary = m == glfw.GetPrimaryMonitor()
-
-    vid_mode :^glfw.VidMode = glfw.GetVideoMode(m)
-    info.refresh_rate = auto_cast vid_mode.refresh_rate
-
-    when is_log {
-        fmt.printf(
-            "XFIT SYSLOG : ADD %s monitor name: %s, x:%d, y:%d, size.x:%d, size.y:%d, refleshrate:%d\n",
-            "primary" if info.is_primary else "",
-            info.name,
-            info.rect.pos.x,
-            info.rect.pos.y,
-            info.rect.size.x,
-            info.rect.size.y,
-            info.refresh_rate,
-        )
-    }
-
-        non_zero_append(&monitors, info)
-        non_zero_append(&glfw_monitors, m)
-    }
-
-    glfw_vulkan_start :: proc "contextless" () {
-    if vk_surface != 0 do vk.DestroySurfaceKHR(vk_instance, vk_surface, nil)
-
-    res := glfw.CreateWindowSurface(vk_instance, wnd, nil, &vk_surface)
-        if (res != .SUCCESS) do trace.panic_log("glfw_vulkan_start : ", res)
-    }
-
-    glfw_system_init :: proc() {
-    res := glfw.Init()
-    if !res do trace.panic_log("glfw.Init : ", res)
-
-    when ODIN_OS == .Linux {
-        name:linux.UTS_Name
-		err := linux.uname(&name)
-        if err != .NONE do trace.panic_log("linux.uname : ", err)
-
-        linux_platform.sys_name = strings.clone_from_ptr(&name.sysname[0], bytes.index_byte(name.sysname[:], 0))
-        linux_platform.node_name = strings.clone_from_ptr(&name.nodename[0], bytes.index_byte(name.nodename[:], 0))
-        linux_platform.machine = strings.clone_from_ptr(&name.machine[0], bytes.index_byte(name.machine[:], 0))
-        linux_platform.release = strings.clone_from_ptr(&name.release[0], bytes.index_byte(name.release[:], 0))
-        linux_platform.version = strings.clone_from_ptr(&name.version[0], bytes.index_byte(name.version[:], 0))
-        when is_log {
-            fmt.println("XFIT SYSLOG : ", linux_platform)
-        }
-       
-        processor_core_len = auto_cast os._unix_get_nprocs()
-        if processor_core_len == 0 do trace.panic_log("processor_core_len can't zero")
-        when is_log {
-            fmt.println("XFIT SYSLOG processor_core_len : ", processor_core_len)
-        }
-	} else when ODIN_OS == .Windows {
-        system_info:windows.SYSTEM_INFO
-		windows.GetSystemInfo(&system_info)
-        processor_core_len = auto_cast system_info.dwNumberOfProcessors
-        if processor_core_len == 0 do trace.panic_log("processor_core_len can't zero")
-
-        os_version_info:windows.OSVERSIONINFOEXW
-        os_version_info.dwOSVersionInfoSize = size_of(os_version_info)
-        _ = windows.RtlGetVersion(&os_version_info)
-
-        windows_platform.build_number = os_version_info.dwBuildNumber
-        windows_platform.service_pack = auto_cast os_version_info.wServicePackMajor
-        server_os := os_version_info.wProductType != 1 // not VER_NT_WORKSTATION
-        if !server_os && os_version_info.dwBuildNumber >= 22000 {
-            windows_platform.version = .Windows11
-        } else if server_os && os_version_info.dwBuildNumber >= 20348 {
-            windows_platform.version = .WindowsServer2022
-        } else if server_os && os_version_info.dwBuildNumber >= 17763 {
-            windows_platform.version = .WindowsServer2019
-        } else if os_version_info.dwMajorVersion == 6 && os_version_info.dwMinorVersion == 1 {
-            if server_os {
-                windows_platform.version = .WindowsServer2008R2
-            } else {
-                windows_platform.version = .Windows7
-            }
-        } else if os_version_info.dwMajorVersion == 6 && os_version_info.dwMinorVersion == 2 {
-            if server_os {
-                windows_platform.version = .WindowsServer2012
-            } else {
-                windows_platform.version = .Windows8
-            }
-        } else if os_version_info.dwMajorVersion == 6 && os_version_info.dwMinorVersion == 3 {
-            if server_os {
-                windows_platform.version = .WindowsServer2012R2
-            } else {
-                windows_platform.version = .Windows8Point1
-            }
-        } else if os_version_info.dwMajorVersion == 10 && os_version_info.dwMinorVersion == 0 {
-            if server_os {
-                windows_platform.version = .WindowsServer2016
-            } else {
-                windows_platform.version = .Windows10
-            }
-        } else {
-            windows_platform.version = .Unknown
-            fmt.print_custom_android("WARN : unknown windows version\n", logPriority = .WARN)
-        }
-
-         when is_log {
-            fmt.println("XFIT SYSLOG processor_core_len : ", processor_core_len)
-            fmt.println("XFIT SYSLOG windows_platform : ", windows_platform)
-        }
+			//CreateRenderFuncThread()
+		}
 	}
+
+	when ODIN_OS == .Windows {
+		glfw_get_current_hmonitor :: proc "contextless" () -> windows.HMONITOR {
+			if wnd == nil do trace.panic_log("glfw_get_current_hmonitor : wnd is nil")
+			h_wnd := glfw.GetWin32Window(wnd)
+			if h_wnd == nil do trace.panic_log("glfw_get_current_hmonitor : h_wnd is nil")
+
+			return windows.MonitorFromWindow(h_wnd, windows.Monitor_From_Flags.MONITOR_DEFAULTTONEAREST)
+		}
+
+		glfw_get_hwnd :: proc "contextless" () -> windows.HWND {
+			if wnd == nil do trace.panic_log("glfw_get_hwnd : wnd is nil")
+			h_wnd := glfw.GetWin32Window(wnd)
+			if h_wnd == nil do trace.panic_log("glfw_get_hwnd : h_wnd is nil")
+
+			return h_wnd
+		}
+	}
+
+	glfw_set_full_screen_mode :: proc "contextless" (monitor:^monitor_info) {
+		for &m, i in monitors {
+			if raw_data(m.name) == raw_data(monitor.name) {
+				glfw.SetWindowMonitor(wnd, glfw_monitors[i], monitor.rect.pos.x,
+					monitor.rect.pos.y,
+					monitor.rect.size.x,
+					monitor.rect.size.y,
+					glfw.DONT_CARE)
+				return
+			}
+		}
+	}
+
+	glfw_set_window_icon :: #force_inline  proc "contextless" (icons:[]glfw.Image) {
+		glfw.SetWindowIcon(wnd, icons)
+	}
+
+	glfw_set_borderless_screen_mode :: proc "contextless" (monitor:^monitor_info) {
+		glfw.SetWindowMonitor(wnd, nil, monitor.rect.pos.x,
+			monitor.rect.pos.y,
+		monitor.rect.size.x,
+		monitor.rect.size.y,
+		glfw.DONT_CARE)
+	}
+
+	glfw_set_window_mode :: proc "contextless" () {
+		glfw.SetWindowMonitor(wnd, nil, auto_cast prev_window_x,
+			auto_cast prev_window_y,
+			auto_cast prev_window_width,
+			auto_cast prev_window_height,
+		glfw.DONT_CARE)
+		}
+
+	@(private="file") glfw_init_monitors :: proc() {
+		glfw_monitors = mem.make_non_zeroed([dynamic]glfw.MonitorHandle)
+		_monitors := glfw.GetMonitors()
+
+		for m in _monitors {
+			glfw_append_monitor(m)
+		}
+	}
+
+	@(private="file") glfw_append_monitor :: proc(m:glfw.MonitorHandle) {
+		info:monitor_info
+		info.name = glfw.GetMonitorName(m)
+		info.rect.pos.x, info.rect.pos.y, info.rect.size.x, info.rect.size.y = glfw.GetMonitorWorkarea(m)
+		info.is_primary = m == glfw.GetPrimaryMonitor()
+
+		vid_mode :^glfw.VidMode = glfw.GetVideoMode(m)
+		info.refresh_rate = auto_cast vid_mode.refresh_rate
+
+		when is_log {
+			fmt.printf(
+				"XFIT SYSLOG : ADD %s monitor name: %s, x:%d, y:%d, size.x:%d, size.y:%d, refleshrate:%d\n",
+				"primary" if info.is_primary else "",
+				info.name,
+				info.rect.pos.x,
+				info.rect.pos.y,
+				info.rect.size.x,
+				info.rect.size.y,
+				info.refresh_rate,
+			)
+		}
+
+		non_zero_append(&monitors, info)
+		non_zero_append(&glfw_monitors, m)
+	}
+
+	glfw_vulkan_start :: proc "contextless" () {
+		if vk_surface != 0 do vk.DestroySurfaceKHR(vk_instance, vk_surface, nil)
+
+		res := glfw.CreateWindowSurface(vk_instance, wnd, nil, &vk_surface)
+		if res != .SUCCESS do trace.panic_log("glfw_vulkan_start : ", res)
+	}
+
+	glfw_system_init :: proc() {
+		res := glfw.Init()
+		if !res do trace.panic_log("glfw.Init : ", res)
+
+		when ODIN_OS == .Linux {
+			name:linux.UTS_Name
+			err := linux.uname(&name)
+			if err != .NONE do trace.panic_log("linux.uname : ", err)
+
+			linux_platform.sys_name = strings.clone_from_ptr(&name.sysname[0], bytes.index_byte(name.sysname[:], 0))
+			linux_platform.node_name = strings.clone_from_ptr(&name.nodename[0], bytes.index_byte(name.nodename[:], 0))
+			linux_platform.machine = strings.clone_from_ptr(&name.machine[0], bytes.index_byte(name.machine[:], 0))
+			linux_platform.release = strings.clone_from_ptr(&name.release[0], bytes.index_byte(name.release[:], 0))
+			linux_platform.version = strings.clone_from_ptr(&name.version[0], bytes.index_byte(name.version[:], 0))
+			when is_log {
+				fmt.println("XFIT SYSLOG : ", linux_platform)
+			}
+		
+			processor_core_len = auto_cast os._unix_get_nprocs()
+			if processor_core_len == 0 do trace.panic_log("processor_core_len can't zero")
+			when is_log {
+				fmt.println("XFIT SYSLOG processor_core_len : ", processor_core_len)
+			}
+		} else when ODIN_OS == .Windows {
+			system_info:windows.SYSTEM_INFO
+			windows.GetSystemInfo(&system_info)
+			processor_core_len = auto_cast system_info.dwNumberOfProcessors
+			if processor_core_len == 0 do trace.panic_log("processor_core_len can't zero")
+
+			os_version_info:windows.OSVERSIONINFOEXW
+			os_version_info.dwOSVersionInfoSize = size_of(os_version_info)
+			_ = windows.RtlGetVersion(&os_version_info)
+
+			windows_platform.build_number = os_version_info.dwBuildNumber
+			windows_platform.service_pack = auto_cast os_version_info.wServicePackMajor
+			server_os := os_version_info.wProductType != 1 // not VER_NT_WORKSTATION
+			if !server_os && os_version_info.dwBuildNumber >= 22000 {
+				windows_platform.version = .Windows11
+			} else if server_os && os_version_info.dwBuildNumber >= 20348 {
+				windows_platform.version = .WindowsServer2022
+			} else if server_os && os_version_info.dwBuildNumber >= 17763 {
+				windows_platform.version = .WindowsServer2019
+			} else if os_version_info.dwMajorVersion == 6 && os_version_info.dwMinorVersion == 1 {
+				if server_os {
+					windows_platform.version = .WindowsServer2008R2
+				} else {
+					windows_platform.version = .Windows7
+				}
+			} else if os_version_info.dwMajorVersion == 6 && os_version_info.dwMinorVersion == 2 {
+				if server_os {
+					windows_platform.version = .WindowsServer2012
+				} else {
+					windows_platform.version = .Windows8
+				}
+			} else if os_version_info.dwMajorVersion == 6 && os_version_info.dwMinorVersion == 3 {
+				if server_os {
+					windows_platform.version = .WindowsServer2012R2
+				} else {
+					windows_platform.version = .Windows8Point1
+				}
+			} else if os_version_info.dwMajorVersion == 10 && os_version_info.dwMinorVersion == 0 {
+				if server_os {
+					windows_platform.version = .WindowsServer2016
+				} else {
+					windows_platform.version = .Windows10
+				}
+			} else {
+				windows_platform.version = .Unknown
+				fmt.print_custom_android("WARN : unknown windows version\n", logPriority = .WARN)
+			}
+
+			when is_log {
+				fmt.println("XFIT SYSLOG processor_core_len : ", processor_core_len)
+				fmt.println("XFIT SYSLOG windows_platform : ", windows_platform)
+			}
+		}
 
         when is_log do glfw.SetErrorCallback(glfw_error_callback)
     }
 
     glfw_error_callback :: proc "c" (error: c.int, description: cstring) {
-    when is_log {
-        context = runtime.default_context()
-            fmt.println("XFIT SYSLOG : glfw", error, description)
-        }
+		when is_log {
+			context = runtime.default_context()
+			fmt.println("XFIT SYSLOG : glfw", error, description)
+		}
     }
 
     glfw_system_start :: proc() {
-    glfw_monitor_proc :: proc "c" (monitor: glfw.MonitorHandle, event: c.int) {
-        sync.mutex_lock(&monitors_mtx)
-        defer sync.mutex_unlock(&monitors_mtx)
-        
-        context = runtime.default_context() 
-        if event == glfw.CONNECTED {
-            glfw_append_monitor(monitor)
-        } else if event == glfw.DISCONNECTED {
-            for m, i in glfw_monitors {
-                if m == monitor {
-                    when is_log && !is_console {
-                        fmt.println(
-                            "XFIT SYSLOG : DEL %s monitor name: %s, x:%d, y:%d, size.x:%d, size.y:%d, refleshrate%d\n",
-                            "primary" if monitors[i].is_primary else "",
-                            monitors[i].name,
-                            monitors[i].rect.pos.x,
-                            monitors[i].rect.pos.y,
-                            monitors[i].rect.size.x,
-                            monitors[i].rect.size.y,
-                            monitors[i].refresh_rate,
-                        )
-                    }
-                    ordered_remove(&glfw_monitors, i)
-                    ordered_remove(&monitors, i)
-                    break
-                }
-            }
-        }
-    }
-    //Unless you will be using OpenGL or OpenGL ES with the same window as Vulkan, there is no need to create a context. You can disable context creation with the GLFW_CLIENT_API hint.
-    glfw.WindowHint(glfw.CLIENT_API, glfw.NO_API)
+		glfw_monitor_proc :: proc "c" (monitor: glfw.MonitorHandle, event: c.int) {
+			sync.mutex_lock(&monitors_mtx)
+			defer sync.mutex_unlock(&monitors_mtx)
+			
+			context = runtime.default_context() 
+			if event == glfw.CONNECTED {
+				glfw_append_monitor(monitor)
+			} else if event == glfw.DISCONNECTED {
+				for m, i in glfw_monitors {
+					if m == monitor {
+						when is_log && !is_console {
+							fmt.println(
+								"XFIT SYSLOG : DEL %s monitor name: %s, x:%d, y:%d, size.x:%d, size.y:%d, refleshrate%d\n",
+								"primary" if monitors[i].is_primary else "",
+								monitors[i].name,
+								monitors[i].rect.pos.x,
+								monitors[i].rect.pos.y,
+								monitors[i].rect.size.x,
+								monitors[i].rect.size.y,
+								monitors[i].refresh_rate,
+							)
+						}
+						ordered_remove(&glfw_monitors, i)
+						ordered_remove(&monitors, i)
+						break
+					}
+				}
+			}
+		}
+		//Unless you will be using OpenGL or OpenGL ES with the same window as Vulkan, there is no need to create a context. You can disable context creation with the GLFW_CLIENT_API hint.
+		glfw.WindowHint(glfw.CLIENT_API, glfw.NO_API)
 
         glfw_init_monitors()
         glfw.SetMonitorCallback(glfw_monitor_proc)
     }
 
     glfw_destroy :: proc "contextless" () {
-    when !is_console {
-        if wnd != nil do glfw.SetWindowShouldClose(wnd, true)
+    	when !is_console {
+        	if wnd != nil do glfw.SetWindowShouldClose(wnd, true)
             //!glfw.DestroyWindow(wnd) 를 쓰지 않는다 왜냐하면 윈도우만 종료되고 윈도우 루프를 빠져나가지 않는다.
         }
     }
 
     glfw_system_destroy :: proc() {
-    delete(glfw_monitors)
+		delete(glfw_monitors)
 
-    when ODIN_OS == .Linux {
-        delete(linux_platform.sys_name)
-        delete(linux_platform.node_name)
-        delete(linux_platform.machine)
-        delete(linux_platform.release)
-        delete(linux_platform.version)
-	} else when ODIN_OS == .Windows {
-		//TODO (xfitgd)
-	}
+		when ODIN_OS == .Linux {
+			delete(linux_platform.sys_name)
+			delete(linux_platform.node_name)
+			delete(linux_platform.machine)
+			delete(linux_platform.release)
+			delete(linux_platform.version)
+		} else when ODIN_OS == .Windows {
+			//TODO (xfitgd)
+		}
   
         glfw.Terminate()
     }
@@ -372,7 +372,7 @@ glfw_set_window_mode :: proc "contextless" () {
 			__window_y = int(ypos)
 		}
 		glfw_window_close_proc :: proc "c" (window: glfw.WindowHandle) {
-			glfw.SetWindowShouldClose(window, auto_cast close())
+			glfw.SetWindowShouldClose(window, auto_cast closing())
 		}
 		glfw_window_focus_proc :: proc "c" (window: glfw.WindowHandle, focused: c.int) {
 			if focused != 0 {

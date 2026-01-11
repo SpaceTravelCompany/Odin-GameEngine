@@ -48,7 +48,7 @@ update: #type proc()
 destroy: #type proc()
 size: #type proc() = proc () {}
 activate: #type proc "contextless" () = proc "contextless" () {}
-close: #type proc "contextless" () -> bool = proc "contextless" () -> bool{ return true }
+closing: #type proc "contextless" () -> bool = proc "contextless" () -> bool{ return true }
 
 @(private="file") inited := false
 
@@ -279,13 +279,14 @@ windows_set_res_icon :: proc "contextless" (icon_resource_number:int) {
 }
 
 /*
-Exits the engine and cleans up resources
+Closes the engine program
 
 Returns:
 - None
 */
-exit :: proc "contextless" () {
+close :: proc "contextless" () {
 	when is_mobile {
+		android_close()
 	} else {
 		glfw_destroy()
 	}

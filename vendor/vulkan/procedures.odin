@@ -35,9 +35,7 @@ ProcCreateWaylandSurfaceKHR                                          :: #type pr
 ProcCreateWin32SurfaceKHR                                            :: #type proc "system" (instance: Instance, pCreateInfo: ^Win32SurfaceCreateInfoKHR, pAllocator: ^AllocationCallbacks, pSurface: ^SurfaceKHR) -> Result
 ProcCreateXcbSurfaceKHR                                              :: #type proc "system" (instance: Instance, pCreateInfo: ^XcbSurfaceCreateInfoKHR, pAllocator: ^AllocationCallbacks, pSurface: ^SurfaceKHR) -> Result
 ProcCreateXlibSurfaceKHR                                             :: #type proc "system" (instance: Instance, pCreateInfo: ^XlibSurfaceCreateInfoKHR, pAllocator: ^AllocationCallbacks, pSurface: ^SurfaceKHR) -> Result
-when ODIN_PLATFORM_SUBTARGET == .Android {
 ProcCreateAndroidSurfaceKHR :: #type proc "system" (instance: Instance, pCreateInfo: ^AndroidSurfaceCreateInfoKHR, pAllocator: ^AllocationCallbacks, pSurface:^SurfaceKHR) -> Result //edited (xfitgd)
-}
 ProcDebugReportMessageEXT                                            :: #type proc "system" (instance: Instance, flags: DebugReportFlagsEXT, objectType: DebugReportObjectTypeEXT, object: u64, location: int, messageCode: i32, pLayerPrefix: cstring, pMessage: cstring)
 ProcDestroyDebugReportCallbackEXT                                    :: #type proc "system" (instance: Instance, callback: DebugReportCallbackEXT, pAllocator: ^AllocationCallbacks)
 ProcDestroyDebugUtilsMessengerEXT                                    :: #type proc "system" (instance: Instance, messenger: DebugUtilsMessengerEXT, pAllocator: ^AllocationCallbacks)

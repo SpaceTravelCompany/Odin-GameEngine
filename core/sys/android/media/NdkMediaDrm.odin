@@ -1,4 +1,4 @@
-#+build linux
+
 package mediandk
 
 foreign import mediandk "system:mediandk"

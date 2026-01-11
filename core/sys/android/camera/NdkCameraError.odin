@@ -1,4 +1,4 @@
-#+build linux
+
 package camerandk
 
 /**

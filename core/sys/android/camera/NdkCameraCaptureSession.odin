@@ -1,4 +1,4 @@
-#+build linux
+
 package camerandk
 
 foreign import camerandk "system:camera2ndk"

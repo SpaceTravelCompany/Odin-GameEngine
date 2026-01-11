@@ -9062,14 +9062,12 @@ Win32SurfaceCreateInfoKHR :: struct {
 	hwnd:      HWND,
 }
 
-when ODIN_PLATFORM_SUBTARGET == .Android {
-	AndroidSurfaceCreateInfoKHR :: struct {
-		sType: StructureType,
-		pNext:rawptr,
-		flags:AndroidSurfaceCreateFlagsKHR,
-		window:^android.ANativeWindow,
-	}//edited (xfitgd)
-}
+AndroidSurfaceCreateInfoKHR :: struct {
+	sType: StructureType,
+	pNext:rawptr,
+	flags:AndroidSurfaceCreateFlagsKHR,
+	window:^android.ANativeWindow,
+}//edited (xfitgd)
 
 ImportMemoryWin32HandleInfoKHR :: struct {
 	sType:      StructureType,
