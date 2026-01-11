@@ -63,10 +63,15 @@ when library.is_android {
 @private main_thread_id: int
 @private engine_def_allocator: runtime.Allocator
 @(private = "file") __tempArena: virtual.Arena
+__temp_arena_allocator: mem.Allocator
 
 @private @thread_local track_allocator:mem.Tracking_Allocator
 
 @private __exiting := false
+
+temp_arena_allocator :: #force_inline proc "contextless" () -> mem.Allocator {
+	return __temp_arena_allocator
+}
 
 
 when library.is_android {

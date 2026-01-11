@@ -124,7 +124,6 @@ vk_uniform_alloc :: struct {
 @(private="file") gNonInsertedUniforms:[dynamic]vk_temp_uniform_struct
 
 @(private="file") gWaitOpSem:sync.Sema
-@private temp_arena_allocator: mem.Allocator
 
 gVkMinUniformBufferOffsetAlignment : vk.DeviceSize = 0
 
@@ -217,7 +216,7 @@ vk_allocator_init :: proc() {
 
 	_ = virtual.arena_init_growing(&__tempArena)
 
-	temp_arena_allocator = virtual.arena_allocator(&__tempArena)
+	__temp_arena_allocator = virtual.arena_allocator(&__tempArena)
 
 	cmdPoolInfo := vk.CommandPoolCreateInfo {
 		sType            = vk.StructureType.COMMAND_POOL_CREATE_INFO,
@@ -988,7 +987,7 @@ vkbuffer_resource_deinit :: proc(self: ^$T) where T == buffer_resource || T == t
 		bufInfo.usage |= {.TRANSFER_DST}
 		if self.option.len > auto_cast len(self.data.data) do trace.panic_log("create_buffer _data not enough size. ", self.option.len, ", ", len(self.data.data))
 		
-		last = new(buffer_resource, temp_arena_allocator)
+		last = new(buffer_resource, __temp_arena_allocator)
 		last^ = {}
 		last.data = self.data
 		buffer_resource_CreateBufferNoAsync(last, {
@@ -1079,7 +1078,7 @@ vkbuffer_resource_deinit :: proc(self: ^$T) where T == buffer_resource || T == t
 	if self.data.data != nil && self.option.resource_usage == .GPU {
 		imgInfo.usage |= {.TRANSFER_DST}
 		
-		last = new(buffer_resource, temp_arena_allocator)
+		last = new(buffer_resource, __temp_arena_allocator)
 		last^ = {}
 		last.data = self.data
 		buffer_resource_CreateBufferNoAsync(last, {
@@ -1203,8 +1202,8 @@ vk_update_descriptor_sets :: proc(sets: []descriptor_set) {
 			}
 		}
 
-		bufs := mem.make_non_zeroed([]vk.DescriptorBufferInfo, bufCnt, temp_arena_allocator)
-		texs := mem.make_non_zeroed([]vk.DescriptorImageInfo, texCnt, temp_arena_allocator)
+		bufs := mem.make_non_zeroed([]vk.DescriptorBufferInfo, bufCnt, __temp_arena_allocator)
+		texs := mem.make_non_zeroed([]vk.DescriptorImageInfo, texCnt, __temp_arena_allocator)
 		bufCnt = 0
 		texCnt = 0
 

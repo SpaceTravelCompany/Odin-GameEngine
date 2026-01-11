@@ -138,7 +138,7 @@ Returns:
 camera_deinit :: proc(self:^camera) {
     mem.ICheckInit_Deinit(&self.check_init)
 
-    clone_mat_uniform := new(buffer_resource, temp_arena_allocator)
+    clone_mat_uniform := new(buffer_resource, __temp_arena_allocator)
     clone_mat_uniform^ = self.mat_uniform
     buffer_resource_deinit(clone_mat_uniform)
 }

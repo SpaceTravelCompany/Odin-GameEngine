@@ -299,7 +299,7 @@ camera:^camera, projection:^projection, colorTransform:^color_transform = nil, v
 // ============================================================================
 
 _super_tile_image_deinit :: proc(self:^tile_image) {
-    clone_tile_uniform := new(buffer_resource, temp_arena_allocator)
+    clone_tile_uniform := new(buffer_resource, __temp_arena_allocator)
     clone_tile_uniform^ = self.tile_uniform
     buffer_resource_deinit(clone_tile_uniform)
 
@@ -517,7 +517,7 @@ texture_init :: proc(
 		single = false,
 	}, self.sampler, pixels, false, pixels_allocator)
 
-	self.set.__resources = mem.make_non_zeroed_slice([]union_resource, 1, temp_arena_allocator)
+	self.set.__resources = mem.make_non_zeroed_slice([]union_resource, 1, __temp_arena_allocator)
 	self.set.__resources[0] = &self.texture
 	update_descriptor_sets(mem.slice_ptr(&self.set, 1))
 }
@@ -564,7 +564,7 @@ texture_init_grey :: proc(
 		single = false,
 	}, self.sampler, pixels, false, pixels_allocator)
 
-	self.set.__resources = mem.make_non_zeroed_slice([]union_resource, 1, temp_arena_allocator)
+	self.set.__resources = mem.make_non_zeroed_slice([]union_resource, 1, __temp_arena_allocator)
 	self.set.__resources[0] = &self.texture
 	update_descriptor_sets(mem.slice_ptr(&self.set, 1))
 }
@@ -674,7 +674,7 @@ Returns:
 */
 texture_deinit :: #force_inline proc(self:^texture) {
     mem.ICheckInit_Deinit(&self.check_init)
-    clone_texture := new(texture_resource, temp_arena_allocator)
+    clone_texture := new(texture_resource, __temp_arena_allocator)
     clone_texture^ = self.texture
     buffer_resource_deinit(clone_texture)
 }
@@ -790,7 +790,7 @@ texture_array_init :: proc(self:^texture_array, width:u32, height:u32, count:u32
         resource_usage = .GPU,
     }, self.sampler, allocPixels, false, engine_def_allocator)
 
-    self.set.__resources = mem.make_non_zeroed_slice([]union_resource, 1, temp_arena_allocator)
+    self.set.__resources = mem.make_non_zeroed_slice([]union_resource, 1, __temp_arena_allocator)
     self.set.__resources[0] = &self.texture
     update_descriptor_sets(mem.slice_ptr(&self.set, 1))
 }
@@ -806,7 +806,7 @@ Returns:
 */
 texture_array_deinit :: #force_inline proc(self:^texture_array) {
     mem.ICheckInit_Deinit(&self.check_init)
-    clone_texture := new(texture_resource, temp_arena_allocator)
+    clone_texture := new(texture_resource, __temp_arena_allocator)
     clone_texture^ = self.texture
     buffer_resource_deinit(clone_texture)
 }
@@ -967,7 +967,7 @@ inPixelFmt:img.color_fmt = .RGBA) {
         type = .TEX2D,
     }, self.sampler, allocPixels, false, engine_def_allocator)
 
-    self.set.__resources = mem.make_non_zeroed_slice([]union_resource, 1, temp_arena_allocator)
+    self.set.__resources = mem.make_non_zeroed_slice([]union_resource, 1, __temp_arena_allocator)
     self.set.__resources[0] = &self.texture
     update_descriptor_sets(mem.slice_ptr(&self.set, 1))
 }
@@ -983,7 +983,7 @@ Returns:
 */
 tile_texture_array_deinit :: #force_inline proc(self:^tile_texture_array) {
     mem.ICheckInit_Deinit(&self.check_init)
-    clone_texture := new(texture_resource, temp_arena_allocator)
+    clone_texture := new(texture_resource, __temp_arena_allocator)
     clone_texture^ = self.texture
     buffer_resource_deinit(clone_texture)
 }

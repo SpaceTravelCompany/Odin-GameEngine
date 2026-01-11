@@ -199,7 +199,7 @@ iobject_init :: proc(self:^iobject, $actual_type:typeid,
 
 _super_iobject_deinit :: #force_inline proc (self:^iobject) {
     mem.ICheckInit_Deinit(&self.check_init)
-    clone_mat_uniform := new(buffer_resource, temp_arena_allocator)
+    clone_mat_uniform := new(buffer_resource, __temp_arena_allocator)
     clone_mat_uniform^ = self.mat_uniform
     buffer_resource_deinit(clone_mat_uniform)
 }
@@ -257,7 +257,7 @@ get_uniform_resources_default :: #force_inline proc(self:^iobject) -> []union_re
     mem.ICheckInit_Check(&self.check_init)
 
     //업데이트 하면 tempArenaAllocator를 다 지우니 중복 할당해도 됨.
-    self.set.__resources = mem.make_non_zeroed_slice([]union_resource, len(resources), temp_arena_allocator)
+    self.set.__resources = mem.make_non_zeroed_slice([]union_resource, len(resources), __temp_arena_allocator)
     mem.copy_non_overlapping(&self.set.__resources[0], &resources[0], len(resources) * size_of(union_resource))
     update_descriptor_sets(mem.slice_ptr(&self.set, 1))
 }
@@ -438,7 +438,7 @@ __vertex_buf_init :: proc (self:^__vertex_buf($NodeType), array:[]NodeType, _fla
 __vertex_buf_deinit :: proc (self:^__vertex_buf($NodeType)) {
     mem.ICheckInit_Deinit(&self.check_init)
 
-    clone_buf := new(buffer_resource, temp_arena_allocator)
+    clone_buf := new(buffer_resource, __temp_arena_allocator)
     clone_buf^ = self.buf
     buffer_resource_deinit(clone_buf)
 }
@@ -462,7 +462,7 @@ __storage_buf_init :: proc (self:^__storage_buf($NodeType), array:[]NodeType, _f
 __storage_buf_deinit :: proc (self:^__storage_buf($NodeType)) {
     mem.ICheckInit_Deinit(&self.check_init)
 
-    clone_buf := new(buffer_resource, temp_arena_allocator)
+    clone_buf := new(buffer_resource, __temp_arena_allocator)
     clone_buf^ = self.buf
     buffer_resource_deinit(clone_buf)
 }
@@ -486,7 +486,7 @@ __index_buf_init :: proc (self:^__index_buf, array:[]u32, _flag:resource_usage, 
 __index_buf_deinit :: proc (self:^__index_buf) {
     mem.ICheckInit_Deinit(&self.check_init)
 
-    clone_buf := new(buffer_resource, temp_arena_allocator)
+    clone_buf := new(buffer_resource, __temp_arena_allocator)
     clone_buf^ = self.buf
     buffer_resource_deinit(clone_buf)
 }

@@ -1,6 +1,8 @@
 package animator
 
 import "core:engine"
+import "core:mem"
+import vk "vendor:vulkan"
 
 import "core:math/linalg"
 /*
@@ -246,8 +248,8 @@ where intrinsics.type_is_subtype_of(actualType, animate_image) {
     iobject_init(self, actualType, pos, rotation, scale, camera, projection, colorTransform, pivot)
 }
 
-animate_image_init2 :: proc(self:^animate_image, $actualType:typeid, src:^texture_array,
-camera:^camera, projection:^projection, colorTransform:^color_transform = nil, vtable:^ianimate_object_vtable = nil) 
+animate_image_init2 :: proc(self:^animate_image, $actualType:typeid, src:^engine.texture_array,
+camera:^engine.camera, projection:^engine.projection, colorTransform:^engine.color_transform = nil, vtable:^ianimate_object_vtable = nil) 
 where intrinsics.type_is_subtype_of(actualType, animate_image) {
     self.src = src
     
@@ -272,7 +274,7 @@ where intrinsics.type_is_subtype_of(actualType, animate_image) {
 }
 
 _super_animate_image_deinit :: proc(self:^animate_image) {
-    clone_frame_uniform := new(engine.buffer_resource, engine.temp_arena_allocator)
+    clone_frame_uniform := new(engine.buffer_resource, engine.temp_arena_allocator())
     clone_frame_uniform^ = self.frame_uniform
     engine.buffer_resource_deinit(clone_frame_uniform)
 
@@ -347,30 +349,30 @@ animate_image_get_color_transform :: proc "contextless" (self:^animate_image) ->
 }
 
 animate_image_update_transform :: #force_inline proc(self:^animate_image, pos:linalg.Point3DF, rotation:f32, scale:linalg.PointF = {1,1}, pivot:linalg.PointF = {0.0,0.0}) {
-    iobject_update_transform(self, pos, rotation, scale, pivot)
+    engine.iobject_update_transform(self, pos, rotation, scale, pivot)
 }
 animate_image_update_transform_matrix_raw :: #force_inline proc(self:^animate_image, _mat:linalg.Matrix) {
-    iobject_update_transform_matrix_raw(self, _mat)
+    engine.iobject_update_transform_matrix_raw(self, _mat)
 }
 animate_image_change_color_transform :: #force_inline proc(self:^animate_image, colorTransform:^engine.color_transform) {
-    iobject_change_color_transform(self, colorTransform)
+    engine.iobject_change_color_transform(self, colorTransform)
 }
 animate_image_update_camera :: #force_inline proc(self:^animate_image, camera:^engine.camera) {
-    iobject_update_camera(self, camera)
+    engine.iobject_update_camera(self, camera)
 }
 animate_image_update_texture_array :: #force_inline proc "contextless" (self:^animate_image, src:^engine.texture_array) {
     self.src = src
 }
 animate_image_update_projection :: #force_inline proc(self:^animate_image, projection:^engine.projection) {
-    iobject_update_projection(self, projection)
+    engine.iobject_update_projection(self, projection)
 }
 
 _super_animate_image_draw :: proc (self:^animate_image, cmd:engine.command_buffer) {
     mem.ICheckInit_Check(&self.check_init)
     mem.ICheckInit_Check(&self.src.check_init)
 
-    engine.graphics_cmd_bind_pipeline(cmd, .GRAPHICS, engine.animate_tex_pipeline)
-    engine.graphics_cmd_bind_descriptor_sets(cmd, .GRAPHICS, engine.animate_tex_pipeline_layout, 0, 2,
+    engine.graphics_cmd_bind_pipeline(cmd, .GRAPHICS, engine.get_animate_tex_pipeline())
+    engine.graphics_cmd_bind_descriptor_sets(cmd, .GRAPHICS, engine.get_animate_tex_pipeline_layout(), 0, 2,
         &([]vk.DescriptorSet{self.set.__set, self.src.set.__set})[0], 0, nil)
 
     engine.graphics_cmd_draw(cmd, 6, 1, 0, 0)
