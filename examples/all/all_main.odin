@@ -161,8 +161,10 @@ package all
 //engine
 
 @(require) import engine "core:engine"
-@(require) import components "core:engine/components"
+@(require) import components "core:engine/component"
 @(require) import font "core:engine/font"
+@(require) import font "core:engine/object"
+@(require) import font "core:engine/animator"
 @(require) import gui "core:engine/gui"
 @(require) import sound "core:engine/sound"
 @(require) import geometry "core:engine/geometry"
