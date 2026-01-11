@@ -7,9 +7,6 @@ import "core:sync"
 import "core:thread"
 import "vendor:miniaudio"
 
-// ============================================================================
-// Type Definitions
-// ============================================================================
 
 @(private = "file") sound_private :: struct #packed {
     __miniaudio_sound:miniaudio.sound,
@@ -35,9 +32,6 @@ sound_src :: struct {
     decoder:miniaudio.decoder
 }
 
-// ============================================================================
-// Global Variables
-// ============================================================================
 
 @(private = "file") miniaudio_engine:miniaudio.engine
 
@@ -57,9 +51,6 @@ sound_src :: struct {
 @(private = "file") g_end_sounds:[dynamic]^sound
 @(private = "file") g_sounds:map[^sound]^sound
 
-// ============================================================================
-// Sound System Initialization
-// ============================================================================
 
 @private g_init :: proc() {
     g_sounds = make(map[^sound]^sound)

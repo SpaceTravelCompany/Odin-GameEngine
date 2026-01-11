@@ -25,7 +25,7 @@ Extends iobject with custom pipeline and descriptor sets
 */
 custom_object :: struct {
     using _:engine.iobject,
-    p_pipeline:^engine.object_pipeline,
+    p_pipeline:^object_pipeline,
     pipeline_set_idx:int, // The index of the pipeline set to use for this 
     pipeline_p_sets:[]^engine.descriptor_set
 }
@@ -52,9 +52,6 @@ shader_lang :: enum {
 
 descriptor_set_layout_binding_init :: vk.DescriptorSetLayoutBindingInit
 
-// ============================================================================
-// Custom Object Pipeline Management
-// ============================================================================
 
 /*
 Deinitializes and cleans up custom object pipeline resources
@@ -65,7 +62,7 @@ Inputs:
 Returns:
 - None
 */
-custom_object_pipeline_deinit :: proc(self:^engine.object_pipeline) {
+custom_object_pipeline_deinit :: proc(self:^object_pipeline) {
     mem.ICheckInit_Deinit(&self.check_init)
 
     for l in self.__descriptor_set_layouts {
@@ -103,11 +100,11 @@ Inputs:
 Returns:
 - `true` if initialization succeeded, `false` otherwise
 */
-custom_object_pipeline_init :: proc(self:^engine.object_pipeline,
+custom_object_pipeline_init :: proc(self:^object_pipeline,
     binding_set_layouts:[][]descriptor_set_layout_binding,
     vertex_input_binding:Maybe([]vertex_input_binding_description),
     vertex_input_attribute:Maybe([]vertex_input_attribute_description),
-    draw_method:engine.object_draw_method,
+    draw_method:object_draw_method,
     pool_sizes:[][]engine.descriptor_pool_size,
     vertex_shader:Maybe(shader_code),
     pixel_shader:Maybe(shader_code),
@@ -303,7 +300,7 @@ custom_object_pipeline_init :: proc(self:^engine.object_pipeline,
         vertexInputState = nil
     }
 
-    if !engine.create_graphics_pipeline(self,
+    if !create_graphics_pipeline(self,
         shaderCreateInfo[:shaderCreateInfoLen],
         &depth_stencil_state2,
         &viewportState,
@@ -313,9 +310,6 @@ custom_object_pipeline_init :: proc(self:^engine.object_pipeline,
     return true
 }
 
-// ============================================================================
-// Custom Object Management
-// ============================================================================
 
 @private custom_object_vtable :engine.iobject_vtable = engine.iobject_vtable{
     draw = auto_cast _super_custom_object_draw,
@@ -344,7 +338,7 @@ Returns:
 - None
 */
 custom_object_init :: proc(self:^custom_object, $actual_type:typeid,
-    p_pipeline:^engine.object_pipeline,
+    p_pipeline:^object_pipeline,
     pipeline_p_sets:[]^engine.descriptor_set,
     pipeline_set_idx:int = 0,
     pos:linalg.Point3DF, rotation:f32, scale:linalg.PointF = {1,1},
@@ -370,9 +364,6 @@ custom_object_init :: proc(self:^custom_object, $actual_type:typeid,
     iobject_init(self, actual_type, pos, rotation, scale, camera, projection, color_transform, pivot)
 }
 
-// ============================================================================
-// Custom Object Cleanup
-// ============================================================================
 
 _super_custom_object_deinit :: proc(self:^custom_object) {
     engine._super_iobject_deinit(auto_cast self)
@@ -380,9 +371,6 @@ _super_custom_object_deinit :: proc(self:^custom_object) {
     delete(self.pipeline_p_sets, engine.def_allocator())
 }
 
-// ============================================================================
-// Custom Object Drawing
-// ============================================================================
 
 _super_custom_object_draw :: proc(self:^custom_object, cmd:engine.command_buffer) {
     mem.ICheckInit_Check(&self.check_init)
@@ -404,10 +392,6 @@ _super_custom_object_draw :: proc(self:^custom_object, cmd:engine.command_buffer
     }
 }
 
-// ============================================================================
-// Buffer Resource Helper
-// ============================================================================
-
 /*
 Creates a buffer resource
 
@@ -423,4 +407,73 @@ Returns:
 */
 create_buffer_resource :: #force_inline proc(self:^engine.buffer_resource, option:engine.buffer_create_option, data:[]byte, is_copy:bool, allocator:Maybe(runtime.Allocator) = nil) {
     engine.buffer_resource_create_buffer(self, option, data, is_copy, allocator)
+}
+
+/*
+Creates a graphics pipeline for a custom object
+
+Inputs:
+- self: Pointer to the custom object pipeline
+- stages: Shader stage create info array
+- depth_stencil_state: Depth stencil state create info
+- viewport_state: Viewport state create info
+- vertex_input_state: Vertex input state create info
+
+Returns:
+- `true` if pipeline creation succeeded, `false` otherwise
+*/
+create_graphics_pipeline :: proc(
+	self: ^object_pipeline,
+	stages: []vk.PipelineShaderStageCreateInfo,
+	depth_stencil_state: ^vk.PipelineDepthStencilStateCreateInfo,
+	viewport_state: ^vk.PipelineViewportStateCreateInfo,
+	vertex_input_state: ^vk.PipelineVertexInputStateCreateInfo,
+) -> bool {
+	pipeline_create_info := vk.GraphicsPipelineCreateInfoInit(
+		stages = stages,
+		layout = self.__pipeline_layout,
+		pDepthStencilState = depth_stencil_state,
+		pViewportState = viewport_state,
+		pVertexInputState = vertex_input_state,
+		renderPass = engine.default_render_pass(),
+		pMultisampleState = engine.default_multisample_state(),
+		pColorBlendState = &vk.DefaultPipelineColorBlendStateCreateInfo,
+	)
+
+	res := vk.CreateGraphicsPipelines(engine.graphics_device(), 0, 1, &pipeline_create_info, nil, &self.__pipeline)
+	if res != .SUCCESS {
+		trace.printlnLog("create_graphics_pipeline: Failed to create graphics pipeline:", res)
+		return false
+	}
+	return true
+}
+
+object_pipeline :: struct {
+    check_init: mem.ICheckInit,
+
+    __pipeline:vk.Pipeline,
+    __pipeline_layout:vk.PipelineLayout,
+    __descriptor_set_layouts:[]vk.DescriptorSetLayout,
+    __pool_binding:[][]u32,//! auto generate inside, uses engine_def_allocator
+
+    draw_method:object_draw_method,
+    pool_sizes:[][]engine.descriptor_pool_size,
+}
+
+object_draw_type :: enum {
+    Draw,
+    DrawIndexed,
+}
+
+object_draw_method :: struct {
+    type:object_draw_type,
+    vertex_count:u32,
+    instance_count:u32,
+    index_count:u32,
+    using _:struct #raw_union {
+        first_vertex:u32,
+        vertex_offset:i32,
+    },
+    first_instance:u32,
+    first_index:u32,
 }

@@ -102,36 +102,6 @@ texture :: struct {
 	check_init: mem.ICheckInit,
 }
 
-object_pipeline :: struct {
-    check_init: mem.ICheckInit,
-
-    __pipeline:vk.Pipeline,
-    __pipeline_layout:vk.PipelineLayout,
-    __descriptor_set_layouts:[]vk.DescriptorSetLayout,
-    __pool_binding:[][]u32,//! auto generate inside, uses engine_def_allocator
-
-    draw_method:object_draw_method,
-    pool_sizes:[][]descriptor_pool_size,
-}
-
-object_draw_type :: enum {
-    Draw,
-    DrawIndexed,
-}
-
-object_draw_method :: struct {
-    type:object_draw_type,
-    vertex_count:u32,
-    instance_count:u32,
-    index_count:u32,
-    using _:struct #raw_union {
-        first_vertex:u32,
-        vertex_offset:i32,
-    },
-    first_instance:u32,
-    first_index:u32,
-}
-
 resource_usage :: enum {
 	GPU,
 	CPU,

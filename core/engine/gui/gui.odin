@@ -5,9 +5,6 @@ import "core:math"
 import "core:math/linalg"
 import ".."
 
-// ============================================================================
-// Type Definitions
-// ============================================================================
 
 pos_align_x :: enum {
     center,
@@ -31,9 +28,6 @@ gui_component :: struct {
     gui_align_y : pos_align_y,
 }
 
-// ============================================================================
-// GUI Component Management
-// ============================================================================
 
 @(require_results, private) __base_mat :: #force_inline proc "contextless" (self_component:^gui_component, mul: linalg.PointF) -> Maybe(linalg.Matrix) {
     return engine.sr_2d_matrix2(self_component.gui_scale, self_component.gui_rotation, self_component.gui_center_pt * mul)

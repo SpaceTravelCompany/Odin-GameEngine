@@ -80,10 +80,6 @@ DEVICE_EXTENSIONS_CHECK: [len(DEVICE_EXTENSIONS)]bool
 INSTANCE_EXTENSIONS_CHECK: [len(INSTANCE_EXTENSIONS)]bool
 LAYERS_CHECK: [len(LAYERS)]bool
 
-// ============================================================================
-// Debug Callback
-// ============================================================================
-
 vk_debug_callback :: proc "system" (
 	messageSeverity: vk.DebugUtilsMessageSeverityFlagsEXT,
 	messageTypes: vk.DebugUtilsMessageTypeFlagsEXT,
@@ -102,10 +98,6 @@ vk_debug_callback :: proc "system" (
 
 	return false
 }
-
-// ============================================================================
-// Extension Support Checks
-// ============================================================================
 
 validation_layer_support :: #force_inline proc "contextless" () -> bool {return LAYERS_CHECK[0]}
 vk_khr_portability_enumeration_support :: #force_inline proc "contextless" () -> bool {return INSTANCE_EXTENSIONS_CHECK[1]}

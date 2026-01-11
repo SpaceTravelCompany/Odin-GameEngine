@@ -9,10 +9,6 @@ import "core:slice"
 import "core:sync"
 import vk "vendor:vulkan"
 
-// ============================================================================
-// Type Definitions
-// ============================================================================
-
 /*
 Projection structure for projection matrix management
 
@@ -21,10 +17,6 @@ Contains the projection matrix and uniform buffer for rendering
 projection :: struct {
     using _: __matrix_in,
 }
-
-// ============================================================================
-// Projection Initialization
-// ============================================================================
 
 /*
 Initializes an orthographic projection matrix

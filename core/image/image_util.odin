@@ -3,10 +3,6 @@ package image
 
 import "core:debug/trace"
 
-// ============================================================================
-// Color Format Utilities
-// ============================================================================
-
 /*
 Returns the bit size of the given color format
 

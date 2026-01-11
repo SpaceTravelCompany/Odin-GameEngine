@@ -291,10 +291,6 @@ exit :: proc "contextless" () {
 	}
 }
 
-// ============================================================================
-// Render Loop
-// ============================================================================
-
 @private calc_frame_time :: proc(paused_: bool) {
 	@static start: time.Time
 	@static now: time.Time
@@ -424,10 +420,6 @@ def_allocator :: #force_inline proc "contextless" () -> runtime.Allocator {
 }
 
 
-
-// ============================================================================
-// Memory Tracking
-// ============================================================================
 
 /*
 Starts tracking memory allocations for debugging

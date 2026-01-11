@@ -16,22 +16,10 @@ import vk "vendor:vulkan"
 
 
 when library.is_android {
-    // ============================================================================
-    // Private Variables
-    // ============================================================================
-    
     @(private="file") app : ^android.android_app
     @(private="file") app_inited := false
     @(private="file") input_state:general_input_state
 
-    // ============================================================================
-    // Android App Setup
-    // ============================================================================
-    
-
-    // ============================================================================
-    // Android Device Information
-    // ============================================================================
     
     /*
     Gets the Android asset manager
@@ -106,9 +94,6 @@ when library.is_android {
         )
     }
 
-    // ============================================================================
-    // Vulkan Surface
-    // ============================================================================
     
     @private vulkan_android_start :: proc "contextless" () {
         if vk_surface != 0 {
@@ -123,10 +108,6 @@ when library.is_android {
             trace.panic_log(res)
         }
     }
-
-    // ============================================================================
-    // Input Handling
-    // ============================================================================
     
     @(private="file") free_saved_state :: proc "contextless" () {
         //TODO (xfitgd)
@@ -354,9 +335,6 @@ when library.is_android {
         return 0
     }
 
-    // ============================================================================
-    // Android Command Handling
-    // ============================================================================
     
     @(private="file") handle_cmd :: proc "c" (app:^android.android_app, cmd : android.AppCmd) {
         #partial switch cmd {
@@ -399,10 +377,6 @@ when library.is_android {
                 }
         }
     }
-
-    // ============================================================================
-    // Android Main Loop
-    // ============================================================================
     
     @private android_start :: proc () {
         app = auto_cast android.get_android_app()

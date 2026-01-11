@@ -9,11 +9,6 @@ import "core:slice"
 import "core:sync"
 import vk "vendor:vulkan"
 
-
-// ============================================================================
-// Type Definitions
-// ============================================================================
-
 /*
 Camera structure for view matrix management
 
@@ -22,11 +17,6 @@ Contains the view matrix and uniform buffer for rendering
 camera :: struct {
     using _: __matrix_in,
 }
-
-
-// ============================================================================
-// Camera Initialization
-// ============================================================================
 
 /*
 Initializes a camera with the specified view parameters
@@ -69,10 +59,6 @@ camera_init_matrix_raw :: proc (self:^camera, mat:linalg.Matrix) {
         resource_usage = .CPU,
     }, mem.ptr_to_bytes(&self.mat), true)
 }
-
-// ============================================================================
-// Camera Update
-// ============================================================================
 
 /*
 Updates the camera view matrix with new parameters
@@ -121,10 +107,6 @@ camera_update_matrix_raw :: proc(self:^camera, _mat:linalg.Matrix) {
 		   0,    0,    0, 1,
 	}
 }
-
-// ============================================================================
-// Camera Cleanup
-// ============================================================================
 
 /*
 Deinitializes and cleans up camera resources

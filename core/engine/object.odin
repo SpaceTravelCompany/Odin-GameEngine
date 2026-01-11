@@ -45,10 +45,6 @@ iobject :: struct {
     check_init: mem.ICheckInit,
 }
 
-// ============================================================================
-// Matrix Calculation Functions
-// ============================================================================
-
 @(require_results)
 srtc_2d_matrix :: proc "contextless" (t: linalg.Point3DF, s: linalg.PointF, r: f32, cp:linalg.PointF) -> linalg.Matrix4x4f32 {
 	pivot := linalg.matrix4_translate(linalg.Point3DF{cp.x,cp.y,0.0})
@@ -150,10 +146,6 @@ sr_2d_matrix2 :: proc "contextless" (s: linalg.PointF, r: f32, cp:linalg.PointF)
     return nil
 }
 
-// ============================================================================
-// IObject Initialization
-// ============================================================================
-
 /*
 Initializes an iobject with transformation parameters
 
@@ -193,10 +185,6 @@ iobject_init :: proc(self:^iobject, $actual_type:typeid,
     self.actual_type = actual_type
 }
 
-// ============================================================================
-// IObject Cleanup
-// ============================================================================
-
 _super_iobject_deinit :: #force_inline proc (self:^iobject) {
     mem.ICheckInit_Deinit(&self.check_init)
     clone_mat_uniform := new(buffer_resource, __temp_arena_allocator)
@@ -216,10 +204,6 @@ iobject_init2 :: proc(self:^iobject, $actual_type:typeid,
     self.actual_type = actual_type
 }
 
-// ============================================================================
-// Uniform Resource Management
-// ============================================================================
-
 //!alloc result array in temp_allocator
 @private get_uniform_resources :: proc(self:^iobject) -> []union_resource {
     if self.vtable != nil && self.vtable.get_uniform_resources != nil {
@@ -230,17 +214,7 @@ iobject_init2 :: proc(self:^iobject, $actual_type:typeid,
 }
 
 
-@private get_uniform_resources_tile_image :: #force_inline proc(self:^iobject) -> []union_resource {
-    res := mem.make_non_zeroed([]union_resource, 5, context.temp_allocator)
-    res[0] = &self.mat_uniform
-    res[1] = &self.camera.mat_uniform
-    res[2] = &self.projection.mat_uniform
-    res[3] = &self.color_transform.mat_uniform
 
-    tile_image_ : ^tile_image = auto_cast self
-    res[4] = &tile_image_.tile_uniform
-    return res[:]
-}
 
 get_uniform_resources_default :: #force_inline proc(self:^iobject) -> []union_resource {
     res := mem.make_non_zeroed([]union_resource, 4, context.temp_allocator)
@@ -358,10 +332,6 @@ iobject_get_projection :: #force_inline proc "contextless" (self:^iobject) -> ^p
     return self.projection
 }
 
-// ============================================================================
-// IObject Accessors
-// ============================================================================
-
 iobject_get_actual_type :: #force_inline proc "contextless" (self:^iobject) -> typeid {
     return self.actual_type
 }
@@ -414,10 +384,6 @@ iobject_size :: proc(self:^iobject) {
     }
     //Size Not Required Default
 }
-
-// ============================================================================
-// Render Settings
-// ============================================================================
 
 set_render_clear_color :: proc "contextless" (_color:linalg.Point3DwF) {
     g_clear_color = _color

@@ -27,10 +27,6 @@ monitor_info :: struct {
 	is_primary:  bool,
 }
 
-// ============================================================================
-// Global Variables
-// ============================================================================
-
 @private __window_width: Maybe(int)
 @private __window_height: Maybe(int)
 @private __window_x: Maybe(int)
@@ -61,10 +57,6 @@ monitor_info :: struct {
 
 @private full_screen_mtx : sync.Mutex
 
-// ============================================================================
-// Utility Functions
-// ============================================================================
-
 /*
 Checks if the engine is paused
 
@@ -84,10 +76,6 @@ Returns:
 activated :: proc "contextless" () -> bool {
 	return __activated
 }
-
-// ============================================================================
-// Screen Mode Management
-// ============================================================================
 
 /*
 Sets the window to fullscreen mode on the specified monitor
@@ -141,10 +129,6 @@ set_window_mode :: proc "contextless" () {
 	}
 }
 
-// ============================================================================
-// Monitor Management
-// ============================================================================
-
 monitor_lock :: proc "contextless" () {
 	sync.mutex_lock(&monitors_mtx)
 	if monitor_locked do trace.panic_log("already monitor_locked locked")
@@ -173,10 +157,6 @@ get_monitor_from_window :: proc "contextless" () -> ^monitor_info #no_bounds_che
 	}
 	return primary_monitor
 }
-
-// ============================================================================
-// Window Accessors
-// ============================================================================
 
 /*
 Gets the window width

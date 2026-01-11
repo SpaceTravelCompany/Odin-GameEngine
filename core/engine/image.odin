@@ -43,22 +43,6 @@ image :: struct {
 
 
 
-/*
-Tile image object structure for rendering tiled textures
-
-Extends iobject with tile texture array and tile index
-*/
-tile_image :: struct {
-    using object:iobject,
-    tile_uniform:buffer_resource,
-    tile_idx:u32,
-    src: ^tile_texture_array,
-}
-
-// ============================================================================
-// Type Checking
-// ============================================================================
-
 is_any_image_type :: #force_inline proc "contextless" ($any_image:typeid) -> bool {
     return intrinsics.type_is_subtype_of(any_image, iobject) && intrinsics.type_has_field(any_image, "src") && 
     (intrinsics.type_field_type(any_image, "src") == ^texture ||
@@ -127,17 +111,9 @@ colorTransform:^color_transform = nil, vtable:^iobject_vtable = nil) where intri
     iobject_init2(self, actualType, camera, projection, colorTransform)
 }
 
-// ============================================================================
-// Image Cleanup
-// ============================================================================
-
 _super_image_deinit :: proc(self:^image) {
     _super_iobject_deinit(self)
 }
-
-// ============================================================================
-// Image Accessors
-// ============================================================================
 
 /*
 Gets the texture source of the image
@@ -191,10 +167,6 @@ image_get_color_transform :: proc "contextless" (self:^image) -> ^color_transfor
     return iobject_get_color_transform(self)
 }
 
-// ============================================================================
-// Image Update Functions
-// ============================================================================
-
 image_update_transform :: #force_inline proc(self:^image, pos:linalg.Point3DF, rotation:f32 = 0.0, scale:linalg.PointF = {1,1}, pivot:linalg.PointF = {0.0,0.0}) {
     iobject_update_transform(self, pos, rotation, scale, pivot)
 }
@@ -213,10 +185,6 @@ image_update_texture :: #force_inline proc "contextless" (self:^image, src:^text
 image_change_color_transform :: #force_inline proc(self:^image, colorTransform:^color_transform) {
     iobject_change_color_transform(self, colorTransform)
 }
-
-// ============================================================================
-// Image Drawing
-// ============================================================================
 
 _super_image_draw :: proc (self:^image, cmd:command_buffer) {
     mem.ICheckInit_Check(&self.check_init)
@@ -243,193 +211,6 @@ image_binding_sets_and_draw :: proc "contextless" (cmd:command_buffer, imageSet:
 
     graphics_cmd_draw(cmd, 6, 1, 0, 0)
 }
-
-// ============================================================================
-// Tile Image Management
-// ============================================================================
-
-@private tile_image_vtable :iobject_vtable = iobject_vtable {
-    draw = auto_cast _super_tile_image_draw,
-    deinit = auto_cast _super_tile_image_deinit,
-}
-
-tile_image_init :: proc(self:^tile_image, $actualType:typeid, src:^tile_texture_array, pos:linalg.Point3DF, rotation:f32, scale:linalg.PointF = {1,1}, 
-camera:^camera, projection:^projection, colorTransform:^color_transform = nil, pivot:linalg.PointF = {0, 0}, vtable:^iobject_vtable = nil) where intrinsics.type_is_subtype_of(actualType, tile_image) {
-    self.src = src
-
-    self.set.bindings = descriptor_set_binding__tile_image_uniform_pool[:]
-    self.set.size = descriptor_pool_size__tile_image_uniform_pool[:]
-    self.set.layout = animate_tex_descriptor_set_layout //animate_tex_descriptor_set_layout 공용
-
-    self.vtable = vtable == nil ? &tile_image_vtable : vtable
-    if self.vtable.draw == nil do self.vtable.draw = auto_cast _super_tile_image_draw
-    if self.vtable.deinit == nil do self.vtable.deinit = auto_cast _super_tile_image_deinit
-
-    if self.vtable.get_uniform_resources == nil do self.vtable.get_uniform_resources = auto_cast get_uniform_resources_tile_image
-
-
-    buffer_resource_create_buffer(&self.tile_uniform, {
-        len = size_of(u32),
-        type = .UNIFORM,
-        resource_usage = .CPU,
-    }, mem.ptr_to_bytes(&self.tile_idx), true)
-
-    iobject_init(self, actualType, pos, rotation, scale, camera, projection, colorTransform, pivot)
-}
-
-tile_image_init2 :: proc(self:^tile_image, $actualType:typeid, src:^tile_texture_array,
-camera:^camera, projection:^projection, colorTransform:^color_transform = nil, vtable:^iobject_vtable = nil) where intrinsics.type_is_subtype_of(actualType, tile_image) {
-    self.src = src
-
-    self.set.bindings = descriptor_set_binding__tile_image_uniform_pool[:]
-    self.set.size = descriptor_pool_size__tile_image_uniform_pool[:]
-    self.set.layout = animate_tex_descriptor_set_layout
-
-    self.vtable = vtable == nil ? &tile_image_vtable : vtable
-    if self.vtable.draw == nil do self.vtable.draw = auto_cast _super_tile_image_draw
-    if self.vtable.deinit == nil do self.vtable.deinit = auto_cast _super_tile_image_deinit
-
-    if self.vtable.get_uniform_resources == nil do self.vtable.get_uniform_resources = auto_cast get_uniform_resources_tile_image
-
-    iobject_init2(self, actualType, camera, projection, colorTransform)
-}
-
-// ============================================================================
-// Tile Image Cleanup
-// ============================================================================
-
-_super_tile_image_deinit :: proc(self:^tile_image) {
-    clone_tile_uniform := new(buffer_resource, __temp_arena_allocator)
-    clone_tile_uniform^ = self.tile_uniform
-    buffer_resource_deinit(clone_tile_uniform)
-
-    _super_iobject_deinit(auto_cast self)
-}
-
-// ============================================================================
-// Tile Image Accessors
-// ============================================================================
-
-/*
-Gets the tile texture array source of the tile image
-
-Inputs:
-- self: Pointer to the tile image
-
-Returns:
-- Pointer to the tile texture array source
-*/
-tile_image_get_tile_texture_array :: #force_inline proc "contextless" (self:^tile_image) -> ^tile_texture_array {
-    return self.src
-}
-
-/*
-Updates the tile texture array source of the tile image
-
-Inputs:
-- self: Pointer to the tile image
-- src: Pointer to the new tile texture array source
-
-Returns:
-- None
-*/
-tile_image_update_tile_texture_array :: #force_inline proc "contextless" (self:^tile_image, src:^tile_texture_array) {
-    self.src = src
-}
-
-tile_image_change_color_transform :: #force_inline proc(self:^tile_image, colorTransform:^color_transform) {
-    iobject_change_color_transform(self, colorTransform)
-}
-tile_image_update_camera :: #force_inline proc(self:^tile_image, camera:^camera) {
-    iobject_update_camera(self, camera)
-}
-
-tile_image_update_projection :: #force_inline proc(self:^tile_image, projection:^projection) {
-    iobject_update_projection(self, projection)
-}
-
-/*
-Gets the camera of the tile image
-
-Inputs:
-- self: Pointer to the tile image
-
-Returns:
-- Pointer to the camera
-*/
-tile_image_get_camera :: proc "contextless" (self:^tile_image) -> ^camera {
-    return iobject_get_camera(self)
-}
-
-/*
-Gets the projection of the tile image
-
-Inputs:
-- self: Pointer to the tile image
-
-Returns:
-- Pointer to the projection
-*/
-tile_image_get_projection :: proc "contextless" (self:^tile_image) -> ^projection {
-    return iobject_get_projection(self)
-}
-
-/*
-Gets the color transform of the tile image
-
-Inputs:
-- self: Pointer to the tile image
-
-Returns:
-- Pointer to the color transform
-*/
-tile_image_get_color_transform :: proc "contextless" (self:^tile_image) -> ^color_transform {
-    return iobject_get_color_transform(self)
-}
-
-// ============================================================================
-// Tile Image Update Functions
-// ============================================================================
-
-tile_image_update_transform :: #force_inline proc(self:^tile_image, pos:linalg.Point3DF, rotation:f32, scale:linalg.PointF = {1,1}, pivot:linalg.PointF = {0.0, 0.0}) {
-    iobject_update_transform(self, pos, rotation, scale, pivot)
-}
-
-tile_image_update_transform_matrix_raw :: #force_inline proc(self:^tile_image, _mat:linalg.Matrix) {
-    iobject_update_transform_matrix_raw(self, _mat)
-}
-
-/*
-Updates the tile index for the tile image
-
-Inputs:
-- self: Pointer to the tile image
-- idx: The new tile index
-
-Returns:
-- None
-*/
-tile_image_update_idx :: proc(self:^tile_image, idx:u32) {
-    mem.ICheckInit_Check(&self.check_init)
-    self.tile_idx = idx
-
-    buffer_resource_copy_update(&self.tile_uniform, &self.tile_idx)
-}
-
-_super_tile_image_draw :: proc (self:^tile_image, cmd:command_buffer) {
-    mem.ICheckInit_Check(&self.check_init)
-    mem.ICheckInit_Check(&self.src.check_init)
-
-    graphics_cmd_bind_pipeline(cmd, .GRAPHICS, animate_tex_pipeline)
-    graphics_cmd_bind_descriptor_sets(cmd, .GRAPHICS, animate_tex_pipeline_layout, 0, 2,
-        &([]vk.DescriptorSet{self.set.__set, self.src.set.__set})[0], 0, nil)
-
-    graphics_cmd_draw(cmd, 6, 1, 0, 0)
-}
-
-// ============================================================================
-// Texture Management
-// ============================================================================
 
 /*
 Initializes a texture with the given width, height, pixels, and sampler
@@ -568,10 +349,6 @@ texture_init_grey :: proc(
 	self.set.__resources[0] = &self.texture
 	update_descriptor_sets(mem.slice_ptr(&self.set, 1))
 }
-
-// ============================================================================
-// Texture Specialized Initialization
-// ============================================================================
 
 //sampler nil default //TODO (xfitgd)
 // texture_init_r8 :: proc(self:^texture, width:u32, height:u32) {
@@ -849,10 +626,6 @@ texture_array_count :: #force_inline proc "contextless" (self:^texture_array) ->
     return self.texture.option.len
 }
 
-// ============================================================================
-// Color Format Conversion
-// ============================================================================
-
 /*
 Converts pixel format to the default graphics format
 
@@ -914,123 +687,6 @@ color_fmt_convert_default_overlap :: proc "contextless" (pixels:[]byte, out:[]by
 }
 
 /*
-Initializes a tile texture array from a tilemap
-
-Inputs:
-- self: Pointer to the tile texture array to initialize
-- tile_width: Width of each tile
-- tile_height: Height of each tile
-- width: Width of the tilemap
-- count: Number of tiles
-- pixels: Pixel data of the tilemap
-- sampler: Sampler to use (default: 0, uses default linear sampler)
-- inPixelFmt: Input pixel format (default: .RGBA)
-
-Returns:
-- None
-*/
-tile_texture_array_init :: proc(self:^tile_texture_array, tile_width:u32, tile_height:u32, width:u32, count:u32, pixels:[]byte, sampler:vk.Sampler = 0, 
-inPixelFmt:img.color_fmt = .RGBA) {
-    mem.ICheckInit_Init(&self.check_init)
-    self.sampler = sampler == 0 ? linear_sampler : sampler
-    self.set.bindings = descriptor_set_binding__single_pool[:]
-    self.set.size = descriptor_pool_size__single_sampler_pool[:]
-    self.set.layout = tex_descriptor_set_layout2
-    self.set.__set = 0
-    bit :: 4//outBit count default 4
-    allocPixels := mem.make_non_zeroed_slice([]byte, count * tile_width * tile_height * bit, engine_def_allocator)
-
-    //convert tilemap pixel data format to tile image data format arranged sequentially
-    cnt:u32
-    row := math.floor_div(width, tile_width)
-    col := math.floor_div(count, row)
-
-    for y in 0..<col {
-        for x in 0..<row {
-            for h in 0..<tile_height {
-                start := cnt * (tile_width * tile_height * bit) + h * tile_width * bit
-                startP := (y * tile_height + h) * (width * bit) + x * tile_width * bit
-                color_fmt_convert_default(pixels[startP:startP + tile_width * bit], allocPixels[start:start + tile_width * bit], inPixelFmt)
-            }
-            cnt += 1
-        }
-    }
-  
-    buffer_resource_create_texture(&self.texture, {
-        width = tile_width,
-        height = tile_height,
-        use_gcpu_mem = false,
-        format = .DefaultColor,
-        samples = 1,
-        len = count,
-        texture_usage = {.IMAGE_RESOURCE},
-        type = .TEX2D,
-    }, self.sampler, allocPixels, false, engine_def_allocator)
-
-    self.set.__resources = mem.make_non_zeroed_slice([]union_resource, 1, __temp_arena_allocator)
-    self.set.__resources[0] = &self.texture
-    update_descriptor_sets(mem.slice_ptr(&self.set, 1))
-}
-
-/*
-Deinitializes and cleans up tile texture array resources
-
-Inputs:
-- self: Pointer to the tile texture array to deinitialize
-
-Returns:
-- None
-*/
-tile_texture_array_deinit :: #force_inline proc(self:^tile_texture_array) {
-    mem.ICheckInit_Deinit(&self.check_init)
-    clone_texture := new(texture_resource, __temp_arena_allocator)
-    clone_texture^ = self.texture
-    buffer_resource_deinit(clone_texture)
-}
-/*
-Gets the width of tiles in the tile texture array
-
-Inputs:
-- self: Pointer to the tile texture array
-
-Returns:
-- Width of each tile in pixels
-*/
-tile_texture_array_width :: #force_inline proc "contextless" (self:^tile_texture_array) -> u32 {
-    return self.texture.option.width
-}
-
-/*
-Gets the height of tiles in the tile texture array
-
-Inputs:
-- self: Pointer to the tile texture array
-
-Returns:
-- Height of each tile in pixels
-*/
-tile_texture_array_height :: #force_inline proc "contextless" (self:^tile_texture_array) -> u32 {
-    return self.texture.option.height
-}
-
-/*
-Gets the number of tiles in the tile texture array
-
-Inputs:
-- self: Pointer to the tile texture array
-
-Returns:
-- Number of tiles in the array
-*/
-tile_texture_array_count :: #force_inline proc "contextless" (self:^tile_texture_array) -> u32 {
-    return self.texture.option.len
-}
-
-// ============================================================================
-// Image Utility Functions
-// ============================================================================
-
-/*
 Calculates pixel-perfect point position for an image
 
 Inputs:
@@ -1081,10 +737,6 @@ Returns:
 default_color_fmt :: proc "contextless" () -> img.color_fmt {
     return texture_fmt_to_color_fmt(vk_fmt_to_texture_fmt(get_graphics_origin_format()))
 }
-
-// ============================================================================
-// Texture Format Utilities
-// ============================================================================
 
 /*
 Converts a texture format to a color format
@@ -1151,10 +803,6 @@ Returns:
     }
     return 4
 }
-
-// ============================================================================
-// Private Vulkan Format Conversion
-// ============================================================================
 
 @(require_results) @private vk_fmt_to_texture_fmt :: proc "contextless" (t:vk.Format) -> texture_fmt {
 	#partial switch t {

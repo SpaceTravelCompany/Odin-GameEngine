@@ -58,6 +58,7 @@ graphics_device :: #force_inline proc "contextless" () -> vk.Device {
 def_color_transform :: #force_inline proc "contextless" () -> ^color_transform {
 	return &__def_color_transform
 }
+
 get_shape_pipeline_layout :: #force_inline proc "contextless" () -> vk.PipelineLayout {
 	return shape_pipeline_layout
 }
@@ -67,6 +68,7 @@ get_tex_pipeline_layout :: #force_inline proc "contextless" () -> vk.PipelineLay
 get_animate_tex_pipeline_layout :: #force_inline proc "contextless" () -> vk.PipelineLayout {
 	return animate_tex_pipeline_layout
 }
+
 get_shape_pipeline :: #force_inline proc "contextless" () -> vk.Pipeline {
 	return shape_pipeline
 }
@@ -76,15 +78,20 @@ get_tex_pipeline :: #force_inline proc "contextless" () -> vk.Pipeline {
 get_animate_tex_pipeline :: #force_inline proc "contextless" () -> vk.Pipeline {
 	return animate_tex_pipeline
 }
+
 get_shape_descriptor_set_layout :: #force_inline proc "contextless" () -> vk.DescriptorSetLayout {
 	return shape_descriptor_set_layout
 }
 get_tex_descriptor_set_layout :: #force_inline proc "contextless" () -> vk.DescriptorSetLayout {
 	return tex_descriptor_set_layout
 }
+get_tex_descriptor_set_layout2 :: #force_inline proc "contextless" () -> vk.DescriptorSetLayout {
+	return tex_descriptor_set_layout2
+}
 get_animate_tex_descriptor_set_layout :: #force_inline proc "contextless" () -> vk.DescriptorSetLayout {
 	return animate_tex_descriptor_set_layout
 }
+
 get_linear_sampler :: #force_inline proc "contextless" () -> vk.Sampler {
 	return linear_sampler
 }
@@ -102,10 +109,6 @@ get_nearest_sampler :: #force_inline proc "contextless" () -> vk.Sampler {
 @private graphics_destroy :: #force_inline proc() {
 	vk_destroy()
 }
-
-// ============================================================================
-// Graphics Operations
-// ============================================================================
 
 // 프레임 렌더링
 @private graphics_draw_frame :: #force_inline proc() {
@@ -192,10 +195,6 @@ free_command_buffers :: proc(p_cmd_buffer: [^]command_buffer, count: u32) {
 	vk.FreeCommandBuffers(graphics_device(), vk_cmd_pool, count, auto_cast p_cmd_buffer)
 }
 
-// ============================================================================
-// Pipeline Operations
-// ============================================================================
-
 // 파이프라인 바인딩
 graphics_cmd_bind_pipeline :: #force_inline proc "contextless" (cmd: command_buffer, pipeline_bind_point: vk.PipelineBindPoint, pipeline: vk.Pipeline) {
 	vk.CmdBindPipeline(cmd.__handle, pipeline_bind_point, pipeline)
@@ -259,9 +258,6 @@ graphics_cmd_draw_indexed :: #force_inline proc "contextless" (
 	vk.CmdDrawIndexed(cmd.__handle, index_count, instance_count, first_index, vertex_offset, first_instance)
 }
 
-// ============================================================================
-// Fullscreen Operations
-// ============================================================================
 
 // 풀스크린 독점 모드 설정
 graphics_set_fullscreen_exclusive :: #force_inline proc() {
@@ -315,10 +311,6 @@ buffer_resource_create_texture :: #force_inline proc(
 update_descriptor_sets :: #force_inline proc(descriptor_sets: []descriptor_set) {
 	vk_update_descriptor_sets(descriptor_sets)
 }
-
-// ============================================================================
-// Color Transform
-// ============================================================================
 
 /*
 Initializes a color transform with a raw matrix
@@ -384,49 +376,6 @@ color_transform_update_matrix_raw :: proc(self: ^color_transform, _mat: linalg.M
 	color_transform_deinit(&__def_color_transform)
 }
 
-// ============================================================================
-// Pipeline Creation
-// ============================================================================
-
-/*
-Creates a graphics pipeline for a custom object
-
-Inputs:
-- self: Pointer to the custom object pipeline
-- stages: Shader stage create info array
-- depth_stencil_state: Depth stencil state create info
-- viewport_state: Viewport state create info
-- vertex_input_state: Vertex input state create info
-
-Returns:
-- `true` if pipeline creation succeeded, `false` otherwise
-*/
-create_graphics_pipeline :: proc(
-	self: ^object_pipeline,
-	stages: []vk.PipelineShaderStageCreateInfo,
-	depth_stencil_state: ^vk.PipelineDepthStencilStateCreateInfo,
-	viewport_state: ^vk.PipelineViewportStateCreateInfo,
-	vertex_input_state: ^vk.PipelineVertexInputStateCreateInfo,
-) -> bool {
-	pipeline_create_info := vk.GraphicsPipelineCreateInfoInit(
-		stages = stages,
-		layout = self.__pipeline_layout,
-		pDepthStencilState = depth_stencil_state,
-		pViewportState = viewport_state,
-		pVertexInputState = vertex_input_state,
-		renderPass = vk_render_pass,
-		pMultisampleState = &vkPipelineMultisampleStateCreateInfo,
-		pColorBlendState = &vk.DefaultPipelineColorBlendStateCreateInfo,
-	)
-
-	res := vk.CreateGraphicsPipelines(graphics_device(), 0, 1, &pipeline_create_info, nil, &self.__pipeline)
-	if res != .SUCCESS {
-		trace.printlnLog("create_graphics_pipeline: Failed to create graphics pipeline:", res)
-		return false
-	}
-	return true
-}
-
 
 /*
 Gets the graphics origin format
@@ -436,6 +385,14 @@ Returns:
 */
 get_graphics_origin_format :: proc "contextless" () -> vk.Format {
 	return vk_fmt.format
+}
+
+default_render_pass :: #force_inline proc "contextless" () -> vk.RenderPass {
+	return vk_render_pass
+}
+
+default_multisample_state :: #force_inline proc "contextless" () -> ^vk.PipelineMultisampleStateCreateInfo {
+	return &vkPipelineMultisampleStateCreateInfo
 }
 
 

@@ -68,10 +68,6 @@ when !library.is_mobile {
     }
 }
 
-    // ============================================================================
-    // Windows-Specific Functions
-    // ============================================================================
-    
     when ODIN_OS == .Windows {
         glfw_get_current_hmonitor :: proc "contextless" () -> windows.HMONITOR {
     if wnd == nil do trace.panic_log("glfw_get_current_hmonitor : wnd is nil")
@@ -90,10 +86,6 @@ glfw_get_hwnd :: proc "contextless" () -> windows.HWND {
         }
     }
 
-    // ============================================================================
-    // Screen Mode Management
-    // ============================================================================
-    
     glfw_set_full_screen_mode :: proc "contextless" (monitor:^monitor_info) {
     for &m, i in monitors {
         if raw_data(m.name) == raw_data(monitor.name) {
@@ -127,10 +119,6 @@ glfw_set_window_mode :: proc "contextless" () {
        glfw.DONT_CARE)
     }
 
-    // ============================================================================
-    // Monitor Management
-    // ============================================================================
-    
     @(private="file") glfw_init_monitors :: proc() {
     glfw_monitors = mem.make_non_zeroed([dynamic]glfw.MonitorHandle)
     _monitors := glfw.GetMonitors()
@@ -166,10 +154,6 @@ glfw_set_window_mode :: proc "contextless" () {
         non_zero_append(&glfw_monitors, m)
     }
 
-    // ============================================================================
-    // Vulkan Integration
-    // ============================================================================
-    
     glfw_vulkan_start :: proc "contextless" () {
     if vk_surface != 0 do vk.DestroySurfaceKHR(vk_instance, vk_surface, nil)
 
@@ -177,10 +161,6 @@ glfw_set_window_mode :: proc "contextless" () {
         if (res != .SUCCESS) do trace.panic_log("glfw_vulkan_start : ", res)
     }
 
-    // ============================================================================
-    // System Initialization
-    // ============================================================================
-    
     glfw_system_init :: proc() {
     res := glfw.Init()
     if !res do trace.panic_log("glfw.Init : ", res)
@@ -261,10 +241,6 @@ glfw_set_window_mode :: proc "contextless" () {
         when is_log do glfw.SetErrorCallback(glfw_error_callback)
     }
 
-    // ============================================================================
-    // Error Handling
-    // ============================================================================
-    
     glfw_error_callback :: proc "c" (error: c.int, description: cstring) {
     when is_log {
         context = runtime.default_context()
@@ -272,10 +248,6 @@ glfw_set_window_mode :: proc "contextless" () {
         }
     }
 
-    // ============================================================================
-    // System Startup
-    // ============================================================================
-    
     glfw_system_start :: proc() {
     glfw_monitor_proc :: proc "c" (monitor: glfw.MonitorHandle, event: c.int) {
         sync.mutex_lock(&monitors_mtx)
@@ -313,10 +285,6 @@ glfw_set_window_mode :: proc "contextless" () {
         glfw.SetMonitorCallback(glfw_monitor_proc)
     }
 
-    // ============================================================================
-    // Window Destruction
-    // ============================================================================
-    
     glfw_destroy :: proc "contextless" () {
     when !is_console {
         if wnd != nil do glfw.SetWindowShouldClose(wnd, true)
@@ -324,10 +292,6 @@ glfw_set_window_mode :: proc "contextless" () {
         }
     }
 
-    // ============================================================================
-    // System Cleanup
-    // ============================================================================
-    
     glfw_system_destroy :: proc() {
     delete(glfw_monitors)
 
@@ -344,10 +308,6 @@ glfw_set_window_mode :: proc "contextless" () {
         glfw.Terminate()
     }
 
-    // ============================================================================
-    // Main Loop
-    // ============================================================================
-    
     glfw_loop :: proc() {
 		glfw_key_proc :: proc "c" (window: glfw.WindowHandle, key, scancode, action, mods: c.int) {
 			//glfw.KEY_SPACE

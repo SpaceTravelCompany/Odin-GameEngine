@@ -18,24 +18,12 @@ import "core:sys/android"
 import "core:thread"
 import "vendor:glfw"
 
-// ============================================================================
-// Constants
-// ============================================================================
-
 @private key_size :: 512
-
-// ============================================================================
-// Global Variables
-// ============================================================================
 
 @private keys : [key_size]bool = { 0..<key_size = false }
 @private __is_mouse_out:bool
 @private __mouse_pos:linalg.PointF
 //@private scroll_dt:int
-
-// ============================================================================
-// Key Code Definitions
-// ============================================================================
 
 when library.is_mobile {
     key_code :: enum i32 {
@@ -290,17 +278,9 @@ when library.is_mobile {
     }
 }
 
-// ============================================================================
-// Mouse Button Constants
-// ============================================================================
-
 left_mouse_button_idx :: 0
 middle_mouse_button_idx :: 1
 right_mouse_button_idx :: 2
-
-// ============================================================================
-// Input Callbacks
-// ============================================================================
 
 key_down : #type proc (keycode:key_code) = proc (keycode:key_code) {}
 key_up : #type proc (keycode:key_code) = proc (keycode:key_code) {}
@@ -314,10 +294,6 @@ mouse_out : #type proc () = proc () {}
 pointer_down : #type proc (pointer_idx:int, x:f32, y:f32) = proc (pointer_idx:int, x:f32, y:f32) {}
 pointer_up : #type proc (pointer_idx:int, x:f32, y:f32) = proc (pointer_idx:int, x:f32, y:f32) {}
 pointer_move : #type proc (pointer_idx:int, x:f32, y:f32) = proc (pointer_idx:int, x:f32, y:f32) {}
-
-// ============================================================================
-// Mouse Functions
-// ============================================================================
 
 /*
 Checks if the mouse is outside the window
@@ -340,10 +316,6 @@ mouse_pos :: #force_inline proc "contextless" () -> linalg.PointF {
 }
 
 
-
-// ============================================================================
-// Gamepad/Controller Input
-// ============================================================================
 
 general_input_state :: struct {
     handle:rawptr,
