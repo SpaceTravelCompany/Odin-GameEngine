@@ -183,7 +183,7 @@ iobject_init :: proc(self:^iobject, $actual_type:typeid,
 
 _super_iobject_deinit :: #force_inline proc (self:^iobject) {
     mem.ICheckInit_Deinit(&self.check_init)
-    clone_mat_uniform := new(buffer_resource, __temp_arena_allocator)
+    clone_mat_uniform := new(buffer_resource, temp_arena_allocator())
     clone_mat_uniform^ = self.mat_uniform
     buffer_resource_deinit(clone_mat_uniform)
 }
@@ -397,7 +397,7 @@ __vertex_buf_init :: proc (self:^__vertex_buf($NodeType), array:[]NodeType, _fla
 __vertex_buf_deinit :: proc (self:^__vertex_buf($NodeType)) {
     mem.ICheckInit_Deinit(&self.check_init)
 
-    clone_buf := new(buffer_resource, __temp_arena_allocator)
+    clone_buf := new(buffer_resource, temp_arena_allocator())
     clone_buf^ = self.buf
     buffer_resource_deinit(clone_buf)
 }
@@ -421,7 +421,7 @@ __storage_buf_init :: proc (self:^__storage_buf($NodeType), array:[]NodeType, _f
 __storage_buf_deinit :: proc (self:^__storage_buf($NodeType)) {
     mem.ICheckInit_Deinit(&self.check_init)
 
-    clone_buf := new(buffer_resource, __temp_arena_allocator)
+    clone_buf := new(buffer_resource, temp_arena_allocator())
     clone_buf^ = self.buf
     buffer_resource_deinit(clone_buf)
 }
@@ -445,7 +445,7 @@ __index_buf_init :: proc (self:^__index_buf, array:[]u32, _flag:resource_usage, 
 __index_buf_deinit :: proc (self:^__index_buf) {
     mem.ICheckInit_Deinit(&self.check_init)
 
-    clone_buf := new(buffer_resource, __temp_arena_allocator)
+    clone_buf := new(buffer_resource, temp_arena_allocator())
     clone_buf^ = self.buf
     buffer_resource_deinit(clone_buf)
 }

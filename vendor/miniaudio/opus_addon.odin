@@ -11,9 +11,9 @@ import "base:library"
 LIB_OPUS :: library.LIBPATH + "/libminiaudio_libopus" + library.ARCH_end
 
 foreign import lib {
+    LIB_OPUS,
     "../opusfile" + opusfile.LIBOPUSFILE,
     "../opus" + opus.LIBOPUS,
-	LIB_OPUS,
 }
 
 libopus :: struct {

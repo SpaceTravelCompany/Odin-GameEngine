@@ -66,7 +66,7 @@ panda_img_allocator_proc :: proc(allocator_data: rawptr, mode: runtime.Allocator
 Init ::proc() {
     renderCmd = engine.render_cmd_init()
 
-    engine.projection_init_matrix_ortho_window(engine.def_projection(), CANVAS_W, CANVAS_H)
+    engine.projection_update_ortho_window(engine.def_projection(), CANVAS_W, CANVAS_H)
 
     //Font Test
     shape_obj: ^shape.shape = new(shape.shape, engine.def_allocator())
@@ -102,13 +102,15 @@ Init ::proc() {
         scale = linalg.PointF{3,3},
     }
 
-    rawText, shapeErr := font.font_render_string(ft, "안녕", renderOpt, context.temp_allocator)
+    rawText, shapeErr := font.font_render_string(ft, "안녕", renderOpt, engine.def_allocator())
     if shapeErr != .None {
         trace.panic_log(shapeErr)
     }
-    defer geometry.raw_shape_free(rawText, context.temp_allocator)
+    defer free(rawText, engine.def_allocator())
+    //!DO NOT geometry.raw_shape_free, auto delete vertex and index data after shape_src_init_raw completed
+    //!only delete raw single pointer
 
-    shape.shape_src_init_raw(&shapeSrc, rawText)
+    shape.shape_src_init_raw(&shapeSrc, rawText, allocator = engine.def_allocator())
 
     shape.shape_init(shape_obj, shape.shape, &shapeSrc, {-0.0, 0, 10}, math.to_radians_f32(45.0), {3, 3},
     pivot = {0.0, 0.0})

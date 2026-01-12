@@ -760,11 +760,6 @@ vkbuffer_resource_create_texture :: proc(
 @(private = "file") buffer_resource_DestroyBufferNoAsync :: proc(self: ^buffer_resource) {
 	vk_mem_buffer_UnBindBufferNode(auto_cast self.mem_buffer, self.__resource, self.idx)
 
-	if self.data.allocator != nil && self.data.data != nil {
-		delete(self.data.data, self.data.allocator.?)
-		self.data.data = nil
-		self.data.allocator = nil
-	}
 	self.__resource = 0
 }
 
@@ -772,11 +767,6 @@ vkbuffer_resource_create_texture :: proc(
 	vk.DestroyImageView(vk_device, self.img_view, nil)
 	vk_mem_buffer_UnBindBufferNode(auto_cast self.mem_buffer, self.__resource, self.idx)
 
-	if self.data.allocator != nil && self.data.data != nil {
-		delete(self.data.data, self.data.allocator.?)
-		self.data.data = nil
-		self.data.allocator = nil
-	}
 	self.__resource = 0
 }
 
@@ -990,7 +980,7 @@ vkbuffer_resource_deinit :: proc(self: ^$T) where T == buffer_resource || T == t
 		bufInfo.usage |= {.TRANSFER_DST}
 		if self.option.len > auto_cast len(self.data.data) do trace.panic_log("create_buffer _data not enough size. ", self.option.len, ", ", len(self.data.data))
 		
-		last = new(buffer_resource, __temp_arena_allocator)
+		last = new(buffer_resource, temp_arena_allocator())
 		last^ = {}
 		last.data = self.data
 		buffer_resource_CreateBufferNoAsync(last, {
@@ -1081,7 +1071,7 @@ vkbuffer_resource_deinit :: proc(self: ^$T) where T == buffer_resource || T == t
 	if self.data.data != nil && self.option.resource_usage == .GPU {
 		imgInfo.usage |= {.TRANSFER_DST}
 		
-		last = new(buffer_resource, __temp_arena_allocator)
+		last = new(buffer_resource, temp_arena_allocator())
 		last^ = {}
 		last.data = self.data
 		buffer_resource_CreateBufferNoAsync(last, {

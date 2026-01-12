@@ -176,9 +176,9 @@ qoi_converter_encode :: proc (self:^qoi_converter, data:[]byte, in_fmt:image.col
     qoi_converter_deinit(self)
 
     ok:bool
-    self.img = new(image.Image, context.temp_allocator)
+    self.img = new(image.Image, allocator)
     defer if !ok {
-        free(self.img, context.temp_allocator)
+        free(self.img, allocator)
         self.img = nil
     } else {
         self.img.pixels = {}

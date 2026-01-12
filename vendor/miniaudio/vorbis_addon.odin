@@ -10,10 +10,10 @@ import "base:library"
 
 LIB_VORBIS :: library.LIBPATH + "/libminiaudio_libvorbis" + library.ARCH_end
 foreign import lib {
+    LIB_VORBIS,
     "../vorbisfile" + vorbisfile.LIB,
     "../vorbis" + vorbis.LIB,
     "../ogg" + ogg.LIB,
-	LIB_VORBIS,
 }
 
 libvorbis :: struct {
