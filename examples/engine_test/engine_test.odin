@@ -173,7 +173,7 @@ Init ::proc() {
     qoiD :^qoi.qoi_converter = new(qoi.qoi_converter, engine.def_allocator())
 
     //imgData, errCode := engine.image_converter_load_file(qoiD, "res/panda.qoi", .RGBA)
-    imgData, errCode := qoi.qoi_converter_load(qoiD, panda_img, .RGBA)
+    imgData, errCode := qoi.qoi_converter_load(qoiD, panda_img, .RGBA, engine.def_allocator())
     if errCode != nil {
         trace.panic_log(errCode)
     }

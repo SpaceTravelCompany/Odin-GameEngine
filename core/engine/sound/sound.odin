@@ -57,10 +57,10 @@ sound_src :: struct {
     g_end_sounds = make([dynamic]^sound)
 
     miniaudio_resource_manager_config = miniaudio.resource_manager_config_init()
-    miniaudio_p_custom_backend_v_tables[0] = miniaudio.ma_decoding_backend_libvorbis
-    miniaudio_p_custom_backend_v_tables[1] = miniaudio.ma_decoding_backend_libopus
-    miniaudio_p_custom_backend_v_tables2[0] = miniaudio.ma_decoding_backend_libvorbis
-    miniaudio_p_custom_backend_v_tables2[1] = miniaudio.ma_decoding_backend_libopus
+    miniaudio_p_custom_backend_v_tables[0] = miniaudio.get_decoding_backend_libvorbis()
+    miniaudio_p_custom_backend_v_tables[1] = miniaudio.get_decoding_backend_libopus()
+    miniaudio_p_custom_backend_v_tables2[0] = miniaudio.get_decoding_backend_libvorbis()
+    miniaudio_p_custom_backend_v_tables2[1] = miniaudio.get_decoding_backend_libopus()
 
     miniaudio_resource_manager_config.ppCustomDecodingBackendVTables = &miniaudio_p_custom_backend_v_tables[0]
     miniaudio_resource_manager_config.customDecodingBackendCount = 2

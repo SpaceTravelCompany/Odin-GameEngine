@@ -6,12 +6,14 @@ import "core:mem"
 import "../vorbisfile"
 import "../vorbis"
 import "../ogg"
+import "base:library"
 
+LIB_VORBIS :: library.LIBPATH + "/libminiaudio_libvorbis" + library.ARCH_end
 foreign import lib {
     "../vorbisfile" + vorbisfile.LIB,
     "../vorbis" + vorbis.LIB,
     "../ogg" + ogg.LIB,
-	LIB,
+	LIB_VORBIS,
 }
 
 libvorbis :: struct {
@@ -32,15 +34,15 @@ foreign lib {
     onTell:ma_tell_proc,
     pReadSeekTellUserData:rawptr,
     pConfig:^decoding_backend_config,
-    _:^allocation_callbacks,//?pAllocationCallbacks
+    pAllocationCallbacks:^allocation_callbacks,
     pVorbis:^libvorbis) -> result ---
     
     libvorbis_init_file :: proc (pFilePath:cstring,
         pConfig:^decoding_backend_config,
-        _:^allocation_callbacks,//?pAllocationCallbacks
+        pAllocationCallbacks:^allocation_callbacks,
         pVorbis:^libvorbis) -> result ---
     
-    libvorbis_uninit :: proc (pVorbis:^libvorbis,_:^allocation_callbacks,/*?pAllocationCallbacks*/) ---
+    libvorbis_uninit :: proc (pVorbis:^libvorbis,pAllocationCallbacks:^allocation_callbacks,) ---
     
     libvorbis_read_pcm_frames :: proc (pVorbis:^libvorbis,
     pFramesOut:rawptr,
@@ -61,7 +63,6 @@ foreign lib {
     libvorbis_get_cursor_in_pcm_frames :: proc (pVorbis: ^libvorbis, pCursor: ^u64) -> result ---
     
     libvorbis_get_length_in_pcm_frames :: proc (pVorbis: ^libvorbis, pLength: ^u64) -> result ---
-}
-foreign lib {
-    ma_decoding_backend_libvorbis : ^decoding_backend_vtable
+
+    get_decoding_backend_libvorbis :: proc () -> ^decoding_backend_vtable ---
 }

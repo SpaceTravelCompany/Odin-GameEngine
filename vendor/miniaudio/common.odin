@@ -21,30 +21,6 @@ BINDINGS_VERSION_REVISION :: 23
 BINDINGS_VERSION          :: [3]u32{BINDINGS_VERSION_MAJOR, BINDINGS_VERSION_MINOR, BINDINGS_VERSION_REVISION}
 BINDINGS_VERSION_STRING   :: "0.11.23"
 
-@(init)
-version_check :: proc "contextless" () {
-	v: [3]u32
-	version(&v.x, &v.y, &v.z)
-	if v != BINDINGS_VERSION {
-		buf: [1024]byte
-		n := copy(buf[:],  "miniaudio version mismatch: ")
-		n += copy(buf[n:], "bindings are for version ")
-		n += copy(buf[n:], BINDINGS_VERSION_STRING)
-		n += copy(buf[n:], ", but version ")
-		n += copy(buf[n:], string(version_string()))
-		n += copy(buf[n:], " is linked, make sure to compile the correct miniaudio version by going to `vendor/miniaudio/src` ")
-
-		when ODIN_OS == .Windows {
-			n += copy(buf[n:], "and executing `build.bat`")
-		} else {
-			n += copy(buf[n:], "and executing `make`")
-		}
-
-		panic_contextless(string(buf[:n]))
-	}
-}
-
-
 handle :: distinct rawptr
 
 /* SIMD alignment in bytes. Currently set to 32 bytes in preparation for future AVX optimizations. */

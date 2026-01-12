@@ -6,11 +6,14 @@ import "core:mem"
 import "../opusfile"
 import "../ogg"
 import "../opus"
+import "base:library"
+
+LIB_OPUS :: library.LIBPATH + "/libminiaudio_libopus" + library.ARCH_end
 
 foreign import lib {
     "../opusfile" + opusfile.LIBOPUSFILE,
     "../opus" + opus.LIBOPUS,
-	LIB,
+	LIB_OPUS,
 }
 
 libopus :: struct {
@@ -30,15 +33,15 @@ foreign lib {
     onTell:ma_tell_proc,
     pReadSeekTellUserData:rawptr,
     pConfig:^decoding_backend_config,
-    _:^allocation_callbacks,//?pAllocationCallbacks
+    pAllocationCallbacks:^allocation_callbacks,
     pOpus:^libopus) -> result ---
     
     libopus_init_file :: proc (pFilePath:cstring,
         pConfig:^decoding_backend_config,
-        _:^allocation_callbacks,//?pAllocationCallbacks
+        pAllocationCallbacks:^allocation_callbacks,
         pOpus:^libopus) -> result ---
     
-    libopus_uninit :: proc (pOpus:^libopus,_:^allocation_callbacks,/*?pAllocationCallbacks*/) ---
+    libopus_uninit :: proc (pOpus:^libopus,pAllocationCallbacks:^allocation_callbacks,) ---
     
     libopus_read_pcm_frames :: proc (pOpus:^libopus,
     pFramesOut:rawptr,
@@ -59,7 +62,6 @@ foreign lib {
     libopus_get_cursor_in_pcm_frames :: proc (pOpus: ^libopus, pCursor: ^u64) -> result ---
     
     libopus_get_length_in_pcm_frames :: proc (pOpus: ^libopus, pLength: ^u64) -> result ---
-}
-foreign lib {
-    ma_decoding_backend_libopus : ^decoding_backend_vtable
+
+	get_decoding_backend_libopus :: proc () -> ^decoding_backend_vtable ---
 }
