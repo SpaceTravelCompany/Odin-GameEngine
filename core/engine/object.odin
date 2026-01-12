@@ -334,6 +334,7 @@ Draws the object using its vtable draw function
 Inputs:
 - self: Pointer to the object
 - cmd: Command buffer to record draw commands
+- viewport: viewport to draw the object. you can use multiple viewports to perform a draw call for each element in the viewport array.
 
 Returns:
 - None
