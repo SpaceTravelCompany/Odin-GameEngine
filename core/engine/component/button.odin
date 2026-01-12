@@ -131,7 +131,7 @@ _super_image_button_deinit :: proc(self:^image_button) {
     engine._super_iobject_deinit(auto_cast self)
 }
 
-_super_image_button_draw :: proc (self:^image_button, cmd:engine.command_buffer) {
+_super_image_button_draw :: proc (self:^image_button, cmd:engine.command_buffer, viewport:engine.viewport) {
     mem.ICheckInit_Check(&self.check_init)
     texture :^engine.texture
 
@@ -145,7 +145,7 @@ _super_image_button_draw :: proc (self:^image_button, cmd:engine.command_buffer)
         mem.ICheckInit_Check(&texture.check_init)
     }
 
-    engine.image_binding_sets_and_draw(cmd, self.set, texture.set)
+    engine.image_binding_sets_and_draw(cmd, self.set, viewport.set, texture.set)
 }
 
 /*
