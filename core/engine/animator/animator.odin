@@ -276,6 +276,7 @@ where intrinsics.type_is_subtype_of(actualType, animate_image) {
 _super_animate_image_deinit :: proc(self:^animate_image) {
     clone_frame_uniform := new(engine.buffer_resource, engine.temp_arena_allocator())
     clone_frame_uniform^ = self.frame_uniform
+    self.frame_uniform.data = {}
     engine.buffer_resource_deinit(clone_frame_uniform)
 
     engine._super_iobject_deinit(auto_cast self)

@@ -714,6 +714,7 @@ vkbuffer_resource_create_buffer :: proc(
 		mem.copy(raw_data(copyData), raw_data(data), len(data))
 		self.data.allocator = allocator == nil ? def_allocator() : allocator.?
 		self.data.data = copyData
+		
 		AppendOp(OpCreateBuffer{src = self})
 	} else {
 		self.data.allocator = allocator
@@ -760,6 +761,11 @@ vkbuffer_resource_create_texture :: proc(
 @(private = "file") buffer_resource_DestroyBufferNoAsync :: proc(self: ^buffer_resource) {
 	vk_mem_buffer_UnBindBufferNode(auto_cast self.mem_buffer, self.__resource, self.idx)
 
+	if self.data.allocator != nil && self.data.data != nil {
+		delete(self.data.data, self.data.allocator.?)	
+	}
+	self.data.data = nil
+	self.data.allocator = nil
 	self.__resource = 0
 }
 
@@ -767,6 +773,11 @@ vkbuffer_resource_create_texture :: proc(
 	vk.DestroyImageView(vk_device, self.img_view, nil)
 	vk_mem_buffer_UnBindBufferNode(auto_cast self.mem_buffer, self.__resource, self.idx)
 
+	if self.data.allocator != nil && self.data.data != nil {
+		delete(self.data.data, self.data.allocator.?)
+	}
+	self.data.data = nil
+	self.data.allocator = nil
 	self.__resource = 0
 }
 
@@ -795,6 +806,7 @@ vkbuffer_resource_create_texture :: proc(
 	allocator: Maybe(runtime.Allocator),
 ) -> bool {
 	inside :: #force_inline proc(v: ^$T, data: []byte, allocator: Maybe(runtime.Allocator)) -> bool {
+		//If the data is already being created or modified, delete the existing data and apply the new data.
 		if v.data.is_creating_modifing {
 			if allocator != nil {
 				delete(v.data.data, v.data.allocator.?)
@@ -914,6 +926,7 @@ vkbuffer_resource_deinit :: proc(self: ^$T) where T == buffer_resource || T == t
 	allocator: Maybe(runtime.Allocator),
 ) {
 	if gVkMinUniformBufferOffsetAlignment > 0 {
+		// Align the length up to the minimum uniform buffer offset alignment requirement
 		self.option.len = (self.option.len + gVkMinUniformBufferOffsetAlignment - 1) & ~(gVkMinUniformBufferOffsetAlignment - 1)
 	}
 	non_zero_append(&gTempUniforms, vk_temp_uniform_struct{uniform = self, data = data, size = self.option.len, allocator = allocator})
@@ -1290,9 +1303,9 @@ vk_update_descriptor_sets :: proc(sets: []descriptor_set) {
 		case OpMapCopy:
 			if n.pData.allocator != nil && n.pData.data != nil {
 				delete(n.pData.data, n.pData.allocator.?)
-				n.pData.data = nil
-				n.pData.allocator = nil
 			}
+			n.pData.data = nil
+			n.pData.allocator = nil
 		}
 	}
 	clear(&opAllocQueue)
@@ -1795,6 +1808,17 @@ vk_op_execute :: proc(wait_and_destroy: bool) {
 		if res != .SUCCESS do trace.panic_log("res := vk.QueueSubmit(vk_graphics_queue, 1, &submitInfo, 0) : ", res)
 
 		vk_wait_graphics_idle()
+
+		for node in opSaveQueue {
+			#partial switch n in node {
+			case OpCopyBuffer:
+				n.target.data.data = nil
+				n.target.data.allocator = nil
+			case OpCopyBufferToTexture:
+				n.target.data.data = nil
+				n.target.data.allocator = nil
+			}
+		}
 		vk_op_execute_destroy()
 	} else if wait_and_destroy {
 		vk_wait_graphics_idle()

@@ -72,7 +72,7 @@ buffer_resource :: struct {
 resource_data :: struct {
 	data: []byte,
 	allocator: Maybe(runtime.Allocator),
-	is_creating_modifing: bool,
+	is_creating_modifing: bool, // Used to ensure that only the most recent data is applied when a resource is being created or modified, preventing duplicates from being applied.
 }
 
 
@@ -489,6 +489,7 @@ color_transform_deinit :: proc(self: ^color_transform) {
 	mem.ICheckInit_Deinit(&self.check_init)
 	clone_mat_uniform := new(buffer_resource, temp_arena_allocator())
 	clone_mat_uniform^ = self.mat_uniform
+	self.mat_uniform.data = {}
 	buffer_resource_deinit(clone_mat_uniform)
 }
 

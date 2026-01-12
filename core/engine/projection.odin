@@ -252,6 +252,7 @@ projection_deinit :: proc(self:^projection) {
 
     clone_mat_uniform := new(buffer_resource, temp_arena_allocator())
     clone_mat_uniform^ = self.mat_uniform
+	self.mat_uniform.data = {}
     buffer_resource_deinit(clone_mat_uniform)
 }
 

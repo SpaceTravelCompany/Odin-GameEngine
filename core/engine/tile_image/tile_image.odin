@@ -82,6 +82,7 @@ colorTransform:^engine.color_transform = nil, vtable:^engine.iobject_vtable = ni
 _super_tile_image_deinit :: proc(self:^tile_image) {
     clone_tile_uniform := new(engine.buffer_resource, engine.temp_arena_allocator())
     clone_tile_uniform^ = self.tile_uniform
+    self.tile_uniform.data = {}
     engine.buffer_resource_deinit(clone_tile_uniform)
 
     engine._super_iobject_deinit(auto_cast self)
@@ -273,6 +274,7 @@ tile_texture_array_deinit :: #force_inline proc(self:^tile_texture_array) {
     mem.ICheckInit_Deinit(&self.check_init)
     clone_texture := new(engine.texture_resource, engine.temp_arena_allocator())
     clone_texture^ = self.texture
+    self.texture.data = {}
     engine.buffer_resource_deinit(clone_texture)
 }
 /*
