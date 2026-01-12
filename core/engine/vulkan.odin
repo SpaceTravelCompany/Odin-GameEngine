@@ -205,16 +205,14 @@ vk_clean_shader_modules :: proc() {
 vk_init_pipelines :: proc() {
 	//vk.InitVulkanTemplate()
 
-	shape_descriptor_set_layout = vk.DescriptorSetLayoutInit(vk_device,
+	base_descriptor_set_layout = vk.DescriptorSetLayoutInit(vk_device,
 		[]vk.DescriptorSetLayoutBinding {
-			vk.DescriptorSetLayoutBindingInit(0, 1, stageFlags = {.VERTEX}),
-			vk.DescriptorSetLayoutBindingInit(1, 1, stageFlags = {.VERTEX}),
-			vk.DescriptorSetLayoutBindingInit(2, 1, stageFlags = {.VERTEX}),
-			vk.DescriptorSetLayoutBindingInit(3, 1, stageFlags = {.FRAGMENT}),
+			vk.DescriptorSetLayoutBindingInit(0, 1),
+			vk.DescriptorSetLayoutBindingInit(1, 1),
 		}
 	)
 	shape_pipeline_layout = vk.PipelineLayoutInit(vk_device,
-		[]vk.DescriptorSetLayout{shape_descriptor_set_layout},
+		[]vk.DescriptorSetLayout{base_descriptor_set_layout, base_descriptor_set_layout},
 	)
 
 	// vk_copy_screen_descriptor_set_layout = vk.DescriptorSetLayoutInit(vk_device,
@@ -227,29 +225,20 @@ vk_init_pipelines :: proc() {
 
 	tex_descriptor_set_layout = vk.DescriptorSetLayoutInit(vk_device,
 		[]vk.DescriptorSetLayoutBinding {
-			vk.DescriptorSetLayoutBindingInit(0, 1),
-			vk.DescriptorSetLayoutBindingInit(1, 1),
-			vk.DescriptorSetLayoutBindingInit(2, 1),
-			vk.DescriptorSetLayoutBindingInit(3, 1, stageFlags = {.FRAGMENT}),},
-	)
-	tex_descriptor_set_layout2 = vk.DescriptorSetLayoutInit(vk_device,
-		[]vk.DescriptorSetLayoutBinding {
 			vk.DescriptorSetLayoutBindingInit(0, 1, descriptorType = .COMBINED_IMAGE_SAMPLER),},
 	)
-	tex_pipeline_layout = vk.PipelineLayoutInit(vk_device,
-		[]vk.DescriptorSetLayout{tex_descriptor_set_layout, tex_descriptor_set_layout2},
+	img_pipeline_layout = vk.PipelineLayoutInit(vk_device,
+		[]vk.DescriptorSetLayout{base_descriptor_set_layout, base_descriptor_set_layout, tex_descriptor_set_layout},
 	)
 
-	animate_tex_descriptor_set_layout = vk.DescriptorSetLayoutInit(vk_device,
+	animate_img_descriptor_set_layout = vk.DescriptorSetLayoutInit(vk_device,
 		[]vk.DescriptorSetLayoutBinding {
 			vk.DescriptorSetLayoutBindingInit(0, 1),
 			vk.DescriptorSetLayoutBindingInit(1, 1),
-			vk.DescriptorSetLayoutBindingInit(2, 1),
-			vk.DescriptorSetLayoutBindingInit(3, 1, stageFlags = {.FRAGMENT}),
-			vk.DescriptorSetLayoutBindingInit(4, 1, stageFlags = {.FRAGMENT}),},
+			vk.DescriptorSetLayoutBindingInit(2, 1),},
 	)
-	animate_tex_pipeline_layout = vk.PipelineLayoutInit(vk_device,
-		[]vk.DescriptorSetLayout{animate_tex_descriptor_set_layout, tex_descriptor_set_layout2},
+	animate_img_pipeline_layout = vk.PipelineLayoutInit(vk_device,
+		[]vk.DescriptorSetLayout{animate_img_descriptor_set_layout, base_descriptor_set_layout, tex_descriptor_set_layout},
 	)
 
 	// vkCopyScreenDescriptorSetLayout = vk.DescriptorSetLayoutInit(vk_device,
@@ -329,7 +318,7 @@ vk_init_pipelines :: proc() {
 
 	pipelineCreateInfos[1] = vk.GraphicsPipelineCreateInfoInit(
 		stages = texShaderStages[:],
-		layout = tex_pipeline_layout,
+		layout = img_pipeline_layout,
 		renderPass = vk_render_pass,
 		pMultisampleState = &vkPipelineMultisampleStateCreateInfo,
 		pDepthStencilState = &defaultDepthStencilState,
@@ -338,7 +327,7 @@ vk_init_pipelines :: proc() {
 	)
 	pipelineCreateInfos[2] = vk.GraphicsPipelineCreateInfoInit(
 		stages = animateTexShaderStages[:],
-		layout = animate_tex_pipeline_layout,
+		layout = animate_img_pipeline_layout,
 		renderPass = vk_render_pass,
 		pMultisampleState = &vkPipelineMultisampleStateCreateInfo,
 		pDepthStencilState = &defaultDepthStencilState,
@@ -360,26 +349,25 @@ vk_init_pipelines :: proc() {
 	}
 
 	shape_pipeline = pipelines[0]
-	tex_pipeline = pipelines[1]
-	animate_tex_pipeline = pipelines[2]
+	img_pipeline = pipelines[1]
+	animate_img_pipeline = pipelines[2]
 	//vk_copy_screen_pipeline = pipelines[3]
 }
 
 vk_clean_pipelines :: proc() {
-	vk.DestroyDescriptorSetLayout(vk_device, shape_descriptor_set_layout, nil)
+	vk.DestroyDescriptorSetLayout(vk_device, base_descriptor_set_layout, nil)
 	vk.DestroyDescriptorSetLayout(vk_device, tex_descriptor_set_layout, nil)
-	vk.DestroyDescriptorSetLayout(vk_device, tex_descriptor_set_layout2, nil)
-	vk.DestroyDescriptorSetLayout(vk_device, animate_tex_descriptor_set_layout, nil)
+	vk.DestroyDescriptorSetLayout(vk_device, animate_img_descriptor_set_layout, nil)
 	//vk.DestroyDescriptorSetLayout(vk_device, copy_screen_descriptor_set_layout, nil)
 
 	vk.DestroyPipelineLayout(vk_device, shape_pipeline_layout, nil)
-	vk.DestroyPipelineLayout(vk_device, tex_pipeline_layout, nil)
-	vk.DestroyPipelineLayout(vk_device, animate_tex_pipeline_layout, nil)
+	vk.DestroyPipelineLayout(vk_device, img_pipeline_layout, nil)
+	vk.DestroyPipelineLayout(vk_device, animate_img_pipeline_layout, nil)
 	//vk.DestroyPipelineLayout(vk_device, copy_screen_pipeline_layout, nil)
 
 	vk.DestroyPipeline(vk_device, shape_pipeline, nil)
-	vk.DestroyPipeline(vk_device, tex_pipeline, nil)
-	vk.DestroyPipeline(vk_device, animate_tex_pipeline, nil)
+	vk.DestroyPipeline(vk_device, img_pipeline, nil)
+	vk.DestroyPipeline(vk_device, animate_img_pipeline, nil)
 	//vk.DestroyPipeline(vk_device, copy_screen_pipeline, nil)
 }
 
@@ -941,8 +929,6 @@ vk_start :: proc() {
 	}, &vk_cmd_buffer[0])
 	if res != .SUCCESS do trace.panic_log("vk.AllocateCommandBuffers(&vk_cmd_buffer) : ", res)
 
-	__render_cmd_create()
-
 	vk_init_block_len()
 	vk_allocator_init()
 
@@ -1146,9 +1132,13 @@ vk_start :: proc() {
 	vk_create_sync_object()
 
 	vk_wait_all_op()//reset wait
+
+	__render_cmd_create()
 }
 
 vk_destroy :: proc() {
+	__render_cmd_clean()
+
 	graphics_clean()
 
 	vk_clean_sync_object()
@@ -1169,7 +1159,6 @@ vk_destroy :: proc() {
 
 	delete(vk_fmts)
 	delete(vkPresentModes)
-	__render_cmd_clean()
 
 	vk.DestroySurfaceKHR(vk_instance, vk_surface, nil)
 
@@ -1602,7 +1591,8 @@ vk_record_command_buffer :: proc(cmd:^__render_cmd, frame:int) {
 
 		vk.CmdBeginRenderPass(c.__handle, &renderPassBeginInfo, vk.SubpassContents.INLINE)
 		
-		viewport := vk.Viewport {
+
+		vp := vk.Viewport {
 			x = 0.0,
 			y = 0.0,
 			width = f32(vk_extent_rotation.width),
@@ -1610,13 +1600,7 @@ vk_record_command_buffer :: proc(cmd:^__render_cmd, frame:int) {
 			minDepth = 0.0,
 			maxDepth = 1.0,
 		}
-		vk.CmdSetViewport(c.__handle, 0, 1, &viewport)
-
-		scissor := vk.Rect2D {
-			offset = {x = 0, y = 0},
-			extent = vk_extent_rotation,
-		}
-		vk.CmdSetScissor(c.__handle, 0, 1, &scissor)
+		vk.CmdSetViewport(c.__handle, 0, 1, &vp)
 
 		sync.rw_mutex_lock(&cmd.obj_lock)
 		objs := mem.make_non_zeroed_slice([]^iobject, len(cmd.scene), context.temp_allocator)
@@ -1624,9 +1608,32 @@ vk_record_command_buffer :: proc(cmd:^__render_cmd, frame:int) {
 		sync.rw_mutex_unlock(&cmd.obj_lock)
 		defer delete(objs, context.temp_allocator)
 		
-		for obj in objs {
-			iobject_draw(auto_cast obj, c)
+		first := true
+		prev_area :Maybe(linalg.RectF) = nil
+		for viewport in __g_viewports {
+			if first || prev_area != viewport.viewport_area {
+				scissor :vk.Rect2D
+				if viewport.viewport_area != nil {
+					scissor = {
+						offset = {x = i32(viewport.viewport_area.?.pos[0]), y = i32(viewport.viewport_area.?.pos[1])},
+						extent = {width = u32(viewport.viewport_area.?.size[0]), height = u32(viewport.viewport_area.?.size[1])},
+					}
+				} else {
+					scissor = {
+						offset = {x = 0, y = 0},
+						extent = vk_extent_rotation,
+					}
+				}
+				vk.CmdSetScissor(c.__handle, 0, 1, &scissor)
+				first = false
+				prev_area = viewport.viewport_area
+			}
+			
+			for obj in objs {
+				iobject_draw(auto_cast obj, c, viewport)
+			}
 		}
+
 
 		vk.CmdEndRenderPass(c.__handle)
 		res = vk.EndCommandBuffer(c.__handle)

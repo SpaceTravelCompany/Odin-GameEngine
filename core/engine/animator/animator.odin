@@ -224,13 +224,13 @@ ianimate_object_vtable :: struct {
 }
 
 animate_image_init :: proc(self:^animate_image, $actualType:typeid, src:^engine.texture_array, pos:linalg.Point3DF, rotation:f32, scale:linalg.PointF = {1,1}, 
-camera:^engine.camera, projection:^engine.projection, colorTransform:^engine.color_transform = nil, pivot:linalg.PointF = {0.0, 0.0}, vtable:^ianimate_object_vtable = nil) 
+colorTransform:^engine.color_transform = nil, pivot:linalg.PointF = {0.0, 0.0}, vtable:^ianimate_object_vtable = nil) 
 where intrinsics.type_is_subtype_of(actualType, animate_image) {
     self.src = src
     
-    self.set.bindings = engine.descriptor_set_binding__animate_image_uniform_pool[:]
-    self.set.size = engine.descriptor_pool_size__animate_image_uniform_pool[:]
-    self.set.layout = engine.animate_tex_descriptor_set_layout
+    self.set.bindings = engine.descriptor_set_binding__animate_img_uniform_pool[:]
+    self.set.size = engine.descriptor_pool_size__animate_img_uniform_pool[:]
+    self.set.layout = engine.get_animate_img_descriptor_set_layout()
 
     self.vtable = auto_cast (vtable == nil ? &animate_image_vtable : vtable)
     if self.vtable.draw == nil do self.vtable.draw = auto_cast _super_animate_image_draw
@@ -245,17 +245,17 @@ where intrinsics.type_is_subtype_of(actualType, animate_image) {
         resource_usage = .CPU,
     }, mem.ptr_to_bytes(&self.frame), true)
 
-    iobject_init(self, actualType, pos, rotation, scale, camera, projection, colorTransform, pivot)
+    iobject_init(self, actualType, pos, rotation, scale, colorTransform, pivot)
 }
 
 animate_image_init2 :: proc(self:^animate_image, $actualType:typeid, src:^engine.texture_array,
-camera:^engine.camera, projection:^engine.projection, colorTransform:^engine.color_transform = nil, vtable:^ianimate_object_vtable = nil) 
+colorTransform:^engine.color_transform = nil, vtable:^ianimate_object_vtable = nil) 
 where intrinsics.type_is_subtype_of(actualType, animate_image) {
     self.src = src
     
-    self.set.bindings = engine.descriptor_set_binding__animate_image_uniform_pool[:]
-    self.set.size = engine.descriptor_pool_size__animate_image_uniform_pool[:]
-    self.set.layout = engine.animate_tex_descriptor_set_layout
+    self.set.bindings = engine.descriptor_set_binding__animate_img_uniform_pool[:]
+    self.set.size = engine.descriptor_pool_size__animate_img_uniform_pool[:]
+    self.set.layout = engine.get_animate_img_descriptor_set_layout()
 
     self.vtable = auto_cast (vtable == nil ? &animate_image_vtable : vtable)
     if self.vtable.draw == nil do self.vtable.draw = auto_cast _super_animate_image_draw
@@ -270,7 +270,7 @@ where intrinsics.type_is_subtype_of(actualType, animate_image) {
         resource_usage = .CPU,
     }, mem.ptr_to_bytes(&self.frame), true)
 
-    iobject_init2(self, actualType, camera, projection, colorTransform)
+    iobject_init2(self, actualType, colorTransform)
 }
 
 _super_animate_image_deinit :: proc(self:^animate_image) {
@@ -309,31 +309,31 @@ animate_image_get_texture_array :: #force_inline proc "contextless" (self:^anima
     return self.src
 }
 
-/*
-Gets the camera of the animated image
+// /*
+// Gets the camera of the animated image
 
-Inputs:
-- self: Pointer to the animated image
+// Inputs:
+// - self: Pointer to the animated image
 
-Returns:
-- Pointer to the camera
-*/
-animate_image_get_camera :: proc "contextless" (self:^animate_image) -> ^engine.camera {
-    return self.camera
-}
+// Returns:
+// - Pointer to the camera
+// */
+// animate_image_get_camera :: proc "contextless" (self:^animate_image) -> ^engine.camera {
+//     return self.camera
+// }
 
-/*
-Gets the projection of the animated image
+// /*
+// Gets the projection of the animated image
 
-Inputs:
-- self: Pointer to the animated image
+// Inputs:
+// - self: Pointer to the animated image
 
-Returns:
-- Pointer to the projection
-*/
-animate_image_get_projection :: proc "contextless" (self:^animate_image) -> ^engine.projection {
-    return self.projection
-}
+// Returns:
+// - Pointer to the projection
+// */
+// animate_image_get_projection :: proc "contextless" (self:^animate_image) -> ^engine.projection {
+//     return self.projection
+// }
 
 /*
 Gets the color transform of the animated image
@@ -357,35 +357,33 @@ animate_image_update_transform_matrix_raw :: #force_inline proc(self:^animate_im
 animate_image_change_color_transform :: #force_inline proc(self:^animate_image, colorTransform:^engine.color_transform) {
     engine.iobject_change_color_transform(self, colorTransform)
 }
-animate_image_update_camera :: #force_inline proc(self:^animate_image, camera:^engine.camera) {
-    engine.iobject_update_camera(self, camera)
-}
+// animate_image_update_camera :: #force_inline proc(self:^animate_image, camera:^engine.camera) {
+//     engine.iobject_update_camera(self, camera)
+// }
 animate_image_update_texture_array :: #force_inline proc "contextless" (self:^animate_image, src:^engine.texture_array) {
     self.src = src
 }
-animate_image_update_projection :: #force_inline proc(self:^animate_image, projection:^engine.projection) {
-    engine.iobject_update_projection(self, projection)
-}
+// animate_image_update_projection :: #force_inline proc(self:^animate_image, projection:^engine.projection) {
+//     engine.iobject_update_projection(self, projection)
+// }
 
-_super_animate_image_draw :: proc (self:^animate_image, cmd:engine.command_buffer) {
+_super_animate_image_draw :: proc (self:^animate_image, cmd:engine.command_buffer, viewport:^engine.viewport) {
     mem.ICheckInit_Check(&self.check_init)
     mem.ICheckInit_Check(&self.src.check_init)
 
-    engine.graphics_cmd_bind_pipeline(cmd, .GRAPHICS, engine.get_animate_tex_pipeline())
-    engine.graphics_cmd_bind_descriptor_sets(cmd, .GRAPHICS, engine.get_animate_tex_pipeline_layout(), 0, 2,
-        &([]vk.DescriptorSet{self.set.__set, self.src.set.__set})[0], 0, nil)
+    engine.graphics_cmd_bind_pipeline(cmd, .GRAPHICS, engine.get_animate_img_pipeline())
+    engine.graphics_cmd_bind_descriptor_sets(cmd, .GRAPHICS, engine.get_animate_img_pipeline_layout(), 0, 3,
+        &([]vk.DescriptorSet{self.set.__set, viewport.set.__set, self.src.set.__set})[0], 0, nil)
 
     engine.graphics_cmd_draw(cmd, 6, 1, 0, 0)
 }
 
 @private get_uniform_resources_animate_image :: #force_inline proc(self:^engine.iobject) -> []engine.union_resource {
-    res := mem.make_non_zeroed([]engine.union_resource, 5, context.temp_allocator)
+    res := mem.make_non_zeroed([]engine.union_resource, 3, context.temp_allocator)
     res[0] = &self.mat_uniform
-    res[1] = &self.camera.mat_uniform
-    res[2] = &self.projection.mat_uniform
-    res[3] = &self.color_transform.mat_uniform
+    res[1] = &self.color_transform.mat_uniform
 
     animate_image_ : ^animate_image = auto_cast self
-    res[4] = &animate_image_.frame_uniform
+    res[2] = &animate_image_.frame_uniform
     return res[:]
 }

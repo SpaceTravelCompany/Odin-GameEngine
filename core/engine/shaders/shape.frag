@@ -1,6 +1,6 @@
 #version 450
 
-layout(set = 0, binding = 3) uniform UniformBufferObject4 {
+layout(set = 0, binding = 1) uniform UniformBufferObject4 {
     mat4 mat;
 } colormat;
 

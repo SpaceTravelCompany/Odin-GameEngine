@@ -16,7 +16,7 @@ import img "core:image"
 
 iobject_vtable :: struct {
     get_uniform_resources: #type proc (self:^iobject) -> []union_resource,
-    draw: #type proc (self:^iobject, cmd:command_buffer),
+    draw: #type proc (self:^iobject, cmd:command_buffer, viewport:^viewport),
     deinit: #type proc (self:^iobject),
     update: #type proc (self:^iobject),
     size: #type proc (self:^iobject),
@@ -32,8 +32,6 @@ Contains transformation matrix, descriptor set, camera, projection, and vtable f
 iobject :: struct {
     using _: __matrix_in,
     set:descriptor_set,
-    camera: ^camera,	
-    projection: ^projection,
     color_transform: ^color_transform,
     actual_type: typeid,
     vtable: ^iobject_vtable,
@@ -162,12 +160,10 @@ Inputs:
 */
 iobject_init :: proc(self:^iobject, $actual_type:typeid,
     pos:linalg.Point3DF, rotation:f32, scale:linalg.PointF = {1,1},
-    _camera:^camera, _projection:^projection, _color_transform:^color_transform = nil, pivot:linalg.PointF = {0.0, 0.0})
+    _color_transform:^color_transform = nil, pivot:linalg.PointF = {0.0, 0.0})
     where actual_type != iobject && intrinsics.type_is_subtype_of(actual_type, iobject) {
 
     mem.ICheckInit_Init(&self.check_init)
-    self.camera = _camera
-    self.projection = _projection
     self.color_transform = _color_transform == nil ? &__def_color_transform : _color_transform
     
     self.mat = srt_2d_matrix2(pos, scale, rotation, pivot)
@@ -193,12 +189,10 @@ _super_iobject_deinit :: #force_inline proc (self:^iobject) {
 }
 
 iobject_init2 :: proc(self:^iobject, $actual_type:typeid,
-    _camera:^camera, _projection:^projection, _color_transform:^color_transform = nil)
+    _color_transform:^color_transform = nil)
     where actual_type != iobject && intrinsics.type_is_subtype_of(actual_type, iobject) {
 
     mem.ICheckInit_Init(&self.check_init)
-    self.camera = _camera
-    self.projection = _projection
     self.color_transform = _color_transform == nil ? def_color_transform() : _color_transform
 
     self.actual_type = actual_type
@@ -217,11 +211,9 @@ iobject_init2 :: proc(self:^iobject, $actual_type:typeid,
 
 
 get_uniform_resources_default :: #force_inline proc(self:^iobject) -> []union_resource {
-    res := mem.make_non_zeroed([]union_resource, 4, context.temp_allocator)
+    res := mem.make_non_zeroed([]union_resource, 2, context.temp_allocator)
     res[0] = &self.mat_uniform
-    res[1] = &self.camera.mat_uniform
-    res[2] = &self.projection.mat_uniform
-    res[3] = &self.color_transform.mat_uniform
+    res[1] = &self.color_transform.mat_uniform
 
     return res[:]
 }
@@ -309,28 +301,28 @@ iobject_change_color_transform :: proc(self:^iobject, _color_transform:^color_tr
     self.color_transform = _color_transform
     __iobject_update_uniform(self, get_uniform_resources(self))
 }
-iobject_update_camera :: proc(self:^iobject, _camera:^camera) {
-    mem.ICheckInit_Check(&self.check_init)
-    self.camera = _camera
-    __iobject_update_uniform(self, get_uniform_resources(self))
-}
-iobject_update_projection :: proc(self:^iobject, _projection:^projection) {
-    mem.ICheckInit_Check(&self.check_init)
-    self.projection = _projection
-    __iobject_update_uniform(self, get_uniform_resources(self))
-}
+// iobject_update_camera :: proc(self:^iobject, _camera:^camera) {
+//     mem.ICheckInit_Check(&self.check_init)
+//     self.camera = _camera
+//     __iobject_update_uniform(self, get_uniform_resources(self))
+// }
+// iobject_update_projection :: proc(self:^iobject, _projection:^projection) {
+//     mem.ICheckInit_Check(&self.check_init)
+//     self.projection = _projection
+//     __iobject_update_uniform(self, get_uniform_resources(self))
+// }
 iobject_get_color_transform :: #force_inline proc "contextless" (self:^iobject) -> ^color_transform {
     mem.ICheckInit_Check(&self.check_init)
     return self.color_transform
 }
-iobject_get_camera :: #force_inline proc "contextless" (self:^iobject) -> ^camera {
-    mem.ICheckInit_Check(&self.check_init)
-    return self.camera
-}
-iobject_get_projection :: #force_inline proc "contextless" (self:^iobject) -> ^projection {
-    mem.ICheckInit_Check(&self.check_init)
-    return self.projection
-}
+// iobject_get_camera :: #force_inline proc "contextless" (self:^iobject) -> ^camera {
+//     mem.ICheckInit_Check(&self.check_init)
+//     return self.camera
+// }
+// iobject_get_projection :: #force_inline proc "contextless" (self:^iobject) -> ^projection {
+//     mem.ICheckInit_Check(&self.check_init)
+//     return self.projection
+// }
 
 iobject_get_actual_type :: #force_inline proc "contextless" (self:^iobject) -> typeid {
     return self.actual_type
@@ -346,9 +338,9 @@ Inputs:
 Returns:
 - None
 */
-iobject_draw :: proc (self:^iobject, cmd:command_buffer) {
+iobject_draw :: proc (self:^iobject, cmd:command_buffer, viewport:^viewport) {
     if self.vtable != nil && self.vtable.draw != nil {
-        self.vtable.draw(self, cmd)
+        self.vtable.draw(self, cmd, viewport)
     } else {
         trace.panic_log("iobjectType_Draw: unknown object type")
     }

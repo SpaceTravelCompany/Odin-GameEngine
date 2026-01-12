@@ -361,10 +361,13 @@ vk_find_mem_type :: proc "contextless" (
 @(private = "file") vk_mem_buffer_Deinit2 :: proc(self: ^vk_mem_buffer) {
 	vk.FreeMemory(vk_device, self.deviceMem, nil)
 	if !self.single {
-		for n: ^list.Node = self.list.head; n.next != nil; n = n.next {
-			free(n, def_allocator())
+		n: ^list.Node
+		for n = self.list.head; n.next != nil;  {
+			tmp := n
+			n = n.next
+			free(tmp, def_allocator())
 		}
-		free(self.list.head, def_allocator())
+		free(n, def_allocator())
 		self.list.head = nil
 		self.list.tail = nil
 	}

@@ -41,8 +41,6 @@ image :: struct {
     src: ^texture,
 }
 
-
-
 is_any_image_type :: #force_inline proc "contextless" ($any_image:typeid) -> bool {
     return intrinsics.type_is_subtype_of(any_image, iobject) && intrinsics.type_has_field(any_image, "src") && 
     (intrinsics.type_field_type(any_image, "src") == ^texture ||
@@ -75,14 +73,13 @@ Returns:
 - None
 */
 image_init :: proc(self:^image, $actualType:typeid, src:^texture, pos:linalg.Point3DF,
-camera:^camera, projection:^projection,
 rotation:f32 = 0.0, scale:linalg.PointF = {1,1}, colorTransform:^color_transform = nil, pivot:linalg.PointF = {0.0, 0.0},
  vtable:^iobject_vtable = nil) where intrinsics.type_is_subtype_of(actualType, image) {
     self.src = src
         
-    self.set.bindings = descriptor_set_binding__transform_uniform_pool[:]
-    self.set.size = descriptor_pool_size__transform_uniform_pool[:]
-    self.set.layout = tex_descriptor_set_layout
+    self.set.bindings = descriptor_set_binding__base_uniform_pool[:]
+    self.set.size = descriptor_pool_size__base_uniform_pool[:]
+    self.set.layout = base_descriptor_set_layout
 
     self.vtable = vtable == nil ? &image_vtable : vtable
     if self.vtable.draw == nil do self.vtable.draw = auto_cast _super_image_draw
@@ -90,17 +87,16 @@ rotation:f32 = 0.0, scale:linalg.PointF = {1,1}, colorTransform:^color_transform
 
     if self.vtable.get_uniform_resources == nil do self.vtable.get_uniform_resources = auto_cast get_uniform_resources_default
 
-    iobject_init(self, actualType, pos, rotation, scale, camera, projection, colorTransform, pivot)
+    iobject_init(self, actualType, pos, rotation, scale, colorTransform, pivot)
 }
 
 image_init2 :: proc(self:^image, $actualType:typeid, src:^texture,
-camera:^camera, projection:^projection,
 colorTransform:^color_transform = nil, vtable:^iobject_vtable = nil) where intrinsics.type_is_subtype_of(actualType, image) {
     self.src = src
         
-    self.set.bindings = descriptor_set_binding__transform_uniform_pool[:]
-    self.set.size = descriptor_pool_size__transform_uniform_pool[:]
-    self.set.layout = tex_descriptor_set_layout
+    self.set.bindings = descriptor_set_binding__base_uniform_pool[:]
+    self.set.size = descriptor_pool_size__base_uniform_pool[:]
+    self.set.layout = base_descriptor_set_layout
 
     self.vtable = vtable == nil ? &image_vtable : vtable
     if self.vtable.draw == nil do self.vtable.draw = auto_cast _super_image_draw
@@ -108,7 +104,7 @@ colorTransform:^color_transform = nil, vtable:^iobject_vtable = nil) where intri
 
     if self.vtable.get_uniform_resources == nil do self.vtable.get_uniform_resources = auto_cast get_uniform_resources_default
 
-    iobject_init2(self, actualType, camera, projection, colorTransform)
+    iobject_init2(self, actualType, colorTransform)
 }
 
 _super_image_deinit :: proc(self:^image) {
@@ -128,31 +124,31 @@ image_get_texture :: #force_inline proc "contextless" (self:^image) -> ^texture 
     return self.src
 }
 
-/*
-Gets the camera of the image
+// /*
+// Gets the camera of the image
 
-Inputs:
-- self: Pointer to the image
+// Inputs:
+// - self: Pointer to the image
 
-Returns:
-- Pointer to the camera
-*/
-image_get_camera :: proc "contextless" (self:^image) -> ^camera {
-    return iobject_get_camera(self)
-}
+// Returns:
+// - Pointer to the camera
+// */
+// image_get_camera :: proc "contextless" (self:^image) -> ^camera {
+//     return iobject_get_camera(self)
+// }
 
-/*
-Gets the projection of the image
+// /*
+// Gets the projection of the image
 
-Inputs:
-- self: Pointer to the image
+// Inputs:
+// - self: Pointer to the image
 
-Returns:
-- Pointer to the projection
-*/
-image_get_projection :: proc "contextless" (self:^image) -> ^projection {
-    return iobject_get_projection(self)
-}
+// Returns:
+// - Pointer to the projection
+// */
+// image_get_projection :: proc "contextless" (self:^image) -> ^projection {
+//     return iobject_get_projection(self)
+// }
 
 /*
 Gets the color transform of the image
@@ -173,12 +169,12 @@ image_update_transform :: #force_inline proc(self:^image, pos:linalg.Point3DF, r
 image_update_transform_matrix_raw :: #force_inline proc(self:^image, _mat:linalg.Matrix) {
     iobject_update_transform_matrix_raw(self, _mat)
 }
-image_update_camera :: #force_inline proc(self:^image, camera:^camera) {
-    iobject_update_camera(self, camera)
-}
-image_update_projection :: #force_inline proc(self:^image, projection:^projection) {
-    iobject_update_projection(self, projection)
-}
+// image_update_camera :: #force_inline proc(self:^image, camera:^camera) {
+//     iobject_update_camera(self, camera)
+// }
+// image_update_projection :: #force_inline proc(self:^image, projection:^projection) {
+//     iobject_update_projection(self, projection)
+// }
 image_update_texture :: #force_inline proc "contextless" (self:^image, src:^texture) {
     self.src = src
 }
@@ -186,11 +182,11 @@ image_change_color_transform :: #force_inline proc(self:^image, colorTransform:^
     iobject_change_color_transform(self, colorTransform)
 }
 
-_super_image_draw :: proc (self:^image, cmd:command_buffer) {
+_super_image_draw :: proc (self:^image, cmd:command_buffer, viewport:^viewport) {
     mem.ICheckInit_Check(&self.check_init)
     mem.ICheckInit_Check(&self.src.check_init)
 
-   image_binding_sets_and_draw(cmd, self.set, self.src.set)
+   image_binding_sets_and_draw(cmd, self.set, viewport.set, self.src.set)
 }
 
 /*
@@ -204,10 +200,10 @@ Inputs:
 Returns:
 - None
 */
-image_binding_sets_and_draw :: proc "contextless" (cmd:command_buffer, imageSet:descriptor_set, textureSet:descriptor_set) {
-    graphics_cmd_bind_pipeline(cmd, .GRAPHICS, tex_pipeline)
-    graphics_cmd_bind_descriptor_sets(cmd, .GRAPHICS, tex_pipeline_layout, 0, 2,
-        &([]vk.DescriptorSet{imageSet.__set, textureSet.__set})[0], 0, nil)
+image_binding_sets_and_draw :: proc "contextless" (cmd:command_buffer, imageSet:descriptor_set, viewSet:descriptor_set, textureSet:descriptor_set) {
+    graphics_cmd_bind_pipeline(cmd, .GRAPHICS, img_pipeline)
+    graphics_cmd_bind_descriptor_sets(cmd, .GRAPHICS, img_pipeline_layout, 0, 3,
+        &([]vk.DescriptorSet{imageSet.__set, viewSet.__set, textureSet.__set})[0], 0, nil)
 
     graphics_cmd_draw(cmd, 6, 1, 0, 0)
 }
@@ -280,7 +276,7 @@ texture_init :: proc(
 	self.sampler = sampler == 0 ? linear_sampler : sampler
 	self.set.bindings = descriptor_set_binding__single_pool[:]
 	self.set.size = descriptor_pool_size__single_sampler_pool[:]
-	self.set.layout = tex_descriptor_set_layout2
+	self.set.layout = tex_descriptor_set_layout
 	self.set.__set = 0
 
 	color_fmt_convert_default_overlap(pixels, pixels, in_pixel_fmt)
@@ -329,7 +325,7 @@ texture_init_grey :: proc(
 	self.sampler = sampler == 0 ? linear_sampler : sampler
 	self.set.bindings = descriptor_set_binding__single_pool[:]
 	self.set.size = descriptor_pool_size__single_sampler_pool[:]
-	self.set.layout = tex_descriptor_set_layout2
+	self.set.layout = tex_descriptor_set_layout
 	self.set.__set = 0
 
 	buffer_resource_create_texture(&self.texture, {
@@ -549,7 +545,7 @@ texture_array_init :: proc(self:^texture_array, width:u32, height:u32, count:u32
     self.sampler = sampler == 0 ? linear_sampler : sampler
     self.set.bindings = descriptor_set_binding__single_pool[:]
     self.set.size = descriptor_pool_size__single_sampler_pool[:]
-    self.set.layout = tex_descriptor_set_layout2
+    self.set.layout = tex_descriptor_set_layout
     self.set.__set = 0
 
     allocPixels := mem.make_non_zeroed_slice([]byte, count * width * height * 4, engine_def_allocator)

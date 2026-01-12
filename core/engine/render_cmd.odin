@@ -4,6 +4,7 @@ import "core:mem"
 import "core:debug/trace"
 import "core:sync"
 import vk "vendor:vulkan"
+import "base:runtime"
 
 
 /*
@@ -21,9 +22,15 @@ render_cmd :: struct {}
     obj_lock:sync.RW_Mutex
 }
 
-@private __g_render_cmd : [dynamic]^__render_cmd
+@private __g_render_cmd : [dynamic]^__render_cmd = nil
 @private __g_main_render_cmd_idx : int = -1
 @private __g_render_cmd_mtx : sync.Mutex
+
+@private __g_viewports: [dynamic]^viewport = nil
+
+@private __g_default_viewport: viewport
+@private __g_default_camera: camera
+@private __g_default_projection: projection
 
 /*
 Initializes a new render command structure
@@ -326,15 +333,27 @@ render_cmd_refresh_all :: proc "contextless" () {
     }
 }
 
-__render_cmd_clean :: proc () {
-    sync.mutex_lock(&__g_render_cmd_mtx)
-    defer sync.mutex_unlock(&__g_render_cmd_mtx)
-    delete(__g_render_cmd)
+@(private) __render_cmd_clean :: proc () {
+	delete(__g_render_cmd)
+	delete(__g_viewports)
+
+	camera_deinit(&__g_default_camera)
+	projection_deinit(&__g_default_projection)
 }
 
-__render_cmd_create :: proc () {
-    sync.mutex_lock(&__g_render_cmd_mtx)
-    defer sync.mutex_unlock(&__g_render_cmd_mtx)
-    __g_render_cmd = mem.make_non_zeroed([dynamic]^__render_cmd)
+@(private) __render_cmd_create :: proc() {
+	__g_render_cmd = mem.make_non_zeroed([dynamic]^__render_cmd)
+	__g_viewports = mem.make_non_zeroed([dynamic]^viewport)
+
+	camera_init(&__g_default_camera)
+	projection_init_matrix_ortho_window(&__g_default_projection, auto_cast window_width(), auto_cast window_height())
+	
+	__g_default_viewport = viewport{
+		camera = &__g_default_camera,
+		projection = &__g_default_projection,
+	}
+	viewport_init_update(&__g_default_viewport)
+
+	non_zero_append(&__g_viewports, &__g_default_viewport)
 }
 

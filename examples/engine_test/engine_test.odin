@@ -26,9 +26,6 @@ renderCmd : ^engine.render_cmd
 shapeSrc: shape.shape_src
 texture:engine.texture
 
-camera: engine.camera
-proj: engine.projection
-
 CANVAS_W :f32: 1280
 CANVAS_H :f32: 720
 
@@ -40,9 +37,8 @@ bgSnd : ^sound.sound
 bgSndFileData:[]u8
 
 GUI_Image_Init :: proc(self:^GUI_Image, src:^engine.texture,
-camera:^engine.camera, projection:^engine.projection,
 colorTransform:^engine.color_transform = nil) {
-    engine.image_init2(auto_cast self, GUI_Image, src, camera, projection, colorTransform)
+    engine.image_init2(auto_cast self, GUI_Image, src, colorTransform)
 
     gui.gui_component_size(self, &self.com)
 }
@@ -70,8 +66,7 @@ panda_img_allocator_proc :: proc(allocator_data: rawptr, mode: runtime.Allocator
 Init ::proc() {
     renderCmd = engine.render_cmd_init()
 
-    engine.camera_init(&camera, )
-    engine.projection_init_matrix_ortho_window(&proj, CANVAS_W, CANVAS_H)
+    engine.projection_init_matrix_ortho_window(engine.def_projection(), CANVAS_W, CANVAS_H)
 
     //Font Test
     shape_obj: ^shape.shape = new(shape.shape, engine.def_allocator())
@@ -115,7 +110,7 @@ Init ::proc() {
 
     shape.shape_src_init_raw(&shapeSrc, rawText)
 
-    shape.shape_init(shape_obj, shape.shape, &shapeSrc, {-0.0, 0, 10}, &camera, &proj, math.to_radians_f32(45.0), {3, 3},
+    shape.shape_init(shape_obj, shape.shape, &shapeSrc, {-0.0, 0, 10}, math.to_radians_f32(45.0), {3, 3},
     pivot = {0.0, 0.0})
 
     engine.render_cmd_add_object(renderCmd, shape_obj)
@@ -196,9 +191,11 @@ Init ::proc() {
     img.com.gui_align_x = .left
     img.com.gui_pos.x = 200.0
 
+	// img:^engine.image = new(engine.image, engine.def_allocator())
+   	// engine.image_init(img, engine.image, &texture, {0, 0, 0})
+	GUI_Image_Init(img, &texture)
+
     fmt.printfln("texture width: %d, height: %d", qoi.qoi_converter_width(qoiD), qoi.qoi_converter_height(qoiD))
-    
-    GUI_Image_Init(img, &texture,  &camera, &proj)
     
 
     engine.render_cmd_add_object(renderCmd, auto_cast img)
@@ -218,7 +215,7 @@ Init ::proc() {
 Update ::proc() {
 }
 Size :: proc() {
-    engine.projection_update_ortho_window(&proj, CANVAS_W, CANVAS_H)
+    engine.projection_update_ortho_window(engine.def_projection(), CANVAS_W, CANVAS_H)
     
     gui_img := (^GUI_Image)(engine.render_cmd_get_object(renderCmd, 1))
 
@@ -234,9 +231,6 @@ Destroy ::proc() {
         free(obj, engine.def_allocator())
     }
     engine.render_cmd_deinit(renderCmd)
-
-    engine.camera_deinit(&camera)
-    engine.projection_deinit(&proj)
 
     sound.sound_src_deinit(bgSndSrc)
     delete(bgSndFileData)

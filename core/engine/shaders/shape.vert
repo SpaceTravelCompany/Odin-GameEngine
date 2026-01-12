@@ -3,10 +3,10 @@
 layout(set = 0, binding = 0) uniform UniformBufferObject0 {
     mat4 model;
 } model;
-layout(set = 0, binding = 1) uniform UniformBufferObject1 {
+layout(set = 1, binding = 0) uniform UniformBufferObject1 {
     mat4 view;
 } view;
-layout(set = 0, binding = 2) uniform UniformBufferObject2 {
+layout(set = 1, binding = 1) uniform UniformBufferObject2 {
     mat4 proj;
 } proj;
 

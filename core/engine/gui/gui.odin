@@ -26,6 +26,7 @@ gui_component :: struct {
     gui_rotation : f32,
     gui_align_x : pos_align_x,
     gui_align_y : pos_align_y,
+	gui_match_proj:^engine.projection,
 }
 
 
@@ -46,9 +47,9 @@ Returns:
  gui_component_init :: proc (self:^$T, self_component:^gui_component)
     where intrinsics.type_is_subtype_of(T, engine.iobject)  {
     
-    window_width :f32 = 2.0 / self.projection.mat[0, 0]
-    window_height :f32 = 2.0 / self.projection.mat[1, 1]
-    
+    window_width :f32 = 2.0 / (self_component.gui_match_proj == nil ? engine.def_projection().mat[0][0] : self_component.gui_match_proj.mat[0][0])
+    window_height :f32 = 2.0 / (self_component.gui_match_proj == nil ? engine.def_projection().mat[1][1] : self_component.gui_match_proj.mat[1][1])
+
     base : Maybe(linalg.Matrix) = nil
     mat : linalg.Matrix
 

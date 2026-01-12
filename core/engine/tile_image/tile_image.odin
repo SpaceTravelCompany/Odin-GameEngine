@@ -23,14 +23,12 @@ tile_image :: struct {
 }
 
 @private get_uniform_resources_tile_image :: #force_inline proc(self:^engine.iobject) -> []engine.union_resource {
-    res := mem.make_non_zeroed([]engine.union_resource, 5, context.temp_allocator)
+    res := mem.make_non_zeroed([]engine.union_resource, 3, context.temp_allocator)
     res[0] = &self.mat_uniform
-    res[1] = &self.camera.mat_uniform
-    res[2] = &self.projection.mat_uniform
-    res[3] = &self.color_transform.mat_uniform
+    res[1] = &self.color_transform.mat_uniform
 
     tile_image_ : ^tile_image = auto_cast self
-    res[4] = &tile_image_.tile_uniform
+    res[2] = &tile_image_.tile_uniform
     return res[:]
 }
 
@@ -41,12 +39,12 @@ tile_image :: struct {
 }
 
 tile_image_init :: proc(self:^tile_image, $actualType:typeid, src:^tile_texture_array, pos:linalg.Point3DF, rotation:f32, scale:linalg.PointF = {1,1}, 
-camera:^engine.camera, projection:^engine.projection, colorTransform:^engine.color_transform = nil, pivot:linalg.PointF = {0, 0}, vtable:^engine.iobject_vtable = nil) where intrinsics.type_is_subtype_of(actualType, tile_image) {
+colorTransform:^engine.color_transform = nil, pivot:linalg.PointF = {0, 0}, vtable:^engine.iobject_vtable = nil) where intrinsics.type_is_subtype_of(actualType, tile_image) {
     self.src = src
 
-    self.set.bindings = descriptor_set_binding__tile_image_uniform_pool[:]
-    self.set.size = descriptor_pool_size__tile_image_uniform_pool[:]
-    self.set.layout = animate_tex_descriptor_set_layout //animate_tex_descriptor_set_layout 공용
+    self.set.bindings = engine.descriptor_set_binding__animate_img_uniform_pool[:]
+    self.set.size = engine.descriptor_pool_size__animate_img_uniform_pool[:]
+    self.set.layout = engine.get_animate_img_descriptor_set_layout() //animate_img_descriptor_set_layout 공용
 
     self.vtable = vtable == nil ? &tile_image_vtable : vtable
     if self.vtable.draw == nil do self.vtable.draw = auto_cast _super_tile_image_draw
@@ -61,16 +59,16 @@ camera:^engine.camera, projection:^engine.projection, colorTransform:^engine.col
         resource_usage = .CPU,
     }, mem.ptr_to_bytes(&self.tile_idx), true)
 
-    iobject_init(self, actualType, pos, rotation, scale, camera, projection, colorTransform, pivot)
+    iobject_init(self, actualType, pos, rotation, scale, colorTransform, pivot)
 }
 
 tile_image_init2 :: proc(self:^tile_image, $actualType:typeid, src:^tile_texture_array,
-camera:^engine.camera, projection:^engine.projection, colorTransform:^engine.color_transform = nil, vtable:^engine.iobject_vtable = nil) where intrinsics.type_is_subtype_of(actualType, tile_image) {
+colorTransform:^engine.color_transform = nil, vtable:^engine.iobject_vtable = nil) where intrinsics.type_is_subtype_of(actualType, tile_image) {
     self.src = src
 
-    self.set.bindings = descriptor_set_binding__tile_image_uniform_pool[:]
-    self.set.size = descriptor_pool_size__tile_image_uniform_pool[:]
-    self.set.layout = animate_tex_descriptor_set_layout
+    self.set.bindings = engine.descriptor_set_binding__animate_img_uniform_pool[:]
+    self.set.size = engine.descriptor_pool_size__animate_img_uniform_pool[:]
+    self.set.layout = engine.get_animate_img_descriptor_set_layout()
 
     self.vtable = vtable == nil ? &tile_image_vtable : vtable
     if self.vtable.draw == nil do self.vtable.draw = auto_cast _super_tile_image_draw
@@ -78,7 +76,7 @@ camera:^engine.camera, projection:^engine.projection, colorTransform:^engine.col
 
     if self.vtable.get_uniform_resources == nil do self.vtable.get_uniform_resources = auto_cast get_uniform_resources_tile_image
 
-    iobject_init2(self, actualType, camera, projection, colorTransform)
+    iobject_init2(self, actualType, colorTransform)
 }
 
 _super_tile_image_deinit :: proc(self:^tile_image) {
@@ -120,39 +118,38 @@ tile_image_update_tile_texture_array :: #force_inline proc "contextless" (self:^
 tile_image_change_color_transform :: #force_inline proc(self:^tile_image, colorTransform:^engine.color_transform) {
     engine.iobject_change_color_transform(self, colorTransform)
 }
-tile_image_update_camera :: #force_inline proc(self:^tile_image, camera:^engine.camera) {
-    engine.iobject_update_camera(self, camera)
-}
+// tile_image_update_camera :: #force_inline proc(self:^tile_image, camera:^engine.camera) {
+//     engine.iobject_update_camera(self, camera)
+// }
+// tile_image_update_projection :: #force_inline proc(self:^tile_image, projection:^engine.projection) {
+//     engine.iobject_update_projection(self, projection)
+// }
 
-tile_image_update_projection :: #force_inline proc(self:^tile_image, projection:^engine.projection) {
-    engine.iobject_update_projection(self, projection)
-}
+// /*
+// Gets the camera of the tile image
 
-/*
-Gets the camera of the tile image
+// Inputs:
+// - self: Pointer to the tile image
 
-Inputs:
-- self: Pointer to the tile image
+// Returns:
+// - Pointer to the camera
+// */
+// tile_image_get_camera :: proc "contextless" (self:^tile_image) -> ^engine.camera {
+//     return engine.iobject_get_camera(self)
+// }
 
-Returns:
-- Pointer to the camera
-*/
-tile_image_get_camera :: proc "contextless" (self:^tile_image) -> ^engine.camera {
-    return engine.iobject_get_camera(self)
-}
+// /*
+// Gets the projection of the tile image
 
-/*
-Gets the projection of the tile image
+// Inputs:
+// - self: Pointer to the tile image
 
-Inputs:
-- self: Pointer to the tile image
-
-Returns:
-- Pointer to the projection
-*/
-tile_image_get_projection :: proc "contextless" (self:^tile_image) -> ^engine.projection {
-    return engine.iobject_get_projection(self)
-}
+// Returns:
+// - Pointer to the projection
+// */
+// tile_image_get_projection :: proc "contextless" (self:^tile_image) -> ^engine.projection {
+//     return engine.iobject_get_projection(self)
+// }
 
 /*
 Gets the color transform of the tile image
@@ -192,13 +189,13 @@ tile_image_update_idx :: proc(self:^tile_image, idx:u32) {
     engine.buffer_resource_copy_update(&self.tile_uniform, &self.tile_idx)
 }
 
-_super_tile_image_draw :: proc (self:^tile_image, cmd:engine.command_buffer) {
+_super_tile_image_draw :: proc (self:^tile_image, cmd:engine.command_buffer, viewport:^engine.viewport) {
     mem.ICheckInit_Check(&self.check_init)
     mem.ICheckInit_Check(&self.src.check_init)
 
-    engine.graphics_cmd_bind_pipeline(cmd, .GRAPHICS, engine.get_animate_tex_pipeline())
-    engine.graphics_cmd_bind_descriptor_sets(cmd, .GRAPHICS, engine.get_animate_tex_pipeline_layout(), 0, 2,
-        &([]vk.DescriptorSet{self.set.__set, self.src.set.__set})[0], 0, nil)
+    engine.graphics_cmd_bind_pipeline(cmd, .GRAPHICS, engine.get_animate_img_pipeline())
+    engine.graphics_cmd_bind_descriptor_sets(cmd, .GRAPHICS, engine.get_animate_img_pipeline_layout(), 0, 3,
+        &([]vk.DescriptorSet{self.set.__set,  viewport.set.__set, self.src.set.__set,})[0], 0, nil)
 
     engine.graphics_cmd_draw(cmd, 6, 1, 0, 0)
 }
@@ -226,7 +223,7 @@ inPixelFmt:img.color_fmt = .RGBA) {
     self.sampler = sampler == 0 ? engine.get_linear_sampler() : sampler
     self.set.bindings = engine.descriptor_set_binding__single_pool[:]
     self.set.size = engine.descriptor_pool_size__single_sampler_pool[:]
-    self.set.layout = engine.get_tex_descriptor_set_layout2()
+    self.set.layout = engine.get_tex_descriptor_set_layout()
     self.set.__set = 0
     bit :: 4//outBit count default 4
     allocPixels := mem.make_non_zeroed_slice([]byte, count * tile_width * tile_height * bit, engine.def_allocator())

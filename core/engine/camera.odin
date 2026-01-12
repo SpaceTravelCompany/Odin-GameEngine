@@ -124,3 +124,13 @@ camera_deinit :: proc(self:^camera) {
     clone_mat_uniform^ = self.mat_uniform
     buffer_resource_deinit(clone_mat_uniform)
 }
+
+/*
+Returns a pointer to the default camera
+
+Returns:
+- Pointer to the default camera
+*/
+def_camera :: proc() -> ^camera {
+    return &__g_default_camera
+}

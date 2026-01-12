@@ -53,6 +53,7 @@ Inputs:
 Returns:
 - None
 */
+import "core:fmt"
 projection_init_matrix_ortho_window :: proc (self:^projection, width:f32, height:f32, near:f32 = 0.1, far:f32 = 100, flip_z_axis_for_vulkan := true) {
     __projection_update_ortho_window(self, width, height, near, far, flip_z_axis_for_vulkan)
     __projection_init(self)
@@ -252,4 +253,14 @@ projection_deinit :: proc(self:^projection) {
     clone_mat_uniform := new(buffer_resource, __temp_arena_allocator)
     clone_mat_uniform^ = self.mat_uniform
     buffer_resource_deinit(clone_mat_uniform)
+}
+
+/*
+Returns a pointer to the default projection
+
+Returns:
+- Pointer to the default projection
+*/
+def_projection :: proc() -> ^projection {
+    return &__g_default_projection
 }
