@@ -1219,7 +1219,7 @@ vk_recreate_swap_chain :: proc() {
 	sync.mutex_unlock(&full_screen_mtx)
 
 	render_cmd_refresh_all()
-
+	render_cmd_size_all()
 	size()
 	if __g_main_render_cmd_idx >= 0 {
 		for obj in __g_render_cmd[__g_main_render_cmd_idx].scene {

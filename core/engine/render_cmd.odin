@@ -357,3 +357,19 @@ render_cmd_refresh_all :: proc "contextless" () {
 	non_zero_append(&__g_viewports, &__g_default_viewport)
 }
 
+/*
+size update all render commands' projection (only ortho windowprojection)
+
+Inputs:
+- None
+
+Returns:
+- None
+*/
+render_cmd_size_all :: proc () {
+	sync.mutex_lock(&__g_render_cmd_mtx)
+	defer sync.mutex_unlock(&__g_render_cmd_mtx)
+	for cmd in __g_viewports {
+		projection_size(cmd.projection)
+	}
+}

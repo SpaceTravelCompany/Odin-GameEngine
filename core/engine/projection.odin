@@ -7,6 +7,7 @@ import "core:math/linalg"
 import "core:mem"
 import "core:slice"
 import "core:sync"
+import "core:debug/trace"
 import vk "vendor:vulkan"
 
 /*
@@ -16,6 +17,28 @@ Contains the projection matrix and uniform buffer for rendering
 */
 projection :: struct {
     using _: __matrix_in,
+	ortho_canvas_width: f32,//canvas width for ortho projection (if 0, not set; if set, projection_update_ortho_window is called when window size changes)
+	ortho_canvas_height: f32,//canvas height for ortho projection
+}
+
+/*
+projection size update (automatically called when window size changes)
+
+Inputs:
+- self: Pointer to the projection to update
+
+Returns:
+- None
+*/
+projection_size :: proc(self:^projection) {
+    if self.ortho_canvas_width > 0 && self.ortho_canvas_height > 0 {
+        projection_update_ortho_window(self, self.ortho_canvas_width, self.ortho_canvas_height)
+    }
+	when ODIN_DEBUG {
+		if self.ortho_canvas_width < 0.0 || self.ortho_canvas_height < 0.0 {
+			trace.panic_log("projection_size: ortho_canvas_width and ortho_canvas_height (both must be greater than or equal to 0)")
+		}
+	}
 }
 
 /*
@@ -53,7 +76,6 @@ Inputs:
 Returns:
 - None
 */
-import "core:fmt"
 projection_init_matrix_ortho_window :: proc (self:^projection, width:f32, height:f32, near:f32 = 0.1, far:f32 = 100, flip_z_axis_for_vulkan := true) {
     __projection_update_ortho_window(self, width, height, near, far, flip_z_axis_for_vulkan)
     __projection_init(self)
@@ -179,11 +201,16 @@ projection_update_matrix_raw :: proc(self:^projection, _mat:linalg.Matrix) {
 
 @private __projection_update_ortho :: #force_inline proc(self:^projection, left:f32, right:f32, bottom:f32, top:f32, near:f32 = 0.1, far:f32 = 100, flip_z_axis_for_vulkan := true) {
     self.mat = linalg.matrix_ortho3d_f32(left, right, bottom, top, near, far, flip_z_axis_for_vulkan)
+	self.ortho_canvas_width = 0.0
+	self.ortho_canvas_height = 0.0
 }
 
 @private __projection_update_ortho_window :: #force_inline proc(self:^projection, width:f32, height:f32, near:f32 = 0.1, far:f32 = 100, flip_axis_for_vulkan := true) {
     window_width_f := f32(__window_width.?)
     window_height_f := f32(__window_height.?)
+	self.ortho_canvas_width = width
+	self.ortho_canvas_height = height
+
     ratio := window_width_f / window_height_f > width / height ? height / window_height_f : width / window_width_f
 
     window_width_f *= ratio
@@ -218,6 +245,8 @@ projection_update_matrix_raw :: proc(self:^projection, _mat:linalg.Matrix) {
     if flip_axis_for_vulkan {
         self.mat[1,1] = -self.mat[1,1]
     }
+	self.ortho_canvas_width = 0.0
+	self.ortho_canvas_height = 0.0
 }
 
 //? uniform object is all small, so use_gcpu_mem is true by default

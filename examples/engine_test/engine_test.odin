@@ -36,10 +36,16 @@ bgSnd : ^sound.sound
 
 bgSndFileData:[]u8
 
+GUI_Image_Vtable: engine.iobject_vtable = {
+    size = auto_cast GUI_Image_Size,
+}
 GUI_Image_Init :: proc(self:^GUI_Image, src:^engine.texture,
 colorTransform:^engine.color_transform = nil) {
-    engine.image_init2(auto_cast self, GUI_Image, src, colorTransform)
+    engine.image_init2(auto_cast self, GUI_Image, src, colorTransform,&GUI_Image_Vtable)
+    gui.gui_component_size(self, &self.com)
+}
 
+GUI_Image_Size :: proc(self:^GUI_Image) {
     gui.gui_component_size(self, &self.com)
 }
 
@@ -219,9 +225,9 @@ Update ::proc() {
 Size :: proc() {
     engine.projection_update_ortho_window(engine.def_projection(), CANVAS_W, CANVAS_H)
     
-    gui_img := (^GUI_Image)(engine.render_cmd_get_object(renderCmd, 1))
+    // gui_img := (^GUI_Image)(engine.render_cmd_get_object(renderCmd, 1))
 
-    gui.gui_component_size(gui_img, &gui_img.com)
+    // gui.gui_component_size(gui_img, &gui_img.com)
 }
 Destroy ::proc() {
     shape.shape_src_deinit(&shapeSrc)
