@@ -1531,17 +1531,18 @@ vk_op_execute :: proc(wait_and_destroy: bool) {
 	sync.atomic_mutex_unlock(&gQueueMtx)
 
 	clear(&opMapQueue)
-	for &node in opSaveQueue {
-		#partial switch n in node {
-			case OpDestroyBuffer:
-				executeDestroyBuffer(n.src)
-			case OpDestroyTexture:
-				executeDestroyTexture(n.src)
-			case:
-				continue
-		}
-		node = nil
-	}
+	//!여기 없애면 작동하는데 왜 적었는지 모르겠음 조사 필요. 확인 필요!
+	// for &node in opSaveQueue {
+	// 	#partial switch n in node {
+	// 		case OpDestroyBuffer:
+	// 			executeDestroyBuffer(n.src)
+	// 		case OpDestroyTexture:
+	// 			executeDestroyTexture(n.src)
+	// 		case:
+	// 			continue
+	// 	}
+	// 	node = nil
+	// }
 
 	for &node in opSaveQueue {
 		#partial switch n in node {
