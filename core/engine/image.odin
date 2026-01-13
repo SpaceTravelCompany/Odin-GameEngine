@@ -447,10 +447,8 @@ Returns:
 */
 texture_deinit :: #force_inline proc(self:^texture) {
     mem.ICheckInit_Deinit(&self.check_init)
-    clone_texture := new(texture_resource, temp_arena_allocator())
-    clone_texture^ = self.texture
-    self.texture.data = {}
-    buffer_resource_deinit(clone_texture)
+    buffer_resource_deinit(&self.texture)
+	self.texture.data = {}
 }
 
 /*
@@ -580,10 +578,8 @@ Returns:
 */
 texture_array_deinit :: #force_inline proc(self:^texture_array) {
     mem.ICheckInit_Deinit(&self.check_init)
-    clone_texture := new(texture_resource, temp_arena_allocator())
-    clone_texture^ = self.texture
-    self.texture.data = {}
-    buffer_resource_deinit(clone_texture)
+    buffer_resource_deinit(&self.texture)
+	self.texture.data = {}
 }
 /*
 Gets the width of textures in the texture array

@@ -1358,7 +1358,6 @@ vk_draw_frame :: proc() {
 
 		sync.mutex_unlock(&__g_render_cmd_mtx)
 	}
-
 	presentInfo := vk.PresentInfoKHR {
 		sType = vk.StructureType.PRESENT_INFO_KHR,
 		waitSemaphoreCount = 1,

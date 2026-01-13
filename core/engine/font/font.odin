@@ -562,6 +562,8 @@ Returns:
 - An error if rendering failed
 */
 font_render_string :: proc(self:^font, _str:string, _renderOpt:font_render_opt, allocator := context.allocator) -> (res:^geometry.raw_shape, err:geometry.shape_error = nil) {
+	if self == nil do trace.panic_log("font_render_string: font is nil")
+
     vertList := make([dynamic]geometry.shape_vertex2d, allocator)
     indList := make([dynamic]u32, allocator)
 

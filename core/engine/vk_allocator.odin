@@ -633,6 +633,9 @@ where T == vk.Buffer || T == vk.Image {
 }
 
 @(private = "file") AppendOp :: proc(node: OpNode) {
+	sync.atomic_mutex_lock(&gQueueMtx)
+	defer sync.atomic_mutex_unlock(&gQueueMtx)
+
 	if exiting() {
 		#partial switch n in node {
 		case OpMapCopy:
@@ -660,10 +663,8 @@ where T == vk.Buffer || T == vk.Image {
 	} else {
 		_Handle :: #force_inline proc(n: $T, allocator : Maybe(runtime.Allocator)) -> bool {
 			if allocator != nil {
-				sync.atomic_mutex_lock(&gQueueMtx)
 				non_zero_append(&opQueue, n)
 				non_zero_append(&opAllocQueue, n)
-				sync.atomic_mutex_unlock(&gQueueMtx)
 				return true
 			}
 			return false
@@ -680,9 +681,35 @@ where T == vk.Buffer || T == vk.Image {
 			if _Handle(n, n.src.data.allocator ) do return
 		}
 	}
-	sync.atomic_mutex_lock(&gQueueMtx)
+	#partial switch &n in node {
+		case OpDestroyBuffer:
+			if n.src.data.is_creating_modifing {
+				n.src.data.is_creating_modifing = false
+				if n.src.data.allocator != nil && n.src.data.data != nil {
+					delete(n.src.data.data, n.src.data.allocator.?)
+					n.src.data.data = nil
+					n.src.data.allocator = nil
+				}
+				return
+			}
+			tmp := n.src
+			n.src = new(buffer_resource, temp_arena_allocator())
+			n.src^ = tmp^
+		case OpDestroyTexture:
+			if n.src.data.is_creating_modifing {
+				n.src.data.is_creating_modifing = false
+				if n.src.data.allocator != nil && n.src.data.data != nil {
+					delete(n.src.data.data, n.src.data.allocator.?)
+					n.src.data.data = nil
+					n.src.data.allocator = nil
+				}
+				return
+			}
+			tmp := n.src
+			n.src = new(texture_resource, temp_arena_allocator())
+			n.src^ = tmp^
+	}
 	non_zero_append(&opQueue, node)
-	sync.atomic_mutex_unlock(&gQueueMtx)
 }
 
 @(private = "file") append_op_save :: proc(node: OpNode) {
@@ -755,6 +782,7 @@ vkbuffer_resource_create_texture :: proc(
 	option: buffer_create_option,
 ) {
 	self.option = option
+	self.data.is_creating_modifing = true
 	executeCreateBuffer(self)
 }
 
@@ -956,6 +984,8 @@ vkbuffer_resource_deinit :: proc(self: ^$T) where T == buffer_resource || T == t
 @(private = "file") executeCreateBuffer :: proc(
 	self: ^buffer_resource,
 ) {
+	if !self.data.is_creating_modifing do return
+
 	if self.option.type == .__STAGING {
 		self.option.resource_usage = .CPU
 		self.option.single = false
@@ -1027,6 +1057,8 @@ vkbuffer_resource_deinit :: proc(self: ^$T) where T == buffer_resource || T == t
 @(private = "file") executeCreateTexture :: proc(
 	self: ^texture_resource,
 ) {
+	if !self.data.is_creating_modifing do return
+	
 	memProp : vk.MemoryPropertyFlags;
 	switch self.option.resource_usage {
 		case .GPU:memProp = {.DEVICE_LOCAL}

@@ -398,10 +398,8 @@ __vertex_buf_init :: proc (self:^__vertex_buf($NodeType), array:[]NodeType, _fla
 __vertex_buf_deinit :: proc (self:^__vertex_buf($NodeType)) {
     mem.ICheckInit_Deinit(&self.check_init)
 
-    clone_buf := new(buffer_resource, temp_arena_allocator())
-    clone_buf^ = self.buf
+    buffer_resource_deinit(&self.buf)
 	self.buf.data = {}
-    buffer_resource_deinit(clone_buf)
 }
 
 __vertex_buf_update :: proc (self:^__vertex_buf($NodeType), array:[]NodeType, allocator :Maybe(runtime.Allocator) = nil) {
@@ -423,10 +421,8 @@ __storage_buf_init :: proc (self:^__storage_buf($NodeType), array:[]NodeType, _f
 __storage_buf_deinit :: proc (self:^__storage_buf($NodeType)) {
     mem.ICheckInit_Deinit(&self.check_init)
 
-    clone_buf := new(buffer_resource, temp_arena_allocator())
-    clone_buf^ = self.buf
+    buffer_resource_deinit(&self.buf)
 	self.buf.data = {}
-    buffer_resource_deinit(clone_buf)
 }
 
 __storage_buf_update :: proc (self:^__storage_buf($NodeType), array:[]NodeType) {
@@ -448,10 +444,8 @@ __index_buf_init :: proc (self:^__index_buf, array:[]u32, _flag:resource_usage, 
 __index_buf_deinit :: proc (self:^__index_buf) {
     mem.ICheckInit_Deinit(&self.check_init)
 
-    clone_buf := new(buffer_resource, temp_arena_allocator())
-    clone_buf^ = self.buf
+    buffer_resource_deinit(&self.buf)
 	self.buf.data = {}
-    buffer_resource_deinit(clone_buf)
 }
 
 __index_buf_update :: #force_inline proc (self:^__index_buf, array:[]u32, allocator :Maybe(runtime.Allocator) = nil) {

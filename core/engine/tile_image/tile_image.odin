@@ -272,10 +272,8 @@ Returns:
 */
 tile_texture_array_deinit :: #force_inline proc(self:^tile_texture_array) {
     mem.ICheckInit_Deinit(&self.check_init)
-    clone_texture := new(engine.texture_resource, engine.temp_arena_allocator())
-    clone_texture^ = self.texture
-    self.texture.data = {}
-    engine.buffer_resource_deinit(clone_texture)
+    engine.buffer_resource_deinit(&self.texture)
+	self.texture.data = {}
 }
 /*
 Gets the width of tiles in the tile texture array
