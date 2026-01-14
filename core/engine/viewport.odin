@@ -42,3 +42,8 @@ viewport_init_update :: proc (self:^viewport) {
 	self.set.__resources[1] = &self.projection.mat_uniform
 	update_descriptor_sets(mem.slice_ptr(&self.set, 1))
 }
+
+
+def_viewport :: proc() -> ^viewport {
+	return &__g_default_viewport
+}

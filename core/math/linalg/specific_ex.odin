@@ -58,13 +58,47 @@ Rect_GetFromCenter :: #force_inline proc "contextless" (_pos: [2]$T, _size: [2]T
 	res.size = _size
 	return res
 }
-//TODO (xfitgd)
 Rect_MulMatrix :: proc (_r: RectF, _mat: Matrix) -> RectF #no_bounds_check {
-	panic("")
+	// Transform 4 corners, then rebuild AABB.
+	x0 := _r.pos.x
+	y0 := _r.pos.y
+	x1 := _r.pos.x + _r.size.x
+	y1 := _r.pos.y + _r.size.y
+
+	p0 := Vector4f32{x0, y0, 0, 1}
+	p1 := Vector4f32{x1, y0, 0, 1}
+	p2 := Vector4f32{x0, y1, 0, 1}
+	p3 := Vector4f32{x1, y1, 0, 1}
+
+	t0 := mul(_mat, p0)
+	t1 := mul(_mat, p1)
+	t2 := mul(_mat, p2)
+	t3 := mul(_mat, p3)
+
+	// Homogeneous divide if needed (safe for ortho/TRS where w == 1).
+	tx0, ty0 := t0.x, t0.y
+	tx1, ty1 := t1.x, t1.y
+	tx2, ty2 := t2.x, t2.y
+	tx3, ty3 := t3.x, t3.y
+
+	if t0.w != 0 { tx0 /= t0.w; ty0 /= t0.w }
+	if t1.w != 0 { tx1 /= t1.w; ty1 /= t1.w }
+	if t2.w != 0 { tx2 /= t2.w; ty2 /= t2.w }
+	if t3.w != 0 { tx3 /= t3.w; ty3 /= t3.w }
+
+	min_x := min(min(tx0, tx1), min(tx2, tx3))//제일 작은거
+	max_x := max(max(tx0, tx1), max(tx2, tx3))//제일 큰거
+	min_y := min(min(ty0, ty1), min(ty2, ty3))
+	max_y := max(max(ty0, ty1), max(ty2, ty3))
+
+	return RectF{
+		pos  = [2]f32{min_x, min_y},
+		size = [2]f32{max_x - min_x, max_y - min_y},
+	}
 }
-//TODO (xfitgd)
 Rect_DivMatrix :: proc (_r: RectF, _mat: Matrix) -> RectF #no_bounds_check {
-	panic("")
+	// Apply inverse transform (Rect / M == Rect * inverse(M))
+	return Rect_MulMatrix(_r, inverse(_mat))
 }
 Rect_Right :: #force_inline proc "contextless" (_r: Rect_($T)) -> T {
 	return _r.pos.x + _r.size.x
