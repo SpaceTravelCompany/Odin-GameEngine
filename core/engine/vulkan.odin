@@ -409,7 +409,7 @@ init_swap_chain :: proc() {
 	for f in vk_fmts {
 		if f.format == .R8G8B8A8_UNORM || f.format == .B8G8R8A8_UNORM {
 			when is_log {
-				fmt.println("XFIT SYSLOG : vulkan swapchain format : %s, colorspace : %s\n", f.format, f.colorSpace)
+				fmt.printfln("XFIT SYSLOG : vulkan swapchain format : %s, colorspace : %ss", f.format, f.colorSpace)
 			}
 			vk_fmt = f
 			break;
@@ -446,16 +446,16 @@ init_swap_chain :: proc() {
 	vkColorHasTransferDstOptimal = .TRANSFER_DST in colorProp.optimalTilingFeatures
 
 	when is_log {
-		fmt.println("XFIT SYSLOG : depth format : %s", depth_fmt)
+		fmt.printfln("XFIT SYSLOG : depth format : %s", depth_fmt)
 		fmt.println("XFIT SYSLOG : optimal format supports")
-		fmt.println("vkDepthHasOptimal : %t", vkDepthHasOptimal)
-		fmt.println("vkDepthHasTransferSrcOptimal : %t", vkDepthHasTransferSrcOptimal)
-		fmt.println("vkDepthHasTransferDstOptimal : %t", vkDepthHasTransferDstOptimal)
-		fmt.println("vkDepthHasSampleOptimal : %t", vkDepthHasSampleOptimal)
-		fmt.println("vkColorHasAttachOptimal : %t", vkColorHasAttachOptimal)
-		fmt.println("vkColorHasSampleOptimal : %t", vkColorHasSampleOptimal)
-		fmt.println("vkColorHasTransferSrcOptimal : %t", vkColorHasTransferSrcOptimal)
-		fmt.println("vkColorHasTransferDstOptimal : %t", vkColorHasTransferDstOptimal)
+		fmt.printfln("vkDepthHasOptimal : %t", vkDepthHasOptimal)
+		fmt.printfln("vkDepthHasTransferSrcOptimal : %t", vkDepthHasTransferSrcOptimal)
+		fmt.printfln("vkDepthHasTransferDstOptimal : %t", vkDepthHasTransferDstOptimal)
+		fmt.printfln("vkDepthHasSampleOptimal : %t", vkDepthHasSampleOptimal)
+		fmt.printfln("vkColorHasAttachOptimal : %t", vkColorHasAttachOptimal)
+		fmt.printfln("vkColorHasSampleOptimal : %t", vkColorHasSampleOptimal)
+		fmt.printfln("vkColorHasTransferSrcOptimal : %t", vkColorHasTransferSrcOptimal)
+		fmt.printfln("vkColorHasTransferDstOptimal : %t", vkColorHasTransferDstOptimal)
 	}
 }
 
