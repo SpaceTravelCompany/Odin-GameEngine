@@ -1613,9 +1613,12 @@ vk_record_command_buffer :: proc(cmd:^__render_cmd, frame:int) {
 			if first || prev_area != viewport.viewport_area {
 				scissor :vk.Rect2D
 				if viewport.viewport_area != nil {
+					if viewport.viewport_area.?.top <= viewport.viewport_area.?.bottom {
+						trace.panic_log("viewport.viewport_area.?.top <= viewport.viewport_area.?.bottom")
+					}
 					scissor = {
-						offset = {x = i32(viewport.viewport_area.?.pos[0]), y = i32(viewport.viewport_area.?.pos[1])},
-						extent = {width = u32(viewport.viewport_area.?.size[0]), height = u32(viewport.viewport_area.?.size[1])},
+						offset = {x = i32(viewport.viewport_area.?.left), y = i32(viewport.viewport_area.?.top)},
+						extent = {width = u32(viewport.viewport_area.?.right - viewport.viewport_area.?.left), height = u32(viewport.viewport_area.?.top - viewport.viewport_area.?.bottom)},
 					}
 				} else {
 					scissor = {

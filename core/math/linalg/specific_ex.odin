@@ -19,51 +19,69 @@ Matrix :: Matrix4x4f32
 
 
 Rect_ :: struct($T: typeid) where intrinsics.type_is_numeric(T) {
-	pos:  [2]T,
-	size: [2]T,
+	left: T,
+	right: T,
+	top: T,
+	bottom: T,
 }
 
+// Rect_Init2 :: #force_inline proc "contextless"(x: $T, y: T, width: T, height: T) -> Rect_(T) {
+// }
 
-__Rect_Init :: #force_inline proc "contextless"(pos: [2]$T, size: [2]T) -> Rect_(T) {
+Rect_Init :: #force_inline proc "contextless"(left: $T, right: T, top: T, bottom: T) -> Rect_(T) {
 	res: Rect_(T)
-	res.pos = pos
-	res.size = size
+	res.left = left
+	res.right = right
+	res.top = top
+	res.bottom = bottom
 	return res
-}
-
-__Rect_Init2 :: #force_inline proc "contextless"(x: $T, y: T, width: T, height: T) -> Rect_(T) {
-	res: Rect_(T)
-	res.pos = [2]T{x, y}
-	res.size = [2]T{width, height}
-	return res
-}
-
-Rect_Init_LTRB :: #force_inline proc "contextless"(left: $T, right: T, top: T, bottom: T) -> Rect_(T) {
-	res: Rect_(T)
-	res.pos = [2]T{left, top}
-	res.size = [2]T{right - left, top - bottom}
-	return res
-}
-
-
-Rect_Init :: proc {
-	__Rect_Init,
-	__Rect_Init2,
 }
 
 //returns a rect whose centre point is the position
-Rect_GetFromCenter :: #force_inline proc "contextless" (_pos: [2]$T, _size: [2]T) -> Rect_(T)  {
-	res: Rect_(T)
-	res.pos = _pos - _size / 2
-	res.size = _size
-	return res
+// Rect_GetFromCenter :: #force_inline proc "contextless" (_pos: [2]$T, _size: [2]T) -> Rect_(T)  {
+// 	res: Rect_(T)
+// 	res.pos = _pos - _size / 2
+// 	res.size = _size
+// 	return res
+// }
+
+Check_Rect :: #force_inline proc "contextless" (_pts:[4][$N]f32) -> bool where N >= 2 {
+	return !(_pts[0].y != _pts[1].y || _pts[2].y != _pts[3].y || _pts[0].x != _pts[2].x || _pts[1].x != _pts[3].x)
 }
-Rect_MulMatrix :: proc (_r: RectF, _mat: Matrix) -> RectF #no_bounds_check {
+
+/*
+Multiplies a rectangle by a matrix. FAILED IF RESULT POINTS IS NOT RECTANGLE.
+Inputs:
+- _r: Rectangle to multiply
+- _mat: Matrix to multiply
+
+Returns:
+- Rectangle multiplied by the matrix
+- bool: true if the result is a rectangle, false if the result is a polygon
+*/
+Rect_MulMatrix :: proc "contextless" (_r: RectF, _mat: Matrix) -> (RectF, bool) {
+	tps := __Rect_MulMatrix(_r, _mat)
+
+	if Check_Rect(tps) do return {}, false
+
+	return RectF{
+		left = tps[0].x,
+		right = tps[3].x,
+		top = tps[0].y,
+		bottom = tps[3].y,
+	}, true
+}
+Rect_DivMatrix :: proc "contextless" (_r: RectF, _mat: Matrix) -> (RectF, bool) {
+	// Apply inverse transform (Rect / M == Rect * inverse(M))
+	return Rect_MulMatrix(_r, inverse(_mat))
+}
+
+@private __Rect_MulMatrix :: proc "contextless" (_r: RectF, _mat: Matrix) -> [4]Vector4f32 {
 	// Transform 4 corners, then rebuild AABB.
-	x0 := _r.pos.x
-	y0 := _r.pos.y
-	x1 := _r.pos.x + _r.size.x
-	y1 := _r.pos.y + _r.size.y
+	x0 := _r.left
+	y0 := _r.top
+	x1 := _r.right
+	y1 := _r.bottom
 
 	p0 := Vector4f32{x0, y0, 0, 1}
 	p1 := Vector4f32{x1, y0, 0, 1}
@@ -86,65 +104,130 @@ Rect_MulMatrix :: proc (_r: RectF, _mat: Matrix) -> RectF #no_bounds_check {
 	if t2.w != 0 { tx2 /= t2.w; ty2 /= t2.w }
 	if t3.w != 0 { tx3 /= t3.w; ty3 /= t3.w }
 
-	min_x := min(min(tx0, tx1), min(tx2, tx3))//제일 작은거
-	max_x := max(max(tx0, tx1), max(tx2, tx3))//제일 큰거
-	min_y := min(min(ty0, ty1), min(ty2, ty3))
-	max_y := max(max(ty0, ty1), max(ty2, ty3))
+	return [4]Vector4f32{t0, t1, t2, t3}
+}
 
-	return RectF{
-		pos  = [2]f32{min_x, min_y},
-		size = [2]f32{max_x - min_x, max_y - min_y},
+/*
+Multiplies a rectangle or a polygon by a matrix.
+if input is a rectangle, and converted result is not a rectangle, it is converted to a polygon.
+if input is a polygon, return the polygon.
+if return value is the polygon, it is allocated using allocator.
+
+Inputs:
+- _a: AreaF(Rectangle or polygon) to multiply
+- _mat: Matrix to multiply
+- allocator: Allocator to use
+
+Returns:
+- AreaF multiplied by the matrix
+*/
+Area_MulMatrix :: proc (_a: AreaF, _mat: Matrix, allocator := context.allocator) -> AreaF {
+	switch &n in _a {
+	case RectF:
+		res := __Rect_MulMatrix(n, _mat)
+		if Check_Rect(res) {
+			min_x := min(res[0].x, res[3].x)
+			max_x := max(res[0].x, res[3].x)
+			min_y := min(res[0].y, res[3].y)
+			max_y := max(res[0].y, res[3].y)
+			return RectF{
+				left = min_x,
+				right = max_x,
+				top = max_y,
+				bottom = min_y,
+			}
+		}
+		res2 := mem.make_non_zeroed([][2]f32, 4, allocator)
+		res2[0] = res[0].xy
+		res2[1] = res[1].xy
+		res2[2] = res[3].xy
+		res2[3] = res[2].xy
+		return res2
+	case [][2]f32:
+		return __Poly_MulMatrix(n, _mat, allocator)
 	}
+	return {}
 }
-Rect_DivMatrix :: proc (_r: RectF, _mat: Matrix) -> RectF #no_bounds_check {
-	// Apply inverse transform (Rect / M == Rect * inverse(M))
-	return Rect_MulMatrix(_r, inverse(_mat))
+
+@private __Poly_MulMatrix :: proc (_p:[][$N]f32, _mat: Matrix, allocator := context.allocator) -> AreaF where N >= 2 {
+	res: [][2]f32 = mem.make_non_zeroed([][2]f32, len(_p), allocator)
+	for i in 0..<len(res) {
+		when N == 4 {
+			r := mul(_mat, _p[i])
+		} else when N == 2 {
+			r := mul(_mat, Vector4f32{_p[i].x, _p[i].y, 0.0, 1.0})
+		} else when N == 3 {
+			r := mul(_mat, Vector4f32{_p[i].x, _p[i].y, _p[i].z, 1.0})
+		} else {
+			#panic("not implemented")
+		}
+		if r.w != 0 { r.x /= r.w; r.y /= r.w }
+		res[i] = r.xy
+	}
+	return res
 }
-Rect_Right :: #force_inline proc "contextless" (_r: Rect_($T)) -> T {
-	return _r.pos.x + _r.size.x
-}
-Rect_Bottom :: #force_inline proc "contextless" (_r: Rect_($T)) -> T {
-	return _r.pos.y + _r.size.y
+Rect_LeftTop :: #force_inline proc "contextless" (_r: Rect_($T)) -> [2]T {
+	return [2]T{_r.left, _r.top}
 }
 Rect_RightBottom :: #force_inline proc "contextless" (_r: Rect_($T)) -> [2]T {
-	return _r.pos + _r.size
+	return [2]T{_r.right, _r.bottom}
 }
-Rect_And :: #force_inline proc "contextless" (_r1: Rect_($T), _r2: Rect_(T)) -> (Rect_(T), bool) #optional_ok #no_bounds_check {
+Rect_And :: #force_inline proc "contextless" (_r1: Rect_($T), _r2: Rect_(T)) -> Rect_(T) #no_bounds_check {
 	res: Rect_(T)
-	for _, i in res.pos {
-		res.pos[i] = max(_r1.pos[i], _r2.pos[i])
-		res.size[i] = min(Rect_RightBottom(_r1)[i], Rect_RightBottom(_r2)[i])
-		if res.size[i] <= res.pos[i] do return {}, false
-		else do res.size[i] -= res.pos[i]
+	res.left = max(_r1.left, _r2.left)
+	res.right = min(_r1.right, _r2.right)
+	if res.right < res.left do return {}
+
+	r1_top := max(_r1.top, _r1.bottom)
+	r1_bottom := min(_r1.top, _r1.bottom)
+	r2_top := max(_r2.top, _r2.bottom)
+	r2_bottom := min(_r2.top, _r2.bottom)
+
+	y_top := min(r1_top, r2_top)
+	y_bottom := max(r1_bottom, r2_bottom)
+
+	if _r1.top >= _r1.bottom {
+		res.top = y_top
+		res.bottom = y_bottom
+	} else {
+		res.top = y_bottom
+		res.bottom = y_top
 	}
-	return res, true
+	return res
 }
 Rect_Or :: #force_inline proc "contextless" (_r1: Rect_($T), _r2: Rect_(T)) -> Rect_(T) #no_bounds_check {
-	if _r1.size.x == 0 || _r1.size.y == 0 do return _r2
-	if _r2.size.x == 0 || _r2.size.y == 0 do return _r1
-
 	res: Rect_(T)
 
-	for _, i in res.pos {
-		res.pos[i] = min(_r1.pos[i], _r2.pos[i])
-		res.size[i] = max(Rect_RightBottom(_r1)[i], Rect_RightBottom(_r2)[i])
+	res.left = min(_r1.left, _r2.left)
+	res.right = max(_r1.right, _r2.right)
+
+	r1_top := max(_r1.top, _r1.bottom)
+	r1_bottom := min(_r1.top, _r1.bottom)
+	r2_top := max(_r2.top, _r2.bottom)
+	r2_bottom := min(_r2.top, _r2.bottom)
+
+	y_top := max(r1_top, r2_top)
+	y_bottom := min(r1_bottom, r2_bottom)
+
+	if _r1.top >= _r1.bottom {
+		res.top = y_top
+		res.bottom = y_bottom
+	} else {
+		res.top = y_bottom
+		res.bottom = y_top
 	}
 	return res
 }
 Rect_PointIn :: #force_inline proc "contextless" (_r: Rect_($T), p: [2]T) -> bool #no_bounds_check {
-	for _, i in _r.pos {
-		if _r.pos[i] > p[i] do return false
-		if Rect_RightBottom(_r)[i] < p[i] do return false
-	}
-	return true
+	return p.x >= _r.left && p.x <= _r.right && (_r.top > _r.bottom ? (p.y <= _r.top && p.y >= _r.bottom) : (p.y >= _r.top && p.y <= _r.bottom))
 }
 
 Rect_Move :: #force_inline proc "contextless" (_r: Rect_($T), p: [2]T) -> Rect_(T) #no_bounds_check {
 	res: Rect_(T)
-	for _, i in _r.pos {
-		res.pos[i] = _r.pos[i] + p[i]
-	}
-	res.size = _r.size
+	res.left = _r.left + p.x
+	res.top = _r.top + p.y
+	res.right = _r.right + p.x
+	res.bottom = _r.bottom + p.y
 	return res
 }
 

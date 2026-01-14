@@ -28,10 +28,10 @@ when !library.is_mobile {
 	glfw_start :: proc() {
 		when !is_console {
 			//?default screen idx 0
-			if __window_width == nil do __window_width = int(monitors[0].rect.size.x / 2)
-			if __window_height == nil do __window_height = int(monitors[0].rect.size.y / 2)
-			if __window_x == nil do __window_x = int(monitors[0].rect.pos.x + monitors[0].rect.size.x / 4)
-			if __window_y == nil do __window_y = int(monitors[0].rect.pos.y + monitors[0].rect.size.y / 4)
+			if __window_width == nil do __window_width = int((monitors[0].rect.right - monitors[0].rect.left) / 2)
+			if __window_height == nil do __window_height = int(abs(monitors[0].rect.bottom - monitors[0].rect.top) / 2)
+			if __window_x == nil do __window_x = int(monitors[0].rect.left + (monitors[0].rect.right - monitors[0].rect.left) / 4)
+			if __window_y == nil do __window_y = int(monitors[0].rect.top + abs(monitors[0].rect.bottom - monitors[0].rect.top) / 4)
 
 			save_prev_window()
 
@@ -40,17 +40,18 @@ when !library.is_mobile {
 				glfw.WindowHint (glfw.DECORATED, glfw.FALSE)
 				glfw.WindowHint(glfw.FLOATING, glfw.TRUE)
 
-				wnd = glfw.CreateWindow(monitors[__screen_idx].rect.size.x,
-					monitors[__screen_idx].rect.size.y,
+				wnd = glfw.CreateWindow(monitors[__screen_idx].rect.right - monitors[__screen_idx].rect.left,
+					abs(monitors[__screen_idx].rect.bottom - monitors[__screen_idx].rect.top),
 					__window_title,
 					nil,
 					nil)
 
-				glfw.SetWindowPos(wnd, monitors[__screen_idx].rect.pos.x, monitors[__screen_idx].rect.pos.y)
-				glfw.SetWindowSize(wnd, monitors[__screen_idx].rect.size.x, monitors[__screen_idx].rect.size.y)
+				glfw.SetWindowPos(wnd, monitors[__screen_idx].rect.left, monitors[__screen_idx].rect.top)
+				glfw.SetWindowSize(wnd, monitors[__screen_idx].rect.right - monitors[__screen_idx].rect.left,
+					 abs(monitors[__screen_idx].rect.bottom - monitors[__screen_idx].rect.top))
 			} else if __screen_mode == .Fullscreen {
-				wnd = glfw.CreateWindow(monitors[__screen_idx].rect.size.x,
-					monitors[__screen_idx].rect.size.y,
+				wnd = glfw.CreateWindow(monitors[__screen_idx].rect.right - monitors[__screen_idx].rect.left,
+					abs(monitors[__screen_idx].rect.bottom - monitors[__screen_idx].rect.top),
 					__window_title,
 					glfw_monitors[__screen_idx],
 					nil)
@@ -89,10 +90,10 @@ when !library.is_mobile {
 	glfw_set_full_screen_mode :: proc "contextless" (monitor:^monitor_info) {
 		for &m, i in monitors {
 			if raw_data(m.name) == raw_data(monitor.name) {
-				glfw.SetWindowMonitor(wnd, glfw_monitors[i], monitor.rect.pos.x,
-					monitor.rect.pos.y,
-					monitor.rect.size.x,
-					monitor.rect.size.y,
+				glfw.SetWindowMonitor(wnd, glfw_monitors[i], monitor.rect.left,
+					monitor.rect.top,
+					monitor.rect.right - monitor.rect.left,
+					abs(monitor.rect.bottom - monitor.rect.top),
 					glfw.DONT_CARE)
 				return
 			}
@@ -104,10 +105,10 @@ when !library.is_mobile {
 	}
 
 	glfw_set_borderless_screen_mode :: proc "contextless" (monitor:^monitor_info) {
-		glfw.SetWindowMonitor(wnd, nil, monitor.rect.pos.x,
-			monitor.rect.pos.y,
-		monitor.rect.size.x,
-		monitor.rect.size.y,
+		glfw.SetWindowMonitor(wnd, nil, monitor.rect.left,
+			monitor.rect.top,
+		monitor.rect.right - monitor.rect.left,
+		abs(monitor.rect.bottom - monitor.rect.top),
 		glfw.DONT_CARE)
 	}
 
@@ -131,7 +132,13 @@ when !library.is_mobile {
 	@(private="file") glfw_append_monitor :: proc(m:glfw.MonitorHandle) {
 		info:monitor_info
 		info.name = glfw.GetMonitorName(m)
-		info.rect.pos.x, info.rect.pos.y, info.rect.size.x, info.rect.size.y = glfw.GetMonitorWorkarea(m)
+		info.rect.left, info.rect.top, _, _ = glfw.GetMonitorWorkarea(m)
+		vid := glfw.GetVideoMode(m)
+
+		info.rect.right = vid.width
+		info.rect.bottom = vid.height
+		info.rect.right += info.rect.left
+		info.rect.bottom += info.rect.top
 		info.is_primary = m == glfw.GetPrimaryMonitor()
 
 		vid_mode :^glfw.VidMode = glfw.GetVideoMode(m)
@@ -142,10 +149,10 @@ when !library.is_mobile {
 				"XFIT SYSLOG : ADD %s monitor name: %s, x:%d, y:%d, size.x:%d, size.y:%d, refleshrate:%d\n",
 				"primary" if info.is_primary else "",
 				info.name,
-				info.rect.pos.x,
-				info.rect.pos.y,
-				info.rect.size.x,
-				info.rect.size.y,
+				info.rect.left,
+				info.rect.top,
+				info.rect.right - info.rect.left,
+				abs(info.rect.top - info.rect.bottom),
 				info.refresh_rate,
 			)
 		}
@@ -264,10 +271,10 @@ when !library.is_mobile {
 								"XFIT SYSLOG : DEL %s monitor name: %s, x:%d, y:%d, size.x:%d, size.y:%d, refleshrate%d\n",
 								"primary" if monitors[i].is_primary else "",
 								monitors[i].name,
-								monitors[i].rect.pos.x,
-								monitors[i].rect.pos.y,
-								monitors[i].rect.size.x,
-								monitors[i].rect.size.y,
+								monitors[i].rect.left,
+								monitors[i].rect.top,
+								monitors[i].rect.right - monitors[i].rect.left,
+								abs(monitors[i].rect.top - monitors[i].rect.bottom),
 								monitors[i].refresh_rate,
 							)
 						}
