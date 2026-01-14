@@ -460,3 +460,46 @@ __storage_buf :: struct($NodeType:typeid) {
     check_init: mem.ICheckInit,
 }
 
+/*
+Converts the area to window coordinate. window coordinate is top-left origin and bottom-right is (window_width(), window_height()).
+
+**Note**: if result area is [][2]f32, it allocates memory for the result area.
+
+Inputs:
+- self: Pointer to the object
+- area: Area to convert
+- viewport: The viewport to which `self` belongs. If nil, the default viewport will be used.
+
+Returns:
+- Area in window coordinates
+*/
+iobject_cvt_area_window_coord :: proc(self:^iobject, area:linalg.AreaF, viewport:^viewport, allocator:runtime.Allocator) -> linalg.AreaF {
+	viewport_ := viewport
+	if viewport_ == nil {
+		viewport_ = def_viewport()
+	}
+	area_ := linalg.Area_MulMatrix(area, self.mat, context.temp_allocator)
+	area_ = linalg.Area_MulMatrix(area_, viewport_.camera.mat, context.temp_allocator)
+	area_ = linalg.Area_MulMatrix(area_, viewport_.projection.mat, allocator)
+
+	switch &n in area_ {
+	case linalg.RectF:
+		n.left *= f32(window_width()) / 2.0
+		n.right *= f32(window_width()) / 2.0
+		n.top *= f32(window_height()) / 2.0
+		n.bottom *= f32(window_height()) / 2.0
+
+		n.left += f32(window_width()) / 2.0
+		n.right += f32(window_width()) / 2.0
+		n.top += f32(window_height()) / 2.0
+		n.bottom += f32(window_height()) / 2.0
+	case [][2]f32:
+		for i in 0..<len(n) {
+			n[i].x *= f32(window_width()) / 2.0
+			n[i].y *= f32(window_height()) / 2.0
+			n[i].x += f32(window_width()) / 2.0
+			n[i].y += f32(window_height()) / 2.0
+		}
+	}
+	return area_
+}
