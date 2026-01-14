@@ -1,8 +1,10 @@
 package component
 
+import "base:intrinsics"
 import "core:math/linalg"
 import "core:mem"
 import "core:engine"
+import "core:engine/shape"
 
 import vk "vendor:vulkan"
 
@@ -12,13 +14,13 @@ button_state :: enum {
 }
 
 image_button :: struct {
-    using _:__button,
+    using _:button,
     up_texture:^engine.texture,
     over_texture:^engine.texture,
     down_texture:^engine.texture,
 }
 
-_super_button_up :: proc (self:^__button, mousePos:linalg.PointF) {
+button_up :: proc (self:^button, mousePos:linalg.PointF) {
     if self.state == .DOWN {
         if linalg.Area_PointIn(self.area, mousePos) {
             self.state = .OVER
@@ -26,29 +28,29 @@ _super_button_up :: proc (self:^__button, mousePos:linalg.PointF) {
             self.state = .UP
         }
         //UPDATE
-        self.button_up_callback(self, mousePos)
+        if self.button_up_callback != nil do self.button_up_callback(self, mousePos)
     }
 }
-_super_button_down :: proc (self:^__button, mousePos:linalg.PointF) {
+button_down :: proc (self:^button, mousePos:linalg.PointF) {
     if self.state == .UP {
         if linalg.Area_PointIn(self.area, mousePos) {
             self.state = .DOWN
             //UPDATE
-            self.button_down_callback(self, mousePos)
+            if self.button_down_callback != nil do self.button_down_callback(self, mousePos)
         }    
     } else if self.state == .OVER {
         self.state = .DOWN
         //UPDATE
-        self.button_down_callback(self, mousePos)
+        if self.button_down_callback != nil do self.button_down_callback(self, mousePos)
     }
 }
-_super_button_move :: proc (self:^__button, mousePos:linalg.PointF) {
+button_move :: proc (self:^button, mousePos:linalg.PointF) {
     if linalg.Area_PointIn(self.area, mousePos) {
         if self.state == .UP {
             self.state = .OVER
             //UPDATE
         }
-        self.button_move_callback(self, mousePos)
+        if self.button_move_callback != nil do self.button_move_callback(self, mousePos)
     } else {
         if self.state != .UP {
             self.state = .UP
@@ -56,21 +58,21 @@ _super_button_move :: proc (self:^__button, mousePos:linalg.PointF) {
         }
     }
 }
-_super_button_touch_up :: proc (self:^__button, touchPos:linalg.PointF, touchIdx:u8) {
+button_touch_up :: proc (self:^button, touchPos:linalg.PointF, touchIdx:u8) {
     if self.state == .DOWN && self.touchIdx != nil && self.touchIdx.? == touchIdx {
         self.state = .UP
         self.touchIdx = nil
         //UPDATE
-        self.touch_up_callback(self, touchPos, touchIdx)
+        if self.touch_up_callback != nil do self.touch_up_callback(self, touchPos, touchIdx)
     }
 }
-_super_button_touch_down :: proc (self:^__button, touchPos:linalg.PointF, touchIdx:u8) {
+button_touch_down :: proc (self:^button, touchPos:linalg.PointF, touchIdx:u8) {
     if self.state == .UP {
         if linalg.Area_PointIn(self.area, touchPos) {
             self.state = .DOWN
             self.touchIdx = touchIdx
             //UPDATE
-            self.touch_down_callback(self, touchPos, touchIdx)
+            if self.touch_down_callback != nil do self.touch_down_callback(self, touchPos, touchIdx)
         }    
     } else if self.touchIdx != nil && self.touchIdx.? == touchIdx {
         self.state = .UP
@@ -78,13 +80,13 @@ _super_button_touch_down :: proc (self:^__button, touchPos:linalg.PointF, touchI
         //UPDATE
     }
 }
-_super_button_touch_move :: proc (self:^__button, touchPos:linalg.PointF, touchIdx:u8) {
+button_touch_move :: proc (self:^button, touchPos:linalg.PointF, touchIdx:u8) {
     if linalg.Area_PointIn(self.area, touchPos) {
         if self.touchIdx == nil && self.state == .UP {
             self.touchIdx = touchIdx
             self.state = .OVER
             //UPDATE
-            self.touch_move_callback(self, touchPos, touchIdx)
+            if self.touch_move_callback != nil do self.touch_move_callback(self, touchPos, touchIdx)
         }    
     } else if self.touchIdx != nil && self.touchIdx.? == touchIdx {
         self.touchIdx = nil
@@ -95,36 +97,44 @@ _super_button_touch_move :: proc (self:^__button, touchPos:linalg.PointF, touchI
     }
 }
 
-@private __button :: struct {
+button :: struct {
     using _:engine.iobject,
     area:linalg.AreaF,
     state : button_state,
     touchIdx:Maybe(u8),
-    button_up_callback: proc (self:^__button, mousePos:linalg.PointF),
-    button_down_callback: proc (self:^__button, mousePos:linalg.PointF),
-    button_move_callback: proc (self:^__button, mousePos:linalg.PointF),
-    touch_down_callback: proc (self:^__button, touchPos:linalg.PointF, touchIdx:u8),
-    touch_up_callback: proc (self:^__button, touchPos:linalg.PointF, touchIdx:u8),
-    touch_move_callback: proc (self:^__button, touchPos:linalg.PointF, touchIdx:u8),
+    button_up_callback: proc (self:^button, mousePos:linalg.PointF),
+    button_down_callback: proc (self:^button, mousePos:linalg.PointF),
+    button_move_callback: proc (self:^button, mousePos:linalg.PointF),
+    touch_down_callback: proc (self:^button, touchPos:linalg.PointF, touchIdx:u8),
+    touch_up_callback: proc (self:^button, touchPos:linalg.PointF, touchIdx:u8),
+    touch_move_callback: proc (self:^button, touchPos:linalg.PointF, touchIdx:u8),
 }
 
 shape_button :: struct {
-    using _:__button,
+    using _:button,
+    up_shape_src:^shape.shape_src,
+    over_shape_src:^shape.shape_src,
+    down_shape_src:^shape.shape_src,
 }
 
 button_vtable :: struct {
     using _: engine.iobject_vtable,
-    button_up: proc (self:^__button, mousePos:linalg.PointF),
-    button_down: proc (self:^__button, mousePos:linalg.PointF),
-    button_move: proc (self:^__button, mousePos:linalg.PointF),
-    touch_down: proc (self:^__button, touchPos:linalg.PointF, touchIdx:u8),
-    touch_up: proc (self:^__button, touchPos:linalg.PointF, touchIdx:u8),
-    touch_move: proc (self:^__button, touchPos:linalg.PointF, touchIdx:u8),
+    button_up: proc (self:^button, mousePos:linalg.PointF),
+    button_down: proc (self:^button, mousePos:linalg.PointF),
+    button_move: proc (self:^button, mousePos:linalg.PointF),
+    touch_down: proc (self:^button, touchPos:linalg.PointF, touchIdx:u8),
+    touch_up: proc (self:^button, touchPos:linalg.PointF, touchIdx:u8),
+    touch_move: proc (self:^button, touchPos:linalg.PointF, touchIdx:u8),
 }
 
 @private image_button_vtable :button_vtable = button_vtable {
     draw = auto_cast _super_image_button_draw,
     deinit = auto_cast _super_image_button_deinit,
+}
+
+@private shape_button_vtable :button_vtable = button_vtable {
+    draw = auto_cast _super_shape_button_draw,
+    deinit = auto_cast _super_shape_button_deinit,
 }
 
 _super_image_button_deinit :: proc(self:^image_button) {
@@ -148,6 +158,7 @@ _super_image_button_draw :: proc (self:^image_button, cmd:engine.command_buffer,
     engine.image_binding_sets_and_draw(cmd, self.set, viewport.set, texture.set)
 }
 
+
 /*
 Initializes an image button
 
@@ -170,11 +181,122 @@ Returns:
 - None
 */
 image_button_init :: proc(self:^image_button, $actualType:typeid, pos:linalg.Point3DF,
-camera:^engine.camera, projection:^engine.projection,
 rotation:f32 = 0.0, scale:linalg.PointF = {1,1}, colorTransform:^engine.color_transform = nil, pivot:linalg.PointF = {0.0, 0.0},
 up:^engine.texture = nil, over:^engine.texture = nil, down:^engine.texture = nil, vtable:^button_vtable = nil) where intrinsics.type_is_subtype_of(actualType, image_button) {
     self.up_texture = up
     self.over_texture = over
     self.down_texture = down
+
+	self.set.bindings = engine.descriptor_set_binding__base_uniform_pool[:]
+    self.set.size = engine.descriptor_pool_size__base_uniform_pool[:]
+    self.set.layout = engine.get_base_descriptor_set_layout()
+
+	self.vtable = vtable == nil ? &image_button_vtable : vtable
+    if self.vtable.draw == nil do self.vtable.draw = auto_cast _super_image_button_draw
+    if self.vtable.deinit == nil do self.vtable.deinit = auto_cast _super_image_button_deinit
+
+	if self.vtable.get_uniform_resources == nil do self.vtable.get_uniform_resources = auto_cast engine.get_uniform_resources_default
+
+	engine.iobject_init(auto_cast self, actualType, pos, rotation, scale, colorTransform, pivot)
 }
 
+image_button_init2 :: proc(self:^image_button, $actualType:typeid, colorTransform:^engine.color_transform = nil,
+up:^engine.texture = nil, over:^engine.texture = nil, down:^engine.texture = nil, vtable:^button_vtable = nil) where intrinsics.type_is_subtype_of(actualType, image_button) {
+    self.up_texture = up
+    self.over_texture = over
+    self.down_texture = down
+
+	self.set.bindings = engine.descriptor_set_binding__base_uniform_pool[:]
+    self.set.size = engine.descriptor_pool_size__base_uniform_pool[:]
+    self.set.layout = engine.get_base_descriptor_set_layout()
+
+	self.vtable = vtable == nil ? &image_button_vtable : vtable
+    if self.vtable.draw == nil do self.vtable.draw = auto_cast _super_image_button_draw
+    if self.vtable.deinit == nil do self.vtable.deinit = auto_cast _super_image_button_deinit
+
+	if self.vtable.get_uniform_resources == nil do self.vtable.get_uniform_resources = auto_cast engine.get_uniform_resources_default
+
+	engine.iobject_init2(auto_cast self, actualType, colorTransform)
+}
+
+
+_super_shape_button_deinit :: proc(self:^shape_button) {
+    engine._super_iobject_deinit(auto_cast self)
+}
+
+_super_shape_button_draw :: proc (self:^shape_button, cmd:engine.command_buffer, viewport:^engine.viewport) {
+    mem.ICheckInit_Check(&self.check_init)
+    shape_src :^shape.shape_src
+
+    switch self.state {
+        case .UP:shape_src = self.up_shape_src
+        case .OVER:shape_src = self.over_shape_src
+        case .DOWN:shape_src = self.down_shape_src
+    }
+    when ODIN_DEBUG {
+        if shape_src == nil do panic_contextless("shape: uninitialized")
+        mem.ICheckInit_Check(&shape_src.vertexBuf.check_init)
+    }
+
+	shape.shape_src_bind_and_draw(shape_src, &self.set, cmd, viewport)
+}
+
+/*
+Initializes a shape button
+
+Inputs:
+- self: Pointer to the shape button to initialize
+- actualType: The actual type of the button (must be a subtype of shape_button)
+- pos: Position of the button
+- camera: Pointer to the camera
+- projection: Pointer to the projection
+- rotation: Rotation angle in radians (default: 0.0)
+- scale: Scale factors (default: {1, 1})
+- colorTransform: Pointer to color transform (default: nil)
+- pivot: Pivot point for transformations (default: {0.0, 0.0})
+- up: Shape for the up state (default: nil)
+- over: Shape for the over state (default: nil)
+- down: Shape for the down state (default: nil)
+- vtable: Custom vtable (default: nil)
+
+Returns:
+- None
+*/
+shape_button_init :: proc(self:^shape_button, $actualType:typeid, pos:linalg.Point3DF,
+rotation:f32 = 0.0, scale:linalg.PointF = {1,1}, colorTransform:^engine.color_transform = nil, pivot:linalg.PointF = {0.0, 0.0},
+up:^shape.shape_src = nil, over:^shape.shape_src = nil, down:^shape.shape_src = nil, vtable:^button_vtable = nil) where intrinsics.type_is_subtype_of(actualType, shape_button) {
+    self.up_shape_src = up
+    self.over_shape_src = over
+    self.down_shape_src = down
+
+	self.set.bindings = engine.descriptor_set_binding__base_uniform_pool[:]
+    self.set.size = engine.descriptor_pool_size__base_uniform_pool[:]
+    self.set.layout = engine.get_base_descriptor_set_layout()
+
+	self.vtable = vtable == nil ? &shape_button_vtable : vtable
+    if self.vtable.draw == nil do self.vtable.draw = auto_cast _super_shape_button_draw
+    if self.vtable.deinit == nil do self.vtable.deinit = auto_cast _super_shape_button_deinit
+
+	if self.vtable.get_uniform_resources == nil do self.vtable.get_uniform_resources = auto_cast engine.get_uniform_resources_default
+
+	engine.iobject_init(auto_cast self, actualType, pos, rotation, scale, colorTransform, pivot)
+}
+
+shape_button_init2 :: proc(self:^shape_button, $actualType:typeid, colorTransform:^engine.color_transform = nil,
+up:^shape.shape_src = nil, over:^shape.shape_src = nil, down:^shape.shape_src = nil, vtable:^button_vtable = nil) where intrinsics.type_is_subtype_of(actualType, shape_button) {
+    self.up_shape_src = up
+    self.over_shape_src = over
+    self.down_shape_src = down
+
+	self.set.bindings = engine.descriptor_set_binding__base_uniform_pool[:]
+    self.set.size = engine.descriptor_pool_size__base_uniform_pool[:]
+    self.set.layout = engine.get_base_descriptor_set_layout()
+
+	self.vtable = vtable == nil ? &shape_button_vtable : vtable
+    if self.vtable.draw == nil do self.vtable.draw = auto_cast _super_shape_button_draw
+    if self.vtable.deinit == nil do self.vtable.deinit = auto_cast _super_shape_button_deinit
+
+	if self.vtable.get_uniform_resources == nil do self.vtable.get_uniform_resources = auto_cast engine.get_uniform_resources_default
+
+	engine.iobject_init2(auto_cast self, actualType, colorTransform)
+}

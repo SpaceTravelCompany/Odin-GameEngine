@@ -116,15 +116,22 @@ shape_change_color_transform :: #force_inline proc(self:^shape, colorTransform:^
 _super_shape_draw :: proc (self:^shape, cmd:engine.command_buffer, viewport:^engine.viewport) {
     mem.ICheckInit_Check(&self.check_init)
 
+    shape_src_bind_and_draw(self.src, &self.set, cmd, viewport)
+}
+
+shape_src_bind_and_draw :: proc(self:^shape_src, set:^engine.descriptor_set, cmd:engine.command_buffer, viewport:^engine.viewport) {
+    mem.ICheckInit_Check(&self.vertexBuf.check_init)
+    mem.ICheckInit_Check(&self.indexBuf.check_init)
+
     engine.graphics_cmd_bind_pipeline(cmd, .GRAPHICS, engine.get_shape_pipeline())
     engine.graphics_cmd_bind_descriptor_sets(cmd, .GRAPHICS, engine.get_shape_pipeline_layout(), 0, 2,
-        &([]vk.DescriptorSet{self.set.__set, viewport.set.__set})[0], 0, nil)
+        &([]vk.DescriptorSet{set.__set, viewport.set.__set})[0], 0, nil)
 
-    offsets: vk.DeviceSize = 0
-    engine.graphics_cmd_bind_vertex_buffers(cmd, 0, 1, &self.src.vertexBuf.buf.__resource, &offsets)
-    engine.graphics_cmd_bind_index_buffer(cmd, self.src.indexBuf.buf.__resource, 0, .UINT32)
+	offsets: vk.DeviceSize = 0
+    engine.graphics_cmd_bind_vertex_buffers(cmd, 0, 1, &self.vertexBuf.buf.__resource, &offsets)
+    engine.graphics_cmd_bind_index_buffer(cmd, self.indexBuf.buf.__resource, 0, .UINT32)
 
-    engine.graphics_cmd_draw_indexed(cmd, auto_cast (self.src.indexBuf.buf.option.len / size_of(u32)), 1, 0, 0, 0)
+    engine.graphics_cmd_draw_indexed(cmd, auto_cast (self.indexBuf.buf.option.len / size_of(u32)), 1, 0, 0, 0)
 }
 
 shape_src_init_raw :: proc(self:^shape_src, raw:^geometry.raw_shape, flag:engine.resource_usage = .GPU, colorFlag:engine.resource_usage = .CPU, allocator :Maybe(runtime.Allocator) = nil) {

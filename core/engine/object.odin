@@ -208,9 +208,6 @@ iobject_init2 :: proc(self:^iobject, $actual_type:typeid,
     }
 }
 
-
-
-
 get_uniform_resources_default :: #force_inline proc(self:^iobject) -> []union_resource {
     res := mem.make_non_zeroed([]union_resource, 2, context.temp_allocator)
     res[0] = &self.mat_uniform
