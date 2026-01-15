@@ -18,8 +18,8 @@ foreign import lua { LIB }
 
 @(default_calling_convention = "c")
 foreign lua {
-	// lua_pushfstring :: proc (L: ^lua_State , fmt: cstring , ...) -> cstring ---;
-	// lua_pushvfstring :: proc (L: ^lua_State , fmt: cstring , va_list argp) -> cstring ---;
+	lua_pushfstring :: proc (L: ^lua_State , fmt: cstring , #c_vararg args: ..any) -> cstring ---;
+	lua_pushvfstring :: proc (L: ^lua_State , fmt: cstring, argp:c.va_list) -> cstring ---;
 	
 	lua_absindex :: proc (L: ^lua_State , idx: c.int ) -> c.int ---;
 	lua_arith :: proc (L: ^lua_State , op: c.int ) ---;
@@ -127,7 +127,7 @@ foreign lua {
 	luaL_getsubtable :: proc (L: ^lua_State , idx: c.int , fname: cstring) -> c.int ---;
 	luaL_gsub :: proc (L : ^lua_State, s: cstring, p: cstring, r: cstring) -> cstring ---;
 	luaL_len :: proc (L: ^lua_State , idx: c.int ) -> lua_Integer ---;
-	luaL_loadbufferx :: proc (L: ^lua_State , buff: cstring, sz: c.ptrdiff_t , name: cstring, mode: cstring) -> c.int ---;
+	luaL_loadbufferx :: proc (L: ^lua_State , buff: cstring, sz: c.size_t , name: cstring, mode: cstring) -> c.int ---;
 	luaL_loadfilex :: proc (L: ^lua_State , filename: cstring, mode: cstring) -> c.int ---;
 	luaL_loadstring :: proc (L: ^lua_State , s: cstring) -> c.int ---;
 	luaL_newmetatable :: proc (L: ^lua_State , tname: cstring) -> c.int ---;
@@ -144,6 +144,10 @@ foreign lua {
 	luaL_tolstring :: proc (L: ^lua_State , idx: c.int , len: ^c.ptrdiff_t) -> cstring ---;
 	luaL_traceback :: proc (L: ^lua_State , L1: ^lua_State ,msg: cstring, level: c.int ) ---;
 	luaL_where :: proc (L: ^lua_State , lvl: c.int ) ---;
+
+	lua_numbertocstring :: proc (L: ^lua_State , idx: c.int, buff:[^]c.char) -> c.uint ---;
+	lua_pushexternalstring :: proc (L: ^lua_State , s: cstring, len: c.size_t, falloc:lua_Alloc, ud:rawptr) -> cstring ---;
+	luaL_alloc :: proc (ud: rawptr, ptr: rawptr, osize:c.size_t, nsize:c.size_t) -> rawptr ---;
 }
 
 luaL_openlibs :: proc "contextless" (L: ^lua_State) {
@@ -261,13 +265,13 @@ LUA_REFNIL :: -1;
 /*
 	TYPES
 */
-lua_CFunction :: proc "c" (L: ^lua_State ) -> c.int;
-lua_KFunction :: proc "c" (L: ^lua_State , status: c.int , ctx:lua_KContext) -> c.int;
-lua_Reader :: proc "c" (L: ^lua_State , ud: rawptr , sz: ^c.ptrdiff_t) -> cstring;
-lua_Writer :: proc "c" (L: ^lua_State , p: cstring, sz:c.ptrdiff_t , ud:rawptr) -> c.int ;
-luaL_unref :: proc "c" (L: ^lua_State , t: c.int , ref: c.int );
-lua_Hook :: proc "c" (L: ^lua_State , ar: ^lua_Debug );
-lua_Alloc :: proc "c" (ud: rawptr, ptr: rawptr, osize:c.ptrdiff_t, nsize:c.ptrdiff_t) -> rawptr;
+lua_CFunction :: #type proc "c" (L: ^lua_State ) -> c.int;
+lua_KFunction :: #type proc "c" (L: ^lua_State , status: c.int , ctx:lua_KContext) -> c.int;
+lua_Reader :: #type  proc "c" (L: ^lua_State , ud: rawptr , sz: ^c.ptrdiff_t) -> cstring;
+lua_Writer :: #type proc "c" (L: ^lua_State , p: cstring, sz:c.ptrdiff_t , ud:rawptr) -> c.int ;
+luaL_unref :: #type proc "c" (L: ^lua_State , t: c.int , ref: c.int );
+lua_Hook :: #type proc "c" (L: ^lua_State , ar: ^lua_Debug );
+lua_Alloc :: #type proc "c" (ud: rawptr, ptr: rawptr, osize:c.ptrdiff_t, nsize:c.ptrdiff_t) -> rawptr;
 
 // lua_ident: ^u8;
 
@@ -302,181 +306,191 @@ lua_Debug :: struct {
 	MACROS
 */
 
-// lua_getextraspace :: proc (L: ^lua_State )
-// {
-// 	(cast(rawptr)(cast(^i8)c.ptrdiff_t(L) - LUA_EXTRASPACE));
-// }	
+lua_getextraspace :: #force_inline proc "contextless" (L: ^lua_State ) -> rawptr
+{
+	return (transmute(rawptr)(transmute(c.size_t)(L) - LUA_EXTRASPACE))
+}	
 
-lua_tonumber :: proc (L: ^lua_State , i: c.int) -> lua_Number
+lua_tonumber :: #force_inline proc "c" (L: ^lua_State , i: c.int) -> lua_Number
 {
 	return lua_Number( lua_tonumberx(L,(i),nil) );
 }	
 
-lua_tointeger :: proc (L: ^lua_State ,i: c.int) -> lua_Integer
+lua_tointeger :: #force_inline proc "c" (L: ^lua_State ,i: c.int) -> lua_Integer
 {
 	return lua_Integer( lua_tointegerx(L,(i),nil) );
 }
-lua_pop :: proc (L: ^lua_State ,n: c.int )
+lua_pop :: #force_inline proc "c" (L: ^lua_State ,n: c.int )
 {
 	lua_settop(L, -(n)-1);
 }		
 
-lua_newtable :: proc (L: ^lua_State )
+lua_newtable :: #force_inline proc "c" (L: ^lua_State )
 {		
 	lua_createtable(L, 0, 0);
 }
 
-lua_register :: proc (L: ^lua_State,n:cstring,f: lua_CFunction )
+lua_register :: #force_inline proc "c" (L: ^lua_State,n:cstring,f: lua_CFunction )
 {
  	lua_pushcfunction(L, (f));
  	lua_setglobal(L, (n));
 }
 
-lua_pushcfunction :: proc (L: ^lua_State ,f: lua_CFunction )
+lua_pushcfunction :: #force_inline proc "c" (L: ^lua_State ,f: lua_CFunction )
 {
 	lua_pushcclosure(L, (f), 0);
 }	
 
-lua_isfunction :: proc (L: ^lua_State ,n: c.int) -> c.bool 
+lua_isfunction :: #force_inline proc "c" (L: ^lua_State ,n: c.int) -> c.bool 
 {
 	return (lua_type(L, (n)) == LUA_TFUNCTION);
 }	
 
-lua_istable :: proc (L: ^lua_State ,n:c.int) -> c.bool
+lua_istable :: #force_inline proc "c" (L: ^lua_State ,n:c.int) -> c.bool
 {
 	return (lua_type(L, (n)) == LUA_TTABLE);
 }
 
-lua_islightuserdata :: proc (L: ^lua_State ,n:c.int) -> c.bool
+lua_islightuserdata :: #force_inline proc "c" (L: ^lua_State ,n:c.int) -> c.bool
 {	
 	return (lua_type(L, (n)) == LUA_TLIGHTUSERDATA);
 }
-lua_isnil :: proc (L: ^lua_State ,n:c.int ) -> c.bool
+lua_isnil :: #force_inline proc "c" (L: ^lua_State ,n:c.int ) -> c.bool
 {
 	return (lua_type(L, (n)) == LUA_TNIL);
 }
 
-lua_isboolean :: proc (L: ^lua_State ,n:c.int ) -> c.bool
+lua_isboolean :: #force_inline proc "c" (L: ^lua_State ,n:c.int ) -> c.bool
 {
 	return (lua_type(L, (n)) == LUA_TBOOLEAN);
 }	
 
-lua_isthread :: proc (L: ^lua_State ,n:c.int ) -> c.bool
+lua_isthread :: #force_inline proc "c" (L: ^lua_State ,n:c.int ) -> c.bool
 {
 	return (lua_type(L, (n)) == LUA_TTHREAD);
 }
 
-lua_isnone :: proc (L: ^lua_State ,n:c.int ) -> c.bool
+lua_isnone :: #force_inline proc "c" (L: ^lua_State ,n:c.int ) -> c.bool
 {
 	return (lua_type(L, (n)) == LUA_TNONE);
 }
 	
-lua_isnoneornil :: proc (L: ^lua_State , n:c.int) -> c.bool
+lua_isnoneornil :: #force_inline proc "c" (L: ^lua_State , n:c.int) -> c.bool
 {
 	return (lua_type(L, (n)) <= 0);
 }
 
-lua_pushliteral :: proc (L: ^lua_State , s:cstring )	
+lua_pushliteral :: #force_inline proc "c" (L: ^lua_State , s:cstring )	
 {
 	lua_pushstring(L, s);
 }
 
-lua_pushglobaltable :: proc (L: ^lua_State )
+lua_pushglobaltable :: #force_inline proc "c" (L: ^lua_State )
 {
 	lua_rawgeti(L, LUA_REGISTRYINDEX, LUA_RIDX_GLOBALS);
 } 
 	
-lua_tostring :: proc (L: ^lua_State ,i:c.int ) -> string
+lua_tostring :: #force_inline proc "c" (L: ^lua_State ,i:c.int ) -> string
 {
 	return string( lua_tolstring(L, (i), nil) );
 }	
 
-lua_insert :: proc (L: ^lua_State ,idx:c.int)
+lua_insert :: #force_inline proc "c" (L: ^lua_State ,idx:c.int)
 {
 	lua_rotate(L, (idx), 1);
 }	
 
-lua_remove :: proc (L: ^lua_State ,idx: c.int)
+lua_remove :: #force_inline proc "c" (L: ^lua_State ,idx: c.int)
 {	
 	lua_rotate(L, (idx), -1);
 	lua_pop(L, 1);
 }
 
-lua_replace :: proc (L: ^lua_State ,idx: c.int)	
+lua_replace :: #force_inline proc "c" (L: ^lua_State ,idx: c.int)	
 {
 	lua_copy(L, -1, (idx));
 	lua_pop(L, 1);
 }
 
-lua_yield :: proc(L : ^lua_State,n: c.int)
+lua_yield :: #force_inline proc "c" (L : ^lua_State,n: c.int)
 {
 	lua_yieldk(L, (n), 0, nil);
 }		
 
-lua_call :: proc (L: ^lua_State,n:c.int,r:c.int)
+lua_call :: #force_inline proc "c" (L: ^lua_State,n:c.int,r:c.int)
 {
 	lua_callk(L, (n), (r), 0, nil);
 }
 
-lua_pcall :: proc (L: ^lua_State,n:c.int,r:c.int,f:c.int) -> c.int
+lua_pcall :: #force_inline proc "c" (L: ^lua_State,n:c.int,r:c.int,f:c.int) -> c.int
 {
 	return lua_pcallk(L, (n), (r), (f), 0, nil);
 }
 
-lua_upvalueindex :: proc (i:c.int) -> c.int
+lua_upvalueindex :: #force_inline proc "contextless" (i:c.int) -> c.int
 {
 	return (LUA_REGISTRYINDEX - (i));
 }
-luaL_loadfile :: proc (L: ^lua_State,f: cstring)
+luaL_loadfile :: #force_inline proc "c" (L: ^lua_State,f: cstring)
 {
 	luaL_loadfilex(L,f,nil);
 }
 
-luaL_checkversion :: proc (L: ^lua_State)
+luaL_checkversion :: #force_inline proc "c" (L: ^lua_State)
 {
 	luaL_checkversion_(L, LUA_VERSION_NUM, LUAL_NUMSIZES);
 }
 
-// luaL_newlibtable :: proc (L:^ lua_State,l: ^luaL_Reg)
-// {
-// 	lua_createtable(L, 0, size_of(l)/size_of((l)[0]) - 1);
-// }
+luaL_newlibtable :: #force_inline proc "contextless" (L:^ lua_State, l: []luaL_Reg)
+{
+	lua_createtable(L, 0, auto_cast len(l) - 1);
+}
 
-// luaL_newlib :: proc (L:^ lua_State,l: ^luaL_Reg )
-// {
-// 	luaL_checkversion(L);
-// 	luaL_newlibtable(L,l);
-// 	luaL_setfuncs(L,l,0);
-// }
+luaL_newlib :: #force_inline proc "contextless" (L:^ lua_State,l: []luaL_Reg)
+{
+	luaL_checkversion(L);
+	luaL_newlibtable(L,l);
+	luaL_setfuncs(L, &l[0],0);
+}
 
 // luaL_argcheck :: (L:^ lua_State, cond,arg,extramsg)	\
 // 		((void)((cond) || luaL_argerror(L, (arg), (extramsg))))
 
-// luaL_checkstring :: (L:^ lua_State,n)	(luaL_checklstring(L, (n), NULL))
-// luaL_optstring :: (L:^ lua_State,n,d)	(luaL_optlstring(L, (n), (d), NULL))
+luaL_checkstring :: #force_inline proc "c" (L:^ lua_State,n: c.int) -> cstring {
+	return luaL_checklstring(L, (n), nil)
+}
+luaL_optstring :: #force_inline proc "c" (L:^ lua_State,n: c.int,d: cstring) -> cstring {
+	return luaL_optlstring(L, (n), (d), nil)
+}
+luaL_typename :: #force_inline proc "c" (L:^ lua_State, i: c.int) -> cstring {
+	return lua_typename(L, lua_type(L,(i)))
+}
 
-// luaL_typename :: (L:^ lua_State,i)	lua_typename(L, lua_type(L,(i)))
-
-luaL_dofile :: proc (L:^ lua_State, fn: cstring)
+luaL_dofile :: #force_inline proc "c" (L:^ lua_State, fn: cstring)
 {
 	luaL_loadfile(L, fn);
 	lua_pcall(L, 0, LUA_MULTRET, 0);
 }
 
-luaL_dostring :: proc (L:^ lua_State, s: cstring) -> bool
+luaL_dostring :: #force_inline proc "c" (L:^ lua_State, s: cstring) -> bool
 {
 	if luaL_loadstring(L, s) != 0 do return false;
 	if lua_pcall(L, 0, LUA_MULTRET, 0) != 0 do return false;
 	return true;
 }
 
-luaL_getmetatable :: proc (L:^ lua_State,n:cstring)
+luaL_getmetatable :: #force_inline proc "c" (L:^ lua_State,n:cstring) -> c.int
 {
-	lua_getfield(L, LUA_REGISTRYINDEX, (n));
+	return lua_getfield(L, LUA_REGISTRYINDEX, (n));
 }
 
-// luaL_opt :: (L:^ lua_State,f,n,d)	(lua_isnoneornil(L,(n)) ? (d) : f(L,(n)))
-// luaL_loadbuffer :: (L:^ lua_State,s,sz,n)	luaL_loadbufferx(L,s,sz,n,NULL)
+luaL_opt :: #force_inline proc "contextless" (L:^ lua_State, f: proc "c" (L:^ lua_State, n: c.int) -> $N,
+ n: c.int, d: N) -> N {
+	return (lua_isnoneornil(L,(n)) ? (d) : f(L,(n)))
+}
+luaL_loadbuffer :: #force_inline proc "c" (L:^ lua_State,s: cstring, sz: c.size_t, n: cstring) -> c.int {
+	return luaL_loadbufferx(L,s,  sz,n,nil)
+}
 
 @(export, link_name="lua_writestring") lua_writestring :: proc "c" (ptr : rawptr, size : c.size_t) -> c.size_t {
 	when  ODIN_PLATFORM_SUBTARGET == .Android {
