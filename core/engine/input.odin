@@ -278,15 +278,17 @@ when library.is_mobile {
     }
 }
 
-left_mouse_button_idx :: 0
-middle_mouse_button_idx :: 1
-right_mouse_button_idx :: 2
+button_idx :: enum int {
+    LEFT = 0,
+    MIDDLE = 1,
+    RIGHT = 2,
+}
 
 key_down : #type proc (keycode:key_code) = proc (keycode:key_code) {}
 key_up : #type proc (keycode:key_code) = proc (keycode:key_code) {}
 key_repeat : #type proc (keycode:key_code) = proc (keycode:key_code) {}
-mouse_button_down : #type proc (button_idx:int, x:f32, y:f32) = proc (button_idx:int, x:f32, y:f32) {}
-mouse_button_up : #type proc (button_idx:int, x:f32, y:f32) = proc (button_idx:int, x:f32, y:f32) {}
+mouse_button_down : #type proc (_button_idx:button_idx, x:f32, y:f32) = proc (button_idx:button_idx, x:f32, y:f32) {}
+mouse_button_up : #type proc (_button_idx:button_idx, x:f32, y:f32) = proc (button_idx:button_idx, x:f32, y:f32) {}
 mouse_move : #type proc (x:f32, y:f32) = proc (x:f32, y:f32) {}
 mouse_scroll : #type proc (dt:int) = proc (dt:int) {}
 mouse_in : #type proc () = proc () {}

@@ -248,10 +248,10 @@ when library.is_android {
 					#partial switch act.action {
 						case .DOWN:
 							is_primary := android.AMotionEvent_getAxisValue(evt, android.MotionEventAxis.PRESSURE, 0) == 1.0
-							mouse_button_down(is_primary ? 0 : 1, mm.x, mm.y)
+							mouse_button_down(is_primary ? .LEFT : .RIGHT, mm.x, mm.y)
 						case .UP:
 							is_primary := android.AMotionEvent_getAxisValue(evt, android.MotionEventAxis.PRESSURE, 0) == 1.0
-							mouse_button_up(is_primary ? 0 : 1, mm.x, mm.y)
+							mouse_button_up(is_primary ? .LEFT : .RIGHT, mm.x, mm.y)
 						case .SCROLL:
 							//TODO (xfitgd) HSCROLL
 							dt := int(android.AMotionEvent_getAxisValue(evt, android.MotionEventAxis.VSCROLL, 0) * 100.0)

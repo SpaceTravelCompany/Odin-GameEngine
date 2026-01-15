@@ -339,9 +339,9 @@ when !library.is_mobile {
 			context = runtime.default_context()
 			switch action {
 				case glfw.PRESS:
-					mouse_button_down(auto_cast button, __mouse_pos.x, __mouse_pos.y)
+					mouse_button_down(button_idx(button), __mouse_pos.x, __mouse_pos.y)
 				case glfw.RELEASE:
-					mouse_button_up(auto_cast button, __mouse_pos.x, __mouse_pos.y)
+					mouse_button_up(button_idx(button), __mouse_pos.x, __mouse_pos.y)
 			}
 		}
 		glfw_cursor_pos_proc :: proc "c" (window: glfw.WindowHandle, xpos,  ypos: f64) {
