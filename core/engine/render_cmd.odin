@@ -12,17 +12,15 @@ Render command structure for managing render objects
 
 Manages a collection of objects to be rendered and their command buffers
 */
-render_cmd :: struct {}
-
-@private __render_cmd :: struct {
-    scene: [dynamic]^iobject,
-    scene_t: [dynamic]^iobject,
+render_cmd :: struct {
+	scene: ^[dynamic]^iobject,
     refresh:[MAX_FRAMES_IN_FLIGHT]bool,
     cmds:[MAX_FRAMES_IN_FLIGHT][]command_buffer,
-    obj_lock:sync.RW_Mutex
+    obj_lock:sync.Mutex,
+	check_init:mem.ICheckInit,
 }
 
-@private __g_render_cmd : [dynamic]^__render_cmd = nil
+@private __g_render_cmd : [dynamic]^render_cmd = nil
 @private __g_main_render_cmd_idx : int = -1
 @private __g_render_cmd_mtx : sync.Mutex
 
@@ -35,24 +33,28 @@ render_cmd :: struct {}
 /*
 Initializes a new render command structure
 
+Make render_cmd.scene manually.
+
 Returns:
 - Pointer to the initialized render command
 */
-render_cmd_init :: proc() -> ^render_cmd {
-    cmd := new(__render_cmd)
-    cmd.scene = mem.make_non_zeroed([dynamic]^iobject)
-    cmd.scene_t = mem.make_non_zeroed([dynamic]^iobject)
+render_cmd_init :: proc(_scene: ^[dynamic]^iobject) -> ^render_cmd {
+    cmd := new(render_cmd, def_allocator())
     for i in 0..<MAX_FRAMES_IN_FLIGHT {
         cmd.refresh[i] = false
         cmd.cmds[i] = mem.make_non_zeroed([]command_buffer, swap_img_cnt)
         allocate_command_buffers(&cmd.cmds[i][0], swap_img_cnt)
     }
-    cmd.obj_lock = sync.RW_Mutex{}
+    cmd.obj_lock = sync.Mutex{}
 
     sync.mutex_lock(&__g_render_cmd_mtx)
     non_zero_append(&__g_render_cmd, cmd)
     sync.mutex_unlock(&__g_render_cmd_mtx)
-    return (^render_cmd)(cmd)
+
+	cmd.scene = _scene
+
+	mem.ICheckInit_Init(&cmd.check_init)
+    return cmd
 }
 
 /*
@@ -65,24 +67,23 @@ Returns:
 - None
 */
 render_cmd_deinit :: proc(cmd: ^render_cmd) {
-    cmd_ :^__render_cmd = (^__render_cmd)(cmd)
+	mem.ICheckInit_Deinit(&cmd.check_init)
+
     for i in 0..<MAX_FRAMES_IN_FLIGHT {
-        free_command_buffers(&cmd_.cmds[i][0], swap_img_cnt)
-        delete(cmd_.cmds[i])
+        free_command_buffers(&cmd.cmds[i][0], swap_img_cnt)
+        delete(cmd.cmds[i])
     }
-    delete(cmd_.scene)
-    delete(cmd_.scene_t)
 
     sync.mutex_lock(&__g_render_cmd_mtx)
     for cmd, i in __g_render_cmd {
-        if cmd == cmd_ {
+        if cmd == cmd {
             ordered_remove(&__g_render_cmd, i)
             if i == __g_main_render_cmd_idx do __g_main_render_cmd_idx = -1
             break
         }
     }
     sync.mutex_unlock(&__g_render_cmd_mtx)
-    free(cmd)
+    free(cmd, def_allocator())
 }
 
 /*
@@ -94,17 +95,33 @@ Inputs:
 Returns:
 - `true` if successful, `false` if the command was not found
 */
-render_cmd_show :: proc (_cmd: ^render_cmd) -> bool {
+render_cmd_show :: proc "contextless" (_cmd: ^render_cmd) -> bool {
+	mem.ICheckInit_Check(&_cmd.check_init)
+	
     sync.mutex_lock(&__g_render_cmd_mtx)
     defer sync.mutex_unlock(&__g_render_cmd_mtx)
     for cmd, i in __g_render_cmd {
-        if cmd == (^__render_cmd)(_cmd) {
+        if cmd == _cmd {
             render_cmd_refresh(_cmd)
             __g_main_render_cmd_idx = i
             return true
         }
     }
     return false
+}
+
+
+/*
+Changes the scene of the render command
+*/
+render_cmd_change_scene :: proc "contextless" (cmd: ^render_cmd, _scene: ^[dynamic]^iobject) {
+	sync.mutex_lock(&cmd.obj_lock)
+	defer sync.mutex_unlock(&cmd.obj_lock)
+	
+	if cmd.scene != _scene {
+		cmd.scene = _scene
+		render_cmd_refresh(cmd)
+	}
 }
 
 /*
@@ -118,17 +135,18 @@ Returns:
 - None
 */
 render_cmd_add_object :: proc(cmd: ^render_cmd, obj: ^iobject) {
-    cmd_ :^__render_cmd = (^__render_cmd)(cmd)
-    sync.rw_mutex_shared_lock(&cmd_.obj_lock)
-    defer sync.rw_mutex_shared_unlock(&cmd_.obj_lock)
+	mem.ICheckInit_Check(&cmd.check_init)
+	
+    sync.mutex_lock(&cmd.obj_lock)
+    defer sync.mutex_unlock(&cmd.obj_lock)
 
-    for obj_t,i in cmd_.scene {
+    for obj_t,i in cmd.scene^ {
         if obj_t == obj {
-            ordered_remove(&cmd_.scene, i)
+            ordered_remove(cmd.scene, i)
             break
         }
     }
-    non_zero_append(&cmd_.scene, obj)
+    non_zero_append(cmd.scene, obj)
     render_cmd_refresh(cmd)
 }
 
@@ -143,19 +161,20 @@ Returns:
 - None
 */
 render_cmd_add_objects :: proc(cmd: ^render_cmd, objs: ..^iobject) {
-    cmd_ :^__render_cmd = (^__render_cmd)(cmd)
-    sync.rw_mutex_shared_lock(&cmd_.obj_lock)
-    defer sync.rw_mutex_shared_unlock(&cmd_.obj_lock)
+	mem.ICheckInit_Check(&cmd.check_init)
+	
+    sync.mutex_lock(&cmd.obj_lock)
+    defer sync.mutex_unlock(&cmd.obj_lock)
 
-    for obj_t,i in cmd_.scene {
+    for obj_t,i in cmd.scene^ {
         for obj in objs {
             if obj_t == obj {
-                ordered_remove(&cmd_.scene, i)
+                ordered_remove(cmd.scene, i)
                 break
             }
         }
     }
-    non_zero_append(&cmd_.scene, ..objs)
+    non_zero_append(cmd.scene, ..objs)
     if len(objs) > 0 do render_cmd_refresh(cmd)
 }
 
@@ -171,13 +190,14 @@ Returns:
 - None
 */
 render_cmd_remove_object :: proc(cmd: ^render_cmd, obj: ^iobject) {
-    cmd_ :^__render_cmd = (^__render_cmd)(cmd)
-    sync.rw_mutex_shared_lock(&cmd_.obj_lock)
-    defer sync.rw_mutex_shared_unlock(&cmd_.obj_lock)
+	mem.ICheckInit_Check(&cmd.check_init)
+	
+    sync.mutex_lock(&cmd.obj_lock)
+    defer sync.mutex_unlock(&cmd.obj_lock)
 
-    for obj_t, i in cmd_.scene {
+    for obj_t, i in cmd.scene^ {
         if obj_t == obj {
-            ordered_remove(&cmd_.scene, i)
+            ordered_remove(cmd.scene, i)
             render_cmd_refresh(cmd)
             break
         }
@@ -194,11 +214,12 @@ Returns:
 - None
 */
 render_cmd_remove_all :: proc(cmd: ^render_cmd) {
-    cmd_ :^__render_cmd = (^__render_cmd)(cmd)
-    sync.rw_mutex_shared_lock(&cmd_.obj_lock)
-    defer sync.rw_mutex_shared_unlock(&cmd_.obj_lock)
-    obj_len := len(cmd_.scene)
-    clear(&cmd_.scene)
+	mem.ICheckInit_Check(&cmd.check_init)
+	
+    sync.mutex_lock(&cmd.obj_lock)
+    defer sync.mutex_unlock(&cmd.obj_lock)
+    obj_len := len(cmd.scene)
+    clear(cmd.scene)
     if obj_len > 0 do render_cmd_refresh(cmd)
 }
 
@@ -213,11 +234,12 @@ Returns:
 - `true` if the object is in the scene, `false` otherwise
 */
 render_cmd_has_object :: proc "contextless"(cmd: ^render_cmd, obj: ^iobject) -> bool {
-    cmd_ :^__render_cmd = (^__render_cmd)(cmd)
-    sync.rw_mutex_shared_lock(&cmd_.obj_lock)
-    defer sync.rw_mutex_shared_unlock(&cmd_.obj_lock)
+	mem.ICheckInit_Check(&cmd.check_init)
+	
+    sync.mutex_lock(&cmd.obj_lock)
+    defer sync.mutex_unlock(&cmd.obj_lock)
     
-    for obj_t in cmd_.scene {
+    for obj_t in cmd.scene^ {
         if obj_t == obj {
             return true
         }
@@ -235,10 +257,11 @@ Returns:
 - The number of objects in the scene
 */
 render_cmd_get_object_len :: proc "contextless" (cmd: ^render_cmd) -> int {
-    cmd_ :^__render_cmd = (^__render_cmd)(cmd)
-    sync.rw_mutex_shared_lock(&cmd_.obj_lock)
-    defer sync.rw_mutex_shared_unlock(&cmd_.obj_lock)
-    return len(cmd_.scene)
+	mem.ICheckInit_Check(&cmd.check_init)
+	
+    sync.mutex_lock(&cmd.obj_lock)
+    defer sync.mutex_unlock(&cmd.obj_lock)
+    return len(cmd.scene)
 }
 
 /*
@@ -252,10 +275,11 @@ Returns:
 - Pointer to the object at the specified index
 */
 render_cmd_get_object :: proc "contextless" (cmd: ^render_cmd, index: int) -> ^iobject {
-    cmd_ :^__render_cmd = (^__render_cmd)(cmd)
-    sync.rw_mutex_shared_lock(&cmd_.obj_lock)
-    defer sync.rw_mutex_shared_unlock(&cmd_.obj_lock)
-    return cmd_.scene[index]
+	mem.ICheckInit_Check(&cmd.check_init)
+	
+    sync.mutex_lock(&cmd.obj_lock)
+    defer sync.mutex_unlock(&cmd.obj_lock)
+    return cmd.scene^[index]
 }
 
 /*
@@ -269,10 +293,7 @@ Returns:
 - The index of the object, or -1 if not found
 */
 render_cmd_get_object_idx :: proc "contextless"(cmd: ^render_cmd, obj: ^iobject) -> int {
-    cmd_ :^__render_cmd = (^__render_cmd)(cmd)
-    sync.rw_mutex_shared_lock(&cmd_.obj_lock)
-    defer sync.rw_mutex_shared_unlock(&cmd_.obj_lock)
-    for obj_t, i in cmd_.scene {
+    for obj_t, i in cmd.scene^ {
         if obj_t == obj {
             return i
         }
@@ -292,13 +313,7 @@ Returns:
 - A slice of all objects in the scene
 */
 render_cmd_get_objects :: proc(cmd: ^render_cmd) -> []^iobject {
-    cmd_ :^__render_cmd = (^__render_cmd)(cmd)
-
-    clear(&cmd_.scene_t)
-    sync.rw_mutex_shared_lock(&cmd_.obj_lock)
-    non_zero_append(&cmd_.scene_t, ..cmd_.scene[:])
-    sync.rw_mutex_shared_unlock(&cmd_.obj_lock)
-    return cmd_.scene_t[:]
+    return cmd.scene^[:]
 }
 
 /*
@@ -311,8 +326,7 @@ Returns:
 - None
 */
 render_cmd_refresh :: proc "contextless" (cmd: ^render_cmd) {
-    cmd_ :^__render_cmd = (^__render_cmd)(cmd)
-    for &b in cmd_.refresh {
+    for &b in cmd.refresh {
         b = true
     }
 }
@@ -342,8 +356,8 @@ render_cmd_refresh_all :: proc "contextless" () {
 }
 
 @(private) __render_cmd_create :: proc() {
-	__g_render_cmd = mem.make_non_zeroed([dynamic]^__render_cmd)
-	__g_viewports = mem.make_non_zeroed([dynamic]^viewport)
+	__g_render_cmd = mem.make_non_zeroed([dynamic]^render_cmd, def_allocator())
+	__g_viewports = mem.make_non_zeroed([dynamic]^viewport, def_allocator())
 
 	camera_init(&__g_default_camera)
 	projection_init_matrix_ortho_window(&__g_default_projection, auto_cast window_width(), auto_cast window_height())

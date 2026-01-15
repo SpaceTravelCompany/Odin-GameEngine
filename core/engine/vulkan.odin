@@ -1563,7 +1563,7 @@ vk_end_single_time_cmd :: proc "contextless" (_cmd:vk.CommandBuffer)  {
 	vk.FreeCommandBuffers(vk_device, vk_cmd_pool, 1, &cmd)
 }
 
-vk_record_command_buffer :: proc(cmd:^__render_cmd, frame:int) {
+vk_record_command_buffer :: proc(cmd:^render_cmd, frame:int) {
 	clsColor :vk.ClearValue = {color = {float32 = g_clear_color}}
 	clsDepthStencil :vk.ClearValue = {depthStencil = {depth = 1.0, stencil = 0}}
 	clsZero :vk.ClearValue = {depthStencil = {depth = 1.0, stencil = 0}}
@@ -1601,10 +1601,10 @@ vk_record_command_buffer :: proc(cmd:^__render_cmd, frame:int) {
 		}
 		vk.CmdSetViewport(c.__handle, 0, 1, &vp)
 
-		sync.rw_mutex_lock(&cmd.obj_lock)
+		sync.mutex_lock(&cmd.obj_lock)
 		objs := mem.make_non_zeroed_slice([]^iobject, len(cmd.scene), context.temp_allocator)
 		copy_slice(objs, cmd.scene[:])
-		sync.rw_mutex_unlock(&cmd.obj_lock)
+		sync.mutex_unlock(&cmd.obj_lock)
 		defer delete(objs, context.temp_allocator)
 		
 		first := true
