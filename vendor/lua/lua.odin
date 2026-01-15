@@ -4,6 +4,7 @@ import "base:runtime"
 import "core:os"
 import "core:mem"
 import "core:c"
+import "core:math"
 import "core:sys/linux"
 import "core:sys/windows"
 import "core:debug/trace"
@@ -106,7 +107,7 @@ foreign lua {
 	lua_typename :: proc (L: ^lua_State , tp: c.int ) -> cstring ---;
 	lua_upvalueid :: proc (L: ^lua_State , fidx: c.int, n: c.int) -> rawptr ---;
 	lua_upvaluejoin :: proc (L: ^lua_State , fidx1: c.int, n1: c.int, fidx2: c.int, n2: c.int) ---;
-	lua_version :: proc (L: ^lua_State ) -> ^lua_Number ---;
+	lua_version :: proc (L: ^lua_State ) -> lua_Number ---;
 	lua_xmove :: proc (from: ^lua_State, to: ^lua_State, n:c.int) ---;
 	lua_yieldk :: proc (L: ^lua_State , nresults: c.int, ctx: lua_KContext, k: lua_KFunction ) -> c.int ---;
 	luaL_argerror :: proc (L: ^lua_State , arg: c.int , extramsg: cstring) -> c.int ---;
@@ -165,7 +166,7 @@ LUA_AUTHORS ::	"R. Ierusalimschy, L. H. de Figueiredo, W. Celes";
 LUA_SIGNATURE :: "\x1bLua";
 LUA_MULTRET	:: (-1);
 
-LUA_NUMBER :: c.float;
+LUA_NUMBER :: c.double;
 LUA_INTEGER :: c.longlong;
 LUA_KCONTEXT :: c.ptrdiff_t;
 LUA_IDSIZE :: 60;
@@ -178,7 +179,7 @@ lua_Integer :: LUA_INTEGER;
 lua_Unsigned :: LUA_UNSIGNED;
 lua_KContext :: LUA_KCONTEXT;
 
-LUA_REGISTRYINDEX :: (-LUAI_MAXSTACK - 1000);
+LUA_REGISTRYINDEX :: (-(math.max(c.int) / 2 + 1000))
 
 LUA_OK 			:: 0;
 LUA_YIELD 		:: 1;
