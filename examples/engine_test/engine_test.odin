@@ -22,6 +22,7 @@ import "core:debug/trace"
 is_android :: engine.is_android// TODO ANDROID SUPPORT
 
 renderCmd : ^engine.render_cmd
+scene: [dynamic]^engine.iobject
 
 shapeSrc: shape.shape_src
 texture:engine.texture
@@ -70,7 +71,8 @@ panda_img_allocator_proc :: proc(allocator_data: rawptr, mode: runtime.Allocator
 }
 
 Init ::proc() {
-    renderCmd = engine.render_cmd_init()
+	scene = make([dynamic]^engine.iobject, engine.def_allocator())
+    renderCmd = engine.render_cmd_init(&scene)
 
     engine.projection_update_ortho_window(engine.def_projection(), CANVAS_W, CANVAS_H)
 
@@ -239,6 +241,8 @@ Destroy ::proc() {
         free(obj, engine.def_allocator())
     }
     engine.render_cmd_deinit(renderCmd)
+
+	delete(scene)
 
     sound.sound_src_deinit(bgSndSrc)
     delete(bgSndFileData)
