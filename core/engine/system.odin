@@ -61,7 +61,6 @@ when library.is_android {
 }
 
 @private main_thread_id: int
-@private engine_def_allocator: runtime.Allocator
 @(private = "file") __tempArena: virtual.Arena
 __temp_arena_allocator: mem.Allocator
 
@@ -183,7 +182,6 @@ engine_main :: proc(
 
 
 @private system_start :: #force_inline proc() {
-	engine_def_allocator = context.allocator
 	main_thread_id = sync.current_thread_id()
 
     monitors = mem.make_non_zeroed([dynamic]monitor_info)

@@ -65,19 +65,19 @@ panda_img_allocator_proc :: proc(allocator_data: rawptr, mode: runtime.Allocator
 	case .Free:
 		 qoiD :^qoi.qoi_converter = auto_cast allocator_data
 		 qoi.qoi_converter_deinit(qoiD)
-         free(qoiD, engine.def_allocator())
+         free(qoiD, qoiD.allocator)
 	}
 	return nil, nil
 }
 
 Init ::proc() {
-	scene = make([dynamic]^engine.iobject, engine.def_allocator())
+	scene = make([dynamic]^engine.iobject)
     renderCmd = engine.render_cmd_init(&scene)
 
     engine.projection_update_ortho_window(engine.def_projection(), CANVAS_W, CANVAS_H)
 
     //Font Test
-    shape_obj: ^shape.shape = new(shape.shape, engine.def_allocator())
+    shape_obj: ^shape.shape = new(shape.shape)
 
     fontFileData:[]u8
     defer delete(fontFileData, context.temp_allocator)
@@ -110,15 +110,15 @@ Init ::proc() {
         scale = linalg.PointF{3,3},
     }
 
-    rawText, shapeErr := font.font_render_string(ft, "안녕", renderOpt, engine.def_allocator())
-    if shapeErr != .None {
+    rawText, shapeErr := font.font_render_string(ft, "안녕", renderOpt, context.allocator)
+    if shapeErr != nil {
         trace.panic_log(shapeErr)
     }
-    defer free(rawText, engine.def_allocator())
+    defer free(rawText)
     //!DO NOT geometry.raw_shape_free, auto delete vertex and index data after shape_src_init_raw completed
     //!only delete raw single pointer
 
-    shape.shape_src_init_raw(&shapeSrc, rawText, allocator = engine.def_allocator())
+    shape.shape_src_init_raw(&shapeSrc, rawText, allocator = context.allocator)
 
     shape.shape_init(shape_obj, shape.shape, &shapeSrc, {-0.0, 0, 10}, math.to_radians_f32(45.0), {3, 3},
     pivot = {0.0, 0.0})
@@ -180,10 +180,10 @@ Init ::proc() {
     //
 
     //Image Test
-    qoiD :^qoi.qoi_converter = new(qoi.qoi_converter, engine.def_allocator())
+    qoiD :^qoi.qoi_converter = new(qoi.qoi_converter)
 
     //imgData, errCode := engine.image_converter_load_file(qoiD, "res/panda.qoi", .RGBA)
-    imgData, errCode := qoi.qoi_converter_load(qoiD, panda_img, .RGBA, engine.def_allocator())
+    imgData, errCode := qoi.qoi_converter_load(qoiD, panda_img, .RGBA)
     if errCode != nil {
         trace.panic_log(errCode)
     }
@@ -195,7 +195,7 @@ Init ::proc() {
             data= auto_cast qoiD,
           })
 
-    img: ^GUI_Image = new(GUI_Image, engine.def_allocator())
+    img: ^GUI_Image = new(GUI_Image)
     img.com.gui_scale = {0.7,0.7}
     img.com.gui_rotation = math.to_radians_f32(45.0)
     img.com.gui_align_x = .left
@@ -238,7 +238,7 @@ Destroy ::proc() {
     for i in 0..<len {
         obj := engine.render_cmd_get_object(renderCmd, i)
         engine.iobject_deinit(obj)
-        free(obj, engine.def_allocator())
+        free(obj)
     }
     engine.render_cmd_deinit(renderCmd)
 
@@ -250,11 +250,15 @@ Destroy ::proc() {
 
 
 main :: proc() {
+	tracking_allocator := trace.start_tracking_allocator() 
+
     engine.init = Init
     engine.update = Update
     engine.destroy = Destroy
     engine.size = Size
     engine.engine_main(window_width = int(CANVAS_W), window_height = int(CANVAS_H))
+
+	trace.destroy_tracking_allocator(&tracking_allocator)
 }
 
 

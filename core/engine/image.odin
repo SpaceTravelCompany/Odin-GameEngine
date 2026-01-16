@@ -547,7 +547,7 @@ texture_array_init :: proc(self:^texture_array, width:u32, height:u32, count:u32
     self.set.layout = tex_descriptor_set_layout
     self.set.__set = 0
 
-    allocPixels := mem.make_non_zeroed_slice([]byte, count * width * height * 4, engine_def_allocator)
+    allocPixels := mem.make_non_zeroed_slice([]byte, count * width * height * 4, context.allocator)
     color_fmt_convert_default(pixels, allocPixels, inPixelFmt)
 
     buffer_resource_create_texture(&self.texture, {
@@ -560,7 +560,7 @@ texture_array_init :: proc(self:^texture_array, width:u32, height:u32, count:u32
         texture_usage = {.IMAGE_RESOURCE},
         type = .TEX2D,
         resource_usage = .GPU,
-    }, self.sampler, allocPixels, false, engine_def_allocator)
+    }, self.sampler, allocPixels, false, context.allocator)
 
     self.set.__resources = mem.make_non_zeroed_slice([]union_resource, 1, __temp_arena_allocator)
     self.set.__resources[0] = &self.texture
