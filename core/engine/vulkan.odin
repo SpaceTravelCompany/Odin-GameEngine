@@ -173,15 +173,16 @@ vkNoBlending := vk.PipelineColorBlendStateCreateInfoInit(__vkNoBlendingState[:1]
 vkCopyBlending := vk.PipelineColorBlendStateCreateInfoInit(__vkNoBlendingState[:1])
 
 vk_init_shader_modules :: proc() {
-	vkShapeVertShader, _ = vk.CreateShaderModule2(vk_device, #shader_load("shaders/shape.vert"))
-	vkShapeFragShader, _ = vk.CreateShaderModule2(vk_device, #shader_load("shaders/shape.frag"))
-	when wire_mode do vkShapeWireFragShader, _ = vk.CreateShaderModule2(vk_device, #shader_load("shaders/shape_wire.frag"))
-	vkTexVertShader, _ = vk.CreateShaderModule2(vk_device, #shader_load("shaders/tex.vert"))
-	vkTexFragShader, _ = vk.CreateShaderModule2(vk_device, #shader_load("shaders/tex.frag"))
-	vkAnimateTexVertShader, _ = vk.CreateShaderModule2(vk_device, #shader_load("shaders/animate_tex.vert"))
-	vkAnimateTexFragShader, _ = vk.CreateShaderModule2(vk_device, #shader_load("shaders/animate_tex.frag"))
-	//vkCopyScreenVertShader, _ = vk.CreateShaderModule2(vk_device, #shader_load("shaders/screen_copy.vert"))
-	//vkCopyScreenFragShader, _ = vk.CreateShaderModule2(vk_device, #shader_load("shaders/screen_copy.frag"))
+
+	vkShapeVertShader, _ = vk.CreateShaderModule2(vk_device, #shader_load("shaders/shape.vert", SHADER_COMPILE_OPTION))
+	vkShapeFragShader, _ = vk.CreateShaderModule2(vk_device, #shader_load("shaders/shape.frag", SHADER_COMPILE_OPTION))
+	when wire_mode do vkShapeWireFragShader, _ = vk.CreateShaderModule2(vk_device, #shader_load("shaders/shape_wire.frag", SHADER_COMPILE_OPTION))
+	vkTexVertShader, _ = vk.CreateShaderModule2(vk_device, #shader_load("shaders/tex.vert", SHADER_COMPILE_OPTION))
+	vkTexFragShader, _ = vk.CreateShaderModule2(vk_device, #shader_load("shaders/tex.frag", SHADER_COMPILE_OPTION))
+	vkAnimateTexVertShader, _ = vk.CreateShaderModule2(vk_device, #shader_load("shaders/animate_tex.vert", SHADER_COMPILE_OPTION))
+	vkAnimateTexFragShader, _ = vk.CreateShaderModule2(vk_device, #shader_load("shaders/animate_tex.frag", SHADER_COMPILE_OPTION))
+	//vkCopyScreenVertShader, _ = vk.CreateShaderModule2(vk_device, #shader_load("shaders/screen_copy.vert", SHADER_COMPILE_OPTION))
+	//vkCopyScreenFragShader, _ = vk.CreateShaderModule2(vk_device, #shader_load("shaders/screen_copy.frag", SHADER_COMPILE_OPTION))
 
 	shapeShaderStages = vk.CreateShaderStages(vkShapeVertShader, vkShapeFragShader)
 	when wire_mode do shapeWireShaderStages = vk.CreateShaderStages(vkShapeVertShader, vkShapeWireFragShader)

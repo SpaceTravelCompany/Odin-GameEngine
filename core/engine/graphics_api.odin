@@ -541,3 +541,9 @@ default_multisample_state :: #force_inline proc "contextless" () -> ^vk.Pipeline
 @(private) graphics_recreate_surface :: #force_inline proc() {vk_recreate_surface()}
 @(private) graphics_allocator_init :: #force_inline proc() {vk_allocator_init()}
 @(private) graphics_allocator_destroy :: #force_inline proc() {vk_allocator_destroy()}
+
+when ODIN_DEBUG {
+	@private SHADER_COMPILE_OPTION :: "none"
+} else {
+	@private SHADER_COMPILE_OPTION :: "speed"
+}
