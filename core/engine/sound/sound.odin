@@ -53,6 +53,7 @@ sound_src :: struct {
 
 
 @private g_init :: proc() {
+	context.allocator = runtime.default_allocator()// avoid g_sounds, g_end_sounds affects tracking allocator
     g_sounds = make(map[^sound]^sound)
     g_end_sounds = make([dynamic]^sound)
 

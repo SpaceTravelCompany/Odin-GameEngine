@@ -244,13 +244,20 @@ Destroy ::proc() {
 
 	delete(scene)
 
+	font.font_deinit(ft)
+
     sound.sound_src_deinit(bgSndSrc)
     delete(bgSndFileData)
 }
 
+BREAKPOINT_ON_TRACKING_ALLOCATOR :: true
 
 main :: proc() {
-	tracking_allocator := trace.start_tracking_allocator() 
+	when ODIN_DEBUG {
+		track_allocator: mem.Tracking_Allocator
+		mem.tracking_allocator_init(&track_allocator, context.allocator)
+		context.allocator = mem.tracking_allocator(&track_allocator)
+	}
 
     engine.init = Init
     engine.update = Update
@@ -258,7 +265,39 @@ main :: proc() {
     engine.size = Size
     engine.engine_main(window_width = int(CANVAS_W), window_height = int(CANVAS_H))
 
-	trace.destroy_tracking_allocator(&tracking_allocator)
+	when ODIN_DEBUG {
+		if track_allocator.backing.procedure != nil {
+			when BREAKPOINT_ON_TRACKING_ALLOCATOR {
+				breakP := false
+			}
+
+			if len(track_allocator.allocation_map) > 0 {
+				fmt.eprintf("=== %v allocations not freed: ===\n", len(track_allocator.allocation_map))
+				for _, entry in track_allocator.allocation_map {
+					fmt.eprintf("- %v bytes @ %v\n", entry.size, entry.location)
+				}
+				when BREAKPOINT_ON_TRACKING_ALLOCATOR {
+					breakP = true
+				}
+			}
+			if len(track_allocator.bad_free_array) > 0 {
+				fmt.eprintf("=== %v incorrect frees: ===\n", len(track_allocator.bad_free_array))
+				for entry in track_allocator.bad_free_array {
+					fmt.eprintf("- %p @ %v\n", entry.memory, entry.location)
+				}
+				when BREAKPOINT_ON_TRACKING_ALLOCATOR {
+					breakP = true
+				}
+			}
+			mem.tracking_allocator_destroy(&track_allocator)
+
+			when BREAKPOINT_ON_TRACKING_ALLOCATOR {
+				if breakP {
+					runtime.debug_trap()
+				}
+			}
+		}
+	}
 }
 
 
