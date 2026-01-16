@@ -58,38 +58,38 @@ button_move :: proc (self:^button, mousePos:linalg.PointF) {
         }
     }
 }
-button_touch_up :: proc (self:^button, touchPos:linalg.PointF, touchIdx:u8) {
-    if self.state == .DOWN && self.touchIdx != nil && self.touchIdx.? == touchIdx {
+button_pointer_up :: proc (self:^button, pointerPos:linalg.PointF, pointerIdx:u8) {
+    if self.state == .DOWN && self.pointerIdx != nil && self.pointerIdx.? == pointerIdx {
         self.state = .UP
-        self.touchIdx = nil
+        self.pointerIdx = nil
         //UPDATE
-        if self.touch_up_callback != nil do self.touch_up_callback(self, touchPos, touchIdx)
+        if self.pointer_up_callback != nil do self.pointer_up_callback(self, pointerPos, pointerIdx)
     }
 }
-button_touch_down :: proc (self:^button, touchPos:linalg.PointF, touchIdx:u8) {
+button_pointer_down :: proc (self:^button, pointerPos:linalg.PointF, pointerIdx:u8) {
     if self.state == .UP {
-        if linalg.Area_PointIn(self.area, touchPos) {
+        if linalg.Area_PointIn(self.area, pointerPos) {
             self.state = .DOWN
-            self.touchIdx = touchIdx
+            self.pointerIdx = pointerIdx
             //UPDATE
-            if self.touch_down_callback != nil do self.touch_down_callback(self, touchPos, touchIdx)
+            if self.pointer_down_callback != nil do self.pointer_down_callback(self, pointerPos, pointerIdx)
         }    
-    } else if self.touchIdx != nil && self.touchIdx.? == touchIdx {
+    } else if self.pointerIdx != nil && self.pointerIdx.? == pointerIdx {
         self.state = .UP
-        self.touchIdx = nil
+        self.pointerIdx = nil
         //UPDATE
     }
 }
-button_touch_move :: proc (self:^button, touchPos:linalg.PointF, touchIdx:u8) {
-    if linalg.Area_PointIn(self.area, touchPos) {
-        if self.touchIdx == nil && self.state == .UP {
-            self.touchIdx = touchIdx
+button_pointer_move :: proc (self:^button, pointerPos:linalg.PointF, pointerIdx:u8) {
+    if linalg.Area_PointIn(self.area, pointerPos) {
+        if self.pointerIdx == nil && self.state == .UP {
+            self.pointerIdx = pointerIdx
             self.state = .OVER
             //UPDATE
-            if self.touch_move_callback != nil do self.touch_move_callback(self, touchPos, touchIdx)
+            if self.pointer_move_callback != nil do self.pointer_move_callback(self, pointerPos, pointerIdx)
         }    
-    } else if self.touchIdx != nil && self.touchIdx.? == touchIdx {
-        self.touchIdx = nil
+    } else if self.pointerIdx != nil && self.pointerIdx.? == pointerIdx {
+        self.pointerIdx = nil
         if self.state != .UP {
             self.state = .UP
             //UPDATE
@@ -101,13 +101,13 @@ button :: struct {
     using _:engine.iobject,
     area:linalg.AreaF,
     state : button_state,
-    touchIdx:Maybe(u8),
+    pointerIdx:Maybe(u8),
     button_up_callback: proc (self:^button, mousePos:linalg.PointF),
     button_down_callback: proc (self:^button, mousePos:linalg.PointF),
     button_move_callback: proc (self:^button, mousePos:linalg.PointF),
-    touch_down_callback: proc (self:^button, touchPos:linalg.PointF, touchIdx:u8),
-    touch_up_callback: proc (self:^button, touchPos:linalg.PointF, touchIdx:u8),
-    touch_move_callback: proc (self:^button, touchPos:linalg.PointF, touchIdx:u8),
+    pointer_down_callback: proc (self:^button, pointerPos:linalg.PointF, pointerIdx:u8),
+    pointer_up_callback: proc (self:^button, pointerPos:linalg.PointF, pointerIdx:u8),
+    pointer_move_callback: proc (self:^button, pointerPos:linalg.PointF, pointerIdx:u8),
 }
 
 shape_button :: struct {
@@ -122,9 +122,9 @@ button_vtable :: struct {
     button_up: proc (self:^button, mousePos:linalg.PointF),
     button_down: proc (self:^button, mousePos:linalg.PointF),
     button_move: proc (self:^button, mousePos:linalg.PointF),
-    touch_down: proc (self:^button, touchPos:linalg.PointF, touchIdx:u8),
-    touch_up: proc (self:^button, touchPos:linalg.PointF, touchIdx:u8),
-    touch_move: proc (self:^button, touchPos:linalg.PointF, touchIdx:u8),
+    pointer_down: proc (self:^button, pointerPos:linalg.PointF, pointerIdx:u8),
+    pointer_up: proc (self:^button, pointerPos:linalg.PointF, pointerIdx:u8),
+    pointer_move: proc (self:^button, pointerPos:linalg.PointF, pointerIdx:u8),
 }
 
 @private image_button_vtable :button_vtable = button_vtable {

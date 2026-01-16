@@ -4,6 +4,7 @@ import "base:intrinsics"
 import "base:library"
 import "base:runtime"
 import "core:c"
+import "core:c/libc"
 import "core:debug/trace"
 import "core:fmt"
 import "core:math/linalg"
@@ -242,7 +243,7 @@ when library.is_android {
 				if toolType == .MOUSE {
 					count = 1
 					mm := linalg.PointF{android.AMotionEvent_getX(evt, 0), android.AMotionEvent_getY(evt, 0)}
-					mm = convert_mouse_pos(mm)
+					//mm = convert_mouse_pos(mm) //no need to convert anymore
 					__mouse_pos = mm
 
 					#partial switch act.action {
@@ -272,20 +273,20 @@ when library.is_android {
 				if act.action == .MOVE {
 					for i in 0 ..< count {
 						pt := linalg.PointF{android.AMotionEvent_getX(evt, i), android.AMotionEvent_getY(evt, i)}
-						pt = convert_mouse_pos(pt)
+						//pt = convert_mouse_pos(pt) //no need to convert anymore
 
 						if pt.x != pointer_poses[i].x || pt.y != pointer_poses[i].y {
 							pointer_poses[i] = pt
 							if i == 0 {
 								__mouse_pos = pt
 							}
-							pointer_move(int(i), pt.x, pt.y)
+							pointer_move(u8(i), pt.x, pt.y)
 						}
 					}
 				} else {
 					for i in 0 ..< count {
 						pointer_poses[i] = linalg.PointF{android.AMotionEvent_getX(evt, i), android.AMotionEvent_getY(evt, i)}
-						pointer_poses[i] = convert_mouse_pos(pointer_poses[i])
+						//pointer_poses[i] = convert_mouse_pos(pointer_poses[i]) //no need to convert anymore
 					}
 					__mouse_pos = pointer_poses[0]
 				}
@@ -298,14 +299,14 @@ when library.is_android {
 					case .POINTER_DOWN:
 						idx := act.pointer_index
 						if auto_cast idx < count {
-							pointer_down(auto_cast idx, pointer_poses[idx].x, pointer_poses[idx].y)
+							pointer_down(u8(idx), pointer_poses[idx].x, pointer_poses[idx].y)
 						} else {
 							fmt.print_custom_android("WARN OUT OF RANGE PointerDown:", idx, count, "\n", logPriority=.WARN)
 						}
 					case .POINTER_UP:
 						idx := act.pointer_index
 						if auto_cast idx < count {
-							pointer_up(auto_cast idx, pointer_poses[idx].x, pointer_poses[idx].y)
+							pointer_up(u8(idx), pointer_poses[idx].x, pointer_poses[idx].y)
 						} else {
 							fmt.print_custom_android("WARN OUT OF RANGE PointerUp:", idx, count, "\n", logPriority=.WARN)
 						}
@@ -330,6 +331,7 @@ when library.is_android {
 						fmt.print_custom_android("WARN OUT OF RANGE KeyDown: ", int(key_code_), "\n", logPriority=.WARN, sep = "")
 						return 0
 					}
+					if key_code_ == .BACK do return 1 // 뒤로가기 버튼 비활성화
 				case .UP:
 					if .JOYSTICK in transmute(android.InputSourceDevice)(src.device) || .GAMEPAD in transmute(android.InputSourceDevice)(src.device) {
 						if handle_input_buttons(evt, key_code_, false) do return 1
@@ -341,6 +343,7 @@ when library.is_android {
 						fmt.print_custom_android("WARN OUT OF RANGE KeyUp: ", int(key_code_), "\n", logPriority=.WARN, sep = "")
 						return 0
 					}
+					if key_code_ == .BACK do return 1 // 뒤로가기 버튼 비활성화
 				case .MULTIPLE:
 					if int(key_code_) < key_size {
 						cnt := android.AKeyEvent_getRepeatCount(evt)
@@ -352,6 +355,7 @@ when library.is_android {
 						fmt.print_custom_android("WARN OUT OF RANGE Key Multiple: ", int(key_code_), "\n", logPriority=.WARN, sep = "")
 						return 0
 					}
+					if key_code_ == .BACK do return 1 // 뒤로가기 버튼 비활성화
 			}
 		} else {
 			//TODO (xfitgd)
@@ -427,7 +431,9 @@ when library.is_android {
 						graphics_destroy()
 						system_destroy()
 						system_after_destroy()
-						return
+
+						libc.exit(0)
+						//return
 					}
 				}
 

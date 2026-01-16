@@ -81,6 +81,7 @@ when library.is_mobile {
 
         /* Function keys */
         KEY_ESCAPE = auto_cast android.Keycode.ESCAPE,
+        KEY_BACK = auto_cast android.Keycode.BACK,
         KEY_ENTER = auto_cast android.Keycode.ENTER,
         KEY_TAB = auto_cast android.Keycode.TAB,
         KEY_INSERT = auto_cast android.Keycode.INSERT,
@@ -293,9 +294,9 @@ mouse_move : #type proc (x:f32, y:f32) = proc (x:f32, y:f32) {}
 mouse_scroll : #type proc (dt:int) = proc (dt:int) {}
 mouse_in : #type proc () = proc () {}
 mouse_out : #type proc () = proc () {}
-pointer_down : #type proc (pointer_idx:int, x:f32, y:f32) = proc (pointer_idx:int, x:f32, y:f32) {}
-pointer_up : #type proc (pointer_idx:int, x:f32, y:f32) = proc (pointer_idx:int, x:f32, y:f32) {}
-pointer_move : #type proc (pointer_idx:int, x:f32, y:f32) = proc (pointer_idx:int, x:f32, y:f32) {}
+pointer_down : #type proc (pointer_idx:u8, x:f32, y:f32) = proc (pointer_idx:u8, x:f32, y:f32) {}
+pointer_up : #type proc (pointer_idx:u8, x:f32, y:f32) = proc (pointer_idx:u8, x:f32, y:f32) {}
+pointer_move : #type proc (pointer_idx:u8, x:f32, y:f32) = proc (pointer_idx:u8, x:f32, y:f32) {}
 
 /*
 Checks if the mouse is outside the window
