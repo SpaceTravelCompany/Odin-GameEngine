@@ -17,6 +17,7 @@ package all
 
 @(require) import "core:container/avl"
 @(require) import "core:container/bit_array"
+@(require) import "core:container/pool"
 @(require) import "core:container/priority_queue"
 @(require) import "core:container/queue"
 @(require) import "core:container/small_array"
@@ -104,6 +105,8 @@ package all
 @(require) import "core:mem/tlsf"
 @(require) import "core:mem/virtual"
 
+@(require) import "core:nbio"
+
 @(require) import "core:odin/ast"
 @(require) import doc_format "core:odin/doc-format"
 @(require) import "core:odin/parser"
@@ -155,6 +158,7 @@ package all
 @(require) import "core:unicode/utf8/utf8string"
 @(require) import "core:unicode/utf16"
 
+<<<<<<< HEAD
 @(require) import poly2tri "core:math/poly2tri"
 @(require) import collision "core:math/collision"
 
@@ -174,3 +178,6 @@ package all
 
 main :: proc() {}
 
+=======
+main :: proc() {}
+>>>>>>> d46c547264c2be4ff46887d96354e653dbd6069d
