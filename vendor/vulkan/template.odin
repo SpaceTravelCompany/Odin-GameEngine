@@ -100,10 +100,7 @@ DefaultPipelineDepthStencilStateCreateInfo := PipelineDepthStencilStateCreateInf
 }
 
 
-@(require_results) CreateShaderModule2 :: proc(vkDevice: Device, code: []byte) -> (ShaderModule, bool) {
-	if len(code) == 0 {
-		return 0, false
-	}
+@(require_results) CreateShaderModule2 :: proc(vkDevice: Device, code: []byte) -> (ShaderModule, Result) {
 	code_ := transmute([]u32)code
 	createInfo := ShaderModuleCreateInfo {
 		codeSize = len(code_),
@@ -112,9 +109,9 @@ DefaultPipelineDepthStencilStateCreateInfo := PipelineDepthStencilStateCreateInf
 	}
 
 	shaderModule: ShaderModule
-	CreateShaderModule(vkDevice, &createInfo, nil, &shaderModule)
+	res := CreateShaderModule(vkDevice, &createInfo, nil, &shaderModule)
 
-	return shaderModule, true
+	return shaderModule, res
 }
 
 @(require_results) CreateShaderStages :: proc "contextless" (

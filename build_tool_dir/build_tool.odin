@@ -39,12 +39,12 @@ riscv64-linux-gnu
 
 main :: proc() {
 	//shader compile only
-	if len(os2.args) >= 2 {
-		if os2.args[1] == "-s" || os2.args[1] == "--shader" {
-			findGLSLFileAndRunCmd()
-			return
-		}
-	}
+	// if len(os2.args) >= 2 {
+	// 	if os2.args[1] == "-s" || os2.args[1] == "--shader" {
+	// 		findGLSLFileAndRunCmd()
+	// 		return
+	// 	}
+	// }
 
 	//fmt.println(os.args)
 	json_data:json.Value
@@ -90,7 +90,7 @@ main :: proc() {
 	}
 	defer free_all(	context.temp_allocator)
 
-	if !findGLSLFileAndRunCmd() do return
+	//if !findGLSLFileAndRunCmd() do return
 
 	if is_android {
 		android_paths := (json_data.(json.Object)["android-paths"]).(json.Object)
@@ -257,48 +257,48 @@ main :: proc() {
 	}
 }
 
-findGLSLFileAndRunCmd :: proc() -> bool {
-	SHADER_DIR :: "core/engine/shaders/"
+// findGLSLFileAndRunCmd :: proc() -> bool {
+// 	SHADER_DIR :: "core/engine/shaders/"
 
-	dir, err := os2.open(filepath.join({ODIN_ROOT, SHADER_DIR}, context.temp_allocator))
-	if err != nil {
-		fmt.panicf("findGLSLFiles open ERR : %s", err)
-	}
-	defer os2.close(dir)
+// 	dir, err := os2.open(filepath.join({ODIN_ROOT, SHADER_DIR}, context.temp_allocator))
+// 	if err != nil {
+// 		fmt.panicf("findGLSLFiles open ERR : %s", err)
+// 	}
+// 	defer os2.close(dir)
 
 
-	files, readErr := os2.read_dir(dir, 0, context.allocator)
-	if readErr != nil {
-		fmt.panicf("findGLSLFiles read_dir ERR : %s", readErr)
-	}
+// 	files, readErr := os2.read_dir(dir, 0, context.allocator)
+// 	if readErr != nil {
+// 		fmt.panicf("findGLSLFiles read_dir ERR : %s", readErr)
+// 	}
 
-	defer delete(files)
-	for file in files {
-		if file.type != .Regular do continue
+// 	defer delete(files)
+// 	for file in files {
+// 		if file.type != .Regular do continue
 
-		ext := filepath.ext(file.name)
+// 		ext := filepath.ext(file.name)
 
-		glslExts := []string{
-			".glsl", ".vert", ".frag", ".geom", ".comp", 
-			".tesc", ".tese", ".rgen", ".rint", ".rahit", 
-			".rchit", ".rmiss", ".rcall"
-		}
+// 		glslExts := []string{
+// 			".glsl", ".vert", ".frag", ".geom", ".comp", 
+// 			".tesc", ".tese", ".rgen", ".rint", ".rahit", 
+// 			".rchit", ".rmiss", ".rcall"
+// 		}
 
-		for vExt in glslExts {
-			if strings.compare(ext, vExt) == 0 {
-				spvFile := strings.join({ODIN_ROOT, SHADER_DIR, file.name, ".spv"}, "")
-				glslFile := strings.join({ODIN_ROOT, SHADER_DIR, file.name}, "")
-				defer delete(spvFile)
-				defer delete(glslFile)
+// 		for vExt in glslExts {
+// 			if strings.compare(ext, vExt) == 0 {
+// 				spvFile := strings.join({ODIN_ROOT, SHADER_DIR, file.name, ".spv"}, "")
+// 				glslFile := strings.join({ODIN_ROOT, SHADER_DIR, file.name}, "")
+// 				defer delete(spvFile)
+// 				defer delete(glslFile)
 
-				if !runCmd({"glslc", glslFile, "-O", "-o", spvFile}) do return false
-				break
-			}
-		}
-	}
+// 				if !runCmd({"glslc", glslFile, "-O", "-o", spvFile}) do return false
+// 				break
+// 			}
+// 		}
+// 	}
 
-	return true
-}
+// 	return true
+// }
 
 runCmd :: proc(cmd:[]string) -> bool {
 	r, w, err := os2.pipe()

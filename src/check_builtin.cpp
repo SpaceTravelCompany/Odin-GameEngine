@@ -2025,6 +2025,193 @@ gb_internal LoadDirectiveResult check_load_directory_directive(CheckerContext *c
 	return result;
 }
 
+gb_internal i32 system_exec_command_line_app(char const *name, char const *fmt, ...);
+
+gb_internal LoadDirectiveResult check_shader_load_directive(CheckerContext *c, Operand *operand, Ast *call, Type *type_hint, bool err_on_not_found) {
+	ast_node(ce, CallExpr, call);
+	ast_node(bd, BasicDirective, ce->proc);
+	String name = bd->name.string;
+	GB_ASSERT(name == "shader_load");
+
+	if (ce->args.count < 1 || ce->args.count > 2) {
+		if (ce->args.count == 0) {
+			error(ce->close, "'#%.*s' expects 1 or 2 arguments, got 0", LIT(name));
+		} else {
+			error(ce->args[0], "'#%.*s' expects 1 or 2 arguments, got %td", LIT(name), ce->args.count);
+		}
+		return LoadDirective_Error;
+	}
+
+	Ast *arg = ce->args[0];
+	Operand o = {};
+	check_expr(c, &o, arg);
+	if (o.mode != Addressing_Constant) {
+		error(arg, "'#%.*s' expected a constant string argument", LIT(name));
+		return LoadDirective_Error;
+	}
+
+	if (!is_type_string(o.type)) {
+		gbString str = type_to_string(o.type);
+		error(arg, "'#%.*s' expected a constant string, got %s", LIT(name), str);
+		gb_string_free(str);
+		return LoadDirective_Error;
+	}
+
+	GB_ASSERT(o.value.kind == ExactValue_String);
+
+	// Parse optimization level (default: none)
+	// Valid values: "none", "size", "speed"
+	String opt_level = str_lit("none");
+	if (ce->args.count == 2) {
+		Ast *opt_arg = ce->args[1];
+		Operand opt_o = {};
+		check_expr(c, &opt_o, opt_arg);
+		if (opt_o.mode != Addressing_Constant) {
+			error(opt_arg, "'#%.*s' expected a constant string for optimization level", LIT(name));
+			return LoadDirective_Error;
+		}
+		if (!is_type_string(opt_o.type)) {
+			gbString str = type_to_string(opt_o.type);
+			error(opt_arg, "'#%.*s' expected a constant string for optimization level, got %s", LIT(name), str);
+			gb_string_free(str);
+			return LoadDirective_Error;
+		}
+		opt_level = opt_o.value.value_string;
+		
+		// Validate optimization level
+		if (!(opt_level == "none" || opt_level == "size" || opt_level == "speed")) {
+			error(opt_arg, "'#%.*s' invalid optimization level '%.*s', expected 'none', 'size', or 'speed'", LIT(name), LIT(opt_level));
+			return LoadDirective_Error;
+		}
+	}
+
+	operand->type = t_u8_slice;
+	if (type_hint && is_valid_type_for_load(type_hint)) {
+		operand->type = type_hint;
+	}
+	operand->mode = Addressing_Constant;
+
+	String original_string = o.value.value_string;
+	String path;
+	if (gb_path_is_absolute((char*)original_string.text)) {
+		path = original_string;
+	} else {
+		String base_dir = dir_from_path(get_file_path_string(call->file_id));
+
+		BlockingMutex *ignore_mutex = nullptr;
+		bool ok = determine_path_from_string(ignore_mutex, call, base_dir, original_string, &path);
+		if (!ok) {
+			if (err_on_not_found) {
+				error(ce->proc, "Failed to `#%.*s` file: %.*s; invalid file or cannot be found", LIT(name), LIT(original_string));
+			}
+			call->state_flags |= StateFlag_DirectiveWasFalse;
+			return LoadDirective_NotFound;
+		}
+	}
+
+	// Generate cache key including optimization level
+	isize cache_key_len = path.len + 1 + opt_level.len;
+	char *cache_key_buf = gb_alloc_array(permanent_allocator(), char, cache_key_len + 1);
+	gb_memmove(cache_key_buf, path.text, path.len);
+	cache_key_buf[path.len] = ':';
+	gb_memmove(cache_key_buf + path.len + 1, opt_level.text, opt_level.len);
+	cache_key_buf[cache_key_len] = '\0';
+	String cache_key = make_string(cast(u8*)cache_key_buf, cache_key_len);
+
+	MUTEX_GUARD(&c->info->shader_load_mutex);
+
+	// Check cache first
+	ShaderLoadCache **cache_ptr = string_map_get(&c->info->shader_load_cache, cache_key);
+	ShaderLoadCache *cache = cache_ptr ? *cache_ptr : nullptr;
+
+	if (cache && cache->compilation_success) {
+		operand->value = exact_value_string(cache->compiled_data);
+		return LoadDirective_Success;
+	}
+
+	// Compile shader with glslc
+	TEMPORARY_ALLOCATOR_GUARD();
+
+	char *source_path_cstr = alloc_cstring(temporary_allocator(), path);
+
+	// Generate output path (source_path + ".spv")
+	isize output_path_len = path.len + 4;
+	char *output_path_cstr = gb_alloc_array(temporary_allocator(), char, output_path_len + 1);
+	gb_memmove(output_path_cstr, path.text, path.len);
+	gb_memmove(output_path_cstr + path.len, ".spv", 4);
+	output_path_cstr[output_path_len] = '\0';
+
+	// Determine optimization flag
+	char const *opt_flag = "";
+	if (opt_level == "size") {
+		opt_flag = "-Os";
+	} else if (opt_level == "speed") {
+		opt_flag = "-O";
+	}
+	// "none" = no optimization flag
+
+	// Get glslc path from ODIN_ROOT
+	#if defined(GB_SYSTEM_WINDOWS)
+	i32 exit_code = system_exec_command_line_app("glslc",
+		"\"%.*s\\glslc.exe\" %s \"%s\" -o \"%s\"",
+		LIT(build_context.ODIN_ROOT), opt_flag, source_path_cstr, output_path_cstr);
+	#else
+	i32 exit_code = system_exec_command_line_app("glslc",
+		"\"%.*s/glslc\" %s \"%s\" -o \"%s\"",
+		LIT(build_context.ODIN_ROOT), opt_flag, source_path_cstr, output_path_cstr);
+	#endif
+
+	ShaderLoadCache *new_cache = gb_alloc_item(permanent_allocator(), ShaderLoadCache);
+	new_cache->source_path = path;
+
+	if (exit_code != 0) {
+		new_cache->compilation_success = false;
+		new_cache->file_error = gbFileError_Invalid;
+		string_map_set(&c->info->shader_load_cache, cache_key, new_cache);
+
+		if (err_on_not_found) {
+			error(ce->proc, "Failed to compile shader with glslc: %.*s (exit code: %d)", LIT(path), exit_code);
+		}
+		call->state_flags |= StateFlag_DirectiveWasFalse;
+		return LoadDirective_Error;
+	}
+
+	// Read compiled SPIR-V file
+	gbFile spv_file = {};
+	gbFileError file_error = gb_file_open(&spv_file, output_path_cstr);
+	defer (gb_file_close(&spv_file));
+
+	if (file_error != gbFileError_None) {
+		new_cache->compilation_success = false;
+		new_cache->file_error = file_error;
+		string_map_set(&c->info->shader_load_cache, cache_key, new_cache);
+
+		if (err_on_not_found) {
+			error(ce->proc, "Failed to read compiled shader: %s", output_path_cstr);
+		}
+		call->state_flags |= StateFlag_DirectiveWasFalse;
+		return LoadDirective_Error;
+	}
+
+	isize file_size = cast(isize)gb_file_size(&spv_file);
+	String data = {};
+	if (file_size > 0) {
+		u8 *ptr = cast(u8 *)gb_alloc(permanent_allocator(), file_size + 1);
+		gb_file_read_at(&spv_file, ptr, file_size, 0);
+		ptr[file_size] = '\0';
+		data.text = ptr;
+		data.len = file_size;
+	}
+
+	new_cache->compiled_data = data;
+	new_cache->compilation_success = true;
+	new_cache->file_error = gbFileError_None;
+	string_map_set(&c->info->shader_load_cache, cache_key, new_cache);
+
+	operand->value = exact_value_string(data);
+	return LoadDirective_Success;
+}
+
 gb_internal bool check_hash_kind(CheckerContext *c, Ast *call, String const &hash_kind, u8 const *data, isize data_size, u64 *hash_value) {
 	ast_node(ce, CallExpr, call);
 	ast_node(bd, BasicDirective, ce->proc);
@@ -2158,6 +2345,8 @@ gb_internal bool check_builtin_procedure_directive(CheckerContext *c, Operand *o
 		return check_load_directive(c, operand, call, type_hint, true) == LoadDirective_Success;
 	} else if (name == "load_directory") {
 		return check_load_directory_directive(c, operand, call, type_hint, true) == LoadDirective_Success;
+	} else if (name == "shader_load") {
+		return check_shader_load_directive(c, operand, call, type_hint, true) == LoadDirective_Success;
 	} else if (name == "load_hash") {
 		if (ce->args.count != 2) {
 			if (ce->args.count == 0) {

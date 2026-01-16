@@ -818,7 +818,7 @@ gb_internal Ast *ast_basic_directive(AstFile *f, Token token, Token name) {
 	Ast *result = alloc_ast_node(f, Ast_BasicDirective);
 	result->BasicDirective.token = token;
 	result->BasicDirective.name = name;
-	if (string_starts_with(name.string, str_lit("load"))) {
+	if (string_starts_with(name.string, str_lit("load")) || string_starts_with(name.string, str_lit("shader_load"))) {
 		f->seen_load_directive_count++;
 	}
 	return result;
