@@ -158,7 +158,6 @@ package all
 @(require) import "core:unicode/utf8/utf8string"
 @(require) import "core:unicode/utf16"
 
-<<<<<<< HEAD
 @(require) import poly2tri "core:math/poly2tri"
 @(require) import collision "core:math/collision"
 
@@ -178,6 +177,3 @@ package all
 
 main :: proc() {}
 
-=======
-main :: proc() {}
->>>>>>> d46c547264c2be4ff46887d96354e653dbd6069d
