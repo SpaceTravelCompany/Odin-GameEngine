@@ -469,11 +469,12 @@ Inputs:
 - self: Pointer to the object
 - area: Area to convert
 - viewport: The viewport to which `self` belongs. If nil, the default viewport will be used.
+- allocator: Allocator to use for the result area.
 
 Returns:
 - Area in window coordinates
 */
-iobject_cvt_area_window_coord :: proc(self:^iobject, area:linalg.AreaF, viewport:^viewport, allocator:runtime.Allocator) -> linalg.AreaF {
+iobject_cvt_area_window_coord :: proc(self:^iobject, area:linalg.AreaF, viewport:^viewport, allocator := context.allocator) -> linalg.AreaF {
 	viewport_ := viewport
 	if viewport_ == nil {
 		viewport_ = def_viewport()

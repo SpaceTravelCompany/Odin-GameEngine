@@ -178,7 +178,6 @@ engine_main :: proc(
 
 			system_after_destroy()
 		}
-		__destroy_tracking_allocator()
 	}
 }
 
@@ -186,7 +185,6 @@ engine_main :: proc(
 @private system_start :: #force_inline proc() {
 	engine_def_allocator = context.allocator
 	main_thread_id = sync.current_thread_id()
-	start_tracking_allocator()
 
     monitors = mem.make_non_zeroed([dynamic]monitor_info)
 	when library.is_android {
@@ -410,62 +408,7 @@ Returns:
 */
 exiting :: #force_inline proc  "contextless"() -> bool {return __exiting}
 
-/*
-Gets the default engine allocator
 
-Returns:
-- The default engine allocator
-*/
-def_allocator :: #force_inline proc "contextless" () -> runtime.Allocator {
-	return engine_def_allocator
-}
-
-
-
-/*
-Starts tracking memory allocations for debugging
-
-Returns:
-- None
-*/
-start_tracking_allocator :: proc() {
-	when ODIN_DEBUG {
-		mem.tracking_allocator_init(&track_allocator, context.allocator)
-		if engine_def_allocator == context.allocator {
-			engine_def_allocator = mem.tracking_allocator(&track_allocator)
-			context.allocator = engine_def_allocator
-		} else {
-			context.allocator = mem.tracking_allocator(&track_allocator)
-		}
-	}
-}
-
-destroy_tracking_allocator :: proc() {
-	when ODIN_DEBUG {
-		__destroy_tracking_allocator()
-	}
-}
-
-@private __destroy_tracking_allocator :: proc() {
-	when ODIN_DEBUG {
-		if track_allocator.backing.procedure != nil {
-			if len(track_allocator.allocation_map) > 0 {
-			fmt.eprintf("=== %v allocations not freed: ===\n", len(track_allocator.allocation_map))
-			for _, entry in track_allocator.allocation_map {
-				fmt.eprintf("- %v bytes @ %v\n", entry.size, entry.location)
-			}
-			}
-			if len(track_allocator.bad_free_array) > 0 {
-				fmt.eprintf("=== %v incorrect frees: ===\n", len(track_allocator.bad_free_array))
-				for entry in track_allocator.bad_free_array {
-					fmt.eprintf("- %p @ %v\n", entry.memory, entry.location)
-				}
-			}
-			mem.tracking_allocator_destroy(&track_allocator)
-			track_allocator = {}
-		}
-	}
-}
 
 // @(private) CreateRenderFuncThread :: proc() {
 // 	render_th = thread.create_and_start(RenderFunc)

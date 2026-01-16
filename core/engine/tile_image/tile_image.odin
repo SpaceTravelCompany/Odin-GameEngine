@@ -219,7 +219,7 @@ Returns:
 - None
 */
 tile_texture_array_init :: proc(self:^tile_texture_array, tile_width:u32, tile_height:u32, width:u32, count:u32, pixels:[]byte, sampler:vk.Sampler = 0, 
-inPixelFmt:img.color_fmt = .RGBA) {
+inPixelFmt:img.color_fmt = .RGBA, allocator := context.allocator) {
     mem.ICheckInit_Init(&self.check_init)
     self.sampler = sampler == 0 ? engine.get_linear_sampler() : sampler
     self.set.bindings = engine.descriptor_set_binding__single_pool[:]
@@ -227,7 +227,7 @@ inPixelFmt:img.color_fmt = .RGBA) {
     self.set.layout = engine.get_tex_descriptor_set_layout()
     self.set.__set = 0
     bit :: 4//outBit count default 4
-    allocPixels := mem.make_non_zeroed_slice([]byte, count * tile_width * tile_height * bit, engine.def_allocator())
+    allocPixels := mem.make_non_zeroed_slice([]byte, count * tile_width * tile_height * bit, allocator)
 
     //convert tilemap pixel data format to tile image data format arranged sequentially
     cnt:u32
@@ -254,7 +254,7 @@ inPixelFmt:img.color_fmt = .RGBA) {
         len = count,
         texture_usage = {.IMAGE_RESOURCE},
         type = .TEX2D,
-    }, self.sampler, allocPixels, false, engine.def_allocator())
+    }, self.sampler, allocPixels, false, allocator)
 
     self.set.__resources = mem.make_non_zeroed_slice([]engine.union_resource, 1, engine.temp_arena_allocator())
     self.set.__resources[0] = &self.texture

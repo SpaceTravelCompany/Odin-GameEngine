@@ -18,6 +18,7 @@ render_cmd :: struct {
     cmds:[MAX_FRAMES_IN_FLIGHT][]command_buffer,
     obj_lock:sync.Mutex,
 	check_init:mem.ICheckInit,
+	creation_allocator: runtime.Allocator,
 }
 
 @private __g_render_cmd : [dynamic]^render_cmd = nil
@@ -38,8 +39,8 @@ Make render_cmd.scene manually.
 Returns:
 - Pointer to the initialized render command
 */
-render_cmd_init :: proc(_scene: ^[dynamic]^iobject) -> ^render_cmd {
-    cmd := new(render_cmd, def_allocator())
+render_cmd_init :: proc(_scene: ^[dynamic]^iobject, allocator := context.allocator) -> ^render_cmd {
+    cmd := new(render_cmd, allocator)
     for i in 0..<MAX_FRAMES_IN_FLIGHT {
         cmd.refresh[i] = false
         cmd.cmds[i] = mem.make_non_zeroed([]command_buffer, swap_img_cnt)
@@ -54,6 +55,7 @@ render_cmd_init :: proc(_scene: ^[dynamic]^iobject) -> ^render_cmd {
 	cmd.scene = _scene
 
 	mem.ICheckInit_Init(&cmd.check_init)
+	cmd.creation_allocator = allocator
     return cmd
 }
 
@@ -83,7 +85,7 @@ render_cmd_deinit :: proc(cmd: ^render_cmd) {
         }
     }
     sync.mutex_unlock(&__g_render_cmd_mtx)
-    free(cmd, def_allocator())
+    free(cmd, cmd.creation_allocator)
 }
 
 /*
@@ -356,8 +358,8 @@ render_cmd_refresh_all :: proc "contextless" () {
 }
 
 @(private) __render_cmd_create :: proc() {
-	__g_render_cmd = mem.make_non_zeroed([dynamic]^render_cmd, def_allocator())
-	__g_viewports = mem.make_non_zeroed([dynamic]^viewport, def_allocator())
+	__g_render_cmd = mem.make_non_zeroed([dynamic]^render_cmd)
+	__g_viewports = mem.make_non_zeroed([dynamic]^viewport)
 
 	camera_init(&__g_default_camera)
 	projection_init_matrix_ortho_window(&__g_default_projection, auto_cast window_width(), auto_cast window_height())

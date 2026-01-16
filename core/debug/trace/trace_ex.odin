@@ -5,6 +5,7 @@ import "core:strings"
 import "core:os"
 import "core:fmt"
 import "core:sync"
+import "core:mem"
 import "base:runtime"
 import "base:intrinsics"
 import "core:sys/android"
@@ -157,4 +158,49 @@ printflnLog :: proc "contextless" (_fmt:string ,args: ..any) {
 
 	printToFile(cstr)
 	_print(cstr)
+}
+
+/*
+Starts tracking memory allocations for debugging
+
+Returns:
+- None
+*/
+start_tracking_allocator :: proc() -> mem.Tracking_Allocator{
+	when ODIN_DEBUG {
+		track_allocator: mem.Tracking_Allocator
+		mem.tracking_allocator_init(&track_allocator, context.allocator)
+		context.allocator = mem.tracking_allocator(&track_allocator)
+		return track_allocator
+	}
+	return {}
+}
+
+destroy_tracking_allocator :: proc(track_allocator: ^mem.Tracking_Allocator) {
+	when ODIN_DEBUG {
+		if track_allocator.backing.procedure != nil {
+			breakP := false
+
+			if len(track_allocator.allocation_map) > 0 {
+				fmt.eprintf("=== %v allocations not freed: ===\n", len(track_allocator.allocation_map))
+				for _, entry in track_allocator.allocation_map {
+					fmt.eprintf("- %v bytes @ %v\n", entry.size, entry.location)
+				}
+				breakP = true
+			}
+			if len(track_allocator.bad_free_array) > 0 {
+				fmt.eprintf("=== %v incorrect frees: ===\n", len(track_allocator.bad_free_array))
+				for entry in track_allocator.bad_free_array {
+					fmt.eprintf("- %p @ %v\n", entry.memory, entry.location)
+				}
+				breakP = true
+			}
+			context.allocator = track_allocator.backing
+			mem.tracking_allocator_destroy(track_allocator)
+
+			if breakP {
+				runtime.debug_trap()
+			}
+		}
+	}
 }

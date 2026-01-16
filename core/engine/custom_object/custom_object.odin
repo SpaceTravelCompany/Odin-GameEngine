@@ -69,16 +69,16 @@ custom_object_pipeline_deinit :: proc(self:^object_pipeline) {
         vk.DestroyDescriptorSetLayout(engine.graphics_device(), l, nil)
     }
     for p in self.__pool_binding {
-        delete(p, engine.def_allocator())
+        delete(p)
     }
     for p in self.pool_sizes {
-        delete(p, engine.def_allocator())
+        delete(p)
     }
     vk.DestroyPipelineLayout(engine.graphics_device(), self.__pipeline_layout, nil)
     vk.DestroyPipeline(engine.graphics_device(), self.__pipeline, nil)
-    delete(self.pool_sizes, engine.def_allocator())
-    delete(self.__descriptor_set_layouts, engine.def_allocator())
-    delete(self.__pool_binding, engine.def_allocator())
+    delete(self.pool_sizes)
+    delete(self.__descriptor_set_layouts)
+    delete(self.__pool_binding)
 }
 
 /*
@@ -114,15 +114,15 @@ custom_object_pipeline_init :: proc(self:^object_pipeline,
     mem.ICheckInit_Init(&self.check_init)
 
     self.draw_method = draw_method
-    self.pool_sizes = mem.make_non_zeroed_slice([][]engine.descriptor_pool_size, len(pool_sizes), engine.def_allocator())
+    self.pool_sizes = mem.make_non_zeroed_slice([][]engine.descriptor_pool_size, len(pool_sizes))
     for &p, i in self.pool_sizes {
-        p = mem.make_non_zeroed_slice([]engine.descriptor_pool_size, len(pool_sizes[i]), engine.def_allocator())
+        p = mem.make_non_zeroed_slice([]engine.descriptor_pool_size, len(pool_sizes[i]))
         mem.copy_non_overlapping(&self.pool_sizes[i][0], &pool_sizes[i][0], len(pool_sizes[i]) * size_of(engine.descriptor_pool_size))
     }
     
-    self.__pool_binding = mem.make_non_zeroed_slice([][]u32, len(pool_sizes), engine.def_allocator())
+    self.__pool_binding = mem.make_non_zeroed_slice([][]u32, len(pool_sizes))
     for &b, i in self.__pool_binding {
-        b = mem.make_non_zeroed_slice([]u32, len(pool_sizes[i]), engine.def_allocator())
+        b = mem.make_non_zeroed_slice([]u32, len(pool_sizes[i]))
         b[0] = 0 // The first binding is always 0, as it is the default binding for the descriptor set.
         pool_idx :u32 = 0
         for j in 1..<len(pool_sizes[i]) {
@@ -250,12 +250,12 @@ custom_object_pipeline_init :: proc(self:^object_pipeline,
                     
                     // SPIR-V 데이터 가져오기
                     spirv_size := glslang.program_SPIRV_get_size(program)
-                    spirv_data, alloc_err := mem.alloc(cast(int)(size_of(u32) * spirv_size), align_of(u32), engine.def_allocator())
+                    spirv_data, alloc_err := mem.alloc(cast(int)(size_of(u32) * spirv_size), align_of(u32))
                     if alloc_err != nil {
                         trace.printlnLog("custom_object_pipeline_init: failed to allocate memory for SPIR-V")
                         return false
                     }
-                    defer mem.free(spirv_data, engine.def_allocator())
+                    defer mem.free(spirv_data)
                     glslang.program_SPIRV_get(program, cast(^c.uint)spirv_data)
                     
                     // SPIR-V 메시지 확인
@@ -287,7 +287,7 @@ custom_object_pipeline_init :: proc(self:^object_pipeline,
     depth_stencil_state2 := depth_stencil_state == nil ? vk.PipelineDepthStencilStateCreateInfoInit() : depth_stencil_state.?
     viewportState := vk.PipelineViewportStateCreateInfoInit()
 
-    self.__descriptor_set_layouts = mem.make_non_zeroed_slice([]vk.DescriptorSetLayout, len(binding_set_layouts), engine.def_allocator())
+    self.__descriptor_set_layouts = mem.make_non_zeroed_slice([]vk.DescriptorSetLayout, len(binding_set_layouts))
     for &l, i in self.__descriptor_set_layouts {
         l = vk.DescriptorSetLayoutInit(engine.graphics_device(), binding_set_layouts[i])
     }
@@ -345,7 +345,7 @@ custom_object_init :: proc(self:^custom_object, $actual_type:typeid,
     camera:^engine.camera, projection:^engine.projection, color_transform:^engine.color_transform = nil, pivot:linalg.PointF = {0.0, 0.0}, vtable:^engine.iobject_vtable = nil)
     where intrinsics.type_is_subtype_of(actual_type, custom_object) {
 
-    self.pipeline_p_sets = mem.make_non_zeroed_slice([]^engine.descriptor_set, len(pipeline_p_sets), engine.def_allocator())
+    self.pipeline_p_sets = mem.make_non_zeroed_slice([]^engine.descriptor_set, len(pipeline_p_sets))
     mem.copy_non_overlapping(&self.pipeline_p_sets[0], &pipeline_p_sets[0], len(pipeline_p_sets) * size_of(^descriptor_set))
 
     self.p_pipeline = p_pipeline
@@ -368,15 +368,15 @@ custom_object_init :: proc(self:^custom_object, $actual_type:typeid,
 _super_custom_object_deinit :: proc(self:^custom_object) {
     engine._super_iobject_deinit(auto_cast self)
 
-    delete(self.pipeline_p_sets, engine.def_allocator())
+    delete(self.pipeline_p_sets)
 }
 
 
 _super_custom_object_draw :: proc(self:^custom_object, cmd:engine.command_buffer) {
     mem.ICheckInit_Check(&self.check_init)
 
-    sets := mem.make_non_zeroed_slice([]vk.DescriptorSet, len(self.pipeline_p_sets), engine.def_allocator())
-    defer delete(sets, engine.def_allocator())
+    sets := mem.make_non_zeroed_slice([]vk.DescriptorSet, len(self.pipeline_p_sets))
+    defer delete(sets)
     for i in 0..<len(self.pipeline_p_sets) {
         sets[i] = self.pipeline_p_sets[i].__set
     }

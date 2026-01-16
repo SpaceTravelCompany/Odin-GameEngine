@@ -546,7 +546,7 @@ Computes a polygon from shapes data
 
 Inputs:
 - poly: Pointer to the shapes data
-- allocator: Allocator to use (default: context.allocator)
+- allocator: Allocator to use
 
 Returns:
 - Pointer to the computed raw shape

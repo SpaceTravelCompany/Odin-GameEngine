@@ -185,13 +185,13 @@ shape_src_update_raw :: proc(self:^shape_src, raw:^geometry.raw_shape, allocator
     engine.__index_buf_update(&self.indexBuf, raw.indices, allocator)
 }
 
-@require_results shape_src_update :: proc(self:^shape_src, shapes:^geometry.shapes) -> (err:geometry.shape_error = .None) {
+@require_results shape_src_update :: proc(self:^shape_src, shapes:^geometry.shapes, allocator := context.allocator) -> (err:geometry.shape_error = .None) {
     raw : ^geometry.raw_shape
-    raw, err = geometry.shapes_compute_polygon(shapes, engine.def_allocator())
+    raw, err = geometry.shapes_compute_polygon(shapes, allocator)
     if err != .None do return
 
-    engine.__vertex_buf_update(&self.vertexBuf, raw.vertices)
-    engine.__index_buf_update(&self.indexBuf, raw.indices)
+    engine.__vertex_buf_update(&self.vertexBuf, raw.vertices, allocator)
+    engine.__index_buf_update(&self.indexBuf, raw.indices, allocator)
 
     defer free(raw)
     return
