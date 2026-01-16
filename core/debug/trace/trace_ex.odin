@@ -176,30 +176,40 @@ start_tracking_allocator :: proc() -> mem.Tracking_Allocator{
 	return {}
 }
 
+BREAKPOINT_ON_TRACKING_ALLOCATOR :: #config(BREAKPOINT_ON_TRACKING_ALLOCATOR, true)
+
 destroy_tracking_allocator :: proc(track_allocator: ^mem.Tracking_Allocator) {
 	when ODIN_DEBUG {
 		if track_allocator.backing.procedure != nil {
-			breakP := false
+			when BREAKPOINT_ON_TRACKING_ALLOCATOR {
+				breakP := false
+			}
 
 			if len(track_allocator.allocation_map) > 0 {
 				fmt.eprintf("=== %v allocations not freed: ===\n", len(track_allocator.allocation_map))
 				for _, entry in track_allocator.allocation_map {
 					fmt.eprintf("- %v bytes @ %v\n", entry.size, entry.location)
 				}
-				breakP = true
+				when BREAKPOINT_ON_TRACKING_ALLOCATOR {
+					breakP = true
+				}
 			}
 			if len(track_allocator.bad_free_array) > 0 {
 				fmt.eprintf("=== %v incorrect frees: ===\n", len(track_allocator.bad_free_array))
 				for entry in track_allocator.bad_free_array {
 					fmt.eprintf("- %p @ %v\n", entry.memory, entry.location)
 				}
-				breakP = true
+				when BREAKPOINT_ON_TRACKING_ALLOCATOR {
+					breakP = true
+				}
 			}
 			context.allocator = track_allocator.backing
 			mem.tracking_allocator_destroy(track_allocator)
 
-			if breakP {
-				runtime.debug_trap()
+			when BREAKPOINT_ON_TRACKING_ALLOCATOR {
+				if breakP {
+					runtime.debug_trap()
+				}
 			}
 		}
 	}

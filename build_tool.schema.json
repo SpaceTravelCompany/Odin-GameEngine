@@ -31,6 +31,9 @@
 				"log": {
 					"type": "boolean"
 				},
+				"breakpoint-on-tracking-allocator": {
+					"type": "boolean"
+				},
 				"resource": {
 					"type": "string",
 					"description": "Windows resource file path"

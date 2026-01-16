@@ -64,6 +64,10 @@ main :: proc() {
 	if "log" in setting {
 		log = setting["log"].(json.Boolean)
 	}
+	breakpoint_on_tracking_allocator := true
+	if "breakpoint-on-tracking-allocator" in setting {
+		breakpoint_on_tracking_allocator = setting["breakpoint-on-tracking-allocator"].(json.Boolean)
+	}
 
 	// Sets the optimization mode for compilation.
 	// Available options:
@@ -157,7 +161,8 @@ main :: proc() {
 			strings.join({"-out:", outSos[i]}, "", context.temp_allocator), 
 			o, 
 			"-debug" if debug else ({}),
-			"-define:__log__=true" if log else ({}),
+			"-define:LOG=true" if log else "-define:LOG=false",
+			"-define:BREAKPOINT_ON_TRACKING_ALLOCATOR=true" if !breakpoint_on_tracking_allocator else "-define:BREAKPOINT_ON_TRACKING_ALLOCATOR=false",
 			//"-show-system-calls" if debug else ({}),
 			//"-sanitize:address" if debug else ({}),
 			"-build-mode:shared",
@@ -241,8 +246,9 @@ main :: proc() {
 		"-debug" if debug else ({}),
 		//"-show-debug-messages",//!for debug
 		resource.? if resource != nil else ({}),
-		"-define:__log__=true" if log else ({}),
-		"-define:__console__=true" if console else ({}),
+		"-define:LOG=true" if log else "-define:LOG=false",
+		"-define:BREAKPOINT_ON_TRACKING_ALLOCATOR=true" if !breakpoint_on_tracking_allocator else "-define:BREAKPOINT_ON_TRACKING_ALLOCATOR=false",
+		"-define:CONSOLE=true" if console else "-define:CONSOLE=false",
 		("-subsystem:console" if console else "-subsystem:windows") if ODIN_OS == .Windows else ({}),
 		//"-sanitize:address" if debug else ({}),
 		}) {

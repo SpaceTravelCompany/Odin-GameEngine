@@ -40,8 +40,8 @@ get_processor_core_len :: #force_inline proc "contextless" () -> int { return pr
 
 is_android :: ODIN_PLATFORM_SUBTARGET == .Android
 is_mobile :: is_android
-is_log :: #config(__log__, false)
-is_console :: #config(__console__, false)
+is_log :: #config(LOG, false)
+is_console :: #config(CONSOLE, false)
 
 init: #type proc()
 update: #type proc()
