@@ -155,10 +155,10 @@ Inputs:
 Returns:
 - An error if initialization failed
 */
-@require_results shape_src_init :: proc(self:^shape_src, shapes:^geometry.shapes, flag:engine.resource_usage = .GPU, colorFlag:engine.resource_usage = .CPU, allocator :runtime.Allocator = context.allocator) -> (err:geometry.shape_error = .None) {
+@require_results shape_src_init :: proc(self:^shape_src, shapes:^geometry.shapes, flag:engine.resource_usage = .GPU, colorFlag:engine.resource_usage = .CPU, allocator :runtime.Allocator = context.allocator) -> (err:geometry.shape_error = nil) {
     raw : ^geometry.raw_shape
     raw, err = geometry.shapes_compute_polygon(shapes, allocator)
-    if err != .None do return
+    if err != nil do return
 
     engine.__vertex_buf_init(&self.vertexBuf, raw.vertices, flag, allocator=allocator)
     engine.__index_buf_init(&self.indexBuf, raw.indices, flag, allocator=allocator)
@@ -185,10 +185,10 @@ shape_src_update_raw :: proc(self:^shape_src, raw:^geometry.raw_shape, allocator
     engine.__index_buf_update(&self.indexBuf, raw.indices, allocator)
 }
 
-@require_results shape_src_update :: proc(self:^shape_src, shapes:^geometry.shapes, allocator := context.allocator) -> (err:geometry.shape_error = .None) {
+@require_results shape_src_update :: proc(self:^shape_src, shapes:^geometry.shapes, allocator := context.allocator) -> (err:geometry.shape_error = nil) {
     raw : ^geometry.raw_shape
     raw, err = geometry.shapes_compute_polygon(shapes, allocator)
-    if err != .None do return
+    if err != nil do return
 
     engine.__vertex_buf_update(&self.vertexBuf, raw.vertices, allocator)
     engine.__index_buf_update(&self.indexBuf, raw.indices, allocator)

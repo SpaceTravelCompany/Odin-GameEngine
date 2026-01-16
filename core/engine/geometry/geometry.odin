@@ -68,6 +68,7 @@ curve_type :: enum {
 shape_error :: union #shared_nil {
     __ShapesError,
     poly2tri.Trianguate_Error,
+    mem.Allocator_Error,
 }
 
 shapes :: struct {
@@ -113,11 +114,20 @@ Inputs:
 
 Returns:
 - Pointer to the cloned raw shape
+- Allocator error if allocation failed
 */
-raw_shape_clone :: proc (self:^raw_shape, allocator := context.allocator) -> (res:^raw_shape = nil) {
-    res = new(raw_shape, allocator)
-    res.vertices = mem.make_non_zeroed_slice([]shape_vertex2d, len(self.vertices), allocator)
-    res.indices = mem.make_non_zeroed_slice([]u32, len(self.indices), allocator)
+raw_shape_clone :: proc (self:^raw_shape, allocator := context.allocator) -> (res:^raw_shape = nil, err: mem.Allocator_Error) #optional_allocator_error {
+    res = new(raw_shape, allocator) or_return
+    defer if err != nil {
+        free(res, allocator)
+        res = nil
+    }
+
+    res.vertices = mem.make_non_zeroed_slice([]shape_vertex2d, len(self.vertices), allocator) or_return
+    defer if err != nil do delete(res.vertices, allocator)
+
+    res.indices = mem.make_non_zeroed_slice([]u32, len(self.indices), allocator) or_return
+
     intrinsics.mem_copy_non_overlapping(&res.vertices[0], &self.vertices[0], len(self.vertices) * size_of(shape_vertex2d))
     intrinsics.mem_copy_non_overlapping(&res.indices[0], &self.indices[0], len(self.indices) * size_of(u32))
 
@@ -550,13 +560,14 @@ Inputs:
 
 Returns:
 - Pointer to the computed raw shape
-- An error if computation failed
+- An error if computation failed (includes allocator errors)
 */
 shapes_compute_polygon :: proc(poly:^shapes, allocator := context.allocator) -> (res:^raw_shape = nil, err:shape_error = nil) {
     vertList:[dynamic]shape_vertex2d = mem.make_non_zeroed_dynamic_array([dynamic]shape_vertex2d, context.temp_allocator)
     indList:[dynamic]u32 = mem.make_non_zeroed_dynamic_array([dynamic]u32, context.temp_allocator)
 
-    res = mem.new_non_zeroed(raw_shape, allocator)
+    res = mem.new_non_zeroed(raw_shape, allocator) or_return
+	defer if err != nil do free(res, allocator)
 
     defer {
         delete(vertList)
@@ -775,8 +786,9 @@ shapes_compute_polygon :: proc(poly:^shapes, allocator := context.allocator) -> 
         if err != nil do return
     }
 
-    res.vertices = mem.make_non_zeroed_slice([]shape_vertex2d, len(vertList), allocator)
-    res.indices = mem.make_non_zeroed_slice([]u32, len(indList), allocator)
+    res.vertices = mem.make_non_zeroed_slice([]shape_vertex2d, len(vertList), allocator) or_return
+    defer if err != nil do delete(res.vertices, allocator)
+	res.indices = mem.make_non_zeroed_slice([]u32, len(indList), allocator) or_return
 
     intrinsics.mem_copy_non_overlapping(&res.vertices[0], &vertList[0], len(vertList) * size_of(shape_vertex2d))
     intrinsics.mem_copy_non_overlapping(&res.indices[0], &indList[0], len(indList) * size_of(u32))

@@ -38,12 +38,24 @@ Make render_cmd.scene manually.
 
 Returns:
 - Pointer to the initialized render command
+- Allocator error if allocation failed
 */
-render_cmd_init :: proc(_scene: ^[dynamic]^iobject, allocator := context.allocator) -> ^render_cmd {
-    cmd := new(render_cmd, allocator)
+render_cmd_init :: proc(_scene: ^[dynamic]^iobject, allocator := context.allocator) -> (cmd: ^render_cmd, err: mem.Allocator_Error) #optional_allocator_error {
+    cmd = new(render_cmd, allocator) or_return
+    
+    allocated_count := 0
+    defer if err != nil {
+        for j in 0..<allocated_count {
+            delete(cmd.cmds[j], allocator)
+        }
+        free(cmd, allocator)
+        cmd = nil
+    }
+
     for i in 0..<MAX_FRAMES_IN_FLIGHT {
         cmd.refresh[i] = false
-        cmd.cmds[i] = mem.make_non_zeroed([]command_buffer, swap_img_cnt)
+        cmd.cmds[i] = mem.make_non_zeroed([]command_buffer, swap_img_cnt) or_return
+        allocated_count += 1
         allocate_command_buffers(&cmd.cmds[i][0], swap_img_cnt)
     }
     cmd.obj_lock = sync.Mutex{}
@@ -56,7 +68,7 @@ render_cmd_init :: proc(_scene: ^[dynamic]^iobject, allocator := context.allocat
 
 	mem.ICheckInit_Init(&cmd.check_init)
 	cmd.creation_allocator = allocator
-    return cmd
+    return
 }
 
 /*

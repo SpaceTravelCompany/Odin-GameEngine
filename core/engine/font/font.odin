@@ -85,7 +85,10 @@ font_render_range :: struct {
     }
 }
 
-freetype_err :: freetype.Error
+freetype_err :: union #shared_nil {
+    freetype.Error,
+    mem.Allocator_Error,
+}
 
 /*
 Initializes a font from font data
@@ -98,30 +101,39 @@ Inputs:
 Returns:
 - Pointer to the initialized font, or nil on error
 - An error if initialization failed
+- Allocator error if allocation failed
 */
-font_init :: proc(_fontData:[]byte, #any_int _faceIdx:int = 0, allocator:mem.Allocator = context.allocator) -> (font : ^font = nil, err : freetype_err = .Ok)  {
-    font_ := mem.new_non_zeroed(font_t, allocator)
-    defer if err != .Ok do free(font_, allocator)
+font_init :: proc(_fontData:[]byte, #any_int _faceIdx:int = 0, allocator:mem.Allocator = context.allocator) -> (font : ^font = nil, err : freetype_err = nil) {
+    font_, alloc_err := mem.new_non_zeroed(font_t, allocator)
+    if alloc_err != nil {
+        err = alloc_err
+        return
+    }
+    defer if err != nil do free(font_, allocator)
 
     font_.scale = SCALE_DEFAULT
     font_.mutex = {}
 
     font_.char_array = make_map( map[FONT_KEY]char_data, allocator )
-    defer if err != .Ok do delete(font_.char_array)
+    defer if err != nil do delete(font_.char_array)
 
     if freetype_lib == nil do _init_freetype()
 
-    err = freetype.new_memory_face(freetype_lib, raw_data(_fontData), auto_cast len(_fontData), auto_cast _faceIdx, &font_.face)
-    if err != .Ok {
+    ft_err := freetype.new_memory_face(freetype_lib, raw_data(_fontData), auto_cast len(_fontData), auto_cast _faceIdx, &font_.face)
+    if ft_err != .Ok {
+        err = ft_err
         return
     }
 
-    defer if err != .Ok {
-        err = freetype.done_face(font_.face)
+    defer if err != nil {
+        freetype.done_face(font_.face)
     }  
 
-    err = freetype.set_char_size(font_.face, 0, 16 * 256 * 64, 0, 0)
-    if err != .Ok do return
+    ft_err = freetype.set_char_size(font_.face, 0, 16 * 256 * 64, 0, 0)
+    if ft_err != .Ok {
+        err = ft_err
+        return
+    }
 
     font_.allocator = allocator
     font = auto_cast font_
@@ -137,12 +149,12 @@ Inputs:
 Returns:
 - An error if deinitialization failed
 */
-font_deinit :: proc(self:^font) -> (err : freetype.Error = .Ok) {
+font_deinit :: proc(self:^font) -> (err : freetype_err = nil) {
     self_:^font_t = auto_cast self
     sync.mutex_lock(&self_.mutex)
 
     err = freetype.done_face(self_.face)
-    if err != .Ok do trace.panic_log(err)
+    if err != nil do trace.panic_log(err)
 
     for key,value in self_.char_array {
         geometry.raw_shape_free(value.raw_shape, self_.allocator)
@@ -175,7 +187,7 @@ font_set_scale :: proc(self:^font, scale:f32) {
 _renderOpt:font_render_opt2,
 vertList:^[dynamic]geometry.shape_vertex2d,
 indList:^[dynamic]u32,
-allocator : runtime.Allocator) -> (rect:linalg.RectF, err:geometry.shape_error = .None) {
+allocator : runtime.Allocator) -> (rect:linalg.RectF, err:geometry.shape_error = nil) {
     i : int = 0
     opt := _renderOpt.opt
     rectT : linalg.RectF
@@ -203,7 +215,7 @@ allocator : runtime.Allocator) -> (rect:linalg.RectF, err:geometry.shape_error =
     _renderOpt:font_render_opt,
     _vertArr:^[dynamic]geometry.shape_vertex2d,
     _indArr:^[dynamic]u32,
-    allocator : runtime.Allocator) -> (pt:linalg.PointF, rect:linalg.RectF, err:geometry.shape_error = .None) {
+    allocator : runtime.Allocator) -> (pt:linalg.PointF, rect:linalg.RectF, err:geometry.shape_error = nil) {
 
     maxP : linalg.PointF = {min(f32), min(f32)}
     minP : linalg.PointF = {max(f32), max(f32)}
@@ -275,7 +287,7 @@ allocator : runtime.Allocator) -> (rect:linalg.RectF, err:geometry.shape_error =
     color:Maybe(linalg.Point3DwF),
     stroke_color:linalg.Point3DwF,
     thickness:f32,
-    allocator : runtime.Allocator) -> (shapeErr:geometry.shape_error = .None) {
+    allocator : runtime.Allocator) -> (shapeErr:geometry.shape_error = nil) {
     ok := FONT_KEY{_char, thickness} in self.char_array
     charD : ^char_data
 
@@ -472,9 +484,9 @@ allocator : runtime.Allocator) -> (rect:linalg.RectF, err:geometry.shape_error =
 
                 rawP : ^geometry.raw_shape
                 rawP , shapeErr = geometry.shapes_compute_polygon(&poly, self.allocator)//높은 부하 작업 High load operations
-                if shapeErr != .None do return
+                if shapeErr != nil do return
 
-                defer if shapeErr != .None {
+                defer if shapeErr != nil {
                     geometry.raw_shape_free(rawP, self.allocator)
                 }
                 // if len(rawP.vertices) > 0 {
@@ -536,14 +548,17 @@ allocator : runtime.Allocator) -> (rect:linalg.RectF, err:geometry.shape_error =
     return
 }
 
-font_render_string2 :: proc(_str:string, _renderOpt:font_render_opt2, allocator := context.allocator) -> (res:^geometry.raw_shape, err:geometry.shape_error = nil)  {
-    vertList := make([dynamic]geometry.shape_vertex2d, allocator)
-    indList := make([dynamic]u32, allocator)
+font_render_string2 :: proc(_str:string, _renderOpt:font_render_opt2, allocator := context.allocator) -> (res:^geometry.raw_shape, err:geometry.shape_error = nil) {
+    vertList := make([dynamic]geometry.shape_vertex2d, allocator) or_return
+    defer if err != nil do delete(vertList)
+
+    indList := make([dynamic]u32, allocator) or_return
+    defer if err != nil do delete(indList)
 
     _font_render_string2(_str, _renderOpt, &vertList, &indList, allocator) or_return
     shrink(&vertList)
     shrink(&indList)
-    res = new (geometry.raw_shape, allocator)
+    res = new (geometry.raw_shape, allocator) or_return
     res^ = {
         vertices = vertList[:],
         indices = indList[:],
@@ -564,18 +579,22 @@ Inputs:
 Returns:
 - Pointer to the raw shape containing the rendered geometry
 - An error if rendering failed
+- Allocator error if allocation failed
 */
 font_render_string :: proc(self:^font, _str:string, _renderOpt:font_render_opt, allocator := context.allocator) -> (res:^geometry.raw_shape, err:geometry.shape_error = nil) {
 	if self == nil do trace.panic_log("font_render_string: font is nil")
 
-    vertList := make([dynamic]geometry.shape_vertex2d, allocator)
-    indList := make([dynamic]u32, allocator)
+    vertList := make([dynamic]geometry.shape_vertex2d, allocator) or_return
+    defer if err != nil do delete(vertList)
+
+    indList := make([dynamic]u32, allocator) or_return
+    defer if err != nil do delete(indList)
 
     _, rect := _font_render_string(auto_cast self, _str, _renderOpt, &vertList, &indList, allocator) or_return
 
     shrink(&vertList)
     shrink(&indList)
-    res = new (geometry.raw_shape, allocator)
+    res = new (geometry.raw_shape, allocator) or_return
     res^ = {
         vertices = vertList[:],
         indices = indList[:],
