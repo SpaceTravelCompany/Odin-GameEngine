@@ -173,7 +173,6 @@ vkNoBlending := vk.PipelineColorBlendStateCreateInfoInit(__vkNoBlendingState[:1]
 vkCopyBlending := vk.PipelineColorBlendStateCreateInfoInit(__vkNoBlendingState[:1])
 
 vk_init_shader_modules :: proc() {
-
 	vkShapeVertShader, _ = vk.CreateShaderModule2(vk_device, #shader_load("shaders/shape.vert", SHADER_COMPILE_OPTION))
 	vkShapeFragShader, _ = vk.CreateShaderModule2(vk_device, #shader_load("shaders/shape.frag", SHADER_COMPILE_OPTION))
 	when wire_mode do vkShapeWireFragShader, _ = vk.CreateShaderModule2(vk_device, #shader_load("shaders/shape_wire.frag", SHADER_COMPILE_OPTION))

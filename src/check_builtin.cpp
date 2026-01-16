@@ -2150,15 +2150,15 @@ gb_internal LoadDirectiveResult check_shader_load_directive(CheckerContext *c, O
 	}
 	// "none" = no optimization flag
 
-	// Get glslc path from ODIN_ROOT
+	// Use glslc from PATH
 	#if defined(GB_SYSTEM_WINDOWS)
 	i32 exit_code = system_exec_command_line_app("glslc",
-		"\"%.*s\\glslc.exe\" %s \"%s\" -o \"%s\"",
-		LIT(build_context.ODIN_ROOT), opt_flag, source_path_cstr, output_path_cstr);
+		"glslc.exe %s \"%s\" -o \"%s\"",
+		opt_flag, source_path_cstr, output_path_cstr);
 	#else
 	i32 exit_code = system_exec_command_line_app("glslc",
-		"\"%.*s/glslc\" %s \"%s\" -o \"%s\"",
-		LIT(build_context.ODIN_ROOT), opt_flag, source_path_cstr, output_path_cstr);
+		"glslc %s \"%s\" -o \"%s\"",
+		opt_flag, source_path_cstr, output_path_cstr);
 	#endif
 
 	ShaderLoadCache *new_cache = gb_alloc_item(permanent_allocator(), ShaderLoadCache);
