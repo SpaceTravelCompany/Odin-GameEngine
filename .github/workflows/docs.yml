@@ -40,13 +40,6 @@ jobs:
           make debug
           echo "${{ github.workspace }}" >> $GITHUB_PATH
 
-      - name: Setup Vulkan SDK
-        uses: humbletim/setup-vulkan-sdk@v1.2.1
-        with:
-          vulkan-query-version: 1.4.304.1
-          vulkan-components: SPIRV-Tools, Glslang
-          vulkan-use-cache: true
-
       - name: Get and build Odin docs generator
         run: |
           git clone https://github.com/odin-lang/pkg.odin-lang.org odin-doc
