@@ -24,6 +24,7 @@ webp_converter :: struct {
     anim_info:webp.WebPAnimInfo,
     out_fmt:color_fmt,
     config:webp_config,
+	out_data:[]byte,
     allocator:runtime.Allocator,
 }
 
@@ -123,6 +124,8 @@ webp_converter_deinit :: proc (self:^webp_converter) {
             webp.WebPAnimDecoderDelete(self.anim_dec)
             self.config = nil
         }
+		delete(self.out_data, self.allocator)
+		self.out_data = nil
     }
 }
 
@@ -196,7 +199,11 @@ webp_converter_load :: proc (self:^webp_converter, data:[]byte, out_fmt:color_fm
     self.out_fmt = out_fmt
     self.allocator = allocator
 
-    out_data := mem.make_non_zeroed_slice([]byte, webp_converter_size(self), allocator)
+    out_data, alloc_err := mem.make_non_zeroed_slice([]byte, webp_converter_size(self), allocator)
+    if alloc_err != nil {
+        return nil, alloc_err
+    }
+    self.out_data = out_data
 
     bit := color_fmt_bit(self.out_fmt) >> 3
 
@@ -245,6 +252,7 @@ WebP_Error :: union #shared_nil {
     WebP_Error_In,
     webp.VP8StatusCode,
     os2.Error,
+    runtime.Allocator_Error,
 }
 
 /*
