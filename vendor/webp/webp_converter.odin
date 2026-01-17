@@ -1,4 +1,4 @@
-package image
+package webp
 
 import "core:mem"
 import "core:debug/trace"
@@ -8,6 +8,7 @@ import "base:intrinsics"
 import "base:runtime"
 import "vendor:webp"
 import "base:library"
+import "core:image"
 
 @private webp_config :: union {
     webp.WebPDecoderConfig,
@@ -22,7 +23,7 @@ Supports both static images and animated WebP images
 webp_converter :: struct {
     anim_dec:^webp.WebPAnimDecoder,
     anim_info:webp.WebPAnimInfo,
-    out_fmt:color_fmt,
+    out_fmt:image.color_fmt,
     config:webp_config,
 	out_data:[]byte,
     allocator:runtime.Allocator,
@@ -85,9 +86,9 @@ webp_converter_size :: proc "contextless" (self:^webp_converter) -> u32 {
     if self.config != nil {
         switch &t in self.config {
         case webp.WebPDecoderConfig:
-            return u32(t.input.height * t.input.width) * (color_fmt_bit(self.out_fmt) >> 3)
+            return u32(t.input.height * t.input.width) * (image.color_fmt_bit(self.out_fmt) >> 3)
         case webp.WebPAnimDecoderOptions:
-            return self.anim_info.canvas_height * self.anim_info.canvas_width * self.anim_info.frame_count * (color_fmt_bit(self.out_fmt) >> 3)
+            return self.anim_info.canvas_height * self.anim_info.canvas_width * self.anim_info.frame_count * (image.color_fmt_bit(self.out_fmt) >> 3)
         }
     }
     return 0
@@ -144,7 +145,7 @@ Returns:
 - The decoded image data as bytes (all frames for animated images)
 - An error if loading failed
 */
-webp_converter_load :: proc (self:^webp_converter, data:[]byte, out_fmt:color_fmt, allocator := context.allocator) -> ([]byte, WebP_Error) {
+webp_converter_load :: proc (self:^webp_converter, data:[]byte, out_fmt:image.color_fmt, allocator := context.allocator) -> ([]byte, WebP_Error) {
     webp_converter_deinit(self)
 
     errCode :WebP_Error = nil
@@ -205,7 +206,7 @@ webp_converter_load :: proc (self:^webp_converter, data:[]byte, out_fmt:color_fm
     }
     self.out_data = out_data
 
-    bit := color_fmt_bit(self.out_fmt) >> 3
+    bit := image.color_fmt_bit(self.out_fmt) >> 3
 
     switch &t in self.config {
     case webp.WebPDecoderConfig:
@@ -269,7 +270,7 @@ Returns:
 - An error if loading failed
 - An error if loading failed
 */
-webp_converter_load_file :: proc (self:^webp_converter, file_path:string, out_fmt:color_fmt, allocator := context.allocator) -> ([]byte, WebP_Error) {
+webp_converter_load_file :: proc (self:^webp_converter, file_path:string, out_fmt:image.color_fmt, allocator := context.allocator) -> ([]byte, WebP_Error) {
     imgFileData:[]byte
     when library.is_android {
         imgFileReadErr : android.AssetFileError
