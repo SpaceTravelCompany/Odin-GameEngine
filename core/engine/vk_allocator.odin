@@ -426,12 +426,12 @@ vk_allocator_error :: enum {
 	}
 	vk_mem_buffer_BindBufferNodeInside(self, vkResource, cur.idx)
 	cur.free = false
-	remain := cur.size - cellCnt
+	remain := cur.size - cellCnt//remain space when vkResource bind
 	self.cur = auto_cast cur
 
 	range: resource_range = auto_cast cur
 	curNext: ^vk_mem_buffer_node = auto_cast  (cur.node.next if cur.node.next != nil else self.list.head)
-	if cur == curNext {
+	if cur == curNext {// only one item on list
 		if remain > 0 {
 			list.push_back(&self.list, auto_cast new(vk_mem_buffer_node, vk_def_allocator()))
 			tail: ^vk_mem_buffer_node = auto_cast self.list.tail
@@ -476,19 +476,22 @@ vk_allocator_error :: enum {
 	range_: ^vk_mem_buffer_node = auto_cast range
 	range_.free = true
 
-	next: ^vk_mem_buffer_node = auto_cast (range_.node.next if range_.node.next != nil else self.list.head)
-	if next.free && range_ != next && range_.idx < next.idx {
-		range_.size += next.size
-		list.remove(&self.list, auto_cast next)
-		free(next, vk_def_allocator())
+	if range_.node.next != nil {
+		next: ^vk_mem_buffer_node = auto_cast range_.node.next
+		if next.free {
+			range_.size += next.size
+			list.remove(&self.list, auto_cast next)
+			free(next, vk_def_allocator())
+		}
 	}
-
-	prev: ^vk_mem_buffer_node = auto_cast (range_.node.prev if range_.node.prev != nil else self.list.tail)
-	if prev.free && range_ != prev && range_.idx > prev.idx {
-		range_.size += prev.size
-		range_.idx -= prev.size
-		list.remove(&self.list, auto_cast prev)
-		free(prev, vk_def_allocator())
+	if range_.node.prev != nil {
+		prev: ^vk_mem_buffer_node = auto_cast range_.node.prev
+		if prev.free {
+			range_.size += prev.size
+			range_.idx -= prev.size
+			list.remove(&self.list, auto_cast prev)
+			free(prev, vk_def_allocator())
+		}
 	}
 	if gVkMemIdxCnts[self.allocateInfo.memoryTypeIndex] > VkMaxMemIdxCnt {
 		for b in gVkMemBufs {
@@ -503,7 +506,7 @@ vk_allocator_error :: enum {
 			return
 		}
 	}
-	if self.list.head == nil {//?always self.list.head not nil when list is not empty
+	if self.list.head == nil {//?always self.list.head not nil
 		list.push_back(&self.list, auto_cast new(vk_mem_buffer_node, vk_def_allocator()))
 		((^vk_mem_buffer_node)(self.list.head)).free = true
 		((^vk_mem_buffer_node)(self.list.head)).size = self.len
