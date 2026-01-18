@@ -134,7 +134,7 @@ shape_src_bind_and_draw :: proc(self:^shape_src, set:^engine.descriptor_set, cmd
     engine.graphics_cmd_draw_indexed(cmd, auto_cast (self.indexBuf.buf.option.len / size_of(u32)), 1, 0, 0, 0)
 }
 
-shape_src_init_raw :: proc(self:^shape_src, raw:^geometry.raw_shape, flag:engine.resource_usage = .GPU, colorFlag:engine.resource_usage = .CPU, allocator :Maybe(runtime.Allocator) = nil) {
+shape_src_init_raw :: proc(self:^shape_src, raw:^geometry.raw_shape, flag:engine.resource_usage = .GPU, allocator :Maybe(runtime.Allocator) = nil) {
     engine.__vertex_buf_init(&self.vertexBuf, raw.vertices, flag, allocator=allocator)
     engine.__index_buf_init(&self.indexBuf, raw.indices, flag, allocator=allocator)
 
@@ -150,12 +150,11 @@ Inputs:
 - self: Pointer to the shape source to initialize
 - shapes: Pointer to the geometry shapes
 - flag: Resource usage flag for buffers (default: .GPU)
-- colorFlag: Resource usage flag for colors (default: .CPU)
 
 Returns:
 - An error if initialization failed
 */
-@require_results shape_src_init :: proc(self:^shape_src, shapes:^geometry.shapes, flag:engine.resource_usage = .GPU, colorFlag:engine.resource_usage = .CPU, allocator :runtime.Allocator = context.allocator) -> (err:geometry.shape_error = nil) {
+@require_results shape_src_init :: proc(self:^shape_src, shapes:^geometry.shapes, flag:engine.resource_usage = .GPU, allocator :runtime.Allocator = context.allocator) -> (err:geometry.shape_error = nil) {
     raw : ^geometry.raw_shape
     raw, err = geometry.shapes_compute_polygon(shapes, allocator)
     if err != nil do return

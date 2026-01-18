@@ -443,18 +443,10 @@ vk_allocator_error :: enum {
 		if remain > 0 {
 			if !curNext.free || curNext.idx < cur.idx {
 				list.insert_after(&self.list, auto_cast cur, auto_cast new(vk_mem_buffer_node, vk_def_allocator()))
-				if cur.node.next != nil {
-					next: ^vk_mem_buffer_node = auto_cast cur.node.next
-					next.free = true
-					next.idx = cur.idx + cellCnt
-					next.size = remain
-				} else {
-					list.push_back(&self.list, auto_cast new(vk_mem_buffer_node, vk_def_allocator()))
-					tail: ^vk_mem_buffer_node = auto_cast self.list.tail
-					tail.free = true
-					tail.idx = cur.idx + cellCnt
-					tail.size = self.len - tail.idx
-				}
+				next: ^vk_mem_buffer_node = auto_cast cur.node.next
+				next.free = true
+				next.idx = cur.idx + cellCnt
+				next.size = remain
 			} else {
 				curNext.idx -= remain
 				curNext.size += remain
@@ -484,21 +476,30 @@ vk_allocator_error :: enum {
 	range_: ^vk_mem_buffer_node = auto_cast range
 	range_.free = true
 
-	if range_.node.next != nil {
-		next: ^vk_mem_buffer_node = auto_cast range_.node.next
+	next_ := range_.node.next
+	for next_ != nil {
+		next: ^vk_mem_buffer_node = auto_cast next_
 		if next.free {
 			range_.size += next.size
+			next_ = next.node.next
 			list.remove(&self.list, auto_cast next)
 			free(next, vk_def_allocator())
+		} else {
+			break
 		}
 	}
-	if range_.node.prev != nil {
-		prev: ^vk_mem_buffer_node = auto_cast range_.node.prev
+
+	prev_ := range_.node.prev
+	for prev_ != nil {
+		prev: ^vk_mem_buffer_node = auto_cast prev_
 		if prev.free {
 			range_.size += prev.size
 			range_.idx -= prev.size
+			prev_ = prev.node.prev
 			list.remove(&self.list, auto_cast prev)
 			free(prev, vk_def_allocator())
+		} else {
+			break
 		}
 	}
 	if gVkMemIdxCnts[self.allocateInfo.memoryTypeIndex] > VkMaxMemIdxCnt {
