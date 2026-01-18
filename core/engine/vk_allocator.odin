@@ -443,10 +443,18 @@ vk_allocator_error :: enum {
 		if remain > 0 {
 			if !curNext.free || curNext.idx < cur.idx {
 				list.insert_after(&self.list, auto_cast cur, auto_cast new(vk_mem_buffer_node, vk_def_allocator()))
-				next: ^vk_mem_buffer_node = auto_cast cur.node.next
-				next.free = true
-				next.idx = cur.idx + cellCnt
-				next.size = remain
+				if cur.node.next != nil {
+					next: ^vk_mem_buffer_node = auto_cast cur.node.next
+					next.free = true
+					next.idx = cur.idx + cellCnt
+					next.size = remain
+				} else {
+					list.push_back(&self.list, auto_cast new(vk_mem_buffer_node, vk_def_allocator()))
+					tail: ^vk_mem_buffer_node = auto_cast self.list.tail
+					tail.free = true
+					tail.idx = cur.idx + cellCnt
+					tail.size = self.len - tail.idx
+				}
 			} else {
 				curNext.idx -= remain
 				curNext.size += remain
@@ -594,7 +602,7 @@ vk_allocator_error :: enum {
 		memBufT := _Init(BLKSize, maxSize_, memRequire, memProp_)
 
 		if memBufT == nil {
-			free(memBuf)
+			free(memBuf, vk_def_allocator())
 			memBuf = nil
 
 			memProp_ = {.HOST_VISIBLE, .HOST_CACHED}
