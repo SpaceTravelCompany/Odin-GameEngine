@@ -23,7 +23,7 @@ vkSupportCacheLocal := false
 vkSupportNonCacheLocal := false
 @(private = "file") __tempArena: virtual.Arena
 @(private = "file") gQueueMtx: sync.Atomic_Mutex
-@(private = "file") gDestroyQueueMtx: sync.Atomic_Mutex
+@(private = "file") gDestroyQueueMtx: sync.Mutex
 @(private = "file") __vk_def_allocator: runtime.Allocator
 
 vk_def_allocator :: proc() -> runtime.Allocator {
@@ -216,7 +216,7 @@ vk_init_block_len :: proc() {
 
 vk_allocator_init :: proc() {
 	__vk_def_allocator = context.allocator
-	
+
 	gVkMemBufs = mem.make_non_zeroed([dynamic]^vk_mem_buffer, vk_def_allocator())
 
 	gVkMemIdxCnts = mem.make_non_zeroed([]int, vk_physical_mem_prop.memoryTypeCount, vk_def_allocator())
@@ -1516,33 +1516,31 @@ vk_update_descriptor_sets :: proc(sets: []descriptor_set) {
 }
 
 vk_op_execute_destroy :: proc() {
-	sync.atomic_mutex_lock(&gDestroyQueueMtx)
-	
-	for node in opDestroyQueue {
-		#partial switch n in node {
-			case OpDestroyBuffer : 
-				executeDestroyBuffer(n.src)
-			case OpDestroyTexture : 
-				executeDestroyTexture(n.src)
+	sync.mutex_lock(&gDestroyQueueMtx)
+		
+		for node in opDestroyQueue {
+			#partial switch n in node {
+				case OpDestroyBuffer : 
+					executeDestroyBuffer(n.src)
+				case OpDestroyTexture : 
+					executeDestroyTexture(n.src)
+			}
 		}
-	}
-	
-	clear(&opDestroyQueue)
-
-	sync.atomic_mutex_unlock(&gDestroyQueueMtx)
-	virtual.arena_free_all(&__tempArena)
+		
+		clear(&opDestroyQueue)
+		sync.mutex_unlock(&gDestroyQueueMtx)
+		
+		virtual.arena_free_all(&__tempArena)
 
 	sync.sema_post(&gWaitOpSem)
 }
 
-vk_op_execute :: proc(wait_and_destroy: bool) {
+vk_op_execute :: proc() {
 	sync.atomic_mutex_lock(&gQueueMtx)
 	if len(opQueue) == 0 {
 		sync.atomic_mutex_unlock(&gQueueMtx)
-		if wait_and_destroy {
-			vk_wait_graphics_idle()
-			vk_op_execute_destroy()
-		}
+		vk_wait_graphics_idle()
+		vk_op_execute_destroy()
 		return
 	}
 	resize(&opSaveQueue, len(opQueue))
@@ -1787,7 +1785,7 @@ vk_op_execute :: proc(wait_and_destroy: bool) {
 		clear(&gTempUniforms)
 	}
 
-	sync.atomic_mutex_lock(&gDestroyQueueMtx)
+	sync.mutex_lock(&gDestroyQueueMtx)
 	for &node in opSaveQueue {
 		#partial switch n in node {
 		case OpDestroyBuffer:
@@ -1799,7 +1797,7 @@ vk_op_execute :: proc(wait_and_destroy: bool) {
 		}
 		node = nil
 	}
-	sync.atomic_mutex_unlock(&gDestroyQueueMtx)
+	sync.mutex_unlock(&gDestroyQueueMtx)
 
 	memBufT: ^vk_mem_buffer = nil
 	save_to_map_queue(&memBufT)
@@ -1873,11 +1871,9 @@ vk_op_execute :: proc(wait_and_destroy: bool) {
 			}
 		}
 		vk_op_execute_destroy()
-	} else if wait_and_destroy {
-		vk_wait_graphics_idle()
-		vk_op_execute_destroy()
 	} else {
-		sync.sema_post(&gWaitOpSem)
+		//vk_wait_graphics_idle()
+		vk_op_execute_destroy()
 	}
 
 	clear(&opSaveQueue)

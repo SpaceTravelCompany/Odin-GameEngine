@@ -605,7 +605,7 @@ vk_create_swap_chain_and_image_views :: proc() -> bool {
 	}
 
 	vk_refresh_pre_matrix()
-	vk_op_execute(true)
+	vk_op_execute()
 
 	for img, i in swapImgs {
 		imageViewCreateInfo := vk.ImageViewCreateInfo{
@@ -1260,7 +1260,7 @@ vk_recreate_surface :: proc() {
 vk_draw_frame :: proc() {
 	@(static) frame:int = 0
 
-	vk_op_execute(true)
+	vk_op_execute()
 
 	if vk_swapchain == 0 do return
 	if vk_extent.width <= 0 || vk_extent.height <= 0 {
@@ -1455,7 +1455,7 @@ vk_clean_swap_chain :: proc() {
 		when msaa_count > 1 {
 			texture_deinit(&vk_msaa_frame_texture)
 		}
-		vk_op_execute(true)
+		vk_op_execute()
 
 		delete(vk_frame_buffers)
 		//delete(vkClearFrameBuffers)

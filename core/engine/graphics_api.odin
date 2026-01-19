@@ -273,15 +273,15 @@ graphics_wait_present_idle :: #force_inline proc "contextless" () {
 // 모든 비동기 작업 대기
 graphics_wait_all_ops :: #force_inline proc () {
     if is_main_thread() {
-        graphics_execute_ops(true)
+        graphics_execute_ops()
     } else {
         vk_wait_all_op()
     }
 }
 
 // 작업 실행
-graphics_execute_ops :: #force_inline proc(wait_and_destroy: bool) {
-	vk_op_execute(wait_and_destroy)
+graphics_execute_ops :: #force_inline proc() {
+	vk_op_execute()
 }
 
 // 작업 실행 (파괴만)
