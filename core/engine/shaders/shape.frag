@@ -15,6 +15,15 @@ void main() {
     float k = inUv.x;
     float l = inUv.y;
     float m = inUv.z;
+    
+    // 일반 폴리곤 감지: uvw가 (1,0,0)인 경우
+    // 일반 폴리곤은 곡선 경계가 없으므로 항상 불투명하게 렌더링
+    if (abs(k - 1.0) < 0.001 && abs(l) < 0.001 && abs(m) < 0.001) {
+        vec4 color = colormat.mat * inColor;
+        outColor = color;
+        return;
+    }
+    
     float res = pow(k, 3) - l * m;
     
     // GPU Gems 3 방법: 체인 룰을 사용한 정확한 도함수 계산
@@ -37,7 +46,7 @@ void main() {
     
     // Linear alpha based on signed distance
     // Boundary interval: ±0.5 pixel
-    float alpha = sd;
+    float alpha = 0.5 + sd;
     
     if (alpha > 1.0) {
         // Inside - fully opaque
