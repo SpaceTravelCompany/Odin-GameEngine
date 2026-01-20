@@ -37,9 +37,9 @@ viewport_init_update :: proc (self:^viewport) {
 	}
 	
 	//__temp_arena_allocator update 하면 다 지우니 중복 할당해도 됨.
-	self.set.__resources = mem.make_non_zeroed_slice([]union_resource, 2, temp_arena_allocator())
-	self.set.__resources[0] = &self.camera.mat_uniform
-	self.set.__resources[1] = &self.projection.mat_uniform
+	self.set.__resources = mem.make_non_zeroed_slice([]iresource, 2, temp_arena_allocator())
+	self.set.__resources[0] = self.camera.mat_uniform
+	self.set.__resources[1] = self.projection.mat_uniform
 	update_descriptor_sets(mem.slice_ptr(&self.set, 1))
 }
 

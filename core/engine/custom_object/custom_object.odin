@@ -396,17 +396,17 @@ _super_custom_object_draw :: proc(self:^custom_object, cmd:engine.command_buffer
 Creates a buffer resource
 
 Inputs:
-- self: Pointer to the buffer resource to initialize
 - option: Buffer creation options
 - data: Initial data for the buffer
 - is_copy: Whether to copy the data
 - allocator: Optional allocator (default: nil)
 
 Returns:
-- None
+- Pointer to the buffer resource
+- Pointer to the resource data
 */
-create_buffer_resource :: #force_inline proc(self:^engine.buffer_resource, option:engine.buffer_create_option, data:[]byte, is_copy:bool, allocator:Maybe(runtime.Allocator) = nil) {
-    engine.buffer_resource_create_buffer(self, option, data, is_copy, allocator)
+create_buffer_resource :: #force_inline proc(option:engine.buffer_create_option, data:[]byte, is_copy:bool, allocator:Maybe(runtime.Allocator) = nil) -> engine.iresource {
+    return engine.buffer_resource_create_buffer(option, data, is_copy, allocator)
 }
 
 /*

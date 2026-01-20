@@ -54,11 +54,21 @@ graphics_device :: #force_inline proc "contextless" () -> vk.Device {
 // Default Color Transform
 @private __def_color_transform: color_transform
 
+@private __none :: struct {}
+
+@private g_res : map[^base_resource]__none
+
+
+@private resource_type :: enum {
+	BUFFER,
+	TEXTURE,
+}
+
 base_resource :: struct {
-	data: resource_data,
 	g_uniform_indices: [4]graphics_size,
 	idx: resource_range,  // unused uniform buffer
 	mem_buffer: MEM_BUFFER,
+	type: resource_type,
 }
 
 MEM_BUFFER :: distinct rawptr
@@ -69,24 +79,12 @@ buffer_resource :: struct {
 	__resource: vk.Buffer,
 }
 
-resource_data :: struct {
-	data: []byte,
-	allocator: Maybe(runtime.Allocator),
-	is_creating_modifing: bool, // Used to ensure that only the most recent data is applied when a resource is being created or modified, preventing duplicates from being applied.
-}
-
-
 texture_resource :: struct {
 	using _: base_resource,
 	img_view: vk.ImageView,
 	sampler: vk.Sampler,
 	option: texture_create_option,
 	__resource: vk.Image,
-}
-
-union_resource :: union #no_nil {
-	^buffer_resource,
-	^texture_resource,
 }
 
 buffer_create_option :: struct {
@@ -131,7 +129,7 @@ descriptor_set :: struct {
 	__set: vk.DescriptorSet,
 	size: []descriptor_pool_size,
 	bindings: []u32,
-	__resources: []union_resource,
+	__resources: []iresource,
 }
 
 command_buffer :: struct #packed {
@@ -140,12 +138,12 @@ command_buffer :: struct #packed {
 
 color_transform :: struct {
 	mat: linalg.Matrix,
-	mat_uniform: buffer_resource,
+	mat_uniform: iresource,
 	check_init: mem.ICheckInit,
 }
 
 texture :: struct {
-	texture: texture_resource,
+	texture: iresource,
 	set: descriptor_set,
 	sampler: vk.Sampler,
 	check_init: mem.ICheckInit,
@@ -272,11 +270,12 @@ graphics_wait_present_idle :: #force_inline proc "contextless" () {
 
 // 모든 비동기 작업 대기
 graphics_wait_all_ops :: #force_inline proc () {
-    if is_main_thread() {
-        graphics_execute_ops()
-    } else {
-        vk_wait_all_op()
-    }
+    vk_wait_all_op()
+}
+
+// 렌더링 까지 대기
+graphics_wait_rendering :: #force_inline proc () {
+    vk_wait_rendering()
 }
 
 // 작업 실행
@@ -355,24 +354,29 @@ graphics_cmd_bind_descriptor_sets :: #force_inline proc "contextless" (
 }
 
 // 버텍스 버퍼 바인딩
-graphics_cmd_bind_vertex_buffers :: #force_inline proc "contextless" (
+graphics_cmd_bind_vertex_buffers :: proc (
 	cmd: command_buffer,
 	first_binding: u32,
 	binding_count: u32,
-	p_buffers: ^vk.Buffer,
+	p_buffers: []iresource,
 	p_offsets: ^vk.DeviceSize,
 ) {
-	vk.CmdBindVertexBuffers(cmd.__handle, first_binding, binding_count, p_buffers, p_offsets)
+	buffers: []vk.Buffer = mem.make_non_zeroed([]vk.Buffer, len(p_buffers), context.temp_allocator)
+	defer delete(buffers, context.temp_allocator)
+	for b, i in p_buffers {
+		buffers[i] = (^buffer_resource)(b).__resource
+	}
+	vk.CmdBindVertexBuffers(cmd.__handle, first_binding, binding_count, &buffers[0], p_offsets)
 }
 
 // 인덱스 버퍼 바인딩
 graphics_cmd_bind_index_buffer :: #force_inline proc "contextless" (
 	cmd: command_buffer,
-	buffer: vk.Buffer,
+	buffer: iresource,
 	offset: vk.DeviceSize,
 	index_type: vk.IndexType,
 ) {
-	vk.CmdBindIndexBuffer(cmd.__handle, buffer, offset, index_type)
+	vk.CmdBindIndexBuffer(cmd.__handle, (^buffer_resource)(buffer).__resource, offset, index_type)
 }
 
 // 드로우
@@ -411,40 +415,38 @@ graphics_release_fullscreen_exclusive :: #force_inline proc() {
 
 // Buffer Resource Operations
 buffer_resource_create_buffer :: #force_inline proc(
-	self: ^buffer_resource,
 	option: buffer_create_option,
 	data: []byte,
 	is_copy: bool = false,
 	allocator: Maybe(runtime.Allocator) = nil,
-) {
-	vkbuffer_resource_create_buffer(self, option, data, is_copy, allocator)
+) -> iresource {
+	return vkbuffer_resource_create_buffer(option, data, is_copy, allocator)
 }
 
-buffer_resource_deinit :: #force_inline proc(self: ^$T) where T == buffer_resource || T == texture_resource {
+buffer_resource_deinit :: #force_inline proc(self: iresource) {
 	vkbuffer_resource_deinit(self)
 }
 
-buffer_resource_copy_update :: #force_inline proc(self: union_resource, data: ^$T, allocator: Maybe(runtime.Allocator) = nil) {
+buffer_resource_copy_update :: #force_inline proc(self: iresource, data: ^$T, allocator: Maybe(runtime.Allocator) = nil) {
 	vkbuffer_resource_copy_update(self, data, allocator)
 }
 
-buffer_resource_copy_update_slice :: #force_inline proc(self: union_resource, array: $T/[]$E, allocator: Maybe(runtime.Allocator) = nil) {
+buffer_resource_copy_update_slice :: #force_inline proc(self: iresource, array: $T/[]$E, allocator: Maybe(runtime.Allocator) = nil) {
 	vkbuffer_resource_copy_update_slice(self, array, allocator)
 }
 
-buffer_resource_map_update_slice :: #force_inline proc(self: union_resource, array: $T/[]$E, allocator: Maybe(runtime.Allocator) = nil) {
-	vkbuffer_resource_map_update_slice(self, array, allocator)
+buffer_resource_map_update_slice :: #force_inline proc(self: iresource, array: $T/[]$E, allocator: Maybe(runtime.Allocator) = nil) {
+	vkbuffer_resource_map_update_slice(self, array,allocator)
 }
 
 buffer_resource_create_texture :: #force_inline proc(
-	self: ^texture_resource,
 	option: texture_create_option,
 	sampler: vk.Sampler,
 	data: []byte,
 	is_copy: bool = false,
 	allocator: Maybe(runtime.Allocator) = nil,
-) {
-	vkbuffer_resource_create_texture(auto_cast self, option, sampler, data, is_copy, allocator)
+) -> iresource {
+	return vkbuffer_resource_create_texture(option, sampler, data, is_copy, allocator)
 }
 
 // Descriptor Set Operations
@@ -469,7 +471,7 @@ color_transform_init_matrix_raw :: proc(self: ^color_transform, mat: linalg.Matr
 
 @private __color_transform_init :: #force_inline proc(self: ^color_transform) {
 	mem.ICheckInit_Init(&self.check_init)
-	buffer_resource_create_buffer(&self.mat_uniform, {
+	self.mat_uniform = buffer_resource_create_buffer({
 		len = size_of(linalg.Matrix),
 		type = .UNIFORM,
 		resource_usage = .CPU,
@@ -487,10 +489,8 @@ Returns:
 */
 color_transform_deinit :: proc(self: ^color_transform) {
 	mem.ICheckInit_Deinit(&self.check_init)
-	clone_mat_uniform := new(buffer_resource, temp_arena_allocator())
-	clone_mat_uniform^ = self.mat_uniform
-	self.mat_uniform.data = {}
-	buffer_resource_deinit(clone_mat_uniform)
+	buffer_resource_deinit(self.mat_uniform)
+	self.mat_uniform = nil
 }
 
 /*
@@ -506,7 +506,7 @@ Returns:
 color_transform_update_matrix_raw :: proc(self: ^color_transform, _mat: linalg.Matrix) {
 	mem.ICheckInit_Check(&self.check_init)
 	self.mat = _mat
-	buffer_resource_copy_update(&self.mat_uniform, &self.mat)
+	buffer_resource_copy_update(self.mat_uniform, &self.mat)
 }
 
 @private graphics_create :: proc() {

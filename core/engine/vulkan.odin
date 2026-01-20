@@ -635,7 +635,7 @@ vk_create_swap_chain_and_image_views :: proc() -> bool {
 				sType = vk.StructureType.FRAMEBUFFER_CREATE_INFO,
 				renderPass = vk_render_pass,
 				attachmentCount = 2,
-				pAttachments = &([]vk.ImageView{vk_frame_buffer_image_views[i], vk_frame_depth_stencil_texture.texture.img_view, })[0],
+				pAttachments = &([]vk.ImageView{vk_frame_buffer_image_views[i], (^texture_resource)(vk_frame_depth_stencil_texture.texture).img_view, })[0],
 				width = vk_extent_rotation.width,
 				height = vk_extent_rotation.height,
 				layers = 1,
@@ -645,7 +645,9 @@ vk_create_swap_chain_and_image_views :: proc() -> bool {
 				sType = vk.StructureType.FRAMEBUFFER_CREATE_INFO,
 				renderPass = vk_render_pass,
 				attachmentCount = 3,
-				pAttachments = &([]vk.ImageView{vk_msaa_frame_texture.texture.img_view, vk_frame_depth_stencil_texture.texture.img_view, vk_frame_buffer_image_views[i]})[0],
+				pAttachments = &([]vk.ImageView{(^texture_resource)(vk_msaa_frame_texture.texture).img_view,
+					 (^texture_resource)(vk_frame_depth_stencil_texture.texture).img_view,
+					  vk_frame_buffer_image_views[i]})[0],
 				width = vk_extent_rotation.width,
 				height = vk_extent_rotation.height,
 				layers = 1,
@@ -1257,6 +1259,13 @@ vk_recreate_surface :: proc() {
 	}
 }
 
+
+@private g_wait_rendering_sem: sync.Sema
+
+vk_wait_rendering :: proc() {
+	sync.sema_wait(&g_wait_rendering_sem)
+}
+
 vk_draw_frame :: proc() {
 	@(static) frame:int = 0
 
@@ -1393,6 +1402,7 @@ vk_draw_frame :: proc() {
 	} else if res != .SUCCESS { trace.panic_log("QueuePresentKHR : ", res) }
 
 	frame = (frame + 1) % MAX_FRAMES_IN_FLIGHT
+	sync.sema_post(&g_wait_rendering_sem)
 }
 
 vk_refresh_pre_matrix :: proc() {

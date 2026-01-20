@@ -17,18 +17,18 @@ Extends iobject with tile texture array and tile index
 */
 tile_image :: struct {
     using _:engine.iobject,
-    tile_uniform:engine.buffer_resource,
+    tile_uniform:engine.iresource,
     tile_idx:u32,
     src: ^tile_texture_array,
 }
 
-@private get_uniform_resources_tile_image :: #force_inline proc(self:^engine.iobject) -> []engine.union_resource {
-    res := mem.make_non_zeroed([]engine.union_resource, 3, context.temp_allocator)
-    res[0] = &self.mat_uniform
-    res[1] = &self.color_transform.mat_uniform
+@private get_uniform_resources_tile_image :: #force_inline proc(self:^engine.iobject) -> []engine.iresource {
+    res := mem.make_non_zeroed([]engine.iresource, 3, context.temp_allocator)
+    res[0] = self.mat_uniform
+    res[1] = self.color_transform.mat_uniform
 
     tile_image_ : ^tile_image = auto_cast self
-    res[2] = &tile_image_.tile_uniform
+    res[2] = tile_image_.tile_uniform
     return res[:]
 }
 
@@ -53,7 +53,7 @@ colorTransform:^engine.color_transform = nil, pivot:linalg.PointF = {0, 0}, vtab
     if self.vtable.get_uniform_resources == nil do self.vtable.get_uniform_resources = auto_cast get_uniform_resources_tile_image
 
 
-    buffer_resource_create_buffer(&self.tile_uniform, {
+    self.tile_uniform = engine.buffer_resource_create_buffer({
         len = size_of(u32),
         type = .UNIFORM,
         resource_usage = .CPU,
@@ -80,10 +80,8 @@ colorTransform:^engine.color_transform = nil, vtable:^engine.iobject_vtable = ni
 }
 
 _super_tile_image_deinit :: proc(self:^tile_image) {
-    clone_tile_uniform := new(engine.buffer_resource, engine.temp_arena_allocator())
-    clone_tile_uniform^ = self.tile_uniform
-    self.tile_uniform.data = {}
-    engine.buffer_resource_deinit(clone_tile_uniform)
+    engine.buffer_resource_deinit(self.tile_uniform)
+    self.tile_uniform = nil
 
     engine._super_iobject_deinit(auto_cast self)
 }
@@ -187,7 +185,7 @@ tile_image_update_idx :: proc(self:^tile_image, idx:u32) {
     mem.ICheckInit_Check(&self.check_init)
     self.tile_idx = idx
 
-    engine.buffer_resource_copy_update(&self.tile_uniform, &self.tile_idx)
+    engine.buffer_resource_copy_update(self.tile_uniform, &self.tile_idx)
 }
 
 _super_tile_image_draw :: proc (self:^tile_image, cmd:engine.command_buffer, viewport:^engine.viewport) {
@@ -245,7 +243,7 @@ inPixelFmt:img.color_fmt = .RGBA, allocator := context.allocator) {
         }
     }
   
-    engine.buffer_resource_create_texture(&self.texture, {
+    self.texture = engine.buffer_resource_create_texture({
         width = tile_width,
         height = tile_height,
         use_gcpu_mem = false,
@@ -256,8 +254,8 @@ inPixelFmt:img.color_fmt = .RGBA, allocator := context.allocator) {
         type = .TEX2D,
     }, self.sampler, allocPixels, false, allocator)
 
-    self.set.__resources = mem.make_non_zeroed_slice([]engine.union_resource, 1, engine.temp_arena_allocator())
-    self.set.__resources[0] = &self.texture
+    self.set.__resources = mem.make_non_zeroed_slice([]engine.iresource, 1, engine.temp_arena_allocator())
+    self.set.__resources[0] = self.texture
     engine.update_descriptor_sets(mem.slice_ptr(&self.set, 1))
 }
 
@@ -272,8 +270,8 @@ Returns:
 */
 tile_texture_array_deinit :: #force_inline proc(self:^tile_texture_array) {
     mem.ICheckInit_Deinit(&self.check_init)
-    engine.buffer_resource_deinit(&self.texture)
-	self.texture.data = {}
+    engine.buffer_resource_deinit(self.texture)
+	self.texture = nil
 }
 /*
 Gets the width of tiles in the tile texture array
@@ -285,7 +283,7 @@ Returns:
 - Width of each tile in pixels
 */
 tile_texture_array_width :: #force_inline proc "contextless" (self:^tile_texture_array) -> u32 {
-    return self.texture.option.width
+    return (^engine.texture_resource)(self.texture).option.width
 }
 
 /*
@@ -298,7 +296,7 @@ Returns:
 - Height of each tile in pixels
 */
 tile_texture_array_height :: #force_inline proc "contextless" (self:^tile_texture_array) -> u32 {
-    return self.texture.option.height
+    return (^engine.texture_resource)(self.texture).option.height
 }
 
 /*
@@ -311,5 +309,5 @@ Returns:
 - Number of tiles in the array
 */
 tile_texture_array_count :: #force_inline proc "contextless" (self:^tile_texture_array) -> u32 {
-    return self.texture.option.len
+    return (^engine.texture_resource)(self.texture).option.len
 }

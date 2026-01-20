@@ -281,7 +281,7 @@ texture_init :: proc(
 
 	color_fmt_convert_default_overlap(pixels, pixels, in_pixel_fmt)
 
-	buffer_resource_create_texture(&self.texture, {
+	self.texture = buffer_resource_create_texture({
 		width = width,
 		height = height,
 		use_gcpu_mem = false,
@@ -294,8 +294,8 @@ texture_init :: proc(
 		single = false,
 	}, self.sampler, pixels, false, pixels_allocator)
 
-	self.set.__resources = mem.make_non_zeroed_slice([]union_resource, 1, __temp_arena_allocator)
-	self.set.__resources[0] = &self.texture
+	self.set.__resources = mem.make_non_zeroed_slice([]iresource, 1, __temp_arena_allocator)
+	self.set.__resources[0] = self.texture
 	update_descriptor_sets(mem.slice_ptr(&self.set, 1))
 }
 
@@ -328,7 +328,7 @@ texture_init_grey :: proc(
 	self.set.layout = tex_descriptor_set_layout
 	self.set.__set = 0
 
-	buffer_resource_create_texture(&self.texture, {
+	self.texture = buffer_resource_create_texture({
 		width = width,
 		height = height,
 		use_gcpu_mem = false,
@@ -341,8 +341,8 @@ texture_init_grey :: proc(
 		single = false,
 	}, self.sampler, pixels, false, pixels_allocator)
 
-	self.set.__resources = mem.make_non_zeroed_slice([]union_resource, 1, __temp_arena_allocator)
-	self.set.__resources[0] = &self.texture
+	self.set.__resources = mem.make_non_zeroed_slice([]iresource, 1, __temp_arena_allocator)
+	self.set.__resources[0] = self.texture
 	update_descriptor_sets(mem.slice_ptr(&self.set, 1))
 }
 
@@ -389,7 +389,7 @@ texture_init_depth_stencil :: proc(self:^texture, width:u32, height:u32) {
     self.set.layout = 0
     self.set.__set = 0
 
-    buffer_resource_create_texture(&self.texture, {
+    self.texture = buffer_resource_create_texture({
         width = width,
         height = height,
         use_gcpu_mem = false,
@@ -422,7 +422,7 @@ texture_init_msaa :: proc(self:^texture, width:u32, height:u32) {
     self.set.layout = 0
     self.set.__set = 0
 
-    buffer_resource_create_texture(&self.texture, {
+    self.texture = buffer_resource_create_texture({
         width = width,
         height = height,
         use_gcpu_mem = false,
@@ -447,8 +447,8 @@ Returns:
 */
 texture_deinit :: #force_inline proc(self:^texture) {
     mem.ICheckInit_Deinit(&self.check_init)
-    buffer_resource_deinit(&self.texture)
-	self.texture.data = {}
+    buffer_resource_deinit(self.texture)
+	self.texture = nil
 }
 
 /*
@@ -461,7 +461,11 @@ Returns:
 - Width of the texture in pixels
 */
 texture_width :: #force_inline proc "contextless" (self:^texture) -> u32{
-    return auto_cast self.texture.option.width
+	if self.texture == nil {
+		return 0
+	}
+	tex: ^texture_resource = auto_cast self.texture
+    return auto_cast tex.option.width
 }
 
 /*
@@ -474,7 +478,11 @@ Returns:
 - Height of the texture in pixels
 */
 texture_height :: #force_inline proc "contextless" (self:^texture) -> u32 {
-    return auto_cast self.texture.option.height
+	if self.texture == nil {
+		return 0
+	}
+	tex: ^texture_resource = auto_cast self.texture
+    return auto_cast tex.option.height
 }
 
 /*
@@ -550,7 +558,7 @@ texture_array_init :: proc(self:^texture_array, width:u32, height:u32, count:u32
     allocPixels := mem.make_non_zeroed_slice([]byte, count * width * height * 4, context.allocator)
     color_fmt_convert_default(pixels, allocPixels, inPixelFmt)
 
-    buffer_resource_create_texture(&self.texture, {
+    self.texture = buffer_resource_create_texture({
         width = width,
         height = height,
         use_gcpu_mem = false,
@@ -562,8 +570,8 @@ texture_array_init :: proc(self:^texture_array, width:u32, height:u32, count:u32
         resource_usage = .GPU,
     }, self.sampler, allocPixels, false, context.allocator)
 
-    self.set.__resources = mem.make_non_zeroed_slice([]union_resource, 1, __temp_arena_allocator)
-    self.set.__resources[0] = &self.texture
+    self.set.__resources = mem.make_non_zeroed_slice([]iresource, 1, __temp_arena_allocator)
+    self.set.__resources[0] = self.texture
     update_descriptor_sets(mem.slice_ptr(&self.set, 1))
 }
 
@@ -578,8 +586,8 @@ Returns:
 */
 texture_array_deinit :: #force_inline proc(self:^texture_array) {
     mem.ICheckInit_Deinit(&self.check_init)
-    buffer_resource_deinit(&self.texture)
-	self.texture.data = {}
+    buffer_resource_deinit(self.texture)
+	self.texture = nil
 }
 /*
 Gets the width of textures in the texture array
@@ -591,7 +599,11 @@ Returns:
 - Width of each texture in pixels
 */
 texture_array_width :: #force_inline proc "contextless" (self:^texture_array) -> u32 {
-    return self.texture.option.width
+	if self.texture == nil {
+		return 0
+	}
+	tex: ^texture_resource = auto_cast self.texture
+    return auto_cast tex.option.width
 }
 
 /*
@@ -604,7 +616,11 @@ Returns:
 - Height of each texture in pixels
 */
 texture_array_height :: #force_inline proc "contextless" (self:^texture_array) -> u32 {
-    return self.texture.option.height
+	if self.texture == nil {
+		return 0
+	}
+	tex: ^texture_resource = auto_cast self.texture
+    return auto_cast tex.option.height
 }
 
 /*
@@ -617,7 +633,11 @@ Returns:
 - Number of textures in the array
 */
 texture_array_count :: #force_inline proc "contextless" (self:^texture_array) -> u32 {
-    return self.texture.option.len
+    if self.texture == nil {
+        return 0
+    }
+    tex: ^texture_resource = auto_cast self.texture
+    return auto_cast tex.option.len
 }
 
 /*
@@ -708,14 +728,21 @@ where is_any_image_type(ANY_IMAGE) {
     if width % 2 == 0 do p.x -= 0.5
     if height % 2 == 0 do p.y += 0.5
 
+
+	if img.src == nil {
+		return p
+	}
+	img_width := (^texture_resource)(img.src).option.width
+	img_height := (^texture_resource)(img.src).option.height
+
     #partial switch pivot {
         case .Center:
-            if img.src.texture.option.width % 2 != 0 do p.x += 0.5
-            if img.src.texture.option.height % 2 != 0 do p.y -= 0.5
+            if img_width % 2 != 0 do p.x += 0.5
+            if img_height % 2 != 0 do p.y -= 0.5
         case .Left, .Right:
-            if img.src.texture.option.height % 2 != 0 do p.y -= 0.5
+            if img_height % 2 != 0 do p.y -= 0.5
         case .Top, .Bottom:
-            if img.src.texture.option.width % 2 != 0 do p.x += 0.5
+            if img_width % 2 != 0 do p.x += 0.5
     }
     return p
 }

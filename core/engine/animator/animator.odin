@@ -12,7 +12,7 @@ Contains frame information and uniform buffer for frame data
 */
 ianimate_object :: struct {
     using _:engine.iobject,
-    frame_uniform:engine.buffer_resource,
+    frame_uniform:engine.iresource,
     frame:u32,
 }
 
@@ -198,7 +198,7 @@ Returns:
 - None
 */
 ianimate_object_update_frame :: #force_inline proc (self:^ianimate_object) {
-    engine.buffer_resource_copy_update(&self.frame_uniform, &self.frame)
+    engine.buffer_resource_copy_update(self.frame_uniform, &self.frame)
 }
 
 /*
@@ -239,7 +239,7 @@ where intrinsics.type_is_subtype_of(actualType, animate_image) {
 
     if self.vtable.get_uniform_resources == nil do self.vtable.get_uniform_resources = auto_cast get_uniform_resources_animate_image
 
-    engine.buffer_resource_create_buffer(&self.frame_uniform, {
+    self.frame_uniform = engine.buffer_resource_create_buffer({
         len = size_of(u32),
         type = .UNIFORM,
         resource_usage = .CPU,
@@ -264,7 +264,7 @@ where intrinsics.type_is_subtype_of(actualType, animate_image) {
 
     if self.vtable.get_uniform_resources == nil do self.vtable.get_uniform_resources = auto_cast get_uniform_resources_animate_image
 
-    engine.buffer_resource_create_buffer(&self.frame_uniform, {
+    self.frame_uniform = engine.buffer_resource_create_buffer({
         len = size_of(u32),
         type = .UNIFORM,
         resource_usage = .CPU,
@@ -274,11 +274,8 @@ where intrinsics.type_is_subtype_of(actualType, animate_image) {
 }
 
 _super_animate_image_deinit :: proc(self:^animate_image) {
-    clone_frame_uniform := new(engine.buffer_resource, engine.temp_arena_allocator())
-    clone_frame_uniform^ = self.frame_uniform
-    self.frame_uniform.data = {}
-    engine.buffer_resource_deinit(clone_frame_uniform)
-
+    engine.buffer_resource_deinit(self.frame_uniform)
+    self.frame_uniform = nil
     engine._super_iobject_deinit(auto_cast self)
 }
 
@@ -294,7 +291,7 @@ Returns:
 - The total number of frames in the texture array
 */
 _super_animate_image_get_frame_cnt :: proc "contextless" (self:^animate_image) -> u32 {
-    return self.src.texture.option.len
+    return (^engine.texture_resource)(self.src.texture).option.len
 }
 
 /*
@@ -379,12 +376,12 @@ _super_animate_image_draw :: proc (self:^animate_image, cmd:engine.command_buffe
     engine.graphics_cmd_draw(cmd, 6, 1, 0, 0)
 }
 
-@private get_uniform_resources_animate_image :: #force_inline proc(self:^engine.iobject) -> []engine.union_resource {
-    res := mem.make_non_zeroed([]engine.union_resource, 3, context.temp_allocator)
-    res[0] = &self.mat_uniform
-    res[1] = &self.color_transform.mat_uniform
+@private get_uniform_resources_animate_image :: #force_inline proc(self:^engine.iobject) -> []engine.iresource {
+    res := mem.make_non_zeroed([]engine.iresource, 3, context.temp_allocator)
+    res[0] = self.mat_uniform
+    res[1] = self.color_transform.mat_uniform
 
     animate_image_ : ^animate_image = auto_cast self
-    res[2] = &animate_image_.frame_uniform
+    res[2] = animate_image_.frame_uniform
     return res[:]
 }

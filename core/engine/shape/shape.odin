@@ -128,10 +128,10 @@ shape_src_bind_and_draw :: proc(self:^shape_src, set:^engine.descriptor_set, cmd
         &([]vk.DescriptorSet{set.__set, viewport.set.__set})[0], 0, nil)
 
 	offsets: vk.DeviceSize = 0
-    engine.graphics_cmd_bind_vertex_buffers(cmd, 0, 1, &self.vertexBuf.buf.__resource, &offsets)
-    engine.graphics_cmd_bind_index_buffer(cmd, self.indexBuf.buf.__resource, 0, .UINT32)
+    engine.graphics_cmd_bind_vertex_buffers(cmd, 0, 1, []engine.iresource{self.vertexBuf.buf}, &offsets)
+    engine.graphics_cmd_bind_index_buffer(cmd, self.indexBuf.buf, 0, .UINT32)
 
-    engine.graphics_cmd_draw_indexed(cmd, auto_cast (self.indexBuf.buf.option.len / size_of(u32)), 1, 0, 0, 0)
+    engine.graphics_cmd_draw_indexed(cmd, auto_cast ((^engine.buffer_resource)(self.indexBuf.buf).option.len / size_of(u32)), 1, 0, 0, 0)
 }
 
 shape_src_init_raw :: proc(self:^shape_src, raw:^geometry.raw_shape, flag:engine.resource_usage = .GPU, allocator :Maybe(runtime.Allocator) = nil) {

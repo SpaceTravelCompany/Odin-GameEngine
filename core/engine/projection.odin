@@ -196,7 +196,7 @@ projection_update_matrix_raw :: proc(self:^projection, _mat:linalg.Matrix) {
         mat = _mat
     }
     self.mat = _mat
-    buffer_resource_copy_update(&self.mat_uniform, &mat)
+    buffer_resource_copy_update(self.mat_uniform, &mat)
 }
 
 @private __projection_update_ortho :: #force_inline proc(self:^projection, left:f32, right:f32, bottom:f32, top:f32, near:f32 = 0.1, far:f32 = 100, flip_z_axis_for_vulkan := true) {
@@ -257,8 +257,8 @@ projection_update_matrix_raw :: proc(self:^projection, _mat:linalg.Matrix) {
         mat = linalg.matrix_mul(rotation_matrix, self.mat)
     } else {
         mat = self.mat
-    }
-    buffer_resource_create_buffer(&self.mat_uniform, {
+    }	
+    self.mat_uniform = buffer_resource_create_buffer({
         len = size_of(linalg.Matrix),
         type = .UNIFORM,
         resource_usage = .CPU,
@@ -279,10 +279,8 @@ Returns:
 projection_deinit :: proc(self:^projection) {
     mem.ICheckInit_Deinit(&self.check_init)
 
-    clone_mat_uniform := new(buffer_resource, temp_arena_allocator())
-    clone_mat_uniform^ = self.mat_uniform
-	self.mat_uniform.data = {}
-    buffer_resource_deinit(clone_mat_uniform)
+    buffer_resource_deinit(self.mat_uniform)
+	self.mat_uniform = nil
 }
 
 /*
