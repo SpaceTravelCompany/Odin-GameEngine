@@ -123,7 +123,7 @@ animateTexShaderStages: [2]vk.PipelineShaderStageCreateInfo
 vk_cmd_pool:vk.CommandPool
 vk_cmd_buffer:[MAX_FRAMES_IN_FLIGHT]vk.CommandBuffer
 
-msaa_count :: #config(MSAA_COUNT, 4)
+msaa_count :: #config(MSAA_COUNT, 1)
 
 when msaa_count == 4 {
 	VK_SAMPLE_COUNT_FLAGS :: vk.SampleCountFlags{._4}
