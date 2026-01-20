@@ -37,7 +37,7 @@ void main() {
     
     // Linear alpha based on signed distance
     // Boundary interval: ±0.5 pixel
-    float alpha = sd - 0.5;
+    float alpha = sd;
     
     if (alpha > 1.0) {
         // Inside - fully opaque
