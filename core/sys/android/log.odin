@@ -129,6 +129,7 @@ __android_logger_function :: #type proc "c" (log_message: ^LogMessage)
  */
 __android_aborter_function :: #type proc "c" (abort_message: cstring)
 
+@(default_calling_convention="c")
 foreign log {
 	/**
 	 * Writes the constant string `text` to the log, with priority `prio` and tag

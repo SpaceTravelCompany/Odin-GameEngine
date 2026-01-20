@@ -108,6 +108,7 @@ AMediaCodecOnFrameRendered :: #type proc "c" (
     systemNano: i64,
 )
 
+@(default_calling_convention="c")
 foreign mediandk {
 	/**
 	 * Create codec by name. Use this if you know the exact codec you want to use.

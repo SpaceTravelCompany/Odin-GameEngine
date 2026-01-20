@@ -79,7 +79,7 @@ FamilyVariant :: enum u32 {
  */
 AFontMatcher :: struct{}
 
-
+@(default_calling_convention="c")
 foreign android {
 	/**
 	 * Creates a new AFontMatcher object.

@@ -6,6 +6,7 @@ foreign import mediandk "system:mediandk"
 AMediaCrypto :: struct{}
 AMediaUUID :: [16]u8
 
+@(default_calling_convention="c")
 foreign mediandk {
 	/**
 	 * Available since API level 21.

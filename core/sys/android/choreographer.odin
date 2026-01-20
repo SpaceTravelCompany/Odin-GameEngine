@@ -58,7 +58,7 @@ AChoreographer_vsyncCallback :: #type proc "c" (callbackData: ^AChoreographerFra
  */
 AChoreographer_refreshRateCallback :: #type proc "c" (vsyncPeriodNanos: i64, data: rawptr)
 
-
+@(default_calling_convention="c")
 foreign android {
 	/**
 	 * Get the AChoreographer instance for the current thread. This must be called

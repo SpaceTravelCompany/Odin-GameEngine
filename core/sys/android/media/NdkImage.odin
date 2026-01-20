@@ -521,6 +521,7 @@ AImageCropRect :: struct {
     bottom: i32,
 }
 
+@(default_calling_convention="c")
 foreign mediandk {
 	/**
 	 * Return the image back the the system and delete the AImage object from memory.

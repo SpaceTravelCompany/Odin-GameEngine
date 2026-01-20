@@ -133,8 +133,7 @@ ACameraMetadata_const_entry :: struct {
     },
 }
 
-
-
+@(default_calling_convention="c")
 foreign camerandk {
 	/**
 	 * Get a metadata entry from an input {@link ACameraMetadata}.

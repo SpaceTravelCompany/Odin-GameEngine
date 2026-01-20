@@ -3,6 +3,7 @@ package android
 
 foreign import android "system:android"
 
+@(default_calling_convention="c")
 foreign android {
 	/**
 	 * Return the AHardwareBuffer wrapped by a Java HardwareBuffer object.

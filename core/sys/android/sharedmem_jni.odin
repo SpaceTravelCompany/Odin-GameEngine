@@ -3,6 +3,7 @@ package android
 
 foreign import android "system:android"
 
+@(default_calling_convention="c")
 foreign android {
 	/**
 	 * Returns a dup'd FD from the given Java android.os.SharedMemory object. The returned file

@@ -106,7 +106,7 @@ ACameraManager_PhysicalCameraAvailabilityCallback :: #type proc "c" (_context: r
  */
 ACameraManager_AccessPrioritiesChangedCallback :: #type proc "c" (_context: rawptr)
 
-
+@(default_calling_convention="c")
 foreign camerandk {
 	/**
 	 * Create ACameraManager instance.

@@ -59,7 +59,7 @@ AMediaDataSourceClose :: #type proc "c" (userdata: rawptr)
  */
 AMediaDataSourceGetAvailableSize :: #type proc "c" (userdata: rawptr, offset: android.off64_t) -> int
 
-
+@(default_calling_convention="c")
 foreign mediandk {
 	/**
 	 * Create new media data source. Returns NULL if memory allocation

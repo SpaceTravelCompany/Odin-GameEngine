@@ -214,6 +214,7 @@ android_app :: struct {
     pendingContentRect: ARect,
 }
 
+@(default_calling_convention="c")
 foreign android {
 	app_dummy :: proc() ---
 }

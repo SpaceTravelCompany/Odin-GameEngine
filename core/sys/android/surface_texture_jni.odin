@@ -3,6 +3,7 @@ package android
 
 foreign import android "system:android"
 
+@(default_calling_convention="c")
 foreign android {
 	/**
 	 * Get a reference to the native ASurfaceTexture from the corresponding java object.

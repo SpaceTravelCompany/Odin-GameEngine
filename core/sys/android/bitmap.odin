@@ -121,7 +121,7 @@ BitmapInfo :: struct {
  */
 AndroidBitmap_CompressWriteFunc :: #type proc "c" (userContext: rawptr, data: rawptr, size: uint) -> bool
 
-
+@(default_calling_convention="c")
 foreign android {
 	/**
 	 * Given a java bitmap object, fill out the {@link BitmapInfo} struct for it.

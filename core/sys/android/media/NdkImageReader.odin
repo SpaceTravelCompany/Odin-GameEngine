@@ -78,6 +78,7 @@ AImageReader_ImageCallback :: #type proc "c" (_context: rawptr, reader: ^AImageR
 */
 AImageReader_BufferRemovedCallback :: #type proc "c" (_context: rawptr, reader: ^AImageReader, buffer: ^android.AHardwareBuffer)
 
+@(default_calling_convention="c")
 foreign mediandk {
 	/**
 	 * Create a new reader for images of the desired size and format.

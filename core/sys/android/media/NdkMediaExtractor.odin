@@ -35,6 +35,7 @@ PsshInfo :: struct {
 	entries: [0]PsshEntry,
 }
 
+@(default_calling_convention="c")
 foreign mediandk {
 	/**
 	 * Create new media extractor.

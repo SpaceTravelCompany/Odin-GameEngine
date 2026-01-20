@@ -702,6 +702,7 @@ AAudioStream_dataCallback :: #type proc "c" (stream: ^AAudioStream, userData: ra
 */
 AAudioStream_errorCallback :: #type proc "c" (stream: ^AAudioStream, userData: rawptr, error: AAudioResult)
 
+@(default_calling_convention="c")
 foreign aaudio {
 	/**
 	 * The text is the ASCII symbol corresponding to the returnCode,

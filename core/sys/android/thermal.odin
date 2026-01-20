@@ -56,6 +56,7 @@ AThermalManager :: struct{}
  */
 AThermal_StatusCallback :: #type proc "c" (data: rawptr, status: AThermalStatus)
 
+@(default_calling_convention="c")
 foreign android {
 	/**
 	  * Acquire an instance of the thermal manager. This must be freed using

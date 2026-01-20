@@ -609,6 +609,7 @@ ACameraCaptureSession_logicalCamera_captureCallback_failed :: #type proc "c" (_c
  */
 ACameraCaptureSession_captureCallback_startV2 :: #type proc "c" (_context: rawptr, session: ^ACameraCaptureSession, request: ^ACaptureRequest, timestamp: i64, frameNumber: i64)
 
+@(default_calling_convention="c")
 foreign camerandk {
 	/**
 	 * Close this capture session.

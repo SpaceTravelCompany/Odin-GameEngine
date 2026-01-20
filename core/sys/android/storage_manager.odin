@@ -82,6 +82,7 @@ AStorageManager :: struct{}
 */
 AStorageManager_obbCallbackFunc :: #type proc "c" (filename: cstring, state: OBBState, data: rawptr)
 
+@(default_calling_convention="c")
 foreign android {
 	/**
 	 * Obtains a new instance of AStorageManager.

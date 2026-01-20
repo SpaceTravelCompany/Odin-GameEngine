@@ -111,6 +111,7 @@ android_fdsan_error_level :: enum {
   FATAL,
 }
 
+@(default_calling_convention="c")
 foreign android {
 	/*
 	* Create an owner tag with the specified type and least significant 56 bits of tag.

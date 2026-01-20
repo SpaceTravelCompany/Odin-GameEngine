@@ -4,6 +4,7 @@ import "base:intrinsics"
 import "base:library"
 import "base:runtime"
 import "core:c"
+import "core:mem"
 import "core:c/libc"
 import "core:debug/trace"
 import "core:fmt"
@@ -116,6 +117,16 @@ android_print_current_config :: proc () {
 }
 
 when library.is_android {
+	@private print_android :: proc "contextless" (args: ..any, sep := " ", flush := true) -> i32 {
+		_ = flush
+		context = runtime.Context {
+			allocator = runtime.heap_allocator(),
+		}
+		cstr := fmt.caprint(..args, sep=sep)
+		defer delete(cstr)
+		
+		return android.__android_log_write(android.LogPriority.INFO, ODIN_BUILD_PROJECT_NAME, cstr)
+	}
 	@private android_close :: #force_inline proc "contextless" () {
 		app.destroyRequested = 1
 	}
@@ -185,10 +196,10 @@ when library.is_android {
 	}
 
 	@(private="file") handle_input :: proc "c" (app:^android.android_app, evt : ^android.AInputEvent) -> c.int {
+		context = runtime.default_context()
+
 		MAX_POINTERS :: 20
 		@static pointer_poses:[MAX_POINTERS]linalg.PointF
-
-		context = runtime.default_context()
 
 		type := android.AInputEvent_getType(evt)
 		src := android.AInputEvent_getSource(evt)
@@ -301,14 +312,14 @@ when library.is_android {
 						if auto_cast idx < count {
 							pointer_down(u8(idx), pointer_poses[idx].x, pointer_poses[idx].y)
 						} else {
-							fmt.print_custom_android("WARN OUT OF RANGE PointerDown:", idx, count, "\n", logPriority=.WARN)
+							print_android("WARN OUT OF RANGE PointerDown:", idx, count, "\n", sep = "")
 						}
 					case .POINTER_UP:
 						idx := act.pointer_index
 						if auto_cast idx < count {
 							pointer_up(u8(idx), pointer_poses[idx].x, pointer_poses[idx].y)
 						} else {
-							fmt.print_custom_android("WARN OUT OF RANGE PointerUp:", idx, count, "\n", logPriority=.WARN)
+							print_android("WARN OUT OF RANGE PointerUp:", idx, count, "\n", sep = "")
 						}
 				}
 				return 1
@@ -328,7 +339,7 @@ when library.is_android {
 							key_down(transmute(key_code)(key_code_))
 						}
 					} else {
-						fmt.print_custom_android("WARN OUT OF RANGE KeyDown: ", int(key_code_), "\n", logPriority=.WARN, sep = "")
+						print_android("WARN OUT OF RANGE KeyDown: ", int(key_code_), "\n", sep = "")
 						return 0
 					}
 					if key_code_ == .BACK do return 1 // 뒤로가기 버튼 비활성화
@@ -340,7 +351,7 @@ when library.is_android {
 						keys[int(key_code_)] = false
 						key_up(transmute(key_code)(key_code_))
 					} else {
-						fmt.print_custom_android("WARN OUT OF RANGE KeyUp: ", int(key_code_), "\n", logPriority=.WARN, sep = "")
+						print_android("WARN OUT OF RANGE KeyUp: ", int(key_code_), "\n", sep = "")
 						return 0
 					}
 					if key_code_ == .BACK do return 1 // 뒤로가기 버튼 비활성화
@@ -352,7 +363,7 @@ when library.is_android {
 							key_up(transmute(key_code)(key_code_))
 						}
 					} else {
-						fmt.print_custom_android("WARN OUT OF RANGE Key Multiple: ", int(key_code_), "\n", logPriority=.WARN, sep = "")
+						print_android("WARN OUT OF RANGE Key Multiple: ", int(key_code_), "\n", sep = "")
 						return 0
 					}
 					if key_code_ == .BACK do return 1 // 뒤로가기 버튼 비활성화

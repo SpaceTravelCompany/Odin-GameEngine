@@ -57,6 +57,7 @@ AAssetManager :: struct{}
  */
 AAsset :: struct{}
 
+@(default_calling_convention="c")
 foreign android {
 	/**
 	 * Open an asset.

@@ -43,7 +43,7 @@ FontWeight :: enum u16 {
  */
 AFont :: struct{}
 
-
+@(default_calling_convention="c")
 foreign android {
 	/**
 	 * Close an AFont.

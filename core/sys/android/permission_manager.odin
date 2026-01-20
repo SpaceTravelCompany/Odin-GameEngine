@@ -48,6 +48,7 @@ PermissionManagerStatus :: enum i32 {
     SERVICE_UNAVAILABLE = -2,
 }
 
+@(default_calling_convention="c")
 foreign android {
 	/**
 	 * Checks whether the package with the given pid/uid has been granted a permission.

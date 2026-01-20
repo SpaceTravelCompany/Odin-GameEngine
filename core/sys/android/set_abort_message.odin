@@ -3,6 +3,7 @@ package android
 
 foreign import android "system:android"
 
+@(default_calling_convention="c")
 foreign android {
 	/**
 	 * android_set_abort_message() sets the abort message that will be shown

@@ -22,6 +22,7 @@ AppendMode :: enum i32 {
 
 AMediaMuxer :: struct{}
 
+@(default_calling_convention="c")
 foreign mediandk {
 	/**
 	 * Create new media muxer.

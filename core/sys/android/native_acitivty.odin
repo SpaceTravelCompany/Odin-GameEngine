@@ -240,7 +240,7 @@ ANativeActivityCallbacks :: struct {
  */
 ANativeActivity_createFunc :: #type proc "c" (activity: ^ANativeActivity, savedState: rawptr, savedStateSize: uint)
 
-
+@(default_calling_convention="c")
 foreign android {
 	/**
 	 * Finish the given activity.  Its finish() method will be called, causing it

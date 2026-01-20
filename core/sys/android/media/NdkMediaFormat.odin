@@ -193,6 +193,7 @@ AMEDIAFORMAT_KEY_MPEGH_PROFILE_LEVEL_INDICATION: cstring        //__INTRODUCED_I
  */
 AMEDIAFORMAT_KEY_MPEGH_REFERENCE_CHANNEL_LAYOUT: cstring        //__INTRODUCED_IN(32)
 
+@(default_calling_convention="c")
 foreign mediandk {
 	/**
 	 * Available since API level 21.

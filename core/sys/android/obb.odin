@@ -11,6 +11,7 @@ ObbFlags :: enum i32 {
 /** {@link AObbInfo} is an opaque type representing information for obb storage. */
 AObbInfo :: struct{}
 
+@(default_calling_convention="c")
 foreign android {
 	/**
 	 * Scan an OBB and get information about it.

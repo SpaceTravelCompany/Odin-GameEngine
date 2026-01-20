@@ -3,6 +3,7 @@ package android
 
 foreign import android "system:android"
 
+@(default_calling_convention="c")
 foreign android {
 	/**
 	 * Create a {@link ANeuralNetworksMemoryDesc} with no properties.

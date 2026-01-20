@@ -660,6 +660,7 @@ ASensorRef :: ^ASensor
  */
 ASensorList :: [^]ASensorRef
 
+@(default_calling_convention="c")
 foreign android {
 	/**
 	 * Get a reference to the sensor manager. ASensorManager is a singleton

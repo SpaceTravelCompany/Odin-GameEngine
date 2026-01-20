@@ -72,6 +72,7 @@ ResNsendFlagsBits :: enum u32 {
 
 ResNsendFlags :: bit_set[ResNsendFlagsBits; u32]
 
+@(default_calling_convention="c")
 foreign android {
 	/**
 	 * All functions below that return an i32 return 0 on success or -1

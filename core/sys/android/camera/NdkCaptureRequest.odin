@@ -40,6 +40,7 @@ ACameraOutputTarget :: struct{}
 */
 ACaptureRequest :: struct{}
 
+@(default_calling_convention="c")
 foreign camerandk {
 	/**
 	* Create a ACameraOutputTarget object.

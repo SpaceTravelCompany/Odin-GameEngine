@@ -52,6 +52,7 @@ foreign import android "system:android"
  */
 ASystemFontIterator :: struct{}
 
+@(default_calling_convention="c")
 foreign android {
 	/**
 	 * Create a system font iterator.

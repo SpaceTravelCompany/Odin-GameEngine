@@ -88,6 +88,35 @@ ASurfaceTransaction_OnComplete :: #type proc "c" (_context: rawptr, stats: ^ASur
 */
 ASurfaceTransaction_OnCommit :: #type proc "c" (_context: rawptr, stats: ^ASurfaceTransactionStats)
 
+/**
+* The ASurfaceTransaction_OnBufferRelease callback is invoked when a buffer that was passed in
+* ASurfaceTransaction_setBuffer is ready to be reused.
+*
+* This callback is guaranteed to be invoked if ASurfaceTransaction_setBuffer is called with a non
+* null buffer. If the buffer in the transaction is replaced via another call to
+* ASurfaceTransaction_setBuffer, the callback will be invoked immediately. Otherwise the callback
+* will be invoked before the ASurfaceTransaction_OnComplete callback after the buffer was
+* presented.
+*
+* If this callback is set, caller should not release the buffer using the
+* ASurfaceTransaction_OnComplete.
+*
+* \param context Optional context provided by the client that is passed into the callback.
+*
+* \param release_fence_fd Returns the fence file descriptor used to signal the release of buffer
+* associated with this callback. If this fence is valid (>=0), the buffer has not yet been released
+* and the fence will signal when the buffer has been released. If the fence is -1 , the buffer is
+* already released. The recipient of the callback takes ownership of the fence fd and is
+* responsible for closing it.
+*
+* THREADING
+* The callback can be invoked on any thread.
+*
+* Available since API level 36.
+*/
+ASurfaceTransaction_OnBufferRelease :: #type proc "c" (_context: rawptr, release_fence_fd: i32)
+
+@(default_calling_convention="c")
 foreign android {
 	/**
 	 * Creates an ASurfaceControl with either ANativeWindow or an ASurfaceControl as its parent.
@@ -286,9 +315,30 @@ foreign android {
 	* Note that the buffer must be allocated with AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE
 	* as the surface control might be composited using the GPU.
 	*
+	* Starting with API level 36, prefer using \a ASurfaceTransaction_setBufferWithRelease to
+	* set a buffer and a callback which will be invoked when the buffer is ready to be reused.
+	*
 	* Available since API level 29.
 	*/
 	ASurfaceTransaction_setBuffer :: proc(transaction: ^ASurfaceTransaction, surface_control: ^ASurfaceControl, buffer: ^AHardwareBuffer, acquire_fence_fd: i32 = -1) ---
+
+	/**
+	* Updates the AHardwareBuffer displayed for \a surface_control. If not -1, the
+	* acquire_fence_fd should be a file descriptor that is signaled when all pending work
+	* for the buffer is complete and the buffer can be safely read.
+	*
+	* The frameworks takes ownership of the \a acquire_fence_fd passed and is responsible
+	* for closing it.
+	*
+	* Note that the buffer must be allocated with AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE
+	* as the surface control might be composited using the GPU.
+	*
+	* When the buffer is ready to be reused, the ASurfaceTransaction_OnBufferRelease
+	* callback will be invoked. If the buffer is null, the callback will not be invoked.
+	*
+	* Available since API level 36.
+	*/
+	ASurfaceTransaction_setBufferWithRelease :: proc(transaction: ^ASurfaceTransaction, surface_control: ^ASurfaceControl, buffer: ^AHardwareBuffer, acquire_fence_fd: i32, _context: rawptr, func: ASurfaceTransaction_OnBufferRelease) ---
 
 	/**
 	* Updates the color for \a surface_control.  This will make the background color for the
@@ -432,6 +482,91 @@ foreign android {
 	ASurfaceTransaction_setHdrMetadata_cta861_3 :: proc(transaction: ^ASurfaceTransaction, surface_control: ^ASurfaceControl, metadata: ^AHdrMetadata_cta861_3) ---
 
 	/**
+	* Sets the desired extended range brightness for the layer. This only applies for layers whose
+	* dataspace has RANGE_EXTENDED set on it. See: ASurfaceTransaction_setDesiredHdrHeadroom, prefer
+	* using this API for formats that encode an HDR/SDR ratio as part of generating the buffer.
+	*
+	* @param surface_control The layer whose extended range brightness is being specified
+	* @param currentBufferRatio The current HDR/SDR ratio of the current buffer as represented as
+	*                           peakHdrBrightnessInNits / targetSdrWhitePointInNits. For example if the
+	*                           buffer was rendered with a target SDR whitepoint of 100nits and a max
+	*                           display brightness of 200nits, this should be set to 2.0f.
+	*
+	*                           Default value is 1.0f.
+	*
+	*                           Transfer functions that encode their own brightness ranges, such as
+	*                           HLG or PQ, should also set this to 1.0f and instead communicate
+	*                           extended content brightness information via metadata such as CTA861_3
+	*                           or SMPTE2086.
+	*
+	*                           Must be finite && >= 1.0f
+	*
+	* @param desiredRatio The desired HDR/SDR ratio as represented as peakHdrBrightnessInNits /
+	*                     targetSdrWhitePointInNits. This can be used to communicate the max desired
+	*                     brightness range. This is similar to the "max luminance" value in other
+	*                     HDR metadata formats, but represented as a ratio of the target SDR whitepoint
+	*                     to the max display brightness. The system may not be able to, or may choose
+	*                     not to, deliver the requested range.
+	*
+	*                     While requesting a large desired ratio will result in the most
+	*                     dynamic range, voluntarily reducing the requested range can help
+	*                     improve battery life as well as can improve quality by ensuring
+	*                     greater bit depth is allocated to the luminance range in use.
+	*
+	*                     Default value is 1.0f and indicates that extended range brightness
+	*                     is not being used, so the resulting SDR or HDR behavior will be
+	*                     determined entirely by the dataspace being used (ie, typically SDR
+	*                     however PQ or HLG transfer functions will still result in HDR)
+	*
+	*                     When called after ASurfaceTransaction_setDesiredHdrHeadroom, the
+	*                     desiredRatio will override the desiredHeadroom provided by
+	*                     ASurfaceTransaction_setDesiredHdrHeadroom. Conversely, when called before
+	*                     ASurfaceTransaction_setDesiredHdrHeadroom, the desiredHeadroom provided by
+	*                     ASurfaceTransaction_setDesiredHdrHeadroom will override the desiredRatio.
+	*
+	*                     Must be finite && >= 1.0f
+	*
+	* Available since API level 34.
+	*/
+	ASurfaceTransaction_setExtendedRangeBrightness :: proc(transaction: ^ASurfaceTransaction, surface_control: ^ASurfaceControl, currentBufferRatio: f32, desiredRatio: f32) ---
+
+	/**
+	* Sets the desired HDR headroom for the layer. See: ASurfaceTransaction_setExtendedRangeBrightness,
+	* prefer using this API for formats that conform to HDR standards like HLG or HDR10, that do not
+	* communicate a HDR/SDR ratio as part of generating the buffer.
+	*
+	* @param surface_control The layer whose desired HDR headroom is being specified
+	*
+	* @param desiredHeadroom The desired HDR/SDR ratio as represented as peakHdrBrightnessInNits /
+	*                        targetSdrWhitePointInNits. This can be used to communicate the max
+	*                        desired brightness range of the panel. The system may not be able to, or
+	*                        may choose not to, deliver the requested range.
+	*
+	*                        While requesting a large desired ratio will result in the most
+	*                        dynamic range, voluntarily reducing the requested range can help
+	*                        improve battery life as well as can improve quality by ensuring
+	*                        greater bit depth is allocated to the luminance range in use.
+	*
+	*                        Default value is 0.0f and indicates that the system will choose the best
+	*                        headroom for this surface control's content. Typically, this means that
+	*                        HLG/PQ encoded content will be displayed with some HDR headroom greater
+	*                        than 1.0.
+	*
+	*                        When called after ASurfaceTransaction_setExtendedRangeBrightness, the
+	*                        desiredHeadroom will override the desiredRatio provided by
+	*                        ASurfaceTransaction_setExtendedRangeBrightness. Conversely, when called
+	*                        before ASurfaceTransaction_setExtendedRangeBrightness, the desiredRatio
+	*                        provided by ASurfaceTransaction_setExtendedRangeBrightness will override
+	*                        the desiredHeadroom.
+	*
+	*                        Must be finite && >= 1.0f or 0.0f to indicate there is no desired
+	*                        headroom.
+	*
+	* Available since API level 35.
+	*/
+	ASurfaceTransaction_setDesiredHdrHeadroom :: proc(transaction: ^ASurfaceTransaction, surface_control: ^ASurfaceControl, desiredHeadroom: f32) ---
+
+	/**
 	* Same as ASurfaceTransaction_setFrameRateWithChangeStrategy(transaction, surface_control,
 	* frameRate, compatibility, ANATIVEWINDOW_CHANGE_FRAME_RATE_ONLY_IF_SEAMLESS).
 	*
@@ -454,6 +589,8 @@ foreign android {
 	* You can register for changes in the refresh rate using
 	* \a AChoreographer_registerRefreshRateCallback.
 	*
+	* See ASurfaceTransaction_clearFrameRate().
+	*
 	* \param frameRate is the intended frame rate of this surface, in frames per second. 0 is a special
 	* value that indicates the app will accept the system's choice for the display frame rate, which is
 	* the default behavior if this function isn't called. The frameRate param does <em>not</em> need to
@@ -472,6 +609,29 @@ foreign android {
 	* Available since API level 31.
 	*/
 	ASurfaceTransaction_setFrameRateWithChangeStrategy :: proc(transaction: ^ASurfaceTransaction, surface_control: ^ASurfaceControl, frameRate: f32, compatibility: ANativeWindow_FrameRateCompatibility, changeFrameRateStrategy: ANativeWindow_ChangeFrameRateStrategy) ---
+
+	/**
+	* Clears the frame rate which is set for \a surface_control.
+	*
+	* This is equivalent to calling
+	* ASurfaceTransaction_setFrameRateWithChangeStrategy(
+	* transaction, 0, compatibility, changeFrameRateStrategy).
+	*
+	* Usage of this API won't directly affect the application's frame production pipeline. However,
+	* because the system may change the display refresh rate, calls to this function may result in
+	* changes to Choreographer callback timings, and changes to the time interval at which the system
+	* releases buffers back to the application.
+	*
+	* See ASurfaceTransaction_setFrameRateWithChangeStrategy()
+	*
+	* You can register for changes in the refresh rate using
+	* \a AChoreographer_registerRefreshRateCallback.
+	*
+	* See ASurfaceTransaction_setFrameRateWithChangeStrategy().
+	*
+	* Available since API level 34.
+	*/
+	ASurfaceTransaction_clearFrameRate :: proc(transaction: ^ASurfaceTransaction, surface_control: ^ASurfaceControl) ---
 
 	/**
 	* Indicate whether to enable backpressure for buffer submission to a given SurfaceControl.

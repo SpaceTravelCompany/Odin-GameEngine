@@ -50,6 +50,7 @@ sync_get_fence_info :: #force_inline proc(info: ^sync_file_info) -> ^sync_fence_
 	return cast(^sync_fence_info)(uintptr(info.sync_fence_info))
 }
 
+@(default_calling_convention="c")
 foreign android {
 	/**
 	 * Merge two sync files.

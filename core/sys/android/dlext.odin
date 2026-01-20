@@ -148,6 +148,7 @@ android_dlextinfo :: struct {
   library_namespace: ^android_namespace_t,
 }
 
+@(default_calling_convention="c")
 foreign android {
 	/**
 	 * Opens the given library. The `__filename` and `__flags` arguments are

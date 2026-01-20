@@ -181,6 +181,7 @@ AMediaDrmExpirationUpdateListener :: #type proc "c" (drm: ^AMediaDrm, sessionId:
 
 AMediaDrmKeysChangeListener :: #type proc "c" (drm: ^AMediaDrm, sessionId: ^AMediaDrmSessionId, keyStatus: ^AMediaDrmKeyStatus, numKeys: uint, hasNewUsableKey: bool)
 
+@(default_calling_convention="c")
 foreign mediandk {
 	/**
 	 * Query if the given scheme identified by its UUID is supported on this device, and

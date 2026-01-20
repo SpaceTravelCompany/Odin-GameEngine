@@ -832,6 +832,7 @@ AInputEvent :: struct{}
  */
 AInputQueue :: struct{}
 
+@(default_calling_convention="c")
 foreign android {
 	/** Get the input event type. */
 	AInputEvent_getType :: proc(event: ^AInputEvent) -> InputEventType ---

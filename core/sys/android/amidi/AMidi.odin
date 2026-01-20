@@ -100,6 +100,7 @@ AMidiDevice :: struct{}
 AMidiInputPort :: struct{}
 AMidiOutputPort :: struct{}
 
+@(default_calling_convention="c")
 foreign amidi {
 	/*
 	 * Device API

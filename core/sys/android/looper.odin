@@ -113,6 +113,7 @@ ALooper :: struct{}
  */
 ALooper_callbackFunc :: #type proc "c" (fd: i32, events: ALooperFdFlags, data: rawptr) -> i32
 
+@(default_calling_convention="c")
 foreign android {
 	/**
 	 * Returns the looper associated with the calling thread, or NULL if

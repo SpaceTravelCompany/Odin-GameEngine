@@ -11,6 +11,7 @@ foreign import android "system:android"
  */
 ASurfaceTexture :: struct{}
 
+@(default_calling_convention="c")
 foreign android {
 	/**
 	 * Release the reference to the native ASurfaceTexture acquired with

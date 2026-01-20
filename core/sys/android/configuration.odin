@@ -436,6 +436,7 @@ MNC_ZERO :: 0xffff
  */
 AConfiguration :: struct{}
 
+@(default_calling_convention="c")
 foreign android {
 	/**
 	 * Create a new AConfiguration, initialized with no values set.

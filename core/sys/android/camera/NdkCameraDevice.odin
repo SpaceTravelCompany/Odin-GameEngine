@@ -211,6 +211,7 @@ ACameraDevice_ErrorStateCallback :: #type proc "c" (_context: rawptr, device: ^A
  */
 ACameraDevice_stateCallbacks :: ACameraDevice_StateCallbacks
 
+@(default_calling_convention="c")
 foreign camerandk {
 	/**
 	 * Close the connection and free this ACameraDevice synchronously. Access to the ACameraDevice
