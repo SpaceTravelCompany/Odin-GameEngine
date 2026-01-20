@@ -71,14 +71,24 @@ shape_error :: union #shared_nil {
     mem.Allocator_Error,
 }
 
+shape_line :: struct {
+    start: linalg.PointF,
+    control0: linalg.PointF,
+    control1: linalg.PointF,
+    end: linalg.PointF,
+    /// default value 'Unknown' recongnises curve type 'cubic'
+    type: curve_type,
+}
+
+shape_node :: struct {
+    lines: []shape_line,
+    color: linalg.Point3DwF,
+    stroke_color: linalg.Point3DwF,
+    thickness: f32,
+}
+
 shapes :: struct {
-    poly:[]linalg.PointF,//len(poly) == all sum n_polys
-    n_polys:[]u32,
-    n_types:[]u32,
-    types:[]curve_type,
-    colors:[]linalg.Point3DwF,//same length as n_polys
-    strokeColors:[]linalg.Point3DwF,//same length as n_polys
-    thickness:[]f32,//same length as n_polys
+    nodes: []shape_node,
 }
 
 CvtQuadraticToCubic0 :: #force_inline proc "contextless" (_start : linalg.PointF, _control : linalg.PointF) -> linalg.PointF {
@@ -579,9 +589,9 @@ shapes_compute_polygon :: proc(poly:^shapes, allocator := context.allocator) -> 
     }
 
     shapes_compute_polygon_in :: proc(vertList:^[dynamic]shape_vertex2d, indList:^[dynamic]u32, poly:^shapes, allocator : runtime.Allocator) -> (err:shape_error = nil) {
-        outPoly:[][dynamic]CurveStruct = mem.make_non_zeroed_slice([][dynamic]CurveStruct, len(poly.n_polys), context.temp_allocator)
+        outPoly:[][dynamic]CurveStruct = mem.make_non_zeroed_slice([][dynamic]CurveStruct, len(poly.nodes), context.temp_allocator)
         outPoly2:[dynamic]linalg.PointF = mem.make_non_zeroed_dynamic_array([dynamic]linalg.PointF, context.temp_allocator)
-        outPoly2N:[]u32 = mem.make_non_zeroed_slice([]u32, len(poly.n_polys), context.temp_allocator)
+        outPoly2N:[]u32 = mem.make_non_zeroed_slice([]u32, len(poly.nodes), context.temp_allocator)
         for &o in outPoly {
             o = mem.make_non_zeroed_dynamic_array([dynamic]CurveStruct, context.temp_allocator)
         }
@@ -595,43 +605,36 @@ shapes_compute_polygon :: proc(poly:^shapes, allocator := context.allocator) -> 
             delete(outPoly2N, context.temp_allocator)
         }
 
-        start :u32 = 0
-        typeIdx :u32 = 0
-
-        for n,e in poly.n_polys {
-            if poly.colors != nil && poly.colors[e].a > 0 {
-                for i:u32 = start; i < start+n; typeIdx += 1 {
-                    if poly.types[typeIdx] == .Line {
-                        non_zero_append(&outPoly[e], CurveStruct{poly.poly[i], false})
-                        i += 1
-                    } else if poly.types[typeIdx] == .Quadratic {
-                        pts := [3]linalg.PointF{poly.poly[i], poly.poly[i+1], i + 2 == start+n ? poly.poly[start] : poly.poly[i+2]}
-                        err = _Shapes_ComputeLine(
-                            vertList,
-                            indList,
-                            &outPoly[e],
-                            poly.colors[e],
-                            pts[:],
-                            .Quadratic, 0.5)
-                        if err != nil do return
-                        i += 2
-                    } else {
-                        pts := [4]linalg.PointF{poly.poly[i], poly.poly[i+1], poly.poly[i+2], i + 3 == start+n ? poly.poly[start] : poly.poly[i+3]}
-                        err = _Shapes_ComputeLine(
-                            vertList,
-                            indList,
-                            &outPoly[e],
-                            poly.colors[e],
-                            pts[:],
-                            .Unknown, 0.5)//TODO (xfitgd) 일단은 0.5로 고정
-                        if err != nil do return
-                        i += 3
-                    }
-                }
-            } else {
-                typeIdx += poly.n_types[e]
+        poly_idx :u32 = 0
+        for node in poly.nodes {
+            if node.color.a > 0 {
+				for line in node.lines {
+					if line.type == .Line {
+						non_zero_append(&outPoly[poly_idx], CurveStruct{line.start, false})
+					} else if line.type == .Quadratic {
+						pts := [4]linalg.PointF{line.start, line.control0, line.control1, line.end}
+						err = _Shapes_ComputeLine(
+							vertList,
+							indList,
+							&outPoly[poly_idx],
+							node.color,
+							pts[:],
+							.Quadratic, 0.5)
+						if err != nil do return
+					} else {
+						pts := [4]linalg.PointF{line.start, line.control0, line.control1, line.end}
+						err = _Shapes_ComputeLine(
+							vertList,
+							indList,
+							&outPoly[poly_idx],
+							node.color,
+							pts[:],
+							.Unknown, 0.5)//TODO (xfitgd) 일단은 0.5로 고정
+						if err != nil do return
+					}
+				}
             }
-            start += n
+			poly_idx += 1
         }
 
         for ps, psi in outPoly {
@@ -677,17 +680,21 @@ shapes_compute_polygon :: proc(poly:^shapes, allocator := context.allocator) -> 
             return
         }
     
-        start = 0
+        start_idx :u32 = 0
         vLen :u32 = auto_cast len(vertList)//Existing Curve Vertices Length
-        for _, i in outPoly2N {
-            for idx in start..<start+outPoly2N[i] {
-                non_zero_append(vertList, shape_vertex2d{
-                    pos = outPoly2[idx],
-                    uvw = {1,0,0},
-                    color = poly.colors[i],
-                })
+        poly_idx = 0
+        for node in poly.nodes {
+            if node.color.a > 0 {
+				for idx in start_idx..<start_idx+outPoly2N[poly_idx] {
+					non_zero_append(vertList, shape_vertex2d{
+						pos = outPoly2[idx],
+						uvw = {1,0,0},
+						color = node.color,
+					})
+				}
+				start_idx += outPoly2N[poly_idx]
             }
-            start += outPoly2N[i]
+			poly_idx += 1
         }
         //???! if len(indList) > 0 {
             for _, i in indicesT {
@@ -699,90 +706,117 @@ shapes_compute_polygon :: proc(poly:^shapes, allocator := context.allocator) -> 
     }
 
 
-    if poly.colors != nil {
+    has_fill := false
+    for node in poly.nodes {
+        if node.color.a > 0 {
+            has_fill = true
+            break
+        }
+    }
+    if has_fill {
         err = shapes_compute_polygon_in(&vertList, &indList, poly, allocator)
         if err != nil do return
     }
 
-    if poly.thickness != nil && poly.strokeColors != nil {
-        polyT:^shapes = mem.new(shapes, context.temp_allocator)
-        defer free(polyT, context.temp_allocator)
-
-        polyT.poly = mem.make_non_zeroed_slice([]linalg.PointF, len(poly.poly) * 2, context.temp_allocator)
-        defer delete(polyT.poly, context.temp_allocator)
-
-        polyT.n_polys = mem.make_non_zeroed_slice([]u32, len(poly.n_polys) * 2, context.temp_allocator)
-        defer delete(polyT.n_polys, context.temp_allocator)
-
-        polyT.colors = mem.make_non_zeroed_slice([]linalg.Point3DwF, len(poly.strokeColors) * 2, context.temp_allocator)
-        defer delete(polyT.colors, context.temp_allocator)
-
-        polyT.types = mem.make_non_zeroed_slice([]curve_type, len(poly.types) * 2, context.temp_allocator)
-        defer delete(polyT.types, context.temp_allocator)
-
-        polyT.n_types = mem.make_non_zeroed_slice([]u32, len(poly.n_types) * 2, context.temp_allocator)
-        defer delete(polyT.n_types, context.temp_allocator)
-
-        start_ :u32 = 0
-        start_2 :u32 = 0
-        start_type :u32 = 0
-        start_type2 :u32 = 0
-        polyOri:linalg.PolyOrientation
-        for i in 0..<len(poly.n_polys) {
-            polyT.n_polys[i * 2] = poly.n_polys[i]
-            polyT.n_polys[i * 2 + 1] = poly.n_polys[i]
-            polyT.colors[i * 2] = poly.strokeColors[i]
-            polyT.colors[i * 2 + 1] = poly.strokeColors[i]
-            
-            polyT.n_types[i * 2] = poly.n_types[i]
-            polyT.n_types[i * 2 + 1] = poly.n_types[i]
-
-            polyOri = linalg.GetPolygonOrientation(poly.poly[start_:start_ + poly.n_polys[i]])
-            for e in 0..<poly.n_polys[i] {
-                prevPoint := e == 0                  ? poly.poly[start_ + poly.n_polys[i] - 1] : poly.poly[start_ + e - 1]
-                nextPoint := e == poly.n_polys[i] - 1 ? poly.poly[start_]                      : poly.poly[start_ + e + 1]
-
-                polyT.poly[start_2 + e] = linalg.LineExtendPoint(prevPoint, poly.poly[start_ + e], nextPoint, poly.thickness[i], polyOri)
-            }
-            ReversePolygonExceptFirst :: proc "contextless" (poly: []linalg.PointF, types:[]curve_type) {
-                count := len(poly) - 1
-                for j in 0..<(count/2) {
-                    tmp := poly[j + 1]
-                    poly[j + 1] = poly[((count + 1) - j - 1)]
-                    poly[((count + 1) - j - 1)] = tmp
-                }
-
-                count = len(types)
-                for j in 0..<count/2 {
-                    tmp := types[j]
-                    types[j] = types[(count - j - 1)]
-                    types[(count - j - 1)] = tmp
-                }
-            }
-            for e in 0..<poly.n_types[i] {
-                polyT.types[start_type2 + e] = poly.types[start_type + e]
-            }
-            if polyOri == .Clockwise do ReversePolygonExceptFirst(polyT.poly[start_2 : start_2 + poly.n_polys[i]], polyT.types[start_type2 : start_type2 + poly.n_types[i]])
-            start_2 += poly.n_polys[i]
-            start_type2 += poly.n_types[i]
-
-            for e in 0..<poly.n_polys[i] {
-                prevPoint := e == 0                  ? poly.poly[start_ + poly.n_polys[i] - 1] : poly.poly[start_ + e - 1]
-                nextPoint := e == poly.n_polys[i] - 1 ? poly.poly[start_]                      : poly.poly[start_ + e + 1]
-
-                polyT.poly[start_2 + e] = linalg.LineExtendPoint(prevPoint, poly.poly[start_ + e], nextPoint, -poly.thickness[i], polyOri)
-            }
-            for e in 0..<poly.n_types[i] {
-                polyT.types[start_type2 + e] = poly.types[start_type + e]
-            }
-            if polyOri == .CounterClockwise do ReversePolygonExceptFirst(polyT.poly[start_2 : start_2 + poly.n_polys[i]], polyT.types[start_type2 : start_type2 + poly.n_types[i]])
-            start_ += poly.n_polys[i]
-            start_2 += poly.n_polys[i]
-            start_type += poly.n_types[i]
-            start_type2 += poly.n_types[i]
+    has_stroke := false
+    for node in poly.nodes {
+        if node.stroke_color.a > 0 && node.thickness > 0 {
+            has_stroke = true
+            break
         }
-
-        err = shapes_compute_polygon_in(&vertList, &indList, polyT, allocator)
+	}
+    
+    if has_stroke {
+        // 스트로크를 위한 새로운 shapes 생성
+        total_stroke_polygons := len(poly.nodes) * 2
+        
+        stroke_nodes := mem.make_non_zeroed_slice([]shape_node, total_stroke_polygons, context.temp_allocator)
+        defer delete(stroke_nodes, context.temp_allocator)
+        
+        node_idx := 0
+        for node in poly.nodes {
+            if node.stroke_color.a > 0 && node.thickness > 0 {
+                line_idx :u32 = 0
+				// 폴리곤의 점들을 수집
+				poly_points := mem.make_non_zeroed_dynamic_array([dynamic]linalg.PointF, context.temp_allocator)
+				defer delete(poly_points)
+				
+				node_len :u32 = auto_cast len(node.lines)
+				for i:u32 = 0; i < node_len; i += 1 {
+					line := node.lines[line_idx + i]
+					non_zero_append(&poly_points, line.start)
+					if i == node_len - 1 {
+						non_zero_append(&poly_points, line.end)
+					}
+				}
+				
+				polyOri := linalg.GetPolygonOrientation(poly_points[:])
+				
+				// 외부 스트로크
+				outer_lines := mem.make_non_zeroed_slice([]shape_line, node_len, context.temp_allocator)
+				for i:u32 = 0; i < node_len; i += 1 {
+					line := node.lines[line_idx + i]
+					prev_idx := i == 0 ? node_len - 1 : i - 1
+					next_idx := i == node_len - 1 ? 0 : i + 1
+					prev_point := poly_points[prev_idx]
+					next_point := poly_points[next_idx]
+					current_point := line.start
+					
+					extended := linalg.LineExtendPoint(prev_point, current_point, next_point, node.thickness, polyOri)
+					outer_lines[i] = shape_line{
+						start = extended,
+						control0 = line.control0,
+						control1 = line.control1,
+						end = i == node_len - 1 ? linalg.LineExtendPoint(poly_points[node_len - 2], line.end, poly_points[0], node.thickness, polyOri) : line.end,
+						type = line.type,
+					}
+				}
+				
+				stroke_nodes[node_idx] = shape_node{
+					lines = outer_lines,
+					color = node.stroke_color,
+					stroke_color = {},
+					thickness = 0,
+				}
+				node_idx += 1
+				
+				// 내부 스트로크
+				inner_lines := mem.make_non_zeroed_slice([]shape_line, node_len, context.temp_allocator)
+				for i:u32 = 0; i < node_len; i += 1 {
+					line := node.lines[line_idx + i]
+					prev_idx := i == 0 ? node_len - 1 : i - 1
+					next_idx := i == node_len - 1 ? 0 : i + 1
+					prev_point := poly_points[prev_idx]
+					next_point := poly_points[next_idx]
+					current_point := line.start
+					
+					extended := linalg.LineExtendPoint(prev_point, current_point, next_point, -node.thickness, polyOri)
+					inner_lines[i] = shape_line{
+						start = extended,
+						control0 = line.control0,
+						control1 = line.control1,
+						end = i == node_len - 1 ? linalg.LineExtendPoint(poly_points[node_len - 2], line.end, poly_points[0], -node.thickness, polyOri) : line.end,
+						type = line.type,
+					}
+				}
+				
+				stroke_nodes[node_idx] = shape_node{
+					lines = inner_lines,
+					color = node.stroke_color,
+					stroke_color = {},
+					thickness = 0,
+				}
+				node_idx += 1
+				
+				line_idx += node_len
+			}
+        }
+        
+        polyT := shapes{
+            nodes = stroke_nodes[:node_idx],
+        }
+        
+        err = shapes_compute_polygon_in(&vertList, &indList, &polyT, allocator)
         if err != nil do return
     }
 

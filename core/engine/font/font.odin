@@ -292,73 +292,78 @@ allocator : runtime.Allocator) -> (rect:linalg.RectF, err:geometry.shape_error =
 
     FTMoveTo :: proc "c" (to: ^freetype.Vector, user: rawptr) -> c.int {
         data : ^font_user_data = auto_cast user
+		context = data.context_
+
         data.pen = linalg.PointF{f32(to.x) / (64 * data.scale), f32(to.y) / (64 * data.scale)}
 
-        if data.idx > 0 {
-            data.polygon.n_polys[data.nPoly] = data.nPolyLen
-            data.nPoly += 1
-            data.polygon.n_types[data.n_types] = data.nTypesLen
-            data.n_types += 1
-            data.nPolyLen = 0
-            data.nTypesLen = 0
+        if data.lineCount > 0 {
+            data.polygonCount += 1
+            data.lineCount = 0
         }
         return 0
     }
     FTLineTo :: proc "c" (to: ^freetype.Vector, user: rawptr) -> c.int {
         data : ^font_user_data = auto_cast user
+		context = data.context_
+
         end := linalg.PointF{f32(to.x) / (64 * data.scale), f32(to.y) / (64 * data.scale)}
     
-        data.polygon.poly[data.idx] = data.pen
-        data.polygon.types[data.typeIdx] = .Line
+        non_zero_append(&data.lines_da[data.polygonCount], geometry.shape_line{
+            start = data.pen,
+            control0 = {0, 0},
+            control1 = {0, 0},
+            end = end,
+            type = .Line,
+        })
         data.pen = end
-        data.idx += 1
-        data.nPolyLen += 1
-        data.typeIdx += 1
-        data.nTypesLen += 1
+        data.lineCount += 1
         return 0
     }
     FTConicTo :: proc "c" (control: ^freetype.Vector, to: ^freetype.Vector, user: rawptr) -> c.int {
         data : ^font_user_data = auto_cast user
+		context = data.context_
+
         ctl := linalg.PointF{f32(control.x) / (64 * data.scale), f32(control.y) / (64 * data.scale)}
         end := linalg.PointF{f32(to.x) / (64 * data.scale), f32(to.y) / (64 * data.scale)}
     
-        data.polygon.poly[data.idx] = data.pen
-        data.polygon.poly[data.idx+1] = ctl
-        data.polygon.types[data.typeIdx] = .Quadratic
+        non_zero_append(&data.lines_da[data.polygonCount], geometry.shape_line{
+            start = data.pen,
+            control0 = geometry.CvtQuadraticToCubic0(data.pen, ctl),
+            control1 = geometry.CvtQuadraticToCubic1(end, ctl),
+            end = end,
+            type = .Quadratic,
+        })
         data.pen = end
-        data.idx += 2
-        data.nPolyLen += 2
-        data.typeIdx += 1
-        data.nTypesLen += 1
+        data.lineCount += 1
         return 0
     }
     FTCubicTo :: proc "c" (control0, control1, to: ^freetype.Vector, user: rawptr) -> c.int {
         data : ^font_user_data = auto_cast user
+		context = data.context_
+
         ctl0 := linalg.PointF{f32(control0.x) / (64 * data.scale), f32(control0.y) / (64 * data.scale)}
         ctl1 := linalg.PointF{f32(control1.x) / (64 * data.scale), f32(control1.y) / (64 * data.scale)}
         end := linalg.PointF{f32(to.x) / (64 * data.scale), f32(to.y) / (64 * data.scale)}
     
-        data.polygon.poly[data.idx] = data.pen
-        data.polygon.poly[data.idx+1] = ctl0
-        data.polygon.poly[data.idx+2] = ctl1
-        data.polygon.types[data.typeIdx] = .Unknown
+        non_zero_append(&data.lines_da[data.polygonCount], geometry.shape_line{
+            start = data.pen,
+            control0 = ctl0,
+            control1 = ctl1,
+            end = end,
+            type = .Unknown,
+        })
         data.pen = end
-        data.idx += 3
-        data.nPolyLen += 3
-        data.typeIdx += 1
-        data.nTypesLen += 1
+        data.lineCount += 1
         return 0
     }
     font_user_data :: struct {
         pen : linalg.PointF,
-        polygon : ^geometry.shapes,
-        idx : u32,
-        nPoly : u32,
-        nPolyLen : u32,
-        n_types : u32,
-        nTypesLen : u32,
-        typeIdx : u32,
+        nodes : []geometry.shape_node,
+		lines_da:[][dynamic]geometry.shape_line,
+        lineCount : u32,
+        polygonCount : u32,
         scale : f32,
+		context_:runtime.Context,
     }
     @static funcs : freetype.Outline_Funcs = {
         move_to = FTMoveTo,
@@ -405,49 +410,32 @@ allocator : runtime.Allocator) -> (rect:linalg.RectF, err:geometry.shape_error =
             if freetype.outline_get_orientation(&self.face.glyph.outline) == freetype.Orientation.FILL_RIGHT {
                 freetype.outline_reverse(&self.face.glyph.outline)
             }
-        
-            poly : geometry.shapes = {
-                n_polys = mem.make_non_zeroed([]u32, self.face.glyph.outline.n_contours, context.temp_allocator),//갯수는 후에 RESIZE 처리
-                n_types = mem.make_non_zeroed([]u32, self.face.glyph.outline.n_contours, context.temp_allocator),
-                types = mem.make_non_zeroed([]geometry.curve_type, self.face.glyph.outline.n_points * 3, context.temp_allocator),
-                poly = mem.make_non_zeroed([]linalg.PointF, self.face.glyph.outline.n_points * 3, context.temp_allocator),
-            }
-            if thickness > 0.0 {
-                poly.strokeColors = mem.make_non_zeroed([]linalg.Point3DwF, self.face.glyph.outline.n_contours, context.temp_allocator)
-                poly.thickness = mem.make_non_zeroed([]f32, self.face.glyph.outline.n_contours, context.temp_allocator)
-            }
-            if color != nil {
-                poly.colors = mem.make_non_zeroed([]linalg.Point3DwF, self.face.glyph.outline.n_contours, context.temp_allocator)
-            }
 
-            defer {
-                delete(poly.n_polys, context.temp_allocator)
-                delete(poly.n_types, context.temp_allocator)
-                delete(poly.types, context.temp_allocator)
-                delete(poly.poly, context.temp_allocator)
-                if poly.strokeColors != nil {
-                    delete(poly.strokeColors, context.temp_allocator)
-                    delete(poly.thickness, context.temp_allocator)
-                }
-                if poly.colors != nil {
-                    delete(poly.colors, context.temp_allocator)
-                }
-            }
-
+            // 최대 폴리곤 개수는 n_contours와 같음
+            max_polygons := self.face.glyph.outline.n_contours
+            nodes_slice := mem.make_non_zeroed([]geometry.shape_node, max_polygons, context.temp_allocator)
+            defer delete(nodes_slice, context.temp_allocator)
+            
             data : font_user_data = {
-                polygon = &poly,
-                idx = 0,
-                typeIdx = 0,
-                nPolyLen = 0,
-                nTypesLen = 0,
+				context_ = context,
+                lineCount = 0,
+                nodes = nodes_slice,
+                polygonCount = 0,
                 scale = self.scale,
+				lines_da = mem.make_non_zeroed([][dynamic]geometry.shape_line, max_polygons, context.temp_allocator),
             }
+			defer {
+				for lines in data.lines_da {
+					delete(lines)
+				}
+				delete(data.lines_da, context.temp_allocator)
+			}
         
             err = freetype.outline_decompose(&self.face.glyph.outline, &funcs, &data)
             if err != .Ok do trace.panic_log(err)
 
             charData : char_data
-            if data.idx == 0 {
+            if data.lineCount == 0 {
                 charData = {
                     advance_x = f32(self.face.glyph.advance.x) / (64.0 * self.scale),
                     raw_shape = nil
@@ -460,25 +448,18 @@ allocator : runtime.Allocator) -> (rect:linalg.RectF, err:geometry.shape_error =
                 sync.mutex_unlock(&self.mutex)// else 부분은 mutex 해제 후 작업 후 다시 잠금
                 defer sync.mutex_lock(&self.mutex)
                
-                poly.n_polys[data.nPoly] = data.nPolyLen
-                poly.n_types[data.n_types] = data.nTypesLen
-                poly.poly = mem.resize_non_zeroed_slice(poly.poly, data.idx, context.temp_allocator)
-                poly.types = mem.resize_non_zeroed_slice(poly.types, data.typeIdx, context.temp_allocator)
-                if thickness > 0.0 {
-                    poly.strokeColors = mem.resize_non_zeroed_slice(poly.strokeColors, data.nPoly + 1, context.temp_allocator)
-                    poly.thickness = mem.resize_non_zeroed_slice(poly.thickness, data.nPoly + 1, context.temp_allocator)
-                     for &c in poly.strokeColors {
-                        c = linalg.Point3DwF{0,0,0,1}//?no matter
-                    }
-                    for &t in poly.thickness {
-                        t = thickness
-                    }
+                // 마지막 폴리곤의 선분 개수 추가
+                if data.lineCount > 0 {
+					data.polygonCount += 1
                 }
-                if color != nil {
-                    poly.colors = mem.resize_non_zeroed_slice(poly.colors, data.nPoly + 1, context.temp_allocator)
-                    for &c in poly.colors {
-                        c = linalg.Point3DwF{0,0,0,2}//?no matter but stroke 와 구분한다.
-                    }
+				for i in 0..<data.polygonCount {
+					data.nodes[i].lines = data.lines_da[i][:]
+					data.nodes[i].color = linalg.Point3DwF{0,0,0,2}
+					data.nodes[i].stroke_color = linalg.Point3DwF{0,0,0,1}
+					data.nodes[i].thickness = thickness
+				}
+                poly := geometry.shapes{
+                    nodes = data.nodes[:data.polygonCount],
                 }
 
                 rawP : ^geometry.raw_shape
