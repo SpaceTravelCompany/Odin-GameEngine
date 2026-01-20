@@ -535,6 +535,8 @@ vk_op_execute_destroy :: proc() {
 			executeDestroyBuffer(n.src)
 		case OpDestroyTexture:
 			executeDestroyTexture(n.src)
+		case OpReleaseUniform:
+			executeReleaseUniform(n.src)
 		}
 	}
 
@@ -577,16 +579,6 @@ vk_op_execute :: proc() {
 			executeCreateTexture(n.src, n.data, n.allocator)
 		case Op__RegisterDescriptorPool:
 			executeRegisterDescriptorPool(n.size)
-		case:
-			continue
-		}
-		node = nil
-	}
-
-	for &node in opSaveQueue {
-		#partial switch n in node {
-		case OpReleaseUniform:
-			executeReleaseUniform(n.src)
 		case:
 			continue
 		}
@@ -681,6 +673,8 @@ vk_op_execute :: proc() {
 		case OpDestroyBuffer:
 			non_zero_append(&opDestroyQueue, node)
 		case OpDestroyTexture:
+			non_zero_append(&opDestroyQueue, node)
+		case OpReleaseUniform:
 			non_zero_append(&opDestroyQueue, node)
 		case:
 			continue
@@ -1731,9 +1725,9 @@ executeReleaseUniform :: proc(
 		}
 	}
 	if empty {
-		buffer_resource_DestroyBufferNoAsync(buf)
 		delete(gUniforms[buf.g_uniform_indices[0]].uniforms)
 		gUniforms[buf.g_uniform_indices[0]] = {}
+		buffer_resource_DestroyBufferNoAsync(buf)
 
 		return
 	} else {
