@@ -54,11 +54,6 @@ graphics_device :: #force_inline proc "contextless" () -> vk.Device {
 // Default Color Transform
 @private __def_color_transform: color_transform
 
-@private __none :: struct {}
-
-@private g_res : map[^base_resource]__none
-
-
 @private resource_type :: enum {
 	BUFFER,
 	TEXTURE,
