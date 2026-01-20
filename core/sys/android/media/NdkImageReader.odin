@@ -382,6 +382,42 @@ foreign mediandk {
 	AImageReader_newWithUsage :: proc(width: i32, height: i32, format: AImageFormats, usage: u64, maxImages: i32, reader: ^^AImageReader) -> media_status_t ---
 
 	/**
+	* AImageReader constructor similar to {@link AImageReader_newWithUsage} that takes
+	* two additional parameters to build the format of the Image. All other parameters
+	* and the return values are identical to those passed to {@link AImageReader_newWithUsage}.
+	*
+	* <p>Instead of passing {@code format} parameter, this constructor accepts
+	* the combination of {@code hardwareBufferFormat} and {@code dataSpace} for the
+	* format of the Image that the reader will produce.</p>
+	*
+	* Available since API level 34.
+	*
+	* @param width The default width in pixels of the Images that this reader will produce.
+	* @param height The default height in pixels of the Images that this reader will produce.
+	* @param usage specifies how the consumer will access the AImage.
+	*              See {@link AImageReader_newWithUsage} parameter description for more details.
+	* @param maxImages The maximum number of images the user will want to access simultaneously.
+	*                  See {@link AImageReader_newWithUsage} parameter description for more details.
+	* @param hardwareBufferFormat The hardware buffer format passed by the producer.
+	*                             This must be one of the AHARDWAREBUFFER_FORMAT_* enum values defined
+	*                             in {@link hardware_buffer.h}.
+	* @param dataSpace The dataspace of the Image passed by the producer.
+	*                  This must be one of the ADATASPACE_* enum values defined in
+	*                  {@link ADataSpace}.
+	* @param reader The created image reader will be filled here if the method call succeeds.
+	*
+	* @return <ul>
+	*         <li>{@link AMEDIA_OK} if the method call succeeds.</li>
+	*         <li>{@link AMEDIA_ERROR_INVALID_PARAMETER} if reader is NULL, or one or more of width,
+	*                 height, maxImages, hardwareBufferFormat or dataSpace arguments
+	*                 is not supported.</li>
+	*         <li>{@link AMEDIA_ERROR_UNKNOWN} if the method fails for some other reasons.</li></ul>
+	*
+	* @see AImageReader_newWithUsage
+	*/
+	AImageReader_newWithDataSpace :: proc(width: i32, height: i32, usage: u64, maxImages: i32, hardwareBufferFormat: u32, dataSpace: i32, reader: ^^AImageReader) -> media_status_t ---
+
+	/**
 	* Acquire the next {@link AImage} from the image reader's queue asynchronously.
 	*
 	* <p>AImageReader acquire method similar to {@link AImageReader_acquireNextImage} that takes an

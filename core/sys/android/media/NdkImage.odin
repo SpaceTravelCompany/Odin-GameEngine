@@ -782,4 +782,20 @@ foreign mediandk {
 	* @see AImageReader_ImageCallback
 	*/
 	AImage_getHardwareBuffer :: proc(image: ^AImage, buffer: ^^android.AHardwareBuffer) -> media_status_t ---
+
+	/**
+	 * Query the dataspace of the input {@link AImage}.
+	 *
+	 * Available since API level 34.
+	 *
+	 * @param image the {@link AImage} of interest.
+	 * @param dataSpace the dataspace of the image will be filled here if the method call succeeds.
+	 *
+	 * @return <ul>
+	 *         <li>{@link AMEDIA_OK} if the method call succeeds.</li>
+	 *         <li>{@link AMEDIA_ERROR_INVALID_PARAMETER} if image or dataSpace is NULL.</li>
+	 *         <li>{@link AMEDIA_ERROR_INVALID_OBJECT} if the {@link AImageReader} generated this
+	 *                 image has been deleted.</li></ul>
+	 */
+	AImage_getDataSpace :: proc(image: ^AImage, dataSpace: ^i32) -> media_status_t ---
 }

@@ -60,6 +60,15 @@ AAsset :: struct{}
 @(default_calling_convention="c")
 foreign android {
 	/**
+	 * Open the named directory within the asset hierarchy.  The directory can then
+	 * be inspected with the AAssetDir functions.  To open the top-level directory,
+	 * pass in "" as the dirName.
+	 *
+	 * The object returned here should be freed by calling AAssetDir_close().
+	 */
+	AAssetManager_openDir :: proc(mgr: ^AAssetManager, dirName: cstring) -> ^AAssetDir ---
+
+	/**
 	 * Open an asset.
 	 *
 	 * The object returned here should be freed by calling AAsset_close().

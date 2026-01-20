@@ -175,6 +175,20 @@ foreign camerandk {
 	ACameraMetadata_getAllTags :: proc(metadata: ^ACameraMetadata, numEntries: ^i32, tags: ^[^]acamera_metadata_tag_t) -> CameraStatus ---
 
 	/**
+	 * Retrieve the tag value, given the tag name.
+	 * This method is device specific since some metadata might be defined by device manufacturers
+	 * and might only be accessible for specific cameras.
+	 * @param metadata The {@link ACameraMetadata} of to query the tag value from.
+	 * @param name The name of the tag being queried.
+	 * @param tag The output tag assigned by this method.
+	 *
+	 * @return ACAMERA_OK only if the function call was successful.
+	 *
+	 * Available since API level 35.
+	 */
+	ACameraMetadata_getTagFromName :: proc(metadata: ^ACameraMetadata, name: cstring, tag: ^u32) -> CameraStatus ---
+
+	/**
 	* Create a copy of input {@link ACameraMetadata}.
 	*
 	* <p>The returned ACameraMetadata must be freed by the application by {@link ACameraMetadata_free}

@@ -464,6 +464,31 @@ ACameraCaptureSession_logicalCamera_captureCallbacksV2 :: struct {
 ACameraCaptureSession_stateCallback :: #type proc "c" (_context: rawptr, session: ^ACameraCaptureSession)
 
 /**
+ * The definition of camera capture session onWindowPrepared callback.
+ *
+ * <p>This callback is called when the buffer pre-allocation for an output window Surface is
+ * complete. </p>
+ *
+ * <p>Buffer pre-allocation for an output window is started by
+ * {@link ACameraCaptureSession_prepareWindow}
+ * call. While allocation is underway, the output must not be used in a capture request.
+ * Once this callback is called, the output provided can be used as a target for a
+ * capture request. In case of an error during pre-allocation (such as running out of
+ * suitable-memory), this callback is still invoked after the error is encountered, though some
+ * buffers may not have been successfully pre-allocated.</p>
+ *
+ * Introduced in API 34.
+ *
+ * @param context The optional app-provided context pointer that was included in
+ *        the {@link ACameraCaptureSession_setWindowPreparedCallback} method
+ *        call.
+ * @param window The window that {@link ACameraCaptureSession_prepareWindow} was called on.
+ * @param session The camera capture session on which {@link ACameraCaptureSession_prepareWindow} was
+ *                called on.
+ */
+ACameraCaptureSession_prepareCallback :: #type proc "c" (_context: rawptr, window: ^ACameraWindowType, session: ^ACameraCaptureSession)
+
+/**
  * The definition of camera capture start callback.
  *
  * @param context The optional application context provided by user in
@@ -886,4 +911,97 @@ foreign camerandk {
 	* callback adds frame number in its parameter list.
 	*/
 	ACameraCaptureSession_logicalCamera_setRepeatingRequestV2 :: proc(session: ^ACameraCaptureSession, callbacks: [^]ACameraCaptureSession_logicalCamera_captureCallbacksV2, numRequests: i32, requests: [^]^ACaptureRequest, captureSequenceId: ^i32) -> CameraStatus ---
+
+	/**
+	 * Set a callback to be invoked when buffer pre-allocation for an output window is complete.
+	 *
+	 * <p>This callback is used in conjunction with {@link ACameraCaptureSession_prepareWindow} to
+	 * pre-allocate buffers for output windows. The callback will be invoked when the
+	 * pre-allocation of buffers through the {@link ACameraCaptureSession_prepareWindow} call has
+	 * completed.</p>
+	 *
+	 * <p>Only one callback can be set per session. Setting a new callback will replace the previous
+	 * one. Passing NULL for callback will clear the callback.</p>
+	 *
+	 * @param session the ACameraCaptureSession on which ACameraCaptureSession_prepareWindow was called.
+	 * @param context The optional app-provided context pointer that will be passed to the callback.
+	 * @param callback The callback to be invoked when buffer pre-allocation is complete. Passing
+	 *                 NULL will clear the callback.
+	 *
+	 * @return <ul><li>
+	 *             {@link ACAMERA_OK} if the method succeeds</li>
+	 *         <li>{@link ACAMERA_ERROR_INVALID_PARAMETER} if session is NULL</li>
+	 *         <li>{@link ACAMERA_ERROR_SESSION_CLOSED} if the capture session has been closed</li>
+	 *         <li>{@link ACAMERA_ERROR_CAMERA_DISCONNECTED} if the camera device is closed</li>
+	 *         <li>{@link ACAMERA_ERROR_CAMERA_DEVICE} if the camera device encounters fatal error</li>
+	 *         <li>{@link ACAMERA_ERROR_CAMERA_SERVICE} the camera service encounters fatal error</li>
+	 *         <li>{@link ACAMERA_ERROR_UNKNOWN} if the method fails for some other reasons</li></ul>
+	 *
+	 * Available since API level 34.
+	 */
+	ACameraCaptureSession_setWindowPreparedCallback :: proc(session: ^ACameraCaptureSession, _context: rawptr, callback: ACameraCaptureSession_prepareCallback) -> CameraStatus ---
+
+	/**
+	 *
+	 * <p>Pre-allocate all buffers for an output window.</p>
+	 *
+	 * <p>Normally, the image buffers for a given output window are allocated on-demand,
+	 * to minimize startup latency and memory overhead.</p>
+	 *
+	 * <p>However, in some cases, it may be desirable for the buffers to be allocated before
+	 * any requests targeting the window are actually submitted to the device. Large buffers
+	 * may take some time to allocate, which can result in delays in submitting requests until
+	 * sufficient buffers are allocated to reach steady-state behavior. Such delays can cause
+	 * bursts to take longer than desired, or cause skips or stutters in preview output.</p>
+	 *
+	 * <p>The ACameraCaptureSession_prepareWindow() call can be used to perform this pre-allocation.
+	 * It may only be called for a given output window before that window is used as a target for a
+	 * request. The number of buffers allocated is the sum of the count needed by the consumer providing
+	 * the output window, and the maximum number needed by the camera device to fill its pipeline.
+	 * Since this may be a larger number than what is actually required for steady-state operation,
+	 * using this call may result in higher memory consumption than the normal on-demand behavior
+	 * results in. This method will also delay the time to first output to a given Surface, in exchange
+	 * for smoother frame rate once the allocation is complete.</p>
+	 *
+	 * <p>For example, an application that creates an
+	 * {@link AImageReader} with a maxImages argument of 10,
+	 * but only uses 3 simultaneous {@link AImage}s at once, would normally only cause those 3 images
+	 * to be allocated (plus what is needed by the camera device for smooth operation).  But using
+	 * ACameraCaptureSession_prepareWindow() on the {@link AImageReader}'s window will result in all 10
+	 * {@link AImage}s being allocated. So applications using this method should take care to request
+	 * only the number of buffers actually necessary for their application.</p>
+	 *
+	 * <p>If the same output window is used in consecutive sessions (without closing the first
+	 * session explicitly), then its already-allocated buffers are carried over, and if it was
+	 * used as a target of a capture request in the first session, prepare cannot be called on it
+	 * in the second session. If it is, {@link ACAMERA_ERROR_INVALID_PARAMETER} will
+	 * be returned by the method</p>
+	 *
+	 * <p>Once allocation is complete, {@link ACameraCaptureSession_prepareCallback#onWindowPrepared}
+	 * will be invoked with the output provided to this method. Between the prepare call and the
+	 * {@link ACameraCaptureSession_prepareCallback#onWindowPrepared} call,
+	 * the output provided to prepare must not be used as a target of a capture request submitted
+	 * to this session.</p>
+	 *
+	 * <p>{@link android.hardware.camera2.CameraCharacteristics#INFO_SUPPORTED_HARDWARE_LEVEL_LEGACY LEGACY}
+	 * devices cannot pre-allocate output buffers; for those devices,
+	 * {@link ACameraCaptureSession_prepareCallback#onWindowPrepared} will be immediately called,
+	 * and no pre-allocation is done.</p>
+	 *
+	 * @param session the {@link ACameraCaptureSession} that needs to prepare output buffers.
+	 * @param window the {@link ANativeWindow} for which the output buffers need to be prepared.
+	 *
+	 * @return <ul><li>
+	 *             {@link ACAMERA_OK} if the method succeeds</li>
+	 *         <li>{@link ACAMERA_ERROR_INVALID_PARAMETER} if session/ window is
+	 *              NULL. Or if the session has not been configured with the window</li>
+	 *         <li>{@link ACAMERA_ERROR_SESSION_CLOSED} if the capture session has been closed</li>
+	 *         <li>{@link ACAMERA_ERROR_CAMERA_DISCONNECTED} if the camera device is closed</li>
+	 *         <li>{@link ACAMERA_ERROR_CAMERA_DEVICE} if the camera device encounters fatal error</li>
+	 *         <li>{@link ACAMERA_ERROR_CAMERA_SERVICE} if the camera service encounters fatal error</li>
+	 *         <li>{@link ACAMERA_ERROR_UNKNOWN} if the method fails for some other reasons</li></ul>
+	 *
+	 * Available since API level 34.
+	 */
+	ACameraCaptureSession_prepareWindow :: proc(session: ^ACameraCaptureSession, window: ^ACameraWindowType) -> CameraStatus ---
 }

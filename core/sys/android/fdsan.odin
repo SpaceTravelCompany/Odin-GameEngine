@@ -95,6 +95,9 @@ android_fdsan_owner_type :: enum {
 
   /* native_handle_t */
   NATIVE_HANDLE = 13,
+
+  /* android::Parcel */
+  PARCEL = 14,
 }
 
 android_fdsan_error_level :: enum {

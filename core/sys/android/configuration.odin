@@ -420,10 +420,33 @@ SCREEN_ROUND :: 0x8000
 */
 COLOR_MODE :: 0x10000
 /**
+* Bit mask for
+* <a href::"/guide/topics/resources/providing-resources.html#GrammaticalInflectionQualifier">grammatical gender</a>
+* configuration.
+*/
+GRAMMATICAL_GENDER :: 0x20000
+/**
 * Constant used to to represent MNC (Mobile Network Code) zero.
 * 0 cannot be used since it is used to represent an undefined MNC.
 */
 MNC_ZERO :: 0xffff
+
+/**
+* <a href::"/guide/topics/resources/providing-resources.html#GrammaticalInflectionQualifier">Grammatical gender</a>: not specified.
+*/
+GRAMMATICAL_GENDER_ANY :: 0
+/**
+* <a href::"/guide/topics/resources/providing-resources.html#GrammaticalInflectionQualifier">Grammatical gender</a>: neuter.
+*/
+GRAMMATICAL_GENDER_NEUTER :: 1
+/**
+* <a href::"/guide/topics/resources/providing-resources.html#GrammaticalInflectionQualifier">Grammatical gender</a>: feminine.
+*/
+GRAMMATICAL_GENDER_FEMININE :: 2
+/**
+* <a href::"/guide/topics/resources/providing-resources.html#GrammaticalInflectionQualifier">Grammatical gender</a>: masculine.
+*/
+GRAMMATICAL_GENDER_MASCULINE :: 3
 
 
 /**
@@ -685,6 +708,22 @@ foreign android {
 	* Available since API level 17.
 	*/
 	AConfiguration_setLayoutDirection :: proc(config: ^AConfiguration, value: i32) ---
+
+	/**
+	* Return the configuration's grammatical gender, or ACONFIGURATION_GRAMMATICAL_GENDER_ANY if
+	* not set.
+	*
+	* Available since API level 34.
+	*/
+	AConfiguration_getGrammaticalGender :: proc(config: ^AConfiguration) -> i32 ---
+
+	/**
+	* Set the configuration's grammatical gender to one of the
+	* ACONFIGURATION_GRAMMATICAL_GENDER_* constants.
+	*
+	* Available since API level 34.
+	*/
+	AConfiguration_setGrammaticalGender :: proc(config: ^AConfiguration, value: i32) ---
 
 	/**
 	* Perform a diff between two configurations.  Returns a bit mask of

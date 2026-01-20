@@ -14,9 +14,36 @@ AMEDIACODEC_KEY_SUSPEND_TIME: cstring        //   __INTRODUCED_IN(31);
 AMEDIACODEC_KEY_VIDEO_BITRATE: cstring       //   __INTRODUCED_IN(31);
 
 
+/**
+ * This indicates that the (encoded) buffer marked as such contains
+ * the data for a key frame.
+ *
+ * Semantics are the same as {@link android.media.MediaCodec#BUFFER_FLAG_KEY_FRAME}
+ *
+ * Available since API level 34.
+ */
+AMEDIACODEC_BUFFER_FLAG_KEY_FRAME :: 1
 AMEDIACODEC_BUFFER_FLAG_CODEC_CONFIG :: 2
 AMEDIACODEC_BUFFER_FLAG_END_OF_STREAM :: 4
 AMEDIACODEC_BUFFER_FLAG_PARTIAL_FRAME :: 8
+/**
+ * This indicates that the buffer contains non-media data for the
+ * muxer to process.
+ *
+ * Semantics are the same as {@link android.media.MediaCodec#BUFFER_FLAG_MUXER_DATA}
+ *
+ * Available since API level 34.
+ */
+AMEDIACODEC_BUFFER_FLAG_MUXER_DATA :: 16
+/**
+ * This indicates that the buffer is decoded and updates the internal state of the decoder,
+ * but does not produce any output buffer.
+ *
+ * Semantics are the same as {@link android.media.MediaCodec#BUFFER_FLAG_DECODE_ONLY}
+ *
+ * Available since API level 34.
+ */
+AMEDIACODEC_BUFFER_FLAG_DECODE_ONLY :: 32
 
 AMEDIACODEC_CONFIGURE_FLAG_ENCODE :: 1
 AMEDIACODEC_INFO_OUTPUT_BUFFERS_CHANGED :: -3
