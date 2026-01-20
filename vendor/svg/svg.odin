@@ -482,7 +482,7 @@ deinit :: proc(self: ^svg_parser) {
 			case : _parse_fill_and_stroke(a, &out.polyline[len(out.polyline) - 1]._0, allocator) or_return
 			}
 		}
-		non_zero_append(&out.shape_ptrs, &out.path[len(out.path) - 1])
+		non_zero_append(&out.shape_ptrs, &out.polyline[len(out.polyline) - 1])
 	case "polygon":
 		non_zero_append(&out.polygon, POLYGON{})
 		for a in e.attribs {
@@ -491,7 +491,7 @@ deinit :: proc(self: ^svg_parser) {
 			case : _parse_fill_and_stroke(a, &out.polygon[len(out.polygon) - 1]._0, allocator) or_return
 			}
 		}	
-		non_zero_append(&out.shape_ptrs, &out.path[len(out.path) - 1])
+		non_zero_append(&out.shape_ptrs, &out.polygon[len(out.polygon) - 1])
 	}
 	if err do return .INVALID_NODE
 
@@ -542,39 +542,39 @@ init_parse :: proc(svg_data: []u8, allocator: mem.Allocator = context.allocator)
 		delete(data.polygon)
 		delete(data.shape_ptrs)
 	}
-	_parse_svg_element(xml_doc, 0, &data, allocator)
+	_parse_svg_element(xml_doc, 0, &data, arena)
 
 	parser.svg = data.svg
 	if len(data.path) > 0 {
-		parser.path = mem.make_non_zeroed([]PATH, len(data.path), allocator)
+		parser.path = mem.make_non_zeroed([]PATH, len(data.path), arena)
 		mem.copy_non_overlapping(&parser.path[0], &data.path[0], len(data.path) * size_of(PATH))
 	}
 	if len(data.rect) > 0 {
-		parser.rect = mem.make_non_zeroed([]RECT, len(data.rect), allocator)
+		parser.rect = mem.make_non_zeroed([]RECT, len(data.rect), arena)
 		mem.copy_non_overlapping(&parser.rect[0], &data.rect[0], len(data.rect) * size_of(RECT))
 	}
 	if len(data.circle) > 0 {
-		parser.circle = mem.make_non_zeroed([]CIRCLE, len(data.circle), allocator)
+		parser.circle = mem.make_non_zeroed([]CIRCLE, len(data.circle), arena)
 		mem.copy_non_overlapping(&parser.circle[0], &data.circle[0], len(data.circle) * size_of(CIRCLE))
 	}
 	if len(data.ellipse) > 0 {
-		parser.ellipse = mem.make_non_zeroed([]ELLIPSE, len(data.ellipse), allocator)
+		parser.ellipse = mem.make_non_zeroed([]ELLIPSE, len(data.ellipse), arena)
 		mem.copy_non_overlapping(&parser.ellipse[0], &data.ellipse[0], len(data.ellipse) * size_of(ELLIPSE))
 	}
 	if len(data.line) > 0 {
-		parser.line = mem.make_non_zeroed([]LINE, len(data.line), allocator)
+		parser.line = mem.make_non_zeroed([]LINE, len(data.line), arena)
 		mem.copy_non_overlapping(&parser.line[0], &data.line[0], len(data.line) * size_of(LINE))
 	}
 	if len(data.polyline) > 0 {
-		parser.polyline = mem.make_non_zeroed([]POLYLINE, len(data.polyline), allocator)
+		parser.polyline = mem.make_non_zeroed([]POLYLINE, len(data.polyline), arena)
 		mem.copy_non_overlapping(&parser.polyline[0], &data.polyline[0], len(data.polyline) * size_of(POLYLINE))
 	}
 	if len(data.polygon) > 0 {
-		parser.polygon = mem.make_non_zeroed([]POLYGON, len(data.polygon), allocator)
+		parser.polygon = mem.make_non_zeroed([]POLYGON, len(data.polygon), arena)
 		mem.copy_non_overlapping(&parser.polygon[0], &data.polygon[0], len(data.polygon) * size_of(POLYGON))
 	}
 	if len(data.shape_ptrs) > 0 {
-		parser.shape_ptrs = mem.make_non_zeroed([]svg_shape_ptr, len(data.shape_ptrs), allocator)
+		parser.shape_ptrs = mem.make_non_zeroed([]svg_shape_ptr, len(data.shape_ptrs), arena)
 		mem.copy_non_overlapping(&parser.shape_ptrs[0], &data.shape_ptrs[0], len(data.shape_ptrs) * size_of(svg_shape_ptr))
 	}
 	shapes_ : __shapes = {
@@ -597,13 +597,13 @@ init_parse :: proc(svg_data: []u8, allocator: mem.Allocator = context.allocator)
 	}
 	for s in parser.shape_ptrs {
 		#partial switch v in s {
-		case ^PATH: _parse_path(&shapes_, v, allocator) or_return
-		case ^RECT: _parse_rect(&shapes_, v, allocator) or_return
-		case ^CIRCLE: _parse_circle(&shapes_, v, allocator) or_return
-		case ^ELLIPSE: _parse_ellipse(&shapes_, v, allocator) or_return
-		case ^LINE: _parse_line(&shapes_, v, allocator) or_return
-		case ^POLYLINE: _parse_polyline(&shapes_, v, allocator) or_return
-		case ^POLYGON: _parse_polygon(&shapes_, v, allocator) or_return
+		case ^PATH: _parse_path(&shapes_, v, arena) or_return
+		case ^RECT: _parse_rect(&shapes_, v, arena) or_return
+		case ^CIRCLE: _parse_circle(&shapes_, v, arena) or_return
+		case ^ELLIPSE: _parse_ellipse(&shapes_, v, arena) or_return
+		case ^LINE: _parse_line(&shapes_, v, arena) or_return
+		case ^POLYLINE: _parse_polyline(&shapes_, v, arena) or_return
+		case ^POLYGON: _parse_polygon(&shapes_, v, arena) or_return
 		}
 	}
 	parser.shapes = geometry.shapes{}
@@ -617,7 +617,7 @@ init_parse :: proc(svg_data: []u8, allocator: mem.Allocator = context.allocator)
 			}
 		}
 		if !empty_color {
-			parser.shapes.colors = mem.make_non_zeroed([]linalg.Point3DwF, len(shapes_.colors), allocator)
+			parser.shapes.colors = mem.make_non_zeroed([]linalg.Point3DwF, len(shapes_.colors), arena)
 			mem.copy_non_overlapping(&parser.shapes.colors[0], &shapes_.colors[0], len(shapes_.colors) * size_of(linalg.Point3DwF))
 		}
 	}
@@ -631,30 +631,30 @@ init_parse :: proc(svg_data: []u8, allocator: mem.Allocator = context.allocator)
 			}
 		}
 		if !empty_stroke {
-			parser.shapes.thickness = mem.make_non_zeroed([]f32, len(shapes_.thickness), allocator)
+			parser.shapes.thickness = mem.make_non_zeroed([]f32, len(shapes_.thickness), arena)
 			mem.copy_non_overlapping(&parser.shapes.thickness[0], &shapes_.thickness[0], len(shapes_.thickness) * size_of(f32))
 		}
 	}
 	if !empty_stroke &&len(shapes_.strokeColors) > 0 {
-		parser.shapes.strokeColors = mem.make_non_zeroed([]linalg.Point3DwF, len(shapes_.strokeColors), allocator)
+		parser.shapes.strokeColors = mem.make_non_zeroed([]linalg.Point3DwF, len(shapes_.strokeColors), arena)
 		mem.copy_non_overlapping(&parser.shapes.strokeColors[0], &shapes_.strokeColors[0], len(shapes_.strokeColors) * size_of(linalg.Point3DwF))
 	}
 
 	if !empty_color || !empty_stroke {
 		if len(shapes_.polys) > 0 {
-			parser.shapes.poly = mem.make_non_zeroed([]linalg.PointF, len(shapes_.polys), allocator)
+			parser.shapes.poly = mem.make_non_zeroed([]linalg.PointF, len(shapes_.polys), arena)
 			mem.copy_non_overlapping(&parser.shapes.poly[0], &shapes_.polys[0], len(shapes_.polys) * size_of(linalg.PointF))
 		}
 		if len(shapes_.n_polys) > 0 {
-			parser.shapes.n_polys = mem.make_non_zeroed([]u32, len(shapes_.n_polys), allocator)
+			parser.shapes.n_polys = mem.make_non_zeroed([]u32, len(shapes_.n_polys), arena)
 			mem.copy_non_overlapping(&parser.shapes.n_polys[0], &shapes_.n_polys[0], len(shapes_.n_polys) * size_of(u32))
 		}
 		if len(shapes_.n_types) > 0 {
-			parser.shapes.n_types = mem.make_non_zeroed([]u32, len(shapes_.n_types), allocator)
+			parser.shapes.n_types = mem.make_non_zeroed([]u32, len(shapes_.n_types), arena)
 			mem.copy_non_overlapping(&parser.shapes.n_types[0], &shapes_.n_types[0], len(shapes_.n_types) * size_of(u32))
 		}
 		if len(shapes_.types) > 0 {
-			parser.shapes.types = mem.make_non_zeroed([]geometry.curve_type, len(shapes_.types), allocator)
+			parser.shapes.types = mem.make_non_zeroed([]geometry.curve_type, len(shapes_.types), arena)
 			mem.copy_non_overlapping(&parser.shapes.types[0], &shapes_.types[0], len(shapes_.types) * size_of(geometry.curve_type))
 		}
 	}
@@ -775,15 +775,12 @@ init_parse :: proc(svg_data: []u8, allocator: mem.Allocator = context.allocator)
 		if path.d.?[i] == 'Z' || path.d.?[i] == 'z' {
 			if len(shapes.polys) <= start_idx do return .INVALID_NODE
 			if start {
-				line = g_line_init(line.start, shapes.polys[starti])
 				start = false
-			} else {
-				line = g_line_init(shapes.polys[len(shapes.polys) - 1], shapes.polys[starti])
 			}
-			if !compare(line.start, line.end) {
-				append_line(&shapes.polys, &shapes.types, &n_polys, &n_types, line)
-			}
-			cur = line.end
+			// if !compare(line.start, line.end) {
+			// 	append_line(&shapes.polys, &shapes.types, &n_polys, &n_types, line)
+			// }
+			cur = shapes.polys[starti]
 			i += 1
 			op_ = nil
 			continue
