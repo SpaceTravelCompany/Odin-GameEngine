@@ -42,7 +42,7 @@ void main() {
     if (alpha > 1.0) {
         // Inside - fully opaque
         alpha = 1.0;
-    } else if (alpha < 0.0) {
+    } else if (alpha <= 0.0) {
         // Outside - discard
         discard;
     }
