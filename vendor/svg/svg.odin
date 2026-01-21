@@ -14,9 +14,17 @@ import "core:unicode"
 import "base:intrinsics"
 import "core:engine/geometry"
 
+VIEWBOX :: struct {
+	min_x: f32,
+	min_y: f32,
+	width: f32,
+	height: f32,
+}
+
 SVG :: struct {
-	width:  string,
-	height: string,
+	width:   string,
+	height:  string,
+	viewBox: Maybe(VIEWBOX),
 }
 
 //! css not supported yet
@@ -413,6 +421,11 @@ deinit :: proc(self: ^svg_parser) {
 			switch a.key {
 			case "width" : out.svg.width = strings.clone(a.val, allocator)
 			case "height" : out.svg.height = strings.clone(a.val, allocator)
+			case "viewBox":
+				viewbox, viewbox_err := _parse_viewbox(a.val)
+				if viewbox_err == nil {
+					out.svg.viewBox = viewbox
+				}
 			}
 		}
 		non_zero_append(&out.shape_ptrs, &out.svg)
@@ -1110,6 +1123,45 @@ init_parse :: proc(svg_data: []u8, allocator: mem.Allocator = context.allocator)
 	return value, nil
 }
 
+@private _parse_viewbox :: proc(viewbox_str: string) -> (result: VIEWBOX, err: SVG_ERROR) {
+	i := 0
+	// Parse x
+	x, x_err := _parse_number(viewbox_str, &i)
+	if x_err != nil {
+		err = .INVALID_NODE
+		return
+	}
+	
+	// Parse y
+	y, y_err := _parse_number(viewbox_str, &i)
+	if y_err != nil {
+		err = .INVALID_NODE
+		return
+	}
+	
+	// Parse width
+	width, width_err := _parse_number(viewbox_str, &i)
+	if width_err != nil {
+		err = .INVALID_NODE
+		return
+	}
+	
+	// Parse height
+	height, height_err := _parse_number(viewbox_str, &i)
+	if height_err != nil {
+		err = .INVALID_NODE
+		return
+	}
+
+	result = VIEWBOX{
+		min_x = x,
+		min_y = y,
+		width = width,
+		height = height,
+	}
+	return
+}
+
 @private _parse_color :: proc(color: string, opacity: Maybe(f32)) -> (result: linalg.point3dw, err: SVG_ERROR) {
 	if color == "none" {
 		return linalg.point3dw{0, 0, 0, 0}, nil
@@ -1146,16 +1198,190 @@ init_parse :: proc(svg_data: []u8, allocator: mem.Allocator = context.allocator)
 			b := f32(hex_val & 0xff) / 255.0
 			a := f32(0xff) / 255.0
 			if opacity, ok := opacity.?; ok {
-				a = opacity
+				a *= opacity
 			}
-			return linalg.Vector4f32{r, g, b, a}, nil
+			result = linalg.Vector4f32{r, g, b, a}
+			return
 		}
 	} else if len(color) >= 3 && color[:3] == "rgb" {
-		// TODO: rgb/rgba format
-		return linalg.point3dw{0, 0, 0, 0}, .UNSUPPORTED_FEATURE
+		// Parse rgb/rgba format: rgb(255, 0, 0) or rgba(255, 0, 0, 0.5) or rgb(100%, 0%, 0%)
+		parse_rgb :: proc(color_str: string) -> (r: f32, g: f32, b: f32, a: f32, err: SVG_ERROR) {
+			// Find opening parenthesis
+			open_idx := strings.index_byte(color_str, '(')
+			if open_idx == -1 {
+				err = .INVALID_NODE
+				return
+			}
+			
+			// Find closing parenthesis
+			close_idx := strings.last_index_byte(color_str, ')')
+			if close_idx == -1 || close_idx <= open_idx {
+				err = .INVALID_NODE
+				return
+			}
+			
+			// Extract content between parentheses
+			content := color_str[open_idx + 1:close_idx]
+			
+			// Parse values
+			i := 0
+			values: [4]f32
+			value_count := 0
+			
+			for i < len(content) && value_count < 4 {
+				// Skip whitespace and commas
+				for i < len(content) {
+					c := content[i]
+					if c != ' ' && c != '\t' && c != '\r' && c != '\n' && c != ',' {
+						break
+					}
+					i += 1
+				}
+				if i >= len(content) do break
+				
+				// Check if percentage
+				is_percent := false
+				percent_idx := strings.index_byte(content[i:], '%')
+				if percent_idx != -1 {
+					is_percent = true
+				}
+				
+				// Parse number
+				value, value_err := _parse_number(content, &i)
+				if value_err != nil {
+					err = .INVALID_NODE
+					return
+				}
+				
+				// Skip percentage sign if present
+				if is_percent && i < len(content) && content[i] == '%' {
+					i += 1
+					value = value / 100.0
+					if value_count < 3 {
+						// RGB values: convert percentage to 0-255 range
+						value = value * 255.0
+					}
+				}
+				
+				values[value_count] = value
+				value_count += 1
+			}
+			
+			if value_count < 3 {
+				err = .INVALID_NODE
+				return
+			}
+			
+			// Clamp RGB values to 0-255 range, then normalize to 0-1
+			r = math.clamp(values[0], 0, 255) / 255.0
+			g = math.clamp(values[1], 0, 255) / 255.0
+			b = math.clamp(values[2], 0, 255) / 255.0
+			
+			// Alpha is optional, default to 1.0
+			if value_count >= 4 {
+				a = math.clamp(values[3], 0, 1)
+			} else {
+				a = 1.0
+			}
+			return
+		}
+		
+		r, g, b, a, rgb_err := parse_rgb(color)
+		if rgb_err != nil {
+			return linalg.point3dw{0, 0, 0, 0}, rgb_err
+		}
+		
+		result = linalg.Vector4f32{r, g, b, a}
+		if opacity, ok := opacity.?; ok {
+			result.w *= opacity
+		}
+		return
 	} else if len(color) >= 3 && color[:3] == "hsl" {
-		// TODO: hsl/hsla format
-		return linalg.point3dw{0, 0, 0, 0}, .UNSUPPORTED_FEATURE
+		// Parse hsl/hsla format: hsl(120, 100%, 50%) or hsla(120, 100%, 50%, 0.5)
+		parse_hsl :: proc(color_str: string) -> (result: linalg.Vector4f32, err: SVG_ERROR) {
+			// Find opening parenthesis
+			open_idx := strings.index_byte(color_str, '(')
+			if open_idx == -1 {
+				err = .INVALID_NODE
+				return
+			}
+			
+			// Find closing parenthesis
+			close_idx := strings.last_index_byte(color_str, ')')
+			if close_idx == -1 || close_idx <= open_idx {
+				err = .INVALID_NODE
+				return
+			}
+			
+			// Extract content between parentheses
+			content := color_str[open_idx + 1:close_idx]
+			
+			// Parse values
+			i := 0
+			h: f32 = 0
+			s: f32 = 0
+			l: f32 = 0
+			alpha: f32 = 1.0
+			value_count := 0
+			
+			for i < len(content) && value_count < 4 {
+				// Skip whitespace and commas
+				for i < len(content) {
+					c := content[i]
+					if c != ' ' && c != '\t' && c != '\r' && c != '\n' && c != ',' {
+						break
+					}
+					i += 1
+				}
+				if i >= len(content) do break
+				
+				// Check if percentage
+				is_percent := false
+				percent_idx := strings.index_byte(content[i:], '%')
+				if percent_idx != -1 {
+					is_percent = true
+				}
+				
+				// Parse number
+				value, value_err := _parse_number(content, &i)
+				if value_err != nil {
+					err = .INVALID_NODE
+					return
+				}
+				
+				// Skip percentage sign if present
+				if is_percent && i < len(content) && content[i] == '%' {
+					i += 1
+					value = value / 100.0
+				}
+				
+				if value_count == 0 {
+					h = value // Hue in degrees (0-360)
+				} else if value_count == 1 {
+					s = math.clamp(value, 0, 1) // Saturation (0-1)
+				} else if value_count == 2 {
+					l = math.clamp(value, 0, 1) // Lightness (0-1)
+				} else if value_count == 3 {
+					alpha = math.clamp(value, 0, 1) // Alpha (0-1)
+				}
+				
+				value_count += 1
+			}
+			
+			if value_count < 3 {
+				err = .INVALID_NODE
+				return
+			}
+			
+			result = linalg.vector4_hsl_to_rgb_f32(h, s, l, alpha)
+			return
+		}
+		
+		result = parse_hsl(color) or_return
+		if opacity, ok := opacity.?; ok {
+			result.w *= opacity
+		}
+		return
 	}
 
 	// Try to find CSS color name

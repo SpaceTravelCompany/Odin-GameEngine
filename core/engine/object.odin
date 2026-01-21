@@ -51,7 +51,7 @@ srtc_2d_matrix :: proc "contextless" (t: linalg.point3d, s: linalg.point, r: f32
 	translation := linalg.matrix4_translate(t)
 	rotation := linalg.matrix4_rotate_f32(r, linalg.Vector3f32{0.0, 0.0, 1.0})
 	scale := linalg.matrix4_scale(linalg.point3d{s.x,s.y,1.0})
-	return linalg.mul(translation, linalg.mul(rotation, linalg.mul(pivot, scale)))
+	return linalg.mul(translation, linalg.mul(rotation, linalg.mul(scale, pivot)))
 }
 
 @(require_results)
@@ -88,7 +88,7 @@ src_2d_matrix :: proc "contextless" (s: linalg.point, r: f32, cp:linalg.point) -
 	pivot := linalg.matrix4_translate(linalg.point3d{cp.x,cp.y,0.0})
 	rotation := linalg.matrix4_rotate_f32(r, linalg.Vector3f32{0.0, 0.0, 1.0})
 	scale := linalg.matrix4_scale(linalg.point3d{s.x,s.y,1.0})
-	return linalg.mul(rotation, linalg.mul(pivot, scale))
+	return linalg.mul(rotation, linalg.mul(scale, pivot))
 }
 
 @(require_results)
