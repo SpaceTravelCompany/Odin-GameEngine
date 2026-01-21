@@ -30,7 +30,7 @@ Inputs:
 Returns:
 - None
 */
-camera_init :: proc (self:^camera, eye_vec:linalg.Point3DF = {0,0,-1}, focus_vec:linalg.Point3DF = {0,0,0}, up_vec:linalg.Point3DF = {0,1,0}) {
+camera_init :: proc (self:^camera, eye_vec:linalg.point3d = {0,0,-1}, focus_vec:linalg.point3d = {0,0,0}, up_vec:linalg.point3d = {0,1,0}) {
     __camera_update(self, eye_vec, focus_vec, up_vec)
     __camera_init(self)
 }
@@ -45,7 +45,7 @@ Inputs:
 Returns:
 - None
 */
-camera_init_matrix_raw :: proc (self:^camera, mat:linalg.Matrix) {
+camera_init_matrix_raw :: proc (self:^camera, mat:linalg.matrix44) {
     mem.ICheckInit_Init(&self.check_init)
     self.mat = mat
     __camera_init(self)
@@ -54,7 +54,7 @@ camera_init_matrix_raw :: proc (self:^camera, mat:linalg.Matrix) {
 @private __camera_init :: #force_inline proc(self:^camera) {
     mem.ICheckInit_Init(&self.check_init)
     self.mat_uniform = buffer_resource_create_buffer({
-        len = size_of(linalg.Matrix),
+        len = size_of(linalg.matrix44),
         type = .UNIFORM,
         resource_usage = .CPU,
     }, mem.ptr_to_bytes(&self.mat), true)
@@ -72,7 +72,7 @@ Inputs:
 Returns:
 - None
 */
-camera_update :: proc(self:^camera, eye_vec:linalg.Point3DF = {0,0,-1}, focus_vec:linalg.Point3DF = {0,0,0}, up_vec:linalg.Point3DF = {0,0,1}) {
+camera_update :: proc(self:^camera, eye_vec:linalg.point3d = {0,0,-1}, focus_vec:linalg.point3d = {0,0,0}, up_vec:linalg.point3d = {0,0,1}) {
     __camera_update(self, eye_vec, focus_vec, up_vec)
     camera_update_matrix_raw(self, self.mat)
 }
@@ -87,13 +87,13 @@ Inputs:
 Returns:
 - None
 */
-camera_update_matrix_raw :: proc(self:^camera, _mat:linalg.Matrix) {
+camera_update_matrix_raw :: proc(self:^camera, _mat:linalg.matrix44) {
     mem.ICheckInit_Check(&self.check_init)
     self.mat = _mat
     buffer_resource_copy_update(self.mat_uniform, &self.mat)
 }
 
-@private __camera_update :: #force_inline proc(self:^camera, eye_vec:linalg.Point3DF, focus_vec:linalg.Point3DF, up_vec:linalg.Point3DF = {0,0,1}) {
+@private __camera_update :: #force_inline proc(self:^camera, eye_vec:linalg.point3d, focus_vec:linalg.point3d, up_vec:linalg.point3d = {0,0,1}) {
     f := linalg.normalize(focus_vec - eye_vec)
 	s := linalg.normalize(linalg.cross(up_vec, f))
 	u := linalg.normalize(linalg.cross(f, s))

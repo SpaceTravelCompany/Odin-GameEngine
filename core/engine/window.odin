@@ -21,7 +21,7 @@ screen_orientation :: enum {
 }
 
 monitor_info :: struct {
-	rect:       linalg.RectI,
+	rect:       linalg.recti,
 	refresh_rate: u32,
 	name:       string,
 	is_primary:  bool,

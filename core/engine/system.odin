@@ -343,10 +343,10 @@ Inputs:
 Returns:
 - Mouse position in centered coordinates (origin at window center)
 */
-convert_mouse_pos :: proc "contextless" (pos:linalg.PointF) -> linalg.PointF {
+convert_mouse_pos :: proc "contextless" (pos:linalg.point) -> linalg.point {
     w := f32(window_width()) / 2.0
     h := f32(window_height()) / 2.0
-    return linalg.PointF{ pos.x - w, -pos.y + h }
+    return linalg.point{ pos.x - w, -pos.y + h }
 }
 
 android_api_level :: enum u32 {

@@ -1415,9 +1415,9 @@ vk_refresh_pre_matrix :: proc() {
 		} else if orientation == .Vertical180 {
 			rotation_matrix = linalg.matrix4_rotate_f32(linalg.to_radians(f32(180.0)), {0, 0, 1})
 		} else if orientation == .Vertical360 {
-			rotation_matrix = linalg.identity_matrix(linalg.Matrix)
+			rotation_matrix = linalg.identity_matrix(linalg.matrix44)
 		} else {
-			rotation_matrix = linalg.identity_matrix(linalg.Matrix)
+			rotation_matrix = linalg.identity_matrix(linalg.matrix44)
 		}
 	}
 }
@@ -1618,7 +1618,7 @@ vk_record_command_buffer :: proc(cmd:^render_cmd, frame:int) {
 		defer delete(objs, context.temp_allocator)
 		
 		first := true
-		prev_area :Maybe(linalg.RectF) = nil
+		prev_area :Maybe(linalg.rect) = nil
 		for viewport in __g_viewports {
 			if first || prev_area != viewport.viewport_area {
 				scissor :vk.Rect2D

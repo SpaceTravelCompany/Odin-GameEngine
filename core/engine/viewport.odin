@@ -13,7 +13,7 @@ Contains:
 - set: Descriptor set for uniform resources
 */
 viewport :: struct {
-	viewport_area : Maybe(linalg.RectF),
+	viewport_area : Maybe(linalg.rect),
 	camera : ^camera,
 	projection : ^projection,
 	set:descriptor_set,

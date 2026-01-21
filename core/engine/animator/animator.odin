@@ -223,8 +223,8 @@ ianimate_object_vtable :: struct {
     get_frame_cnt = auto_cast _super_animate_image_get_frame_cnt,
 }
 
-animate_image_init :: proc(self:^animate_image, $actualType:typeid, src:^engine.texture_array, pos:linalg.Point3DF, rotation:f32, scale:linalg.PointF = {1,1}, 
-colorTransform:^engine.color_transform = nil, pivot:linalg.PointF = {0.0, 0.0}, vtable:^ianimate_object_vtable = nil) 
+animate_image_init :: proc(self:^animate_image, $actualType:typeid, src:^engine.texture_array, pos:linalg.point3d, rotation:f32, scale:linalg.point = {1,1}, 
+colorTransform:^engine.color_transform = nil, pivot:linalg.point = {0.0, 0.0}, vtable:^ianimate_object_vtable = nil) 
 where intrinsics.type_is_subtype_of(actualType, animate_image) {
     self.src = src
     
@@ -346,10 +346,10 @@ animate_image_get_color_transform :: proc "contextless" (self:^animate_image) ->
     return self.color_transform
 }
 
-animate_image_update_transform :: #force_inline proc(self:^animate_image, pos:linalg.Point3DF, rotation:f32, scale:linalg.PointF = {1,1}, pivot:linalg.PointF = {0.0,0.0}) {
+animate_image_update_transform :: #force_inline proc(self:^animate_image, pos:linalg.point3d, rotation:f32, scale:linalg.point = {1,1}, pivot:linalg.point = {0.0,0.0}) {
     engine.iobject_update_transform(self, pos, rotation, scale, pivot)
 }
-animate_image_update_transform_matrix_raw :: #force_inline proc(self:^animate_image, _mat:linalg.Matrix) {
+animate_image_update_transform_matrix_raw :: #force_inline proc(self:^animate_image, _mat:linalg.matrix44) {
     engine.iobject_update_transform_matrix_raw(self, _mat)
 }
 animate_image_change_color_transform :: #force_inline proc(self:^animate_image, colorTransform:^engine.color_transform) {

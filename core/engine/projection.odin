@@ -112,7 +112,7 @@ Inputs:
 Returns:
 - None
 */
-projection_init_matrix_raw :: proc (self:^projection, mat:linalg.Matrix) {
+projection_init_matrix_raw :: proc (self:^projection, mat:linalg.matrix44) {
     self.mat = mat
     __projection_init(self)
 }
@@ -187,9 +187,9 @@ Inputs:
 Returns:
 - None
 */
-projection_update_matrix_raw :: proc(self:^projection, _mat:linalg.Matrix) {
+projection_update_matrix_raw :: proc(self:^projection, _mat:linalg.matrix44) {
     mem.ICheckInit_Check(&self.check_init)
-    mat : linalg.Matrix
+    mat : linalg.matrix44
     when is_mobile {
         mat = linalg.matrix_mul(rotation_matrix, _mat)
     } else {
@@ -252,14 +252,14 @@ projection_update_matrix_raw :: proc(self:^projection, _mat:linalg.Matrix) {
 //? uniform object is all small, so use_gcpu_mem is true by default
 @private __projection_init :: #force_inline proc(self:^projection) {
     mem.ICheckInit_Init(&self.check_init)
-    mat : linalg.Matrix
+    mat : linalg.matrix44
     when is_mobile {
         mat = linalg.matrix_mul(rotation_matrix, self.mat)
     } else {
         mat = self.mat
     }	
     self.mat_uniform = buffer_resource_create_buffer({
-        len = size_of(linalg.Matrix),
+        len = size_of(linalg.matrix44),
         type = .UNIFORM,
         resource_usage = .CPU,
         single = false,

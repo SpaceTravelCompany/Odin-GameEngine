@@ -20,9 +20,9 @@ pos_align_y :: enum {
 
 //do subtype to iobject
 gui_component :: struct {
-    gui_pos : linalg.PointF,
-    gui_center_pt : linalg.PointF,
-    gui_scale : linalg.PointF,
+    gui_pos : linalg.point,
+    gui_center_pt : linalg.point,
+    gui_scale : linalg.point,
     gui_rotation : f32,
     gui_align_x : pos_align_x,
     gui_align_y : pos_align_y,
@@ -30,7 +30,7 @@ gui_component :: struct {
 }
 
 
-@(require_results, private) __base_mat :: #force_inline proc "contextless" (self_component:^gui_component, mul: linalg.PointF) -> Maybe(linalg.Matrix) {
+@(require_results, private) __base_mat :: #force_inline proc "contextless" (self_component:^gui_component, mul: linalg.point) -> Maybe(linalg.matrix44) {
     return engine.sr_2d_matrix2(self_component.gui_scale, self_component.gui_rotation, self_component.gui_center_pt * mul)
 }
 
@@ -50,45 +50,45 @@ Returns:
     window_width :f32 = 2.0 / (self_component.gui_match_proj == nil ? engine.def_projection().mat[0][0] : self_component.gui_match_proj.mat[0][0])
     window_height :f32 = 2.0 / (self_component.gui_match_proj == nil ? engine.def_projection().mat[1][1] : self_component.gui_match_proj.mat[1][1])
 
-    base : Maybe(linalg.Matrix) = nil
-    mat : linalg.Matrix
+    base : Maybe(linalg.matrix44) = nil
+    mat : linalg.matrix44
 
     switch self_component.gui_align_x {
         case .left:
             switch self_component.gui_align_y {
                 case .top:
-                    base = __base_mat(self_component, linalg.PointF{1.0, -1.0})
-                    mat = engine.t_2d_matrix(linalg.Point3DF{-window_width / 2.0 + self_component.gui_pos.x, window_height / 2.0 - self_component.gui_pos.y, 0.0})
+                    base = __base_mat(self_component, linalg.point{1.0, -1.0})
+                    mat = engine.t_2d_matrix(linalg.point3d{-window_width / 2.0 + self_component.gui_pos.x, window_height / 2.0 - self_component.gui_pos.y, 0.0})
                 case .middle:
-                    base = __base_mat(self_component, linalg.PointF{1.0, 1.0})
-                    mat = engine.t_2d_matrix(linalg.Point3DF{-window_width / 2.0 + self_component.gui_pos.x, self_component.gui_pos.y, 0.0})
+                    base = __base_mat(self_component, linalg.point{1.0, 1.0})
+                    mat = engine.t_2d_matrix(linalg.point3d{-window_width / 2.0 + self_component.gui_pos.x, self_component.gui_pos.y, 0.0})
                 case .bottom:
-                    base = __base_mat(self_component, linalg.PointF{1.0, 1.0})
-                    mat = engine.t_2d_matrix(linalg.Point3DF{-window_width / 2.0 + self_component.gui_pos.x, -window_height / 2.0 + self_component.gui_pos.y, 0.0})     
+                    base = __base_mat(self_component, linalg.point{1.0, 1.0})
+                    mat = engine.t_2d_matrix(linalg.point3d{-window_width / 2.0 + self_component.gui_pos.x, -window_height / 2.0 + self_component.gui_pos.y, 0.0})     
             }
         case .center:
             switch self_component.gui_align_y {
                 case .top:
-                    base = __base_mat(self_component, linalg.PointF{1.0, -1.0})
-                    mat = engine.t_2d_matrix(linalg.Point3DF{self_component.gui_pos.x, window_height / 2.0 - self_component.gui_pos.y, 0.0})
+                    base = __base_mat(self_component, linalg.point{1.0, -1.0})
+                    mat = engine.t_2d_matrix(linalg.point3d{self_component.gui_pos.x, window_height / 2.0 - self_component.gui_pos.y, 0.0})
                 case .middle:
-                    base = __base_mat(self_component, linalg.PointF{1.0, 1.0})
-                    mat = engine.t_2d_matrix(linalg.Point3DF{self_component.gui_pos.x, self_component.gui_pos.y, 0.0})
+                    base = __base_mat(self_component, linalg.point{1.0, 1.0})
+                    mat = engine.t_2d_matrix(linalg.point3d{self_component.gui_pos.x, self_component.gui_pos.y, 0.0})
                 case .bottom:
-                    base = __base_mat(self_component, linalg.PointF{1.0, 1.0})
-                    mat = engine.t_2d_matrix(linalg.Point3DF{self_component.gui_pos.x, -window_height / 2.0 + self_component.gui_pos.y, 0.0})     
+                    base = __base_mat(self_component, linalg.point{1.0, 1.0})
+                    mat = engine.t_2d_matrix(linalg.point3d{self_component.gui_pos.x, -window_height / 2.0 + self_component.gui_pos.y, 0.0})     
             }
         case .right:
             switch self_component.gui_align_y {
                 case .top:
-                    base = __base_mat(self_component, linalg.PointF{-1.0, -1.0})
-                    mat = engine.t_2d_matrix(linalg.Point3DF{window_width / 2.0 - self_component.gui_pos.x, window_height / 2.0 - self_component.gui_pos.y, 0.0})
+                    base = __base_mat(self_component, linalg.point{-1.0, -1.0})
+                    mat = engine.t_2d_matrix(linalg.point3d{window_width / 2.0 - self_component.gui_pos.x, window_height / 2.0 - self_component.gui_pos.y, 0.0})
                 case .middle:
-                    base = __base_mat(self_component, linalg.PointF{-1.0, 1.0})
-                    mat = engine.t_2d_matrix(linalg.Point3DF{window_width / 2.0 - self_component.gui_pos.x, self_component.gui_pos.y, 0.0})
+                    base = __base_mat(self_component, linalg.point{-1.0, 1.0})
+                    mat = engine.t_2d_matrix(linalg.point3d{window_width / 2.0 - self_component.gui_pos.x, self_component.gui_pos.y, 0.0})
                 case .bottom:
-                    base = __base_mat(self_component, linalg.PointF{-1.0, 1.0})
-                    mat = engine.t_2d_matrix(linalg.Point3DF{window_width / 2.0 - self_component.gui_pos.x, -window_height / 2.0 + self_component.gui_pos.y, 0.0})     
+                    base = __base_mat(self_component, linalg.point{-1.0, 1.0})
+                    mat = engine.t_2d_matrix(linalg.point3d{window_width / 2.0 - self_component.gui_pos.x, -window_height / 2.0 + self_component.gui_pos.y, 0.0})     
             }
     }
 

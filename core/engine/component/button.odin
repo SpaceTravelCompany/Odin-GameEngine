@@ -20,7 +20,7 @@ image_button :: struct {
     down_texture:^engine.texture,
 }
 
-button_up :: proc (self:^button, mousePos:linalg.PointF) {
+button_up :: proc (self:^button, mousePos:linalg.point) {
     if self.state == .DOWN {
         if linalg.Area_PointIn(self.area, mousePos) {
             self.state = .OVER
@@ -31,7 +31,7 @@ button_up :: proc (self:^button, mousePos:linalg.PointF) {
         if self.button_up_callback != nil do self.button_up_callback(self, mousePos)
     }
 }
-button_down :: proc (self:^button, mousePos:linalg.PointF) {
+button_down :: proc (self:^button, mousePos:linalg.point) {
     if self.state == .UP {
         if linalg.Area_PointIn(self.area, mousePos) {
             self.state = .DOWN
@@ -44,7 +44,7 @@ button_down :: proc (self:^button, mousePos:linalg.PointF) {
         if self.button_down_callback != nil do self.button_down_callback(self, mousePos)
     }
 }
-button_move :: proc (self:^button, mousePos:linalg.PointF) {
+button_move :: proc (self:^button, mousePos:linalg.point) {
     if linalg.Area_PointIn(self.area, mousePos) {
         if self.state == .UP {
             self.state = .OVER
@@ -58,7 +58,7 @@ button_move :: proc (self:^button, mousePos:linalg.PointF) {
         }
     }
 }
-button_pointer_up :: proc (self:^button, pointerPos:linalg.PointF, pointerIdx:u8) {
+button_pointer_up :: proc (self:^button, pointerPos:linalg.point, pointerIdx:u8) {
     if self.state == .DOWN && self.pointerIdx != nil && self.pointerIdx.? == pointerIdx {
         self.state = .UP
         self.pointerIdx = nil
@@ -66,7 +66,7 @@ button_pointer_up :: proc (self:^button, pointerPos:linalg.PointF, pointerIdx:u8
         if self.pointer_up_callback != nil do self.pointer_up_callback(self, pointerPos, pointerIdx)
     }
 }
-button_pointer_down :: proc (self:^button, pointerPos:linalg.PointF, pointerIdx:u8) {
+button_pointer_down :: proc (self:^button, pointerPos:linalg.point, pointerIdx:u8) {
     if self.state == .UP {
         if linalg.Area_PointIn(self.area, pointerPos) {
             self.state = .DOWN
@@ -80,7 +80,7 @@ button_pointer_down :: proc (self:^button, pointerPos:linalg.PointF, pointerIdx:
         //UPDATE
     }
 }
-button_pointer_move :: proc (self:^button, pointerPos:linalg.PointF, pointerIdx:u8) {
+button_pointer_move :: proc (self:^button, pointerPos:linalg.point, pointerIdx:u8) {
     if linalg.Area_PointIn(self.area, pointerPos) {
         if self.pointerIdx == nil && self.state == .UP {
             self.pointerIdx = pointerIdx
@@ -102,12 +102,12 @@ button :: struct {
     area:linalg.AreaF,
     state : button_state,
     pointerIdx:Maybe(u8),
-    button_up_callback: proc (self:^button, mousePos:linalg.PointF),
-    button_down_callback: proc (self:^button, mousePos:linalg.PointF),
-    button_move_callback: proc (self:^button, mousePos:linalg.PointF),
-    pointer_down_callback: proc (self:^button, pointerPos:linalg.PointF, pointerIdx:u8),
-    pointer_up_callback: proc (self:^button, pointerPos:linalg.PointF, pointerIdx:u8),
-    pointer_move_callback: proc (self:^button, pointerPos:linalg.PointF, pointerIdx:u8),
+    button_up_callback: proc (self:^button, mousePos:linalg.point),
+    button_down_callback: proc (self:^button, mousePos:linalg.point),
+    button_move_callback: proc (self:^button, mousePos:linalg.point),
+    pointer_down_callback: proc (self:^button, pointerPos:linalg.point, pointerIdx:u8),
+    pointer_up_callback: proc (self:^button, pointerPos:linalg.point, pointerIdx:u8),
+    pointer_move_callback: proc (self:^button, pointerPos:linalg.point, pointerIdx:u8),
 }
 
 shape_button :: struct {
@@ -119,12 +119,12 @@ shape_button :: struct {
 
 button_vtable :: struct {
     using _: engine.iobject_vtable,
-    button_up: proc (self:^button, mousePos:linalg.PointF),
-    button_down: proc (self:^button, mousePos:linalg.PointF),
-    button_move: proc (self:^button, mousePos:linalg.PointF),
-    pointer_down: proc (self:^button, pointerPos:linalg.PointF, pointerIdx:u8),
-    pointer_up: proc (self:^button, pointerPos:linalg.PointF, pointerIdx:u8),
-    pointer_move: proc (self:^button, pointerPos:linalg.PointF, pointerIdx:u8),
+    button_up: proc (self:^button, mousePos:linalg.point),
+    button_down: proc (self:^button, mousePos:linalg.point),
+    button_move: proc (self:^button, mousePos:linalg.point),
+    pointer_down: proc (self:^button, pointerPos:linalg.point, pointerIdx:u8),
+    pointer_up: proc (self:^button, pointerPos:linalg.point, pointerIdx:u8),
+    pointer_move: proc (self:^button, pointerPos:linalg.point, pointerIdx:u8),
 }
 
 @private image_button_vtable :button_vtable = button_vtable {
@@ -180,8 +180,8 @@ Inputs:
 Returns:
 - None
 */
-image_button_init :: proc(self:^image_button, $actualType:typeid, pos:linalg.Point3DF,
-rotation:f32 = 0.0, scale:linalg.PointF = {1,1}, colorTransform:^engine.color_transform = nil, pivot:linalg.PointF = {0.0, 0.0},
+image_button_init :: proc(self:^image_button, $actualType:typeid, pos:linalg.point3d,
+rotation:f32 = 0.0, scale:linalg.point = {1,1}, colorTransform:^engine.color_transform = nil, pivot:linalg.point = {0.0, 0.0},
 up:^engine.texture = nil, over:^engine.texture = nil, down:^engine.texture = nil, vtable:^button_vtable = nil) where intrinsics.type_is_subtype_of(actualType, image_button) {
     self.up_texture = up
     self.over_texture = over
@@ -262,8 +262,8 @@ Inputs:
 Returns:
 - None
 */
-shape_button_init :: proc(self:^shape_button, $actualType:typeid, pos:linalg.Point3DF,
-rotation:f32 = 0.0, scale:linalg.PointF = {1,1}, colorTransform:^engine.color_transform = nil, pivot:linalg.PointF = {0.0, 0.0},
+shape_button_init :: proc(self:^shape_button, $actualType:typeid, pos:linalg.point3d,
+rotation:f32 = 0.0, scale:linalg.point = {1,1}, colorTransform:^engine.color_transform = nil, pivot:linalg.point = {0.0, 0.0},
 up:^shape.shape_src = nil, over:^shape.shape_src = nil, down:^shape.shape_src = nil, vtable:^button_vtable = nil) where intrinsics.type_is_subtype_of(actualType, shape_button) {
     self.up_shape_src = up
     self.over_shape_src = over

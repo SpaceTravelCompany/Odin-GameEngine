@@ -30,15 +30,15 @@ stroke_style :: struct {
 }
 
 shape_vertex2d :: struct #align(1) {
-    pos: linalg.PointF,
-    uvw: linalg.Point3DF,
-    color: linalg.Point3DwF,
+    pos: linalg.point,
+    uvw: linalg.point3d,
+    color: linalg.point3dw,
 };
 
 raw_shape :: struct {
     vertices : []shape_vertex2d,
     indices:[]u32,
-    rect:linalg.RectF,
+    rect:linalg.rect,
 }
 
 curve_type :: enum {
@@ -72,18 +72,18 @@ shape_error :: union #shared_nil {
 }
 
 shape_line :: struct {
-    start: linalg.PointF,
-    control0: linalg.PointF,
-    control1: linalg.PointF,
-    end: linalg.PointF,
+    start: linalg.point,
+    control0: linalg.point,
+    control1: linalg.point,
+    end: linalg.point,
     /// default value 'Unknown' recongnises curve type 'cubic'
     type: curve_type,
 }
 
 shape_node :: struct {
     lines: []shape_line,
-    color: linalg.Point3DwF,
-    stroke_color: linalg.Point3DwF,
+    color: linalg.point3dw,
+    stroke_color: linalg.point3dw,
     thickness: f32,
 }
 
@@ -91,11 +91,113 @@ shapes :: struct {
     nodes: []shape_node,
 }
 
-CvtQuadraticToCubic0 :: #force_inline proc "contextless" (_start : linalg.PointF, _control : linalg.PointF) -> linalg.PointF {
-    return linalg.PointF{ _start.x + (2.0/3.0) * (_control.x - _start.x), _start.y + (2.0/3.0) * (_control.y - _start.y) }
+CvtQuadraticToCubic0 :: #force_inline proc "contextless" (_start : linalg.point, _control : linalg.point) -> linalg.point {
+    return linalg.point{ _start.x + (2.0/3.0) * (_control.x - _start.x), _start.y + (2.0/3.0) * (_control.y - _start.y) }
 }
-CvtQuadraticToCubic1 :: #force_inline proc "contextless" (_end : linalg.PointF, _control : linalg.PointF) -> linalg.PointF {
+CvtQuadraticToCubic1 :: #force_inline proc "contextless" (_end : linalg.point, _control : linalg.point) -> linalg.point {
     return CvtQuadraticToCubic0(_end, _control)
+}
+
+line_init :: proc "contextless" (_start: linalg.point, _end: linalg.point) -> shape_line {
+	return shape_line{
+		start = _start,
+		control0 = {},
+		control1 = {},
+		end = _end,
+		type = .Line,
+	}
+}
+
+quadratic_init :: proc "contextless" (_start: linalg.point, _control01: linalg.point, _end: linalg.point) -> shape_line {
+	return shape_line{
+		start = _start,
+		control0 = CvtQuadraticToCubic0(_start, _control01),
+		control1 = CvtQuadraticToCubic1(_end, _control01),
+		end = _end,
+		type = .Quadratic,
+	}
+}
+
+cubic_init :: proc "contextless" (_start: linalg.point, _control0: linalg.point, _control1: linalg.point, _end: linalg.point) -> shape_line {
+	return shape_line{
+		start = _start,
+		control0 = _control0,
+		control1 = _control1,
+		end = _end,
+		type = .Unknown,
+	}
+}
+
+rect_line_init :: proc "contextless" (_rect: linalg.rect) -> [4]shape_line {
+	return [4]shape_line{
+		line_init(linalg.point{_rect.left, _rect.top}, linalg.point{_rect.right, _rect.top}),
+		line_init(linalg.point{_rect.right, _rect.top}, linalg.point{_rect.right, _rect.bottom}),
+		line_init(linalg.point{_rect.right, _rect.bottom}, linalg.point{_rect.left, _rect.bottom}),
+		line_init(linalg.point{_rect.left, _rect.bottom}, linalg.point{_rect.left, _rect.top}),
+	}
+}
+
+circle_cubic_init :: proc "contextless" (_center: linalg.point, _r: f32) -> [4]shape_line {
+	t: f32 = (4.0 / 3.0) * math.tan_f32(math.PI / 8.0)
+	tt := t * _r
+	return [4]shape_line{
+		shape_line{
+			start = linalg.point{_center.x - _r, _center.y},
+			control0 = linalg.point{_center.x - _r, _center.y + tt},
+			control1 = linalg.point{_center.x - tt, _center.y + _r},
+			end = linalg.point{_center.x, _center.y + _r},
+		},
+		shape_line{
+			start = linalg.point{_center.x, _center.y + _r},
+			control0 = linalg.point{_center.x + tt, _center.y + _r},
+			control1 = linalg.point{_center.x + _r, _center.y + tt},
+			end = linalg.point{_center.x + _r, _center.y},
+		},
+		shape_line{
+			start = linalg.point{_center.x + _r, _center.y},
+			control0 = linalg.point{_center.x + _r, _center.y - tt},
+			control1 = linalg.point{_center.x + tt, _center.y - _r},
+			end = linalg.point{_center.x, _center.y - _r},
+		},
+		shape_line{
+			start = linalg.point{_center.x, _center.y - _r},
+			control0 = linalg.point{_center.x - tt, _center.y - _r},
+			control1 = linalg.point{_center.x - _r, _center.y - tt},
+			end = linalg.point{_center.x - _r, _center.y},
+		},
+	}
+}
+
+ellipse_cubic_init :: proc "contextless" (_center: linalg.point, _rxy: linalg.point) -> [4]shape_line {
+	t: f32 = (4.0 / 3.0) * math.tan_f32(math.PI / 8.0)
+	ttx := t * _rxy.x
+	tty := t * _rxy.y
+	return [4]shape_line{
+		shape_line{
+			start = linalg.point{_center.x - _rxy.x, _center.y},
+			control0 = linalg.point{_center.x - _rxy.x, _center.y + tty},
+			control1 = linalg.point{_center.x - ttx, _center.y + _rxy.y},
+			end = linalg.point{_center.x, _center.y + _rxy.y},
+		},
+		shape_line{
+			start = linalg.point{_center.x, _center.y + _rxy.y},
+			control0 = linalg.point{_center.x + ttx, _center.y + _rxy.y},
+			control1 = linalg.point{_center.x + _rxy.x, _center.y + tty},
+			end = linalg.point{_center.x + _rxy.x, _center.y},
+		},
+		shape_line{
+			start = linalg.point{_center.x + _rxy.x, _center.y},
+			control0 = linalg.point{_center.x + _rxy.x, _center.y - tty},
+			control1 = linalg.point{_center.x + ttx, _center.y - _rxy.y},
+			end = linalg.point{_center.x, _center.y - _rxy.y},
+		},
+		shape_line{
+			start = linalg.point{_center.x, _center.y - _rxy.y},
+			control0 = linalg.point{_center.x - ttx, _center.y - _rxy.y},
+			control1 = linalg.point{_center.x - _rxy.x, _center.y - tty},
+			end = linalg.point{_center.x - _rxy.x, _center.y},
+		},
+	}
 }
 
 /*
@@ -225,8 +327,8 @@ LineSplitLine :: proc "contextless" (pts:[2][$N]$T, t:T) -> (outPts1:[2][N]T, ou
     vertList:^[dynamic]shape_vertex2d,
     indList:^[dynamic]u32,
     outPoly:^[dynamic]CurveStruct,
-    color:linalg.Point3DwF,
-    pts:[]linalg.PointF,
+    color:linalg.point3dw,
+    pts:[]linalg.point,
     type:curve_type,
     _subdiv :f32 = 0.0,
     _repeat :int = -1) -> shape_error {
@@ -238,7 +340,7 @@ LineSplitLine :: proc "contextless" (pts:[2][$N]$T, t:T) -> (outPts1:[2][N]T, ou
 
     pts2 : [4][2]f32
     pts_:[4][2]f32
-    intrinsics.mem_copy_non_overlapping(&pts_[0], &pts[0], len(pts) * size_of(linalg.PointF))
+    intrinsics.mem_copy_non_overlapping(&pts_[0], &pts[0], len(pts) * size_of(linalg.point))
 
     reverse := false
     outD:[3]f32 = {0, 0, 0}
@@ -453,7 +555,7 @@ LineSplitLine :: proc "contextless" (pts:[2][$N]$T, t:T) -> (outPts1:[2][N]T, ou
       F = reverseOrientation(F)
     }
 
-    appendLine :: proc (vertList:^[dynamic]shape_vertex2d, indList:^[dynamic]u32, color:linalg.Point3DwF, pts:[]linalg.PointF, F:matrix[4,4]f32) {
+    appendLine :: proc (vertList:^[dynamic]shape_vertex2d, indList:^[dynamic]u32, color:linalg.point3dw, pts:[]linalg.point, F:matrix[4,4]f32) {
         if len(pts) == 2 {
             return
         }
@@ -557,7 +659,7 @@ LineSplitLine :: proc "contextless" (pts:[2][$N]$T, t:T) -> (outPts1:[2][N]T, ou
 }
 
 @(private="file") CurveStruct :: struct {
-    p:linalg.PointF,
+    p:linalg.point,
     isCurve:bool,
 }
 
@@ -591,7 +693,7 @@ shapes_compute_polygon :: proc(poly:^shapes, allocator := context.allocator) -> 
 
     shapes_compute_polygon_in :: proc(vertList:^[dynamic]shape_vertex2d, indList:^[dynamic]u32, poly:^shapes, allocator : runtime.Allocator, arena : mem.Allocator) -> (err:shape_error = nil) {	
         outPoly:[][dynamic]CurveStruct = mem.make_non_zeroed([][dynamic]CurveStruct, len(poly.nodes), 64, arena)
-        outPoly2:[dynamic]linalg.PointF = mem.make_non_zeroed([dynamic]linalg.PointF, arena)
+        outPoly2:[dynamic]linalg.point = mem.make_non_zeroed([dynamic]linalg.point, arena)
         outPoly2N:[]u32 = mem.make_non_zeroed([]u32, len(poly.nodes), 64, arena)
         for &o in outPoly {
             o = make([dynamic]CurveStruct, arena)
@@ -604,7 +706,7 @@ shapes_compute_polygon :: proc(poly:^shapes, allocator := context.allocator) -> 
 					if line.type == .Line {
 						non_zero_append(&outPoly[poly_idx], CurveStruct{line.start, false})
 					} else if line.type == .Quadratic {
-						pts := [4]linalg.PointF{line.start, line.control0, line.control1, line.end}
+						pts := [4]linalg.point{line.start, line.control0, line.control1, line.end}
 						err = _Shapes_ComputeLine(
 							vertList,
 							indList,
@@ -614,7 +716,7 @@ shapes_compute_polygon :: proc(poly:^shapes, allocator := context.allocator) -> 
 							.Quadratic, 0.5)
 						if err != nil do return
 					} else {
-						pts := [4]linalg.PointF{line.start, line.control0, line.control1, line.end}
+						pts := [4]linalg.point{line.start, line.control0, line.control1, line.end}
 						err = _Shapes_ComputeLine(
 							vertList,
 							indList,
@@ -633,7 +735,7 @@ shapes_compute_polygon :: proc(poly:^shapes, allocator := context.allocator) -> 
             if len(ps) == 0 do continue
             np :u32 = 0
 
-            pT := mem.make_non_zeroed_dynamic_array([dynamic]linalg.PointF, arena )
+            pT := mem.make_non_zeroed_dynamic_array([dynamic]linalg.point, arena )
             defer delete(pT)
             for p in ps {
                 if !p.isCurve {
@@ -730,7 +832,7 @@ shapes_compute_polygon :: proc(poly:^shapes, allocator := context.allocator) -> 
             if node.stroke_color.a > 0 && node.thickness > 0 {
                 line_idx :u32 = 0
 				// 폴리곤의 점들을 수집
-				poly_points := mem.make_non_zeroed_dynamic_array([dynamic]linalg.PointF, arena)
+				poly_points := mem.make_non_zeroed_dynamic_array([dynamic]linalg.point, arena)
 				
 				node_len :u32 = auto_cast len(node.lines)
 				for i:u32 = 0; i < node_len; i += 1 {

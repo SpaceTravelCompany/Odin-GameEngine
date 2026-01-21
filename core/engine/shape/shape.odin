@@ -21,7 +21,7 @@ shape_src :: struct {
     //?vertexBuf, indexBuf에 check_init: ICheckInit 있으므로 따로 필요없음
     vertexBuf:engine.__vertex_buf(geometry.shape_vertex2d),
     indexBuf:engine.__index_buf,
-    rect:linalg.RectF,
+    rect:linalg.rect,
 }
 
 /*
@@ -40,8 +40,8 @@ shape :: struct {
 }
 
 
-shape_init :: proc(self:^shape, $actualType:typeid, src:^shape_src, pos:linalg.Point3DF,
-rotation:f32 = 0.0, scale:linalg.PointF = {1,1}, colorTransform:^engine.color_transform = nil, pivot:linalg.PointF = {0.0, 0.0}, vtable:^engine.iobject_vtable = nil)
+shape_init :: proc(self:^shape, $actualType:typeid, src:^shape_src, pos:linalg.point3d,
+rotation:f32 = 0.0, scale:linalg.point = {1,1}, colorTransform:^engine.color_transform = nil, pivot:linalg.point = {0.0, 0.0}, vtable:^engine.iobject_vtable = nil)
  where intrinsics.type_is_subtype_of(actualType, shape) {
     self.src = src
 
@@ -97,10 +97,10 @@ shape_get_src :: #force_inline proc "contextless" (self:^shape) -> ^shape_src {
 shape_get_color_transform :: #force_inline proc "contextless" (self:^shape) -> ^engine.color_transform {
     return engine.iobject_get_color_transform(self)
 }
-shape_update_transform :: #force_inline proc(self:^shape, pos:linalg.Point3DF, rotation:f32, scale:linalg.PointF = {1,1}, pivot:linalg.PointF = {0.0,0.0}) {
+shape_update_transform :: #force_inline proc(self:^shape, pos:linalg.point3d, rotation:f32, scale:linalg.point = {1,1}, pivot:linalg.point = {0.0,0.0}) {
     engine.iobject_update_transform(self, pos, rotation, scale, pivot)
 }
-shape_update_transform_matrix_raw :: #force_inline proc(self:^shape, _mat:linalg.Matrix) {
+shape_update_transform_matrix_raw :: #force_inline proc(self:^shape, _mat:linalg.matrix44) {
     engine.iobject_update_transform_matrix_raw(self, _mat)
 }
 shape_change_color_transform :: #force_inline proc(self:^shape, colorTransform:^engine.color_transform) {

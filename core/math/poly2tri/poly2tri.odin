@@ -66,7 +66,7 @@ Trianguate_Error :: enum {
 }
 
 @(private = "file") PointE :: struct {
-    using _: linalg.PointF,
+    using _: linalg.point,
     edges:[dynamic]^Edge,
     id: u32,
 }
@@ -109,7 +109,7 @@ Trianguate_Error :: enum {
     return AdvancingFront{head = head, tail = tail, search = head}
 }
 
-@(private = "file") PointE_Init :: proc(point: linalg.PointF, id:u32) -> PointE {
+@(private = "file") PointE_Init :: proc(point: linalg.point, id:u32) -> PointE {
     return PointE{x = point.x, y = point.y, id = id, edges = mem.make_non_zeroed_dynamic_array([dynamic]^Edge, context.temp_allocator)}
 }
 
@@ -870,7 +870,7 @@ Trianguate_Error :: enum {
     return true
 }
 
-TrianguateSinglePolygon :: proc(poly:[]linalg.PointF, baseIdx:[]u32, holes:[][]linalg.PointF = nil, allocator := context.allocator) -> (indices:[]u32, err:Trianguate_Error = .None) {
+TrianguateSinglePolygon :: proc(poly:[]linalg.point, baseIdx:[]u32, holes:[][]linalg.point = nil, allocator := context.allocator) -> (indices:[]u32, err:Trianguate_Error = .None) {
     ctx := TriangleCtx{allocator = allocator}
    
     if holes == nil {
@@ -952,8 +952,8 @@ TrianguateSinglePolygon :: proc(poly:[]linalg.PointF, baseIdx:[]u32, holes:[][]l
     dx:f32 = kAlpha * (ctx.xmax - ctx.xmin)
     dy:f32 = kAlpha * (ctx.ymax - ctx.ymin)
 
-    head :PointE = PointE_Init(linalg.PointF{ ctx.xmin - dx, ctx.ymin - dy }, max(u32))//!not use id
-    tail :PointE = PointE_Init(linalg.PointF{ ctx.xmax + dx, ctx.ymin - dy }, max(u32))
+    head :PointE = PointE_Init(linalg.point{ ctx.xmin - dx, ctx.ymin - dy }, max(u32))//!not use id
+    tail :PointE = PointE_Init(linalg.point{ ctx.xmax + dx, ctx.ymin - dy }, max(u32))
     defer {
         delete(head.edges)
         delete(tail.edges)
@@ -1244,7 +1244,7 @@ TrianguateSinglePolygon :: proc(poly:[]linalg.PointF, baseIdx:[]u32, holes:[][]l
 }
 
 
-TrianguatePolygons :: proc(poly:[]linalg.PointF,  nPoly:[]u32, allocator := context.allocator) -> (indices:[]u32, err:Trianguate_Error = .None) {
+TrianguatePolygons :: proc(poly:[]linalg.point,  nPoly:[]u32, allocator := context.allocator) -> (indices:[]u32, err:Trianguate_Error = .None) {
     indices_ := mem.make_non_zeroed_dynamic_array([dynamic]u32, allocator)
     
     idx :u32 = 0
@@ -1252,7 +1252,7 @@ TrianguatePolygons :: proc(poly:[]linalg.PointF,  nPoly:[]u32, allocator := cont
         isHole := linalg.GetPolygonOrientation( poly[idx:idx+nPoly[n]]) == .Clockwise
 
         if !isHole {
-            holes := mem.make_non_zeroed_dynamic_array([dynamic][]linalg.PointF, context.temp_allocator)
+            holes := mem.make_non_zeroed_dynamic_array([dynamic][]linalg.point, context.temp_allocator)
             holeIndices := mem.make_non_zeroed_dynamic_array([dynamic]u32, context.temp_allocator)
             defer delete(holes)
             defer delete(holeIndices)

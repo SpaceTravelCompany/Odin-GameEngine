@@ -38,8 +38,8 @@ tile_image :: struct {
     deinit = auto_cast _super_tile_image_deinit,
 }
 
-tile_image_init :: proc(self:^tile_image, $actualType:typeid, src:^tile_texture_array, pos:linalg.Point3DF, rotation:f32, scale:linalg.PointF = {1,1}, 
-colorTransform:^engine.color_transform = nil, pivot:linalg.PointF = {0, 0}, vtable:^engine.iobject_vtable = nil) where intrinsics.type_is_subtype_of(actualType, tile_image) {
+tile_image_init :: proc(self:^tile_image, $actualType:typeid, src:^tile_texture_array, pos:linalg.point3d, rotation:f32, scale:linalg.point = {1,1}, 
+colorTransform:^engine.color_transform = nil, pivot:linalg.point = {0, 0}, vtable:^engine.iobject_vtable = nil) where intrinsics.type_is_subtype_of(actualType, tile_image) {
     self.src = src
 
     self.set.bindings = engine.descriptor_set_binding__animate_img_uniform_pool[:]
@@ -163,11 +163,11 @@ tile_image_get_color_transform :: proc "contextless" (self:^tile_image) -> ^engi
     return engine.iobject_get_color_transform(self)
 }
 
-tile_image_update_transform :: #force_inline proc(self:^tile_image, pos:linalg.Point3DF, rotation:f32, scale:linalg.PointF = {1,1}, pivot:linalg.PointF = {0.0, 0.0}) {
+tile_image_update_transform :: #force_inline proc(self:^tile_image, pos:linalg.point3d, rotation:f32, scale:linalg.point = {1,1}, pivot:linalg.point = {0.0, 0.0}) {
     engine.iobject_update_transform(self, pos, rotation, scale, pivot)
 }
 
-tile_image_update_transform_matrix_raw :: #force_inline proc(self:^tile_image, _mat:linalg.Matrix) {
+tile_image_update_transform_matrix_raw :: #force_inline proc(self:^tile_image, _mat:linalg.matrix44) {
     engine.iobject_update_transform_matrix_raw(self, _mat)
 }
 

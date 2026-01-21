@@ -199,7 +199,7 @@ when library.is_android {
 		context = runtime.default_context()
 
 		MAX_POINTERS :: 20
-		@static pointer_poses:[MAX_POINTERS]linalg.PointF
+		@static pointer_poses:[MAX_POINTERS]linalg.point
 
 		type := android.AInputEvent_getType(evt)
 		src := android.AInputEvent_getSource(evt)
@@ -242,8 +242,8 @@ when library.is_android {
 
 				input_state.left_trigger = leftTrigger
 				input_state.right_trigger = rightTrigger
-				input_state.left_thumb = linalg.PointF{x, y}
-				input_state.right_thumb = linalg.PointF{z, rz}
+				input_state.left_thumb = linalg.point{x, y}
+				input_state.right_thumb = linalg.point{z, rz}
 
 				input_state.handle = transmute(rawptr)(int(android.AInputEvent_getDeviceId(evt)))
 				general_input_callback(input_state)
@@ -253,7 +253,7 @@ when library.is_android {
 
 				if toolType == .MOUSE {
 					count = 1
-					mm := linalg.PointF{android.AMotionEvent_getX(evt, 0), android.AMotionEvent_getY(evt, 0)}
+					mm := linalg.point{android.AMotionEvent_getX(evt, 0), android.AMotionEvent_getY(evt, 0)}
 					//mm = convert_mouse_pos(mm) //no need to convert anymore
 					__mouse_pos = mm
 
@@ -283,7 +283,7 @@ when library.is_android {
 
 				if act.action == .MOVE {
 					for i in 0 ..< count {
-						pt := linalg.PointF{android.AMotionEvent_getX(evt, i), android.AMotionEvent_getY(evt, i)}
+						pt := linalg.point{android.AMotionEvent_getX(evt, i), android.AMotionEvent_getY(evt, i)}
 						//pt = convert_mouse_pos(pt) //no need to convert anymore
 
 						if pt.x != pointer_poses[i].x || pt.y != pointer_poses[i].y {
@@ -296,7 +296,7 @@ when library.is_android {
 					}
 				} else {
 					for i in 0 ..< count {
-						pointer_poses[i] = linalg.PointF{android.AMotionEvent_getX(evt, i), android.AMotionEvent_getY(evt, i)}
+						pointer_poses[i] = linalg.point{android.AMotionEvent_getX(evt, i), android.AMotionEvent_getY(evt, i)}
 						//pointer_poses[i] = convert_mouse_pos(pointer_poses[i]) //no need to convert anymore
 					}
 					__mouse_pos = pointer_poses[0]

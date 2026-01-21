@@ -22,7 +22,7 @@ import "vendor:glfw"
 
 @private keys : [key_size]bool = { 0..<key_size = false }
 @private __is_mouse_out:bool
-@private __mouse_pos:linalg.PointF
+@private __mouse_pos:linalg.point
 //@private scroll_dt:int
 
 when library.is_mobile {
@@ -314,7 +314,7 @@ Gets the current mouse position
 Returns:
 - Current mouse position in window coordinates
 */
-mouse_pos :: #force_inline proc "contextless" () -> linalg.PointF {
+mouse_pos :: #force_inline proc "contextless" () -> linalg.point {
     return __mouse_pos
 }
 
@@ -324,8 +324,8 @@ general_input_state :: struct {
     handle:rawptr,
     left_trigger:f32,
     right_trigger:f32,
-    left_thumb: linalg.PointF,
-    right_thumb: linalg.PointF,
+    left_thumb: linalg.point,
+    right_thumb: linalg.point,
     buttons:general_input_buttons,
 }
 

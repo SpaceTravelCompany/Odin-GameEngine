@@ -341,8 +341,8 @@ custom_object_init :: proc(self:^custom_object, $actual_type:typeid,
     p_pipeline:^object_pipeline,
     pipeline_p_sets:[]^engine.descriptor_set,
     pipeline_set_idx:int = 0,
-    pos:linalg.Point3DF, rotation:f32, scale:linalg.PointF = {1,1},
-    camera:^engine.camera, projection:^engine.projection, color_transform:^engine.color_transform = nil, pivot:linalg.PointF = {0.0, 0.0}, vtable:^engine.iobject_vtable = nil)
+    pos:linalg.point3d, rotation:f32, scale:linalg.point = {1,1},
+    camera:^engine.camera, projection:^engine.projection, color_transform:^engine.color_transform = nil, pivot:linalg.point = {0.0, 0.0}, vtable:^engine.iobject_vtable = nil)
     where intrinsics.type_is_subtype_of(actual_type, custom_object) {
 
     self.pipeline_p_sets = mem.make_non_zeroed_slice([]^engine.descriptor_set, len(pipeline_p_sets))

@@ -24,7 +24,7 @@ graphics_device :: #force_inline proc "contextless" () -> vk.Device {
 
 // Graphics State
 @private g_clear_color: [4]f32 = {0.0, 0.0, 0.0, 1.0}
-@private rotation_matrix: linalg.Matrix
+@private rotation_matrix: linalg.matrix44
 @private depth_fmt: texture_fmt
 
 
@@ -132,7 +132,7 @@ command_buffer :: struct #packed {
 }
 
 color_transform :: struct {
-	mat: linalg.Matrix,
+	mat: linalg.matrix44,
 	mat_uniform: iresource,
 	check_init: mem.ICheckInit,
 }
@@ -459,7 +459,7 @@ Inputs:
 Returns:
 - None
 */
-color_transform_init_matrix_raw :: proc(self: ^color_transform, mat: linalg.Matrix = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1}) {
+color_transform_init_matrix_raw :: proc(self: ^color_transform, mat: linalg.matrix44 = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1}) {
 	self.mat = mat
 	__color_transform_init(self)
 }
@@ -467,7 +467,7 @@ color_transform_init_matrix_raw :: proc(self: ^color_transform, mat: linalg.Matr
 @private __color_transform_init :: #force_inline proc(self: ^color_transform) {
 	mem.ICheckInit_Init(&self.check_init)
 	self.mat_uniform = buffer_resource_create_buffer({
-		len = size_of(linalg.Matrix),
+		len = size_of(linalg.matrix44),
 		type = .UNIFORM,
 		resource_usage = .CPU,
 	}, mem.ptr_to_bytes(&self.mat), true)
@@ -498,7 +498,7 @@ Inputs:
 Returns:
 - None
 */
-color_transform_update_matrix_raw :: proc(self: ^color_transform, _mat: linalg.Matrix) {
+color_transform_update_matrix_raw :: proc(self: ^color_transform, _mat: linalg.matrix44) {
 	mem.ICheckInit_Check(&self.check_init)
 	self.mat = _mat
 	buffer_resource_copy_update(self.mat_uniform, &self.mat)

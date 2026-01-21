@@ -5,17 +5,17 @@ import "base:intrinsics"
 import "core:math"
 import "core:mem"
 
-RectI :: Rect_(i32)
-RectU :: Rect_(u32)
-RectF :: Rect_(f32)
+recti :: Rect_(i32)
+rectu :: Rect_(u32)
+rect :: Rect_(f32)
 
-PointF :: Vector2f32
-Point3DF :: Vector3f32
-Point3DwF :: Vector4f32
-PointI :: [2]i32
-PointU :: [2]u32
-PointF64 :: [2]f64
-Matrix :: Matrix4x4f32
+point :: Vector2f32
+point3d :: Vector3f32
+point3dw :: Vector4f32
+pointi :: [2]i32
+pointu :: [2]u32
+pointf64 :: [2]f64
+matrix44 :: Matrix4x4f32
 
 
 Rect_ :: struct($T: typeid) where intrinsics.type_is_numeric(T) {
@@ -53,30 +53,30 @@ Check_Rect :: #force_inline proc "contextless" (_pts:[4][$N]f32) -> bool where N
 Multiplies a rectangle by a matrix. FAILED IF RESULT POINTS IS NOT RECTANGLE.
 Inputs:
 - _r: Rectangle to multiply
-- _mat: Matrix to multiply
+- _mat: matrix44 to multiply
 
 Returns:
 - Rectangle multiplied by the matrix
 - bool: true if the result is a rectangle, false if the result is a polygon
 */
-Rect_MulMatrix :: proc "contextless" (_r: RectF, _mat: Matrix) -> (RectF, bool) {
+Rect_MulMatrix :: proc "contextless" (_r: rect, _mat: matrix44) -> (rect, bool) {
 	tps := __Rect_MulMatrix(_r, _mat)
 
 	if Check_Rect(tps) do return {}, false
 
-	return RectF{
+	return rect{
 		left = tps[0].x,
 		right = tps[3].x,
 		top = tps[0].y,
 		bottom = tps[3].y,
 	}, true
 }
-Rect_DivMatrix :: proc "contextless" (_r: RectF, _mat: Matrix) -> (RectF, bool) {
+Rect_DivMatrix :: proc "contextless" (_r: rect, _mat: matrix44) -> (rect, bool) {
 	// Apply inverse transform (Rect / M == Rect * inverse(M))
 	return Rect_MulMatrix(_r, inverse(_mat))
 }
 
-@private __Rect_MulMatrix :: proc "contextless" (_r: RectF, _mat: Matrix) -> [4]Vector4f32 {
+@private __Rect_MulMatrix :: proc "contextless" (_r: rect, _mat: matrix44) -> [4]Vector4f32 {
 	// Transform 4 corners, then rebuild AABB.
 	x0 := _r.left
 	y0 := _r.top
@@ -115,22 +115,22 @@ if return value is the polygon, it is allocated using allocator.
 
 Inputs:
 - _a: AreaF(Rectangle or polygon) to multiply
-- _mat: Matrix to multiply
+- _mat: matrix44 to multiply
 - allocator: Allocator to use
 
 Returns:
 - AreaF multiplied by the matrix
 */
-Area_MulMatrix :: proc (_a: AreaF, _mat: Matrix, allocator := context.allocator) -> AreaF {
+Area_MulMatrix :: proc (_a: AreaF, _mat: matrix44, allocator := context.allocator) -> AreaF {
 	switch &n in _a {
-	case RectF:
+	case rect:
 		res := __Rect_MulMatrix(n, _mat)
 		if Check_Rect(res) {
 			min_x := min(res[0].x, res[3].x)
 			max_x := max(res[0].x, res[3].x)
 			min_y := min(res[0].y, res[3].y)
 			max_y := max(res[0].y, res[3].y)
-			return RectF{
+			return rect{
 				left = min_x,
 				right = max_x,
 				top = max_y,
@@ -149,7 +149,7 @@ Area_MulMatrix :: proc (_a: AreaF, _mat: Matrix, allocator := context.allocator)
 	return {}
 }
 
-@private __Poly_MulMatrix :: proc (_p:[][$N]f32, _mat: Matrix, allocator := context.allocator) -> AreaF where N >= 2 {
+@private __Poly_MulMatrix :: proc (_p:[][$N]f32, _mat: matrix44, allocator := context.allocator) -> AreaF where N >= 2 {
 	res: [][2]f32 = mem.make_non_zeroed([][2]f32, len(_p), allocator)
 	for i in 0..<len(res) {
 		when N == 4 {
@@ -359,7 +359,7 @@ LineInPolygon :: proc "contextless" (a : [2]$T, b : [2]T, polygon : [][2]T, chec
 	//Points a, b must all be inside the polygon so that line a, b and polygon line segments do not intersect, so b does not need to be checked.
 	if checkInsideLine && PointInPolygon(a, polygon) do return true
 
-	res : PointF
+	res : point
 	ok:bool
 	for i in 0..<len(polygon) {
 		j := (i + 1) % len(polygon)

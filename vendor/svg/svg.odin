@@ -73,12 +73,12 @@ LINE :: struct {
 }
 
 POLYLINE :: struct {
-	points: []linalg.PointF,
+	points: []linalg.point,
 	_0:     FILL_AND_STROKE,
 }
 
 POLYGON :: struct {
-	points: []linalg.PointF,
+	points: []linalg.point,
 	_0:     FILL_AND_STROKE,
 }
 
@@ -285,8 +285,8 @@ svg_parser :: struct {
 
 @private __shapes_node :: struct {
 	lines:        [dynamic]geometry.shape_line,
-    color:        linalg.Point3DwF,
-    stroke_color: linalg.Point3DwF,
+    color:        linalg.point3dw,
+    stroke_color: linalg.point3dw,
     thickness:    f32,
 }
 
@@ -316,7 +316,7 @@ deinit :: proc(self: ^svg_parser) {
 	return nil
 }
 
-@private _parse_point :: proc "contextless" (points: string, inout_idx: ^int) -> (result: linalg.PointF, err: SVG_ERROR = nil) {
+@private _parse_point :: proc "contextless" (points: string, inout_idx: ^int) -> (result: linalg.point, err: SVG_ERROR = nil) {
 	check_two_more_dots :: proc "contextless" (points: string, inout_idx: int, nonidx: int) -> int {
 		found_dot := false
 		for idx in inout_idx..<nonidx {
@@ -385,12 +385,12 @@ deinit :: proc(self: ^svg_parser) {
 	}
 	
 	inout_idx^ = nonidx
-	result = linalg.PointF{x, y}
+	result = linalg.point{x, y}
 	return
 }
 
-@private _parse_points :: proc (points: string, allocator: mem.Allocator) -> (result: []linalg.PointF, err: SVG_ERROR) {
-	result_ := mem.make_non_zeroed([dynamic]linalg.PointF, context.temp_allocator)
+@private _parse_points :: proc (points: string, allocator: mem.Allocator) -> (result: []linalg.point, err: SVG_ERROR) {
+	result_ := mem.make_non_zeroed([dynamic]linalg.point, context.temp_allocator)
 	defer delete(result_)
 
 	i := 0
@@ -398,8 +398,8 @@ deinit :: proc(self: ^svg_parser) {
 		non_zero_append(&result_, _parse_point(points, &i) or_return)
 	}
 
-	result = mem.make_non_zeroed([]linalg.PointF, len(result_), allocator)
-	mem.copy_non_overlapping(&result[0], &result_[0], len(result_) * size_of(linalg.PointF))
+	result = mem.make_non_zeroed([]linalg.point, len(result_), allocator)
+	mem.copy_non_overlapping(&result[0], &result_[0], len(result_) * size_of(linalg.point))
 	return result, nil
 }
 
@@ -630,7 +630,7 @@ init_parse :: proc(svg_data: []u8, allocator: mem.Allocator = context.allocator)
 }
 
 @private _parse_path :: proc(shapes: ^[dynamic]__shapes_node, path: ^PATH, allocator: mem.Allocator) -> SVG_ERROR {
-	_read_path_p :: proc (str: string, idx: ^int, op: u8, cur: linalg.PointF) -> (result: linalg.PointF, err: SVG_ERROR) {
+	_read_path_p :: proc (str: string, idx: ^int, op: u8, cur: linalg.point) -> (result: linalg.point, err: SVG_ERROR) {
 		result = _parse_point(str, idx) or_return
 		result.y *= -1
 		if unicode.is_lower(rune(op)) {
@@ -660,7 +660,7 @@ init_parse :: proc(svg_data: []u8, allocator: mem.Allocator = context.allocator)
 		return
 	}
 	//arc first point parameter is rx,ry
-	_read_path_r :: proc (str: string, idx: ^int) -> (result: linalg.PointF, err: SVG_ERROR) {
+	_read_path_r :: proc (str: string, idx: ^int) -> (result: linalg.point, err: SVG_ERROR) {
 		result = _parse_point(str, idx) or_return
 		return
 	}
@@ -670,20 +670,11 @@ init_parse :: proc(svg_data: []u8, allocator: mem.Allocator = context.allocator)
 	if !(path.d != nil && (has_fill || has_stroke)) do return nil// empty path
 
 
-	g_line_init :: #force_inline proc "contextless" (start: linalg.PointF, end: linalg.PointF) -> geometry.shape_line {
-		return geometry.shape_line{start, {0, 0}, {0, 0}, end, .Line}
-	}
-	g_quadratic_init :: #force_inline proc "contextless" (start: linalg.PointF, control: linalg.PointF, end: linalg.PointF) -> geometry.shape_line {
-		return geometry.shape_line{start, geometry.CvtQuadraticToCubic0(start, control), geometry.CvtQuadraticToCubic1(end, control), end, .Quadratic}
-	}
-	g_cubic_init :: #force_inline proc "contextless" (start: linalg.PointF, control0: linalg.PointF, control1: linalg.PointF, end: linalg.PointF) -> geometry.shape_line {
-		return geometry.shape_line{start, control0, control1, end, .Unknown}
-	}
-	compare :: #force_inline proc "contextless" (a: linalg.PointF, b: linalg.PointF) -> bool {
-		return a[0] == b[0] && a[1] == b[1]
+	compare :: #force_inline proc "contextless" (a: linalg.point, b: linalg.point) -> bool {
+		return a.x == b.x && a.y == b.y
 	}
 
-	cur: linalg.PointF = {0, 0}
+	cur: linalg.point = {0, 0}
 	start: bool = false
 	line :geometry.shape_line
 
@@ -698,10 +689,10 @@ init_parse :: proc(svg_data: []u8, allocator: mem.Allocator = context.allocator)
 		if path.d.?[i] == 'Z' || path.d.?[i] == 'z' {
 			if len(shapes[cur_idx].lines) == 0 do return .INVALID_NODE
 			if start {
-				line = g_line_init(line.start, shapes[cur_idx].lines[0].start)
+				line = geometry.line_init(line.start, shapes[cur_idx].lines[0].start)
 				start = false
 			} else {
-				line = g_line_init(shapes[cur_idx].lines[len(shapes[cur_idx].lines) - 1].end, shapes[cur_idx].lines[0].start)
+				line = geometry.line_init(shapes[cur_idx].lines[len(shapes[cur_idx].lines) - 1].end, shapes[cur_idx].lines[0].start)
 			}
 			
 			if !compare(line.start, line.end) {
@@ -733,8 +724,8 @@ init_parse :: proc(svg_data: []u8, allocator: mem.Allocator = context.allocator)
 			break
 		}
 		
-		prevS: Maybe(linalg.PointF) = nil
-		prevT: Maybe(linalg.PointF) = nil
+		prevS: Maybe(linalg.point) = nil
+		prevT: Maybe(linalg.point) = nil
 
 		if op_ == nil do return .INVALID_NODE
 		
@@ -752,21 +743,21 @@ init_parse :: proc(svg_data: []u8, allocator: mem.Allocator = context.allocator)
 		case 'L', 'l':
 			if !start do return .INVALID_NODE
 			p := _read_path_p(path.d.?, &i, op_.?, cur) or_return
-			line = g_line_init(line.start, p)
+			line = geometry.line_init(line.start, p)
 			cur = p
 			prevS = nil
 			prevT = nil
 		case 'V', 'v':
 			if !start do return .INVALID_NODE
 			y := _read_path_fy(path.d.?, &i, op_.?, cur[1]) or_return
-			line = g_line_init(line.start, linalg.PointF{line.start[0], y})
+			line = geometry.line_init(line.start, linalg.point{line.start.x, y})
 			cur.y = y
 			prevS = nil
 			prevT = nil
 		case 'H', 'h':
 			if !start do return .INVALID_NODE
-			x := _read_path_fx(path.d.?, &i, op_.?, cur[0]) or_return
-			line = g_line_init(line.start, linalg.PointF{x, line.start[1]})
+			x := _read_path_fx(path.d.?, &i, op_.?, cur.x) or_return
+			line = geometry.line_init(line.start, linalg.point{x, line.start.y})
 			cur.x = x
 			prevS = nil
 			prevT = nil
@@ -775,7 +766,7 @@ init_parse :: proc(svg_data: []u8, allocator: mem.Allocator = context.allocator)
 			p := _read_path_p(path.d.?, &i, op_.?, cur) or_return
 			p2 := _read_path_p(path.d.?, &i, op_.?, cur) or_return
 
-			line = g_quadratic_init(line.start, p, p2)
+			line = geometry.quadratic_init(line.start, p, p2)
 			cur = p2
 			prevS = nil
 			prevT = p
@@ -785,9 +776,9 @@ init_parse :: proc(svg_data: []u8, allocator: mem.Allocator = context.allocator)
 			p2 := _read_path_p(path.d.?, &i, op_.?, cur) or_return
 			p3 := _read_path_p(path.d.?, &i, op_.?, cur) or_return
 			if compare(p, line.start) {
-				line = g_quadratic_init(line.start, p2, p3)
+				line = geometry.quadratic_init(line.start, p2, p3)
 			} else {
-				line = g_cubic_init(line.start, p, p2, p3)
+				line = geometry.cubic_init(line.start, p, p2, p3)
 			}
 
 			cur = p3
@@ -798,14 +789,14 @@ init_parse :: proc(svg_data: []u8, allocator: mem.Allocator = context.allocator)
 			if prevS == nil {
 				p := _read_path_p(path.d.?, &i, op_.?, cur) or_return
 				p2 := _read_path_p(path.d.?, &i, op_.?, cur) or_return
-				line = g_quadratic_init(line.start, p, p2)
+				line = geometry.quadratic_init(line.start, p, p2)
 				cur = p2
 				prevS = p
 			} else {
 				p := _read_path_p(path.d.?, &i, op_.?, cur) or_return
 				p0 := linalg.xy_mirror_point(cur, prevS.?)
 				p2 := _read_path_p(path.d.?, &i, op_.?, cur) or_return
-				line = g_cubic_init(line.start, p0, p, p2)
+				line = geometry.cubic_init(line.start, p0, p, p2)
 				cur = p2
 				prevS = p
 			}
@@ -814,10 +805,10 @@ init_parse :: proc(svg_data: []u8, allocator: mem.Allocator = context.allocator)
 			if !start do return .INVALID_NODE
 			p := _read_path_p(path.d.?, &i, op_.?, cur) or_return
 			if prevT == nil {
-				line = g_line_init(line.start, p)
+				line = geometry.line_init(line.start, p)
 			} else {
 				p0 := linalg.xy_mirror_point(cur, prevT.?)
-				line = g_quadratic_init(line.start, p0, p)
+				line = geometry.quadratic_init(line.start, p0, p)
 				cur = p
 				prevT = p0
 			}
@@ -844,7 +835,7 @@ init_parse :: proc(svg_data: []u8, allocator: mem.Allocator = context.allocator)
 			sin_val := math.sin(x_angle)
 			cos_val := math.cos(x_angle)
 
-			pp := linalg.PointF{
+			pp := linalg.point{
 				cos_val * (cur.x - end.x) / 2.0 + sin_val * (cur.y - end.y) / 2.0,
 				-sin_val * (cur.x - end.x) / 2.0 + cos_val * (cur.y - end.y) / 2.0,
 			}
@@ -853,19 +844,19 @@ init_parse :: proc(svg_data: []u8, allocator: mem.Allocator = context.allocator)
 			prevT = nil
 			if (pp.x == 0.0 && pp.y == 0.0) || (r.x == 0.0 || r.y == 0.0) {
 				end.y *= -1
-				line = g_line_init(line.start, end)
+				line = geometry.line_init(line.start, end)
 				cur = end
 			} else {
-				r = linalg.PointF{abs(r.x), abs(r.y)}
+				r = linalg.point{abs(r.x), abs(r.y)}
 
 				lambda := (pp.x * pp.x) / (r.x * r.x) + (pp.y * pp.y) / (r.y * r.y)
 
 				if lambda > 1 {
 					sqrt_lambda := math.sqrt(lambda)
-					r = linalg.PointF{r.x * sqrt_lambda, r.y * sqrt_lambda}
+					r = linalg.point{r.x * sqrt_lambda, r.y * sqrt_lambda}
 				}
-				r_sq := linalg.PointF{r.x * r.x, r.y * r.y}
-				pp_sq := linalg.PointF{pp.x * pp.x, pp.y * pp.y}
+				r_sq := linalg.point{r.x * r.x, r.y * r.y}
+				pp_sq := linalg.point{pp.x * pp.x, pp.y * pp.y}
 
 				radicant: f32 = r_sq.x * r_sq.y - r_sq.x * pp_sq.y - r_sq.y * pp_sq.x
 				if radicant < 0 do radicant = 0
@@ -876,35 +867,35 @@ init_parse :: proc(svg_data: []u8, allocator: mem.Allocator = context.allocator)
 					radicant = math.sqrt(radicant)
 				}
 
-				centerp := linalg.PointF{
+				centerp := linalg.point{
 					radicant * r.x / r.y * pp.y,
 					radicant * -r.y / r.x * pp.x,
 				}
-				center := linalg.PointF{
+				center := linalg.point{
 					cos_val * centerp.x - sin_val * centerp.y + (cur.x + end.x) / 2.0,
 					sin_val * centerp.x + cos_val * centerp.y + (cur.y + end.y) / 2.0,
 				}
 
-				v1: linalg.PointF = linalg.PointF{(pp.x - centerp.x) / r.x, (pp.y - centerp.y) / r.y}
-				v2: linalg.PointF = linalg.PointF{(-pp.x - centerp.x) / r.x, (-pp.y - centerp.y) / r.y}
+				v1: linalg.point = linalg.point{(pp.x - centerp.x) / r.x, (pp.y - centerp.y) / r.y}
+				v2: linalg.point = linalg.point{(-pp.x - centerp.x) / r.x, (-pp.y - centerp.y) / r.y}
 
-				vector_angle :: proc(u: linalg.PointF, v: linalg.PointF) -> f32 {
+				vector_angle :: proc(u: linalg.point, v: linalg.point) -> f32 {
 					sign: f32 = 0 > linalg.vector_cross2(u, v) ? -1 : 1
 					dot_ := linalg.dot(u, v)
 					dot_ = math.clamp(dot_, -1, 1)
 
 					return sign * math.acos(dot_)
 				}
-				map_to_ellipse :: proc(_in: linalg.PointF, _r: linalg.PointF, _cos: f32, _sin: f32, _center: linalg.PointF) -> linalg.PointF {
+				map_to_ellipse :: proc(_in: linalg.point, _r: linalg.point, _cos: f32, _sin: f32, _center: linalg.point) -> linalg.point {
 					__in := _in
-					__in = linalg.PointF{__in.x * _r.x, __in.y * _r.y}
-					return linalg.PointF{
+					__in = linalg.point{__in.x * _r.x, __in.y * _r.y}
+					return linalg.point{
 						_cos * __in.x - _sin * __in.y,
 						_sin * __in.x + _cos * __in.y,
 					} + _center
 				}
 
-				ang1 := vector_angle(linalg.PointF{1.0, 0.0}, v1)
+				ang1 := vector_angle(linalg.point{1.0, 0.0}, v1)
 				ang2 := vector_angle(v1, v2)
 
 				if !sweep && ang2 > 0 {
@@ -921,15 +912,15 @@ init_parse :: proc(svg_data: []u8, allocator: mem.Allocator = context.allocator)
 				for j in 0..<nseg {
 					_ = j
 					a := ang2 == 1.57079625 ? 0.551915024494 : (ang2 == -1.57079625 ? -0.551915024494 : 4.0 / 3.0 * math.tan(ang2 / 4.0))
-					xy1 := linalg.PointF{math.cos(ang1), math.sin(ang1)}
-					xy2 := linalg.PointF{math.cos(ang1 + ang2), math.sin(ang1 + ang2)}
-					ellipse_0 := map_to_ellipse(linalg.PointF{xy1.x - xy1.y * a, xy1.y + xy1.x * a}, r, cos_val, sin_val, center)
-					ellipse_1 := map_to_ellipse(linalg.PointF{xy2.x + xy2.y * a, xy2.y - xy2.x * a}, r, cos_val, sin_val, center)
-					ellipse_2 := map_to_ellipse(linalg.PointF{xy2.x, xy2.y}, r, cos_val, sin_val, center)
-					line = g_cubic_init(line.start, 
-						linalg.PointF{ellipse_0.x, -ellipse_0.y},
-						 linalg.PointF{ellipse_1.x, -ellipse_1.y},
-						  linalg.PointF{ellipse_2.x, -ellipse_2.y})
+					xy1 := linalg.point{math.cos(ang1), math.sin(ang1)}
+					xy2 := linalg.point{math.cos(ang1 + ang2), math.sin(ang1 + ang2)}
+					ellipse_0 := map_to_ellipse(linalg.point{xy1.x - xy1.y * a, xy1.y + xy1.x * a}, r, cos_val, sin_val, center)
+					ellipse_1 := map_to_ellipse(linalg.point{xy2.x + xy2.y * a, xy2.y - xy2.x * a}, r, cos_val, sin_val, center)
+					ellipse_2 := map_to_ellipse(linalg.point{xy2.x, xy2.y}, r, cos_val, sin_val, center)
+					line = geometry.cubic_init(line.start, 
+						linalg.point{ellipse_0.x, -ellipse_0.y},
+						linalg.point{ellipse_1.x, -ellipse_1.y},
+						linalg.point{ellipse_2.x, -ellipse_2.y})
 					non_zero_append(&shapes[cur_idx].lines, line)
 					line.start = line.end
 
@@ -947,8 +938,8 @@ init_parse :: proc(svg_data: []u8, allocator: mem.Allocator = context.allocator)
 			line.start = line.end
 		}
 	}
-	color__ := has_fill ? _parse_color(path._0.fill.?, path._0.fill_opacity) or_return : linalg.Point3DwF{0, 0, 0, 0}
-	stroke__ := has_stroke ? _parse_color(path._0.stroke.?, path._0.stroke_opacity) or_return : linalg.Point3DwF{0, 0, 0, 0}
+	color__ := has_fill ? _parse_color(path._0.fill.?, path._0.fill_opacity) or_return : linalg.point3dw{0, 0, 0, 0}
+	stroke__ := has_stroke ? _parse_color(path._0.stroke.?, path._0.stroke_opacity) or_return : linalg.point3dw{0, 0, 0, 0}
 	thickness__ := has_stroke ? path._0.stroke_width.? : 0
 	for i in start_idx..=cur_idx {
 		shapes[i].color = color__
@@ -960,26 +951,141 @@ init_parse :: proc(svg_data: []u8, allocator: mem.Allocator = context.allocator)
 }
 
 @private _parse_rect :: proc(shapes: ^[dynamic]__shapes_node, rect: ^RECT, allocator: mem.Allocator) -> SVG_ERROR {
+	has_stroke := rect._0.stroke != nil && rect._0.stroke_width != nil && rect._0.stroke_width.? > 0
+	has_fill := rect._0.fill != nil
+	if !(has_fill || has_stroke) do return nil// empty rect
+
+	node := __shapes_node{
+		lines = mem.make_non_zeroed([dynamic]geometry.shape_line, 0, 4,context.temp_allocator),
+		color = has_fill ? _parse_color(rect._0.fill.?, rect._0.fill_opacity) or_return : linalg.point3dw{0, 0, 0, 0},
+		stroke_color = has_stroke ? _parse_color(rect._0.stroke.?, rect._0.stroke_opacity) or_return : linalg.point3dw{0, 0, 0, 0},
+		thickness = has_stroke ? rect._0.stroke_width.? : 0.0,
+	}
+	res := geometry.rect_line_init(linalg.rect{
+		left = rect.x.?,
+		right = rect.x.? + rect.width.?,
+		top = -rect.y.?,
+		bottom = -rect.y.? - rect.height.?,
+	})
+	non_zero_append(&node.lines, ..res[0:4])
+	non_zero_append(shapes, node)
 	return nil
 }
 
 @private _parse_circle :: proc(shapes: ^[dynamic]__shapes_node, circle: ^CIRCLE, allocator: mem.Allocator) -> SVG_ERROR {
+	has_stroke := circle._0.stroke != nil && circle._0.stroke_width != nil && circle._0.stroke_width.? > 0
+	has_fill := circle._0.fill != nil
+	if !(has_fill || has_stroke) do return nil// empty circle
+
+	node := __shapes_node{
+		lines = mem.make_non_zeroed([dynamic]geometry.shape_line, 0, 4,context.temp_allocator),
+		color = has_fill ? _parse_color(circle._0.fill.?, circle._0.fill_opacity) or_return : linalg.point3dw{0, 0, 0, 0},
+		stroke_color = has_stroke ? _parse_color(circle._0.stroke.?, circle._0.stroke_opacity) or_return : linalg.point3dw{0, 0, 0, 0},
+		thickness = has_stroke ? circle._0.stroke_width.? : 0.0,
+	}
+	
+	res := geometry.circle_cubic_init(linalg.point{circle.cx.?, -circle.cy.?}, circle.r.?)
+	non_zero_append(&node.lines, ..res[0:4])
+	non_zero_append(shapes, node)
+
 	return nil
 }
 
 @private _parse_ellipse :: proc(shapes: ^[dynamic]__shapes_node, ellipse: ^ELLIPSE, allocator: mem.Allocator) -> SVG_ERROR {
+	has_stroke := ellipse._0.stroke != nil && ellipse._0.stroke_width != nil && ellipse._0.stroke_width.? > 0
+	has_fill := ellipse._0.fill != nil
+	if !(has_fill || has_stroke) do return nil// empty ellipse
+
+	node := __shapes_node{
+		lines = mem.make_non_zeroed([dynamic]geometry.shape_line, 0, 4,context.temp_allocator),
+		color = has_fill ? _parse_color(ellipse._0.fill.?, ellipse._0.fill_opacity) or_return : linalg.point3dw{0, 0, 0, 0},
+		stroke_color = has_stroke ? _parse_color(ellipse._0.stroke.?, ellipse._0.stroke_opacity) or_return : linalg.point3dw{0, 0, 0, 0},
+		thickness = has_stroke ? ellipse._0.stroke_width.? : 0.0,
+	}
+	
+	res := geometry.ellipse_cubic_init(linalg.point{ellipse.cx.?, -ellipse.cy.?}, linalg.point{ellipse.rx.?, ellipse.ry.?})
+	non_zero_append(&node.lines, ..res[0:4])
+	non_zero_append(shapes, node)
 	return nil
 }
 
 @private _parse_line :: proc(shapes: ^[dynamic]__shapes_node, line: ^LINE, allocator: mem.Allocator) -> SVG_ERROR {
+	has_stroke := line._0.stroke != nil && line._0.stroke_width != nil && line._0.stroke_width.? > 0
+	if !has_stroke do return nil// empty line
+	if line.x1 == nil || line.y1 == nil || line.x2 == nil || line.y2 == nil do return .INVALID_NODE
+
+	node := __shapes_node{
+		lines = mem.make_non_zeroed([dynamic]geometry.shape_line, 1, 1,context.temp_allocator),
+		color = linalg.point3dw{0, 0, 0, 0},
+		stroke_color = has_stroke ? _parse_color(line._0.stroke.?, line._0.stroke_opacity) or_return : linalg.point3dw{0, 0, 0, 0},
+		thickness = has_stroke ? line._0.stroke_width.? : 0.0,
+	}
+	node.lines[0] = geometry.line_init(linalg.point{line.x1.?, line.y1.?}, linalg.point{line.x2.?, line.y2.?})
+	non_zero_append(shapes, node)
 	return nil
 }
 
 @private _parse_polyline :: proc(shapes: ^[dynamic]__shapes_node, polyline: ^POLYLINE, allocator: mem.Allocator) -> SVG_ERROR {
+	has_stroke := polyline._0.stroke != nil && polyline._0.stroke_width != nil && polyline._0.stroke_width.? > 0
+	has_fill := polyline._0.fill != nil
+	if !(has_fill || has_stroke) do return nil// empty polyline
+	if polyline.points == nil do return .INVALID_NODE
+
+	node := __shapes_node{
+		lines = mem.make_non_zeroed([dynamic]geometry.shape_line, 0, len(polyline.points), context.temp_allocator),
+		color = has_fill ? _parse_color(polyline._0.fill.?, polyline._0.fill_opacity) or_return : linalg.point3dw{0, 0, 0, 0},
+		stroke_color = has_stroke ? _parse_color(polyline._0.stroke.?, polyline._0.stroke_opacity) or_return : linalg.point3dw{0, 0, 0, 0},
+		thickness = has_stroke ? polyline._0.stroke_width.? : 0.0,
+	}
+
+	cur: linalg.point
+	for p, i in polyline.points {
+		p_flipped := linalg.point{p.x, -p.y}
+		
+		if i > 0 {
+			non_zero_append(&node.lines, geometry.line_init(cur, p_flipped))
+		}
+		cur = p_flipped
+	}
+
+	if len(node.lines) == 0 do return .INVALID_NODE
+	non_zero_append(shapes, node)
 	return nil
 }
 
 @private _parse_polygon :: proc(shapes: ^[dynamic]__shapes_node, polygon: ^POLYGON, allocator: mem.Allocator) -> SVG_ERROR {
+	has_stroke := polygon._0.stroke != nil && polygon._0.stroke_width != nil && polygon._0.stroke_width.? > 0
+	has_fill := polygon._0.fill != nil
+	if !(has_fill || has_stroke) do return nil// empty polygon
+	if polygon.points == nil do return .INVALID_NODE
+
+	node := __shapes_node{
+		lines = mem.make_non_zeroed([dynamic]geometry.shape_line, 0, len(polygon.points) + 1, context.temp_allocator),
+		color = has_fill ? _parse_color(polygon._0.fill.?, polygon._0.fill_opacity) or_return : linalg.point3dw{0, 0, 0, 0},
+		stroke_color = has_stroke ? _parse_color(polygon._0.stroke.?, polygon._0.stroke_opacity) or_return : linalg.point3dw{0, 0, 0, 0},
+		thickness = has_stroke ? polygon._0.stroke_width.? : 0.0,
+	}
+
+	compare :: #force_inline proc "contextless" (a: linalg.point, b: linalg.point) -> bool {
+		return a.x == b.x && a.y == b.y
+	}
+
+	cur: linalg.point
+	for p in polygon.points {
+		p_flipped := linalg.point{p.x, -p.y}
+		
+		non_zero_append(&node.lines, geometry.line_init(cur, p_flipped))
+		cur = p_flipped
+	}
+
+	if len(node.lines) == 0 do return .INVALID_NODE
+	
+	// Close the polygon if the last point doesn't match the first point
+	if !compare(node.lines[len(node.lines) - 1].end, node.lines[0].start) {
+		non_zero_append(&node.lines, geometry.line_init(node.lines[len(node.lines) - 1].end, node.lines[0].start))
+	}
+	
+	non_zero_append(shapes, node)
 	return nil
 }
 
@@ -1004,9 +1110,9 @@ init_parse :: proc(svg_data: []u8, allocator: mem.Allocator = context.allocator)
 	return value, nil
 }
 
-@private _parse_color :: proc(color: string, opacity: Maybe(f32)) -> (result: linalg.Point3DwF, err: SVG_ERROR) {
+@private _parse_color :: proc(color: string, opacity: Maybe(f32)) -> (result: linalg.point3dw, err: SVG_ERROR) {
 	if color == "none" {
-		return linalg.Point3DwF{0, 0, 0, 0}, nil
+		return linalg.point3dw{0, 0, 0, 0}, nil
 	}
 
 	res: Maybe(u32)
@@ -1018,7 +1124,7 @@ init_parse :: proc(svg_data: []u8, allocator: mem.Allocator = context.allocator)
 			hex_str := color[1:]
 			hex_val, hex_ok := strconv.parse_u64_of_base(hex_str, 16)
 			if !hex_ok {
-				return linalg.Point3DwF{0, 0, 0, 0}, .INVALID_NODE
+				return linalg.point3dw{0, 0, 0, 0}, .INVALID_NODE
 			}
 			r := f32((hex_val >> 8) & 0xf) / 15.0
 			g := f32((hex_val >> 4) & 0xf) / 15.0
@@ -1033,7 +1139,7 @@ init_parse :: proc(svg_data: []u8, allocator: mem.Allocator = context.allocator)
 			hex_str := color[1:]
 			hex_val, hex_ok := strconv.parse_u64_of_base(hex_str, 16)
 			if !hex_ok {
-				return linalg.Point3DwF{0, 0, 0, 0}, .INVALID_NODE
+				return linalg.point3dw{0, 0, 0, 0}, .INVALID_NODE
 			}
 			r := f32((hex_val >> 16) & 0xff) / 255.0
 			g := f32((hex_val >> 8) & 0xff) / 255.0
@@ -1046,10 +1152,10 @@ init_parse :: proc(svg_data: []u8, allocator: mem.Allocator = context.allocator)
 		}
 	} else if len(color) >= 3 && color[:3] == "rgb" {
 		// TODO: rgb/rgba format
-		return linalg.Point3DwF{0, 0, 0, 0}, .UNSUPPORTED_FEATURE
+		return linalg.point3dw{0, 0, 0, 0}, .UNSUPPORTED_FEATURE
 	} else if len(color) >= 3 && color[:3] == "hsl" {
 		// TODO: hsl/hsla format
-		return linalg.Point3DwF{0, 0, 0, 0}, .UNSUPPORTED_FEATURE
+		return linalg.point3dw{0, 0, 0, 0}, .UNSUPPORTED_FEATURE
 	}
 
 	// Try to find CSS color name
@@ -1073,5 +1179,5 @@ init_parse :: proc(svg_data: []u8, allocator: mem.Allocator = context.allocator)
 		return linalg.Vector4f32{r, g, b, a}, nil
 	}
 
-	return linalg.Point3DwF{0, 0, 0, 0}, .INVALID_NODE
+	return linalg.point3dw{0, 0, 0, 0}, .INVALID_NODE
 }

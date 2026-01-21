@@ -72,8 +72,8 @@ Inputs:
 Returns:
 - None
 */
-image_init :: proc(self:^image, $actualType:typeid, src:^texture, pos:linalg.Point3DF,
-rotation:f32 = 0.0, scale:linalg.PointF = {1,1}, colorTransform:^color_transform = nil, pivot:linalg.PointF = {0.0, 0.0},
+image_init :: proc(self:^image, $actualType:typeid, src:^texture, pos:linalg.point3d,
+rotation:f32 = 0.0, scale:linalg.point = {1,1}, colorTransform:^color_transform = nil, pivot:linalg.point = {0.0, 0.0},
  vtable:^iobject_vtable = nil) where intrinsics.type_is_subtype_of(actualType, image) {
     self.src = src
         
@@ -163,10 +163,10 @@ image_get_color_transform :: proc "contextless" (self:^image) -> ^color_transfor
     return iobject_get_color_transform(self)
 }
 
-image_update_transform :: #force_inline proc(self:^image, pos:linalg.Point3DF, rotation:f32 = 0.0, scale:linalg.PointF = {1,1}, pivot:linalg.PointF = {0.0,0.0}) {
+image_update_transform :: #force_inline proc(self:^image, pos:linalg.point3d, rotation:f32 = 0.0, scale:linalg.point = {1,1}, pivot:linalg.point = {0.0,0.0}) {
     iobject_update_transform(self, pos, rotation, scale, pivot)
 }
-image_update_transform_matrix_raw :: #force_inline proc(self:^image, _mat:linalg.Matrix) {
+image_update_transform_matrix_raw :: #force_inline proc(self:^image, _mat:linalg.matrix44) {
     iobject_update_transform_matrix_raw(self, _mat)
 }
 // image_update_camera :: #force_inline proc(self:^image, camera:^camera) {
@@ -713,7 +713,7 @@ Inputs:
 Returns:
 - Adjusted point for pixel-perfect rendering
 */
-image_pixel_perfect_point :: proc "contextless" (img:^$ANY_IMAGE, p:linalg.PointF, canvasW:f32, canvasH:f32, pivot:image_center_pt_pos) -> linalg.PointF 
+image_pixel_perfect_point :: proc "contextless" (img:^$ANY_IMAGE, p:linalg.point, canvasW:f32, canvasH:f32, pivot:image_center_pt_pos) -> linalg.point 
 where is_any_image_type(ANY_IMAGE) {
     width := __windowWidth
     height := __windowHeight

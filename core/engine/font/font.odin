@@ -47,12 +47,12 @@ font :: struct {}
 
 
 font_render_opt :: struct {
-    scale:linalg.PointF,    //(0,0) -> (1,1)
-    offset:linalg.PointF,
-    pivot:linalg.PointF,
-    area:Maybe(linalg.PointF),
-    color:Maybe(linalg.Point3DwF),
-    stroke_color:linalg.Point3DwF,//if thickness == 0, ignore
+    scale:linalg.point,    //(0,0) -> (1,1)
+    offset:linalg.point,
+    pivot:linalg.point,
+    area:Maybe(linalg.point),
+    color:Maybe(linalg.point3dw),
+    stroke_color:linalg.point3dw,//if thickness == 0, ignore
     thickness:f32,//if 0, no stroke
     flag:engine.resource_usage,
 }
@@ -64,8 +64,8 @@ font_render_opt2 :: struct {
 
 font_render_range :: struct {
     font:^font,
-    scale:linalg.PointF,    //(0,0) -> (1,1)
-    color:linalg.Point3DwF,
+    scale:linalg.point,    //(0,0) -> (1,1)
+    color:linalg.point3dw,
     len:uint,
 }
 
@@ -187,10 +187,10 @@ font_set_scale :: proc(self:^font, scale:f32) {
 _renderOpt:font_render_opt2,
 vertList:^[dynamic]geometry.shape_vertex2d,
 indList:^[dynamic]u32,
-allocator : runtime.Allocator) -> (rect:linalg.RectF, err:geometry.shape_error = nil) {
+allocator : runtime.Allocator) -> (rect:linalg.rect, err:geometry.shape_error = nil) {
     i : int = 0
     opt := _renderOpt.opt
-    rectT : linalg.RectF
+    rectT : linalg.rect
     rect = linalg.Rect_Init(f32(0.0), 0.0, 0.0, 0.0)
 
     for r in _renderOpt.ranges {
@@ -214,12 +214,12 @@ allocator : runtime.Allocator) -> (rect:linalg.RectF, err:geometry.shape_error =
     _str:string,
     _renderOpt:font_render_opt,
     _vertArr:^[dynamic]geometry.shape_vertex2d,
-    _indArr:^[dynamic]u32) -> (pt:linalg.PointF, rect:linalg.RectF, err:geometry.shape_error = nil) {
+    _indArr:^[dynamic]u32) -> (pt:linalg.point, rect:linalg.rect, err:geometry.shape_error = nil) {
 
-    maxP : linalg.PointF = {min(f32), min(f32)}
-    minP : linalg.PointF = {max(f32), max(f32)}
+    maxP : linalg.point = {min(f32), min(f32)}
+    minP : linalg.point = {max(f32), max(f32)}
 
-    offset : linalg.PointF = {}
+    offset : linalg.point = {}
 
     sync.mutex_lock(&self.mutex)
     for s in _str {
@@ -238,7 +238,7 @@ allocator : runtime.Allocator) -> (rect:linalg.RectF, err:geometry.shape_error =
         _font_render_char(self, s, _vertArr, _indArr, &offset, _renderOpt.area, _renderOpt.scale,
              _renderOpt.color, _renderOpt.stroke_color, _renderOpt.thickness) or_return
         
-        maxP = math.max_array(maxP,linalg.PointF{offset.x, offset.y + f32(self.face.size.metrics.height) / (64.0 * self.scale) })
+        maxP = math.max_array(maxP,linalg.point{offset.x, offset.y + f32(self.face.size.metrics.height) / (64.0 * self.scale) })
     }
     sync.mutex_unlock(&self.mutex)
     if len(_vertArr) == 0 {
@@ -246,7 +246,7 @@ allocator : runtime.Allocator) -> (rect:linalg.RectF, err:geometry.shape_error =
         return
     }
 
-    size : linalg.PointF = _renderOpt.area != nil ? _renderOpt.area.? : (maxP - minP) * linalg.PointF{1,1}
+    size : linalg.point = _renderOpt.area != nil ? _renderOpt.area.? : (maxP - minP) * linalg.point{1,1}
 
     maxP = {min(f32), min(f32)}
     minP = {max(f32), max(f32)}
@@ -280,11 +280,11 @@ allocator : runtime.Allocator) -> (rect:linalg.RectF, err:geometry.shape_error =
     _char:rune,
     _vertArr:^[dynamic]geometry.shape_vertex2d,
     _indArr:^[dynamic]u32,
-    offset:^linalg.PointF,
-    area:Maybe(linalg.PointF),
-    scale:linalg.PointF,
-    color:Maybe(linalg.Point3DwF),
-    stroke_color:linalg.Point3DwF,
+    offset:^linalg.point,
+    area:Maybe(linalg.point),
+    scale:linalg.point,
+    color:Maybe(linalg.point3dw),
+    stroke_color:linalg.point3dw,
     thickness:f32,
 ) -> (shapeErr:geometry.shape_error = nil) {
     ok := FONT_KEY{_char, thickness} in self.char_array
@@ -294,7 +294,7 @@ allocator : runtime.Allocator) -> (rect:linalg.RectF, err:geometry.shape_error =
         data : ^font_user_data = auto_cast user
 		context = data.context_
 
-        data.pen = linalg.PointF{f32(to.x) / (64 * data.scale), f32(to.y) / (64 * data.scale)}
+        data.pen = linalg.point{f32(to.x) / (64 * data.scale), f32(to.y) / (64 * data.scale)}
 
         if data.lineCount > 0 {
             data.polygonCount += 1
@@ -306,7 +306,7 @@ allocator : runtime.Allocator) -> (rect:linalg.RectF, err:geometry.shape_error =
         data : ^font_user_data = auto_cast user
 		context = data.context_
 
-        end := linalg.PointF{f32(to.x) / (64 * data.scale), f32(to.y) / (64 * data.scale)}
+        end := linalg.point{f32(to.x) / (64 * data.scale), f32(to.y) / (64 * data.scale)}
     
         non_zero_append(&data.lines_da[data.polygonCount], geometry.shape_line{
             start = data.pen,
@@ -323,8 +323,8 @@ allocator : runtime.Allocator) -> (rect:linalg.RectF, err:geometry.shape_error =
         data : ^font_user_data = auto_cast user
 		context = data.context_
 
-        ctl := linalg.PointF{f32(control.x) / (64 * data.scale), f32(control.y) / (64 * data.scale)}
-        end := linalg.PointF{f32(to.x) / (64 * data.scale), f32(to.y) / (64 * data.scale)}
+        ctl := linalg.point{f32(control.x) / (64 * data.scale), f32(control.y) / (64 * data.scale)}
+        end := linalg.point{f32(to.x) / (64 * data.scale), f32(to.y) / (64 * data.scale)}
     
         non_zero_append(&data.lines_da[data.polygonCount], geometry.shape_line{
             start = data.pen,
@@ -341,9 +341,9 @@ allocator : runtime.Allocator) -> (rect:linalg.RectF, err:geometry.shape_error =
         data : ^font_user_data = auto_cast user
 		context = data.context_
 
-        ctl0 := linalg.PointF{f32(control0.x) / (64 * data.scale), f32(control0.y) / (64 * data.scale)}
-        ctl1 := linalg.PointF{f32(control1.x) / (64 * data.scale), f32(control1.y) / (64 * data.scale)}
-        end := linalg.PointF{f32(to.x) / (64 * data.scale), f32(to.y) / (64 * data.scale)}
+        ctl0 := linalg.point{f32(control0.x) / (64 * data.scale), f32(control0.y) / (64 * data.scale)}
+        ctl1 := linalg.point{f32(control1.x) / (64 * data.scale), f32(control1.y) / (64 * data.scale)}
+        end := linalg.point{f32(to.x) / (64 * data.scale), f32(to.y) / (64 * data.scale)}
     
         non_zero_append(&data.lines_da[data.polygonCount], geometry.shape_line{
             start = data.pen,
@@ -357,7 +357,7 @@ allocator : runtime.Allocator) -> (rect:linalg.RectF, err:geometry.shape_error =
         return 0
     }
     font_user_data :: struct {
-        pen : linalg.PointF,
+        pen : linalg.point,
         nodes : []geometry.shape_node,
 		lines_da:[][dynamic]geometry.shape_line,
         lineCount : u32,
@@ -454,8 +454,8 @@ allocator : runtime.Allocator) -> (rect:linalg.RectF, err:geometry.shape_error =
                 }
 				for i in 0..<data.polygonCount {
 					data.nodes[i].lines = data.lines_da[i][:]
-					data.nodes[i].color = linalg.Point3DwF{0,0,0,2}
-					data.nodes[i].stroke_color = linalg.Point3DwF{0,0,0,1}
+					data.nodes[i].color = linalg.point3dw{0,0,0,2}
+					data.nodes[i].stroke_color = linalg.point3dw{0,0,0,1}
 					data.nodes[i].thickness = thickness
 				}
                 poly := geometry.shapes{
@@ -471,8 +471,8 @@ allocator : runtime.Allocator) -> (rect:linalg.RectF, err:geometry.shape_error =
                 if shapeErr != nil do return
 
                 // if len(rawP.vertices) > 0 {
-                //     maxP :linalg.PointF = {min(f32), min(f32)}
-                //     minP :linalg.PointF = {max(f32), max(f32)}
+                //     maxP :linalg.point = {min(f32), min(f32)}
+                //     minP :linalg.point = {max(f32), max(f32)}
 
                 //     for v in rawP.vertices {
                 //         minP = math.min_array(minP, v.pos)
