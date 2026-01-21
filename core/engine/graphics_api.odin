@@ -304,11 +304,11 @@ Inputs:
 Returns:
 - None
 */
-allocate_command_buffers :: proc(p_cmd_buffer: [^]command_buffer, count: u32) {
+allocate_command_buffers :: proc(p_cmd_buffer: [^]command_buffer, count: u32, cmd_pool: vk.CommandPool) {
 	alloc_info := vk.CommandBufferAllocateInfo{
 		sType = vk.StructureType.COMMAND_BUFFER_ALLOCATE_INFO,
-		commandPool = vk_cmd_pool,
-		level = vk.CommandBufferLevel.PRIMARY,
+		commandPool = cmd_pool,
+		level = vk.CommandBufferLevel.SECONDARY,
 		commandBufferCount = count,
 	}
 	res := vk.AllocateCommandBuffers(graphics_device(), &alloc_info, auto_cast p_cmd_buffer)
@@ -325,8 +325,8 @@ Inputs:
 Returns:
 - None
 */
-free_command_buffers :: proc(p_cmd_buffer: [^]command_buffer, count: u32) {
-	vk.FreeCommandBuffers(graphics_device(), vk_cmd_pool, count, auto_cast p_cmd_buffer)
+free_command_buffers :: proc(p_cmd_buffer: [^]command_buffer, count: u32, cmd_pool: vk.CommandPool) {
+	vk.FreeCommandBuffers(graphics_device(), cmd_pool, count, auto_cast p_cmd_buffer)
 }
 
 // 파이프라인 바인딩

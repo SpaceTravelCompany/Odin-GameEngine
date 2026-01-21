@@ -1220,13 +1220,29 @@ vk_recreate_swap_chain :: proc() {
 
 	sync.mutex_unlock(&full_screen_mtx)
 
-	render_cmd_refresh_all()
 	render_cmd_size_all()
 	size()
-	if __g_main_render_cmd_idx >= 0 {
-		for obj in __g_render_cmd[__g_main_render_cmd_idx].scene {
-			iobject_size(auto_cast obj)
+	if len(__g_render_cmd) > 0 {
+		//thread pool 사용해서 각각 처리
+		size_task_data :: struct {
+			cmd: ^render_cmd,
 		}
+		
+		size_task_proc :: proc(task: thread.Task) {
+			data := cast(^size_task_data)task.data
+			for obj in data.cmd.scene {
+				iobject_size(auto_cast obj)
+			}
+		}
+		
+		// Add each render_cmd as a task to thread pool
+		for cmd in __g_render_cmd {
+			data := new(size_task_data, context.temp_allocator)
+			data.cmd = cmd
+			thread.pool_add_task(&g_thread_pool, context.temp_allocator, size_task_proc, data)
+		}
+		
+		thread.pool_finish(&g_thread_pool)
 	}
 }
 vk_create_surface :: vk_recreate_surface
@@ -1294,13 +1310,85 @@ vk_draw_frame :: proc() {
 		frame = 0
 		return
 	} else if res != .SUCCESS { trace.panic_log("AcquireNextImageKHR : ", res) }
-	
-	if __g_render_cmd != nil && __g_main_render_cmd_idx >= 0 {
-		sync.mutex_lock(&__g_render_cmd_mtx)
-		if __g_render_cmd[__g_main_render_cmd_idx].refresh[frame] {
-			__g_render_cmd[__g_main_render_cmd_idx].refresh[frame] = false
-			vk_record_command_buffer(__g_render_cmd[__g_main_render_cmd_idx], frame)
+
+	cmd_visible := false
+	sync.mutex_lock(&__g_render_cmd_mtx)
+	visible_commands := make([dynamic]^render_cmd, 0, len(__g_render_cmd), context.temp_allocator)
+	defer delete(visible_commands)
+	if __g_render_cmd != nil && len(__g_render_cmd) > 0 {
+		// Collect visible commands
+		for &cmd in __g_render_cmd {
+			if cmd.visible {
+				append(&visible_commands, cmd)
+				cmd_visible = true
+			}
 		}
+	}
+	
+	if cmd_visible {	
+		vk.BeginCommandBuffer(vk_cmd_buffer[frame], &vk.CommandBufferBeginInfo {
+			sType = vk.StructureType.COMMAND_BUFFER_BEGIN_INFO,
+			flags = {vk.CommandBufferUsageFlag.RENDER_PASS_CONTINUE},
+		})
+
+		clsColor :vk.ClearValue = {color = {float32 = g_clear_color}}
+		clsDepthStencil :vk.ClearValue = {depthStencil = {depth = 1.0, stencil = 0}}
+		renderPassBeginInfo := vk.RenderPassBeginInfo {
+			sType = vk.StructureType.RENDER_PASS_BEGIN_INFO,
+			renderPass = vk_render_pass,
+			framebuffer = vk_frame_buffers[imageIndex],
+			renderArea = {
+				offset = {x = 0, y = 0},
+				extent = vk_extent_rotation,	
+			},
+			clearValueCount = 2,
+			pClearValues = &([]vk.ClearValue{clsColor, clsDepthStencil})[0],
+		}
+		vk.CmdBeginRenderPass(vk_cmd_buffer[frame], &renderPassBeginInfo, vk.SubpassContents.SECONDARY_COMMAND_BUFFERS)
+		inheritanceInfo := vk.CommandBufferInheritanceInfo {
+			sType = vk.StructureType.COMMAND_BUFFER_INHERITANCE_INFO,
+			renderPass = vk_render_pass,
+			framebuffer = vk_frame_buffers[imageIndex],
+		}
+
+		record_task_data :: struct {
+			cmd: ^render_cmd,
+			frame: int,
+			imageIndex: u32,
+			inheritanceInfo: vk.CommandBufferInheritanceInfo,
+		}
+		
+		record_task_proc :: proc(task: thread.Task) {
+			data := cast(^record_task_data)task.data
+			vk_record_command_buffer(data.cmd, data.frame, data.imageIndex, data.inheritanceInfo)
+			free(data, context.temp_allocator)
+		}
+		
+		// Add tasks to thread pool
+		for cmd in visible_commands {
+			data := new(record_task_data, context.temp_allocator)
+			data.cmd = cmd
+			data.frame = frame
+			data.imageIndex = imageIndex
+			data.inheritanceInfo = inheritanceInfo
+			thread.pool_add_task(&g_thread_pool, context.temp_allocator, record_task_proc, data)
+		}
+		
+		thread.pool_finish(&g_thread_pool)
+
+		cmd_buffers := make([]vk.CommandBuffer, len(visible_commands), context.temp_allocator)
+		defer delete(cmd_buffers, context.temp_allocator)
+		for cmd, i in visible_commands {
+			cmd_buffers[i] = cmd.cmd.__handle
+		}
+		vk.CmdExecuteCommands(vk_cmd_buffer[frame], auto_cast len(cmd_buffers), &cmd_buffers[0])
+		vk.CmdEndRenderPass(vk_cmd_buffer[frame])
+		res = vk.EndCommandBuffer(vk_cmd_buffer[frame])
+		if res != .SUCCESS do trace.panic_log("EndCommandBuffer : ", res)
+
+		res = vk.ResetFences(vk_device, 1, &vk_in_flight_fence[frame])
+		if res != .SUCCESS do trace.panic_log("ResetFences : ", res)
+
 		waitStages := vk.PipelineStageFlags{.COLOR_ATTACHMENT_OUTPUT}
 		submitInfo := vk.SubmitInfo {
 			sType = vk.StructureType.SUBMIT_INFO,
@@ -1308,21 +1396,16 @@ vk_draw_frame :: proc() {
 			pWaitSemaphores = &vk_image_available_semaphore[frame],
 			pWaitDstStageMask = &waitStages,
 			commandBufferCount = 1,
-			pCommandBuffers = auto_cast &__g_render_cmd[__g_main_render_cmd_idx].cmds[frame][imageIndex],
+			pCommandBuffers = &vk_cmd_buffer[frame],
 			signalSemaphoreCount = 1,
 			pSignalSemaphores = &vk_render_finished_semaphore[frame][imageIndex],
 		}
-
-		res = vk.ResetFences(vk_device, 1, &vk_in_flight_fence[frame])
-		if res != .SUCCESS do trace.panic_log("ResetFences : ", res)
-
 		res = vk.QueueSubmit(vk_graphics_queue, 1, &submitInfo, vk_in_flight_fence[frame])
 		if res != .SUCCESS do trace.panic_log("QueueSubmit : ", res)
 
 		sync.mutex_unlock(&__g_render_cmd_mtx)
 	} else {
 		//?그릴 오브젝트가 없는 경우
-		sync.mutex_lock(&__g_render_cmd_mtx)
 		waitStages := vk.PipelineStageFlags{.COLOR_ATTACHMENT_OUTPUT}
 
 		clsColor :vk.ClearValue = {color = {float32 = g_clear_color}}
@@ -1573,82 +1656,62 @@ vk_end_single_time_cmd :: proc "contextless" (_cmd:vk.CommandBuffer)  {
 	vk.FreeCommandBuffers(vk_device, vk_cmd_pool, 1, &cmd)
 }
 
-vk_record_command_buffer :: proc(cmd:^render_cmd, frame:int) {
-	clsColor :vk.ClearValue = {color = {float32 = g_clear_color}}
-	clsDepthStencil :vk.ClearValue = {depthStencil = {depth = 1.0, stencil = 0}}
-	clsZero :vk.ClearValue = {depthStencil = {depth = 1.0, stencil = 0}}
-
-	for &c, i in cmd.cmds[frame] {
-		beginInfo := vk.CommandBufferBeginInfo {
-			sType = vk.StructureType.COMMAND_BUFFER_BEGIN_INFO,
-			flags = {},
-		}
-		res := vk.BeginCommandBuffer(c.__handle, &beginInfo)
-		if res != .SUCCESS do trace.panic_log("BeginCommandBuffer : ", res)
-
-		renderPassBeginInfo := vk.RenderPassBeginInfo {
-			sType = vk.StructureType.RENDER_PASS_BEGIN_INFO,
-			renderPass = vk_render_pass,
-			framebuffer = vk_frame_buffers[i],
-			renderArea = {
-				offset = {x = 0, y = 0},
-				extent = vk_extent_rotation,
-			},
-			clearValueCount = 2,
-			pClearValues = &([]vk.ClearValue{clsColor, clsDepthStencil})[0],
-		}
-
-		vk.CmdBeginRenderPass(c.__handle, &renderPassBeginInfo, vk.SubpassContents.INLINE)
-		
-
-		vp := vk.Viewport {
-			x = 0.0,
-			y = 0.0,
-			width = f32(vk_extent_rotation.width),
-			height = f32(vk_extent_rotation.height),
-			minDepth = 0.0,
-			maxDepth = 1.0,
-		}
-		vk.CmdSetViewport(c.__handle, 0, 1, &vp)
-
-		sync.mutex_lock(&cmd.obj_lock)
-		objs := mem.make_non_zeroed_slice([]^iobject, len(cmd.scene), context.temp_allocator)
-		copy_slice(objs, cmd.scene[:])
-		sync.mutex_unlock(&cmd.obj_lock)
-		defer delete(objs, context.temp_allocator)
-		
-		first := true
-		prev_area :Maybe(linalg.rect) = nil
-		for viewport in __g_viewports {
-			if first || prev_area != viewport.viewport_area {
-				scissor :vk.Rect2D
-				if viewport.viewport_area != nil {
-					if viewport.viewport_area.?.top <= viewport.viewport_area.?.bottom {
-						trace.panic_log("viewport.viewport_area.?.top <= viewport.viewport_area.?.bottom")
-					}
-					scissor = {
-						offset = {x = i32(viewport.viewport_area.?.left), y = i32(viewport.viewport_area.?.top)},
-						extent = {width = u32(viewport.viewport_area.?.right - viewport.viewport_area.?.left), height = u32(viewport.viewport_area.?.top - viewport.viewport_area.?.bottom)},
-					}
-				} else {
-					scissor = {
-						offset = {x = 0, y = 0},
-						extent = vk_extent_rotation,
-					}
-				}
-				vk.CmdSetScissor(c.__handle, 0, 1, &scissor)
-				first = false
-				prev_area = viewport.viewport_area
-			}
-			
-			for obj in objs {
-				iobject_draw(auto_cast obj, c, viewport)
-			}
-		}
-
-
-		vk.CmdEndRenderPass(c.__handle)
-		res = vk.EndCommandBuffer(c.__handle)
-		if res != .SUCCESS do trace.panic_log("EndCommandBuffer : ", res)
+vk_record_command_buffer :: proc(cmd:^render_cmd, frame:int, imageIndex:u32, _inheritanceInfo:vk.CommandBufferInheritanceInfo) {
+	inheritanceInfo := _inheritanceInfo
+	c := cmd.cmd
+	beginInfo := vk.CommandBufferBeginInfo {
+		sType = vk.StructureType.COMMAND_BUFFER_BEGIN_INFO,
+		flags = {vk.CommandBufferUsageFlag.RENDER_PASS_CONTINUE, vk.CommandBufferUsageFlag.ONE_TIME_SUBMIT},
+		pInheritanceInfo = &inheritanceInfo,
 	}
+
+	res := vk.BeginCommandBuffer(c.__handle, &beginInfo)
+	if res != .SUCCESS do trace.panic_log("BeginCommandBuffer : ", res)
+
+	vp := vk.Viewport {
+		x = 0.0,
+		y = 0.0,
+		width = f32(vk_extent_rotation.width),
+		height = f32(vk_extent_rotation.height),
+		minDepth = 0.0,
+		maxDepth = 1.0,
+	}
+	vk.CmdSetViewport(c.__handle, 0, 1, &vp)
+
+	sync.mutex_lock(&cmd.obj_lock)
+	objs := mem.make_non_zeroed_slice([]^iobject, len(cmd.scene), context.temp_allocator)
+	copy_slice(objs, cmd.scene[:])
+	sync.mutex_unlock(&cmd.obj_lock)
+	defer delete(objs, context.temp_allocator)
+	
+	first := true
+	prev_area :Maybe(linalg.rect) = nil
+	for viewport in __g_viewports {
+		if first || prev_area != viewport.viewport_area {
+			scissor :vk.Rect2D
+			if viewport.viewport_area != nil {
+				if viewport.viewport_area.?.top <= viewport.viewport_area.?.bottom {
+					trace.panic_log("viewport.viewport_area.?.top <= viewport.viewport_area.?.bottom")
+				}
+				scissor = {
+					offset = {x = i32(viewport.viewport_area.?.left), y = i32(viewport.viewport_area.?.top)},
+					extent = {width = u32(viewport.viewport_area.?.right - viewport.viewport_area.?.left), height = u32(viewport.viewport_area.?.top - viewport.viewport_area.?.bottom)},
+				}
+			} else {
+				scissor = {
+					offset = {x = 0, y = 0},
+					extent = vk_extent_rotation,
+				}
+			}
+			vk.CmdSetScissor(c.__handle, 0, 1, &scissor)
+			first = false
+			prev_area = viewport.viewport_area
+		}
+		
+		for obj in objs {
+			iobject_draw(auto_cast obj, c, viewport)
+		}
+	}
+	res = vk.EndCommandBuffer(c.__handle)
+	if res != .SUCCESS do trace.panic_log("EndCommandBuffer : ", res)
 }

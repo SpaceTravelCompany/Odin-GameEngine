@@ -13,16 +13,16 @@ Render command structure for managing render objects
 Manages a collection of objects to be rendered and their command buffers
 */
 render_cmd :: struct {
+	visible: bool,
 	scene: ^[dynamic]^iobject,
-    refresh:[MAX_FRAMES_IN_FLIGHT]bool,
-    cmds:[MAX_FRAMES_IN_FLIGHT][]command_buffer,
+    cmd:command_buffer,
     obj_lock:sync.Mutex,
 	check_init:mem.ICheckInit,
 	creation_allocator: runtime.Allocator,
+	cmd_pool: vk.CommandPool,
 }
 
 @private __g_render_cmd : [dynamic]^render_cmd = nil
-@private __g_main_render_cmd_idx : int = -1
 @private __g_render_cmd_mtx : sync.Mutex
 
 @private __g_viewports: [dynamic]^viewport = nil
@@ -42,22 +42,16 @@ Returns:
 */
 render_cmd_init :: proc(_scene: ^[dynamic]^iobject, allocator := context.allocator) -> (cmd: ^render_cmd, err: mem.Allocator_Error) #optional_allocator_error {
     cmd = new(render_cmd, allocator) or_return
-    
-    allocated_count := 0
-    defer if err != nil {
-        for j in 0..<allocated_count {
-            delete(cmd.cmds[j], allocator)
-        }
-        free(cmd, allocator)
-        cmd = nil
-    }
 
-    for i in 0..<MAX_FRAMES_IN_FLIGHT {
-        cmd.refresh[i] = false
-        cmd.cmds[i] = mem.make_non_zeroed([]command_buffer, swap_img_cnt) or_return
-        allocated_count += 1
-        allocate_command_buffers(&cmd.cmds[i][0], swap_img_cnt)
-    }
+	res := vk.CreateCommandPool(vk_device, &vk.CommandPoolCreateInfo{
+		sType = vk.StructureType.COMMAND_POOL_CREATE_INFO,
+		flags = {vk.CommandPoolCreateFlag.RESET_COMMAND_BUFFER},
+		queueFamilyIndex = vk_graphics_family_index,
+	}, nil, &cmd.cmd_pool)
+	if res != .SUCCESS do trace.panic_log("vk.CreateCommandPool(&vk_cmd_pool) : ", res)
+
+    allocate_command_buffers(&cmd.cmd, 1, cmd.cmd_pool)
+
     cmd.obj_lock = sync.Mutex{}
 
     sync.mutex_lock(&__g_render_cmd_mtx)
@@ -83,28 +77,25 @@ Returns:
 render_cmd_deinit :: proc(cmd: ^render_cmd) {
 	mem.ICheckInit_Deinit(&cmd.check_init)
 
-    for i in 0..<MAX_FRAMES_IN_FLIGHT {
-        free_command_buffers(&cmd.cmds[i][0], swap_img_cnt)
-        delete(cmd.cmds[i])
-    }
+    free_command_buffers(&cmd.cmd, 1, cmd.cmd_pool)
 
     sync.mutex_lock(&__g_render_cmd_mtx)
     for cmd, i in __g_render_cmd {
         if cmd == cmd {
             ordered_remove(&__g_render_cmd, i)
-            if i == __g_main_render_cmd_idx do __g_main_render_cmd_idx = -1
             break
         }
     }
     sync.mutex_unlock(&__g_render_cmd_mtx)
+	vk.DestroyCommandPool(vk_device, cmd.cmd_pool, nil)
     free(cmd, cmd.creation_allocator)
 }
 
 /*
-Sets the render command as the main one to display
+Sets the render command as visible
 
 Inputs:
-- _cmd: Pointer to the render command to show
+- _cmd: Pointer to the render command to set visible
 
 Returns:
 - `true` if successful, `false` if the command was not found
@@ -114,10 +105,32 @@ render_cmd_show :: proc "contextless" (_cmd: ^render_cmd) -> bool {
 	
     sync.mutex_lock(&__g_render_cmd_mtx)
     defer sync.mutex_unlock(&__g_render_cmd_mtx)
-    for cmd, i in __g_render_cmd {
+    for cmd in __g_render_cmd {
         if cmd == _cmd {
-            render_cmd_refresh(_cmd)
-            __g_main_render_cmd_idx = i
+            cmd.visible = true
+            return true
+        }
+    }
+    return false
+}
+
+/*
+Sets the render command as hidden
+
+Inputs:
+- _cmd: Pointer to the render command to hide
+
+Returns:
+- `true` if successful, `false` if the command was not found
+*/
+render_cmd_hide :: proc "contextless" (_cmd: ^render_cmd) -> bool {
+	mem.ICheckInit_Check(&_cmd.check_init)
+	
+    sync.mutex_lock(&__g_render_cmd_mtx)
+    defer sync.mutex_unlock(&__g_render_cmd_mtx)
+    for cmd in __g_render_cmd {
+        if cmd == _cmd {
+            cmd.visible = false
             return true
         }
     }
@@ -134,7 +147,6 @@ render_cmd_change_scene :: proc "contextless" (cmd: ^render_cmd, _scene: ^[dynam
 	
 	if cmd.scene != _scene {
 		cmd.scene = _scene
-		render_cmd_refresh(cmd)
 	}
 }
 
@@ -161,7 +173,6 @@ render_cmd_add_object :: proc(cmd: ^render_cmd, obj: ^iobject) {
         }
     }
     non_zero_append(cmd.scene, obj)
-    render_cmd_refresh(cmd)
 }
 
 /*
@@ -189,7 +200,6 @@ render_cmd_add_objects :: proc(cmd: ^render_cmd, objs: ..^iobject) {
         }
     }
     non_zero_append(cmd.scene, ..objs)
-    if len(objs) > 0 do render_cmd_refresh(cmd)
 }
 
 
@@ -212,7 +222,6 @@ render_cmd_remove_object :: proc(cmd: ^render_cmd, obj: ^iobject) {
     for obj_t, i in cmd.scene^ {
         if obj_t == obj {
             ordered_remove(cmd.scene, i)
-            render_cmd_refresh(cmd)
             break
         }
     }
@@ -234,7 +243,6 @@ render_cmd_remove_all :: proc(cmd: ^render_cmd) {
     defer sync.mutex_unlock(&cmd.obj_lock)
     obj_len := len(cmd.scene)
     clear(cmd.scene)
-    if obj_len > 0 do render_cmd_refresh(cmd)
 }
 
 /*
@@ -330,36 +338,7 @@ render_cmd_get_objects :: proc(cmd: ^render_cmd) -> []^iobject {
     return cmd.scene^[:]
 }
 
-/*
-Marks the render command for refresh on all frames in flight
 
-Inputs:
-- cmd: Pointer to the render command
-
-Returns:
-- None
-*/
-render_cmd_refresh :: proc "contextless" (cmd: ^render_cmd) {
-    for &b in cmd.refresh {
-        b = true
-    }
-}
-
-/*
-Marks all render commands for refresh on all frames in flight
-
-Returns:
-- None
-*/
-render_cmd_refresh_all :: proc "contextless" () {
-    sync.mutex_lock(&__g_render_cmd_mtx)
-    defer sync.mutex_unlock(&__g_render_cmd_mtx)
-    for cmd in __g_render_cmd {
-        for &b in cmd.refresh {
-            b = true
-        }
-    }
-}
 
 @(private) __render_cmd_clean :: proc () {
 	delete(__g_render_cmd)

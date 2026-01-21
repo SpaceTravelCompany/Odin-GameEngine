@@ -12,6 +12,7 @@ import "core:fmt"
 import "core:math/linalg"
 import "core:os"
 import "base:intrinsics"
+import "core:thread"
 
 /*
 Gets the delta time in seconds
@@ -51,6 +52,8 @@ activate: #type proc "contextless" () = proc "contextless" () {}
 closing: #type proc "contextless" () -> bool = proc "contextless" () -> bool{ return true }
 
 @(private="file") inited := false
+
+@private g_thread_pool: thread.Pool
 
 when library.is_android {
 	android_platform:android_platform_version
@@ -123,7 +126,6 @@ engine_main :: proc(
 	when ODIN_OS == .Windows {
 		windows_h_instance = auto_cast windows.GetModuleHandleA(nil)
 	}
-
 	system_start()
 
 	assert(!(window_width != nil && window_width.? <= 0))
@@ -150,6 +152,9 @@ engine_main :: proc(
 
 	when is_android {
 		android_start()
+
+		thread.pool_init(&g_thread_pool, context.allocator, get_processor_core_len())
+		thread.pool_start(&g_thread_pool)
 	} else {
 		when is_console {
 			init()
@@ -157,6 +162,9 @@ engine_main :: proc(
 			system_destroy()
 			system_after_destroy()
 		} else {
+			thread.pool_init(&g_thread_pool, context.allocator, get_processor_core_len())
+			thread.pool_start(&g_thread_pool)
+	
 			window_start()
 
 			graphics_init()
@@ -195,6 +203,7 @@ engine_main :: proc(
 @private system_after_destroy :: #force_inline proc() {
 	delete(monitors)
 	virtual.arena_free_all(&__tempArena)
+	thread.pool_destroy(&g_thread_pool)
 }
 
 
@@ -323,10 +332,27 @@ close :: proc "contextless" () {
 	calc_frame_time(paused_)
 
 	update()
-	if __g_main_render_cmd_idx >= 0 {
-		for obj in __g_render_cmd[__g_main_render_cmd_idx].scene {
-			iobject_update(auto_cast obj)
+	if len(__g_render_cmd) > 0 {
+		//thread pool 사용해서 각각 처리
+		update_task_data :: struct {
+			cmd: ^render_cmd,
 		}
+		
+		update_task_proc :: proc(task: thread.Task) {
+			data := cast(^update_task_data)task.data
+			for obj in data.cmd.scene {
+				iobject_update(auto_cast obj)
+			}
+		}
+		
+		// Add each render_cmd as a task to thread pool
+		for cmd in __g_render_cmd {
+			data := new(update_task_data, context.temp_allocator)
+			data.cmd = cmd
+			thread.pool_add_task(&g_thread_pool, context.temp_allocator, update_task_proc, data)
+		}
+		
+		thread.pool_finish(&g_thread_pool)
 	}
 
 	if !paused_ {

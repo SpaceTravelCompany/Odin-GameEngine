@@ -15,7 +15,7 @@ import "core:sys/android"
 import "core:sys/posix"
 import "core:thread"
 import vk "vendor:vulkan"
-
+import "vendor:android_cpu_features"
 
 when library.is_android {
     @(private="file") app : ^android.android_app
@@ -418,6 +418,11 @@ when library.is_android {
 	}
 
 	@private android_start :: proc () {
+		// Set CPU core count for Android
+		core_count := android_cpu_features.android_getCpuCount()
+		processor_core_len = auto_cast core_count
+		if processor_core_len == 0 do trace.panic_log("processor_core_len can't zero")
+		
 		app = auto_cast android.get_android_app()
 		app.userData = nil
 		app.onAppCmd = handle_cmd
