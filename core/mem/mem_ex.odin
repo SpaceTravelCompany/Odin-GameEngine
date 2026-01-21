@@ -18,6 +18,8 @@ make_non_zeroed :: proc {
 	// make_non_zeroed_soa_dynamic_array,
 	// make_non_zeroed_soa_dynamic_array_len,
 	// make_non_zeroed_soa_dynamic_array_len_cap,
+
+	make_non_zeroed_aligned_slice,
 }
 
 @(require_results)
@@ -29,6 +31,17 @@ make_non_zeroed_slice :: proc($T: typeid/[]$E, #any_int len: int, allocator := c
 	}
 	s := runtime.Raw_Slice{raw_data(data), len}
 
+	return transmute(T)s, err
+}
+
+@(require_results)
+make_non_zeroed_aligned_slice :: proc($T: typeid/[]$E, #any_int len: int, alignment: int, allocator := context.allocator, loc := #caller_location) -> (T, runtime.Allocator_Error) #optional_allocator_error {
+	runtime.make_slice_error_loc(loc, len)
+	data, err := runtime.mem_alloc_non_zeroed(size_of(E)*len, alignment, allocator, loc)
+	if data == nil && size_of(E) != 0 {
+		return nil, err
+	}
+	s := runtime.Raw_Slice{raw_data(data), len}
 	return transmute(T)s, err
 }
 

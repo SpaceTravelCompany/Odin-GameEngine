@@ -573,36 +573,28 @@ Returns:
 - An error if computation failed (includes allocator errors)
 */
 shapes_compute_polygon :: proc(poly:^shapes, allocator := context.allocator) -> (res:^raw_shape = nil, err:shape_error = nil) {
-    vertList:[dynamic]shape_vertex2d = mem.make_non_zeroed_dynamic_array([dynamic]shape_vertex2d, context.temp_allocator)
-    indList:[dynamic]u32 = mem.make_non_zeroed_dynamic_array([dynamic]u32, context.temp_allocator)
+	__arena: mem.Dynamic_Arena = {}
+	mem.dynamic_arena_init(&__arena, context.temp_allocator,context.temp_allocator)
+	arena := mem.dynamic_arena_allocator(&__arena)
+	defer mem.dynamic_arena_destroy(&__arena)
+
+    vertList:[dynamic]shape_vertex2d = mem.make_non_zeroed([dynamic]shape_vertex2d, arena)
+    indList:[dynamic]u32 = mem.make_non_zeroed_dynamic_array([dynamic]u32, arena)
 
     res = mem.new_non_zeroed(raw_shape, allocator) or_return
 	defer if err != nil do free(res, allocator)
 
-    defer {
-        delete(vertList)
-        delete(indList)
-    }
     defer if err != nil {
         free(res, allocator)
         res = nil
     }
 
-    shapes_compute_polygon_in :: proc(vertList:^[dynamic]shape_vertex2d, indList:^[dynamic]u32, poly:^shapes, allocator : runtime.Allocator) -> (err:shape_error = nil) {
-        outPoly:[][dynamic]CurveStruct = mem.make_non_zeroed_slice([][dynamic]CurveStruct, len(poly.nodes), context.temp_allocator)
-        outPoly2:[dynamic]linalg.PointF = mem.make_non_zeroed_dynamic_array([dynamic]linalg.PointF, context.temp_allocator)
-        outPoly2N:[]u32 = mem.make_non_zeroed_slice([]u32, len(poly.nodes), context.temp_allocator)
+    shapes_compute_polygon_in :: proc(vertList:^[dynamic]shape_vertex2d, indList:^[dynamic]u32, poly:^shapes, allocator : runtime.Allocator, arena : mem.Allocator) -> (err:shape_error = nil) {	
+        outPoly:[][dynamic]CurveStruct = mem.make_non_zeroed([][dynamic]CurveStruct, len(poly.nodes), 64, arena)
+        outPoly2:[dynamic]linalg.PointF = mem.make_non_zeroed([dynamic]linalg.PointF, arena)
+        outPoly2N:[]u32 = mem.make_non_zeroed([]u32, len(poly.nodes), 64, arena)
         for &o in outPoly {
-            o = mem.make_non_zeroed_dynamic_array([dynamic]CurveStruct, context.temp_allocator)
-        }
-
-        defer {
-            for o in outPoly {
-                delete(o)
-            }
-            delete(outPoly, context.temp_allocator)
-            delete(outPoly2)
-            delete(outPoly2N, context.temp_allocator)
+            o = make([dynamic]CurveStruct, arena)
         }
 
         poly_idx :u32 = 0
@@ -641,7 +633,7 @@ shapes_compute_polygon :: proc(poly:^shapes, allocator := context.allocator) -> 
             if len(ps) == 0 do continue
             np :u32 = 0
 
-            pT := mem.make_non_zeroed_dynamic_array([dynamic]linalg.PointF, context.temp_allocator )
+            pT := mem.make_non_zeroed_dynamic_array([dynamic]linalg.PointF, arena )
             defer delete(pT)
             for p in ps {
                 if !p.isCurve {
@@ -672,8 +664,8 @@ shapes_compute_polygon :: proc(poly:^shapes, allocator := context.allocator) -> 
         }
         if len(outPoly2) == 0 do return
 
-        indicesT, tErr := poly2tri.TrianguatePolygons(outPoly2[:], outPoly2N[:], context.temp_allocator)
-        defer delete(indicesT, context.temp_allocator)
+        indicesT, tErr := poly2tri.TrianguatePolygons(outPoly2[:], outPoly2N[:], arena)
+        defer delete(indicesT, arena)
         
         if tErr != poly2tri.Trianguate_Error.None {
             err = tErr
@@ -714,7 +706,7 @@ shapes_compute_polygon :: proc(poly:^shapes, allocator := context.allocator) -> 
         }
     }
     if has_fill {
-        err = shapes_compute_polygon_in(&vertList, &indList, poly, allocator)
+        err = shapes_compute_polygon_in(&vertList, &indList, poly, allocator, arena)
         if err != nil do return
     }
 
@@ -730,16 +722,15 @@ shapes_compute_polygon :: proc(poly:^shapes, allocator := context.allocator) -> 
         // 스트로크를 위한 새로운 shapes 생성
         total_stroke_polygons := len(poly.nodes) * 2
         
-        stroke_nodes := mem.make_non_zeroed_slice([]shape_node, total_stroke_polygons, context.temp_allocator)
-        defer delete(stroke_nodes, context.temp_allocator)
+        stroke_nodes := mem.make_non_zeroed([]shape_node, total_stroke_polygons, 64,arena)
+        defer delete(stroke_nodes, arena)
         
         node_idx := 0
         for node in poly.nodes {
             if node.stroke_color.a > 0 && node.thickness > 0 {
                 line_idx :u32 = 0
 				// 폴리곤의 점들을 수집
-				poly_points := mem.make_non_zeroed_dynamic_array([dynamic]linalg.PointF, context.temp_allocator)
-				defer delete(poly_points)
+				poly_points := mem.make_non_zeroed_dynamic_array([dynamic]linalg.PointF, arena)
 				
 				node_len :u32 = auto_cast len(node.lines)
 				for i:u32 = 0; i < node_len; i += 1 {
@@ -753,7 +744,7 @@ shapes_compute_polygon :: proc(poly:^shapes, allocator := context.allocator) -> 
 				polyOri := linalg.GetPolygonOrientation(poly_points[:])
 				
 				// 외부 스트로크
-				outer_lines := mem.make_non_zeroed_slice([]shape_line, node_len, context.temp_allocator)
+				outer_lines := mem.make_non_zeroed([]shape_line, node_len, 64, arena)
 				for i:u32 = 0; i < node_len; i += 1 {
 					line := node.lines[line_idx + i]
 					prev_idx := i == 0 ? node_len - 1 : i - 1
@@ -781,7 +772,7 @@ shapes_compute_polygon :: proc(poly:^shapes, allocator := context.allocator) -> 
 				node_idx += 1
 				
 				// 내부 스트로크
-				inner_lines := mem.make_non_zeroed_slice([]shape_line, node_len, context.temp_allocator)
+				inner_lines := mem.make_non_zeroed([]shape_line, node_len,64, arena)
 				for i:u32 = 0; i < node_len; i += 1 {
 					line := node.lines[line_idx + i]
 					prev_idx := i == 0 ? node_len - 1 : i - 1
@@ -816,13 +807,13 @@ shapes_compute_polygon :: proc(poly:^shapes, allocator := context.allocator) -> 
             nodes = stroke_nodes[:node_idx],
         }
         
-        err = shapes_compute_polygon_in(&vertList, &indList, &polyT, allocator)
+        err = shapes_compute_polygon_in(&vertList, &indList, &polyT, allocator, arena)
         if err != nil do return
     }
 
-    res.vertices = mem.make_non_zeroed_slice([]shape_vertex2d, len(vertList), allocator) or_return
+    res.vertices = mem.make_non_zeroed([]shape_vertex2d, len(vertList), 64, allocator) or_return
     defer if err != nil do delete(res.vertices, allocator)
-	res.indices = mem.make_non_zeroed_slice([]u32, len(indList), allocator) or_return
+	res.indices = mem.make_non_zeroed([]u32, len(indList), 64, allocator) or_return
 
     intrinsics.mem_copy_non_overlapping(&res.vertices[0], &vertList[0], len(vertList) * size_of(shape_vertex2d))
     intrinsics.mem_copy_non_overlapping(&res.indices[0], &indList[0], len(indList) * size_of(u32))

@@ -413,7 +413,7 @@ allocator : runtime.Allocator) -> (rect:linalg.RectF, err:geometry.shape_error =
 
             // 최대 폴리곤 개수는 n_contours와 같음
             max_polygons := self.face.glyph.outline.n_contours
-            nodes_slice := mem.make_non_zeroed([]geometry.shape_node, max_polygons, context.temp_allocator)
+            nodes_slice := mem.make_non_zeroed([]geometry.shape_node, max_polygons, 64, context.temp_allocator)
             defer delete(nodes_slice, context.temp_allocator)
             
             data : font_user_data = {
@@ -422,7 +422,7 @@ allocator : runtime.Allocator) -> (rect:linalg.RectF, err:geometry.shape_error =
                 nodes = nodes_slice,
                 polygonCount = 0,
                 scale = self.scale,
-				lines_da = mem.make_non_zeroed([][dynamic]geometry.shape_line, max_polygons, context.temp_allocator),
+				lines_da = mem.make_non_zeroed([][dynamic]geometry.shape_line, max_polygons, 64, context.temp_allocator),
             }
 			defer {
 				for lines in data.lines_da {
@@ -463,12 +463,13 @@ allocator : runtime.Allocator) -> (rect:linalg.RectF, err:geometry.shape_error =
                 }
 
                 rawP : ^geometry.raw_shape
-                rawP , shapeErr = geometry.shapes_compute_polygon(&poly, self.allocator)//높은 부하 작업 High load operations
-                if shapeErr != nil do return
-
+                rawP , shapeErr = geometry.shapes_compute_polygon(&poly, self.allocator)//높은 부하 작업 High load operations		
                 defer if shapeErr != nil {
                     geometry.raw_shape_free(rawP, self.allocator)
                 }
+
+                if shapeErr != nil do return
+
                 // if len(rawP.vertices) > 0 {
                 //     maxP :linalg.PointF = {min(f32), min(f32)}
                 //     minP :linalg.PointF = {max(f32), max(f32)}

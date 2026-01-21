@@ -874,19 +874,19 @@ TrianguateSinglePolygon :: proc(poly:[]linalg.PointF, baseIdx:[]u32, holes:[][]l
     ctx := TriangleCtx{allocator = allocator}
    
     if holes == nil {
-        ctx.pts = mem.make_non_zeroed_slice([]^PointE, len(poly), context.temp_allocator)
-        ctx.ptsData = mem.make_non_zeroed_slice([]PointE, len(poly), context.temp_allocator)
-        ctx.edges = mem.make_non_zeroed_slice([]Edge, len(poly), context.temp_allocator)
-        ctx.nodes = mem.make_non_zeroed_slice([]Node, len(poly) - 1, context.temp_allocator)
+        ctx.pts = mem.make_non_zeroed([]^PointE, len(poly), 64, context.temp_allocator)
+        ctx.ptsData = mem.make_non_zeroed([]PointE, len(poly), 64, context.temp_allocator)
+        ctx.edges = mem.make_non_zeroed([]Edge, len(poly), 64, context.temp_allocator)
+        ctx.nodes = mem.make_non_zeroed([]Node, len(poly) - 1, 64, context.temp_allocator)
     } else {
         holeLen := 0
         for hole in holes {
             holeLen += len(hole)
         }
-        ctx.pts = mem.make_non_zeroed_slice([]^PointE, len(poly) + holeLen, context.temp_allocator)
-        ctx.ptsData = mem.make_non_zeroed_slice([]PointE, len(poly) + holeLen, context.temp_allocator)
-        ctx.edges = mem.make_non_zeroed_slice([]Edge, len(poly) + holeLen, context.temp_allocator)
-        ctx.nodes = mem.make_non_zeroed_slice([]Node, len(poly) + holeLen - 1, context.temp_allocator)
+        ctx.pts = mem.make_non_zeroed([]^PointE, len(poly) + holeLen, 64, context.temp_allocator)
+        ctx.ptsData = mem.make_non_zeroed([]PointE, len(poly) + holeLen, 64, context.temp_allocator)
+        ctx.edges = mem.make_non_zeroed([]Edge, len(poly) + holeLen, 64, context.temp_allocator)
+        ctx.nodes = mem.make_non_zeroed([]Node, len(poly) + holeLen - 1, 64, context.temp_allocator)
     }
     ctx.indices = mem.make_non_zeroed_dynamic_array([dynamic]u32, allocator)
     ctx.maps = mem.make_non_zeroed_dynamic_array([dynamic]^Triangle, context.temp_allocator)

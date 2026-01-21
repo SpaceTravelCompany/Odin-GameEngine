@@ -282,14 +282,16 @@ svg_parser :: struct {
 	shape_ptrs:      [dynamic]svg_shape_ptr,
 }
 
+
+@private __shapes_node :: struct {
+	lines:        [dynamic]geometry.shape_line,
+    color:        linalg.Point3DwF,
+    stroke_color: linalg.Point3DwF,
+    thickness:    f32,
+}
+
 @private __shapes :: struct {
-	polys:[dynamic]linalg.PointF,
-    n_polys:[dynamic]u32,
-    n_types:[dynamic]u32,
-    types:[dynamic]geometry.curve_type,
-    colors:[dynamic]linalg.Point3DwF,
-    strokeColors:[dynamic]linalg.Point3DwF,
-    thickness:[dynamic]f32,
+	nodes: [dynamic]geometry.shape_node,
 }
 
 deinit :: proc(self: ^svg_parser) {
@@ -546,163 +548,63 @@ init_parse :: proc(svg_data: []u8, allocator: mem.Allocator = context.allocator)
 
 	parser.svg = data.svg
 	if len(data.path) > 0 {
-		parser.path = mem.make_non_zeroed([]PATH, len(data.path), arena)
+		parser.path = mem.make_non_zeroed([]PATH, len(data.path), 64, arena)
 		mem.copy_non_overlapping(&parser.path[0], &data.path[0], len(data.path) * size_of(PATH))
 	}
 	if len(data.rect) > 0 {
-		parser.rect = mem.make_non_zeroed([]RECT, len(data.rect), arena)
+		parser.rect = mem.make_non_zeroed([]RECT, len(data.rect), 64, arena)
 		mem.copy_non_overlapping(&parser.rect[0], &data.rect[0], len(data.rect) * size_of(RECT))
 	}
 	if len(data.circle) > 0 {
-		parser.circle = mem.make_non_zeroed([]CIRCLE, len(data.circle), arena)
+		parser.circle = mem.make_non_zeroed([]CIRCLE, len(data.circle), 64, arena)
 		mem.copy_non_overlapping(&parser.circle[0], &data.circle[0], len(data.circle) * size_of(CIRCLE))
 	}
 	if len(data.ellipse) > 0 {
-		parser.ellipse = mem.make_non_zeroed([]ELLIPSE, len(data.ellipse), arena)
+		parser.ellipse = mem.make_non_zeroed([]ELLIPSE, len(data.ellipse), 64, arena)
 		mem.copy_non_overlapping(&parser.ellipse[0], &data.ellipse[0], len(data.ellipse) * size_of(ELLIPSE))
 	}
 	if len(data.line) > 0 {
-		parser.line = mem.make_non_zeroed([]LINE, len(data.line), arena)
+		parser.line = mem.make_non_zeroed([]LINE, len(data.line), 64, arena)
 		mem.copy_non_overlapping(&parser.line[0], &data.line[0], len(data.line) * size_of(LINE))
 	}
 	if len(data.polyline) > 0 {
-		parser.polyline = mem.make_non_zeroed([]POLYLINE, len(data.polyline), arena)
+		parser.polyline = mem.make_non_zeroed([]POLYLINE, len(data.polyline), 64, arena)
 		mem.copy_non_overlapping(&parser.polyline[0], &data.polyline[0], len(data.polyline) * size_of(POLYLINE))
 	}
 	if len(data.polygon) > 0 {
-		parser.polygon = mem.make_non_zeroed([]POLYGON, len(data.polygon), arena)
+		parser.polygon = mem.make_non_zeroed([]POLYGON, len(data.polygon), 64, arena)
 		mem.copy_non_overlapping(&parser.polygon[0], &data.polygon[0], len(data.polygon) * size_of(POLYGON))
 	}
 	if len(data.shape_ptrs) > 0 {
-		parser.shape_ptrs = mem.make_non_zeroed([]svg_shape_ptr, len(data.shape_ptrs), arena)
+		parser.shape_ptrs = mem.make_non_zeroed([]svg_shape_ptr, len(data.shape_ptrs), 64, arena)
 		mem.copy_non_overlapping(&parser.shape_ptrs[0], &data.shape_ptrs[0], len(data.shape_ptrs) * size_of(svg_shape_ptr))
-	}
-	shapes_ : __shapes = {
-		polys = mem.make_non_zeroed([dynamic]linalg.PointF, context.temp_allocator),
-		n_polys = mem.make_non_zeroed([dynamic]u32, context.temp_allocator),
-		n_types = mem.make_non_zeroed([dynamic]u32, context.temp_allocator),
-		types = mem.make_non_zeroed([dynamic]geometry.curve_type, context.temp_allocator),
-		colors = mem.make_non_zeroed([dynamic]linalg.Point3DwF, context.temp_allocator),
-		strokeColors = mem.make_non_zeroed([dynamic]linalg.Point3DwF, context.temp_allocator),
-		thickness = mem.make_non_zeroed([dynamic]f32, context.temp_allocator),
-	}
-	defer {
-		delete(shapes_.polys)
-		delete(shapes_.n_polys)
-		delete(shapes_.n_types)
-		delete(shapes_.types)
-		delete(shapes_.colors)
-		delete(shapes_.strokeColors)
-		delete(shapes_.thickness)
-	}
+	}	
+	shapes := mem.make_non_zeroed([dynamic]__shapes_node, context.temp_allocator)
+	defer delete(shapes)
+
 	for s in parser.shape_ptrs {
 		#partial switch v in s {
-		case ^PATH: _parse_path(&shapes_, v, arena) or_return
-		case ^RECT: _parse_rect(&shapes_, v, arena) or_return
-		case ^CIRCLE: _parse_circle(&shapes_, v, arena) or_return
-		case ^ELLIPSE: _parse_ellipse(&shapes_, v, arena) or_return
-		case ^LINE: _parse_line(&shapes_, v, arena) or_return
-		case ^POLYLINE: _parse_polyline(&shapes_, v, arena) or_return
-		case ^POLYGON: _parse_polygon(&shapes_, v, arena) or_return
+		case ^PATH: _parse_path(&shapes, v, arena) or_return
+		case ^RECT: _parse_rect(&shapes, v, arena) or_return
+		case ^CIRCLE: _parse_circle(&shapes, v, arena) or_return
+		case ^ELLIPSE: _parse_ellipse(&shapes, v, arena) or_return
+		case ^LINE: _parse_line(&shapes, v, arena) or_return
+		case ^POLYLINE: _parse_polyline(&shapes, v, arena) or_return
+		case ^POLYGON: _parse_polygon(&shapes, v, arena) or_return
 		}
 	}
-	// 새로운 구조로 변환
-	if len(shapes_.n_polys) == 0 {
-		parser.shapes = geometry.shapes{nodes = nil}
-		return parser, nil
-	}
 	
-	nodes := mem.make_non_zeroed([dynamic]geometry.shape_node, context.temp_allocator)
-	defer delete(nodes)
-	
-	start_poly :u32 = 0
-	start_type :u32 = 0
-	
-	for i in 0..<len(shapes_.n_polys) {
-		n_poly := shapes_.n_polys[i]
-		n_type := shapes_.n_types[i]
-		
-		if n_poly == 0 do continue
-		
-		// 색상과 스트로크 정보 가져오기
-		color := shapes_.colors[i] if i < len(shapes_.colors) else linalg.Point3DwF{0, 0, 0, 0}
-		stroke_color := shapes_.strokeColors[i] if i < len(shapes_.strokeColors) else linalg.Point3DwF{0, 0, 0, 0}
-		thickness := shapes_.thickness[i] if i < len(shapes_.thickness) else 0.0
-		
-		// 선분들 생성
-		lines := mem.make_non_zeroed([dynamic]geometry.shape_line, context.temp_allocator)
-		defer delete(lines)
-		
-		poly_idx :u32 = 0
-		type_idx :u32 = 0
-		
-		for poly_idx < n_poly && type_idx < n_type {
-			curve_type := shapes_.types[start_type + type_idx]
-			
-			if curve_type == .Line {
-				start_point := shapes_.polys[start_poly + poly_idx]
-				end_point := shapes_.polys[start_poly + (poly_idx + 1) % n_poly]
-				non_zero_append(&lines, geometry.shape_line{
-					start = start_point,
-					control0 = {0, 0},
-					control1 = {0, 0},
-					end = end_point,
-					type = .Line,
-				})
-				poly_idx += 1
-				type_idx += 1
-			} else if curve_type == .Quadratic {
-				start_point := shapes_.polys[start_poly + poly_idx]
-				control_point := shapes_.polys[start_poly + poly_idx + 1]
-				end_point := shapes_.polys[start_poly + (poly_idx + 2) % n_poly]
-				non_zero_append(&lines, geometry.shape_line{
-					start = start_point,
-					control0 = control_point,
-					control1 = {0, 0},
-					end = end_point,
-					type = .Quadratic,
-				})
-				poly_idx += 2
-				type_idx += 1
-			} else {
-				start_point := shapes_.polys[start_poly + poly_idx]
-				control0 := shapes_.polys[start_poly + poly_idx + 1]
-				control1 := shapes_.polys[start_poly + poly_idx + 2]
-				end_point := shapes_.polys[start_poly + (poly_idx + 3) % n_poly]
-				non_zero_append(&lines, geometry.shape_line{
-					start = start_point,
-					control0 = control0,
-					control1 = control1,
-					end = end_point,
-					type = .Unknown,
-				})
-				poly_idx += 3
-				type_idx += 1
+	if len(shapes) > 0 {
+		nodes_array := mem.make_non_zeroed([]geometry.shape_node, len(shapes), arena)
+		for i in 0..<len(shapes) {
+			nodes_array[i] = geometry.shape_node{
+				lines = mem.make_non_zeroed([]geometry.shape_line, len(shapes[i].lines), 64, arena),
+				color = shapes[i].color,
+				stroke_color = shapes[i].stroke_color,
+				thickness = shapes[i].thickness
 			}
+			mem.copy_non_overlapping(&nodes_array[i].lines[0], &shapes[i].lines[0], len(shapes[i].lines) * size_of(geometry.shape_line))
 		}
-		
-		if len(lines) > 0 {
-			lines_array := mem.make_non_zeroed([]geometry.shape_line, len(lines), arena)
-			mem.copy_non_overlapping(&lines_array[0], &lines[0], len(lines) * size_of(geometry.shape_line))
-			
-			n_polygons := mem.make_non_zeroed([]u32, 1, arena)
-			n_polygons[0] = n_poly
-			
-			non_zero_append(&nodes, geometry.shape_node{
-				lines = lines_array,
-				color = color,
-				stroke_color = stroke_color,
-				thickness = thickness,
-			})
-		}
-		
-		start_poly += n_poly
-		start_type += n_type
-	}
-	
-	if len(nodes) > 0 {
-		nodes_array := mem.make_non_zeroed([]geometry.shape_node, len(nodes), arena)
-		mem.copy_non_overlapping(&nodes_array[0], &nodes[0], len(nodes) * size_of(geometry.shape_node))
 		parser.shapes = geometry.shapes{nodes = nodes_array}
 	} else {
 		parser.shapes = geometry.shapes{nodes = nil}
@@ -727,32 +629,40 @@ init_parse :: proc(svg_data: []u8, allocator: mem.Allocator = context.allocator)
 	return false, .INVALID_NODE
 }
 
-@private _parse_path :: proc(shapes: ^__shapes, path: ^PATH, allocator: mem.Allocator) -> SVG_ERROR {
+@private _parse_path :: proc(shapes: ^[dynamic]__shapes_node, path: ^PATH, allocator: mem.Allocator) -> SVG_ERROR {
 	_read_path_p :: proc (str: string, idx: ^int, op: u8, cur: linalg.PointF) -> (result: linalg.PointF, err: SVG_ERROR) {
-		p := _parse_point(str, idx) or_return
-		p[1] *= -1
+		result = _parse_point(str, idx) or_return
+		result.y *= -1
 		if unicode.is_lower(rune(op)) {
-			p += cur
+			result += cur
 		}
-		return p, nil
+		return
 	}
 	_read_path_fx :: proc (str: string, idx: ^int, op: u8, cur_x: f32) -> (result: f32, err: SVG_ERROR) {
 		f, parse_ok := strconv.parse_f32(str[idx^:])
-		if !parse_ok do return 0, .INVALID_NODE
+		if !parse_ok {
+			err = .INVALID_NODE
+			return
+		}
 		if unicode.is_lower(rune(op)) do f += cur_x
-		return f, nil
+		result = f
+		return
 	}
 	_read_path_fy :: proc (str: string, idx: ^int, op: u8, cur_y: f32) -> (result: f32, err: SVG_ERROR) {
 		f, parse_ok := strconv.parse_f32(str[idx^:])
-		if !parse_ok do return 0, .INVALID_NODE
+		if !parse_ok {
+			err = .INVALID_NODE
+			return
+		}
 		f *= -1
 		if unicode.is_lower(rune(op)) do f += cur_y
-		return f, nil
+		result = f
+		return
 	}
 	//arc first point parameter is rx,ry
 	_read_path_r :: proc (str: string, idx: ^int) -> (result: linalg.PointF, err: SVG_ERROR) {
-		r := _parse_point(str, idx) or_return
-		return r, nil
+		result = _parse_point(str, idx) or_return
+		return
 	}
 
 	has_stroke := path._0.stroke != nil && path._0.stroke_width != nil && path._0.stroke_width.? > 0
@@ -760,21 +670,14 @@ init_parse :: proc(svg_data: []u8, allocator: mem.Allocator = context.allocator)
 	if !(path.d != nil && (has_fill || has_stroke)) do return nil// empty path
 
 
-	g_line :: struct {
-		start: linalg.PointF,
-		control0: linalg.PointF,
-		control1: linalg.PointF,
-		end: linalg.PointF,
-		type: geometry.curve_type,
+	g_line_init :: #force_inline proc "contextless" (start: linalg.PointF, end: linalg.PointF) -> geometry.shape_line {
+		return geometry.shape_line{start, {0, 0}, {0, 0}, end, .Line}
 	}
-	g_line_init :: #force_inline proc "contextless" (start: linalg.PointF, end: linalg.PointF) -> g_line {
-		return {start, {0, 0}, {0, 0}, end, .Line}
+	g_quadratic_init :: #force_inline proc "contextless" (start: linalg.PointF, control: linalg.PointF, end: linalg.PointF) -> geometry.shape_line {
+		return geometry.shape_line{start, geometry.CvtQuadraticToCubic0(start, control), geometry.CvtQuadraticToCubic1(end, control), end, .Quadratic}
 	}
-	g_quadratic_init :: #force_inline proc "contextless" (start: linalg.PointF, control: linalg.PointF, end: linalg.PointF) -> g_line {
-		return {start, control, 0, end, .Quadratic}
-	}
-	g_cubic_init :: #force_inline proc "contextless" (start: linalg.PointF, control0: linalg.PointF, control1: linalg.PointF, end: linalg.PointF) -> g_line {
-		return {start, control0, control1, end, .Unknown}
+	g_cubic_init :: #force_inline proc "contextless" (start: linalg.PointF, control0: linalg.PointF, control1: linalg.PointF, end: linalg.PointF) -> geometry.shape_line {
+		return geometry.shape_line{start, control0, control1, end, .Unknown}
 	}
 	compare :: #force_inline proc "contextless" (a: linalg.PointF, b: linalg.PointF) -> bool {
 		return a[0] == b[0] && a[1] == b[1]
@@ -782,54 +685,29 @@ init_parse :: proc(svg_data: []u8, allocator: mem.Allocator = context.allocator)
 
 	cur: linalg.PointF = {0, 0}
 	start: bool = false
-	line :g_line
+	line :geometry.shape_line
 
 	i: int = 0
 	op_: Maybe(u8) = nil
 
-	start_idx := 0
-	for i in 0..<len(shapes.n_polys) {
-		start_idx += int(shapes.n_polys[i])
-	}
-	start_type_idx := 0
-	for i in 0..<len(shapes.n_types) {
-		start_type_idx += int(shapes.n_types[i])
-	}
-	starti: int = start_idx
-	start_typei := start_type_idx
-	n_polys := 0
-	n_types := 0
+	cur_idx := len(shapes) - 1
+	start_idx := cur_idx + 1
 	color_len := 1
 
-
-	append_line :: proc(polys: ^[dynamic]linalg.PointF, types: ^[dynamic]geometry.curve_type, n_polys: ^int, n_types: ^int, line: g_line) {
-		if line.type == .Quadratic {
-			n_polys^ += 1
-			non_zero_append(polys, line.control0)
-			non_zero_append_elem(types, geometry.curve_type.Quadratic)
-		} else if line.type == .Unknown {
-			n_polys^ += 2
-			non_zero_append(polys, line.control0)
-			non_zero_append(polys, line.control1)
-			non_zero_append_elem(types, geometry.curve_type.Unknown)
-		} else {
-			non_zero_append_elem(types, geometry.curve_type.Line)
-		}
-		non_zero_append(polys, line.end)
-		n_polys^ += 1
-		n_types^ += 1
-	}
-	
 	for i < len(path.d.?) {
 		if path.d.?[i] == 'Z' || path.d.?[i] == 'z' {
-			if len(shapes.polys) <= start_idx do return .INVALID_NODE
+			if len(shapes[cur_idx].lines) == 0 do return .INVALID_NODE
 			if start {
+				line = g_line_init(line.start, shapes[cur_idx].lines[0].start)
 				start = false
+			} else {
+				line = g_line_init(shapes[cur_idx].lines[len(shapes[cur_idx].lines) - 1].end, shapes[cur_idx].lines[0].start)
 			}
-			// if !compare(line.start, line.end) {
-			// 	append_line(&shapes.polys, &shapes.types, &n_polys, &n_types, line)
-			// }
-			cur = shapes.polys[starti]
+			
+			if !compare(line.start, line.end) {
+				non_zero_append(&shapes[cur_idx].lines, line)
+			}
+			cur = line.end
 			i += 1
 			op_ = nil
 			continue
@@ -865,19 +743,11 @@ init_parse :: proc(svg_data: []u8, allocator: mem.Allocator = context.allocator)
 			p := _read_path_p(path.d.?, &i, op_.?, cur) or_return
 			line.start = p
 			cur = p
-			starti = start_idx + n_polys
-			if n_polys > 0 {
-				non_zero_append(&shapes.n_polys, auto_cast n_polys)
-				non_zero_append(&shapes.n_types, auto_cast n_types)
-				start_idx += n_polys
-				start_typei += n_types
-				n_polys = 0
-				n_types = 0
-				color_len += 1
-			}
 			start = true
 			prevS = nil
 			prevT = nil
+			non_zero_append(shapes, __shapes_node{lines = mem.make_non_zeroed([dynamic]geometry.shape_line, context.temp_allocator)})
+			cur_idx += 1
 			continue
 		case 'L', 'l':
 			if !start do return .INVALID_NODE
@@ -890,14 +760,14 @@ init_parse :: proc(svg_data: []u8, allocator: mem.Allocator = context.allocator)
 			if !start do return .INVALID_NODE
 			y := _read_path_fy(path.d.?, &i, op_.?, cur[1]) or_return
 			line = g_line_init(line.start, linalg.PointF{line.start[0], y})
-			cur[1] = y
+			cur.y = y
 			prevS = nil
 			prevT = nil
 		case 'H', 'h':
 			if !start do return .INVALID_NODE
 			x := _read_path_fx(path.d.?, &i, op_.?, cur[0]) or_return
 			line = g_line_init(line.start, linalg.PointF{x, line.start[1]})
-			cur[0] = x
+			cur.x = x
 			prevS = nil
 			prevT = nil
 		case 'Q', 'q':
@@ -952,52 +822,54 @@ init_parse :: proc(svg_data: []u8, allocator: mem.Allocator = context.allocator)
 				prevT = p0
 			}
 			prevS = nil
+		//원호 Arc
+        //https://www.npmjs.com/package/svg-arc-to-cubic-bezier?activeTab=code
 		case 'A', 'a':
 			if !start do return .INVALID_NODE
 			prevS = nil
 			prevT = nil
 
-			doublePI: f32 = math.PI * 2
+			doublePI: f32 : math.PI * 2.0
 
 			r := _read_path_r(path.d.?, &i) or_return
 			xx := _parse_number(path.d.?, &i) or_return
-			x_angle: f32 = xx * doublePI / 360
+			x_angle: f32 = xx * doublePI / 360.0
 			large_arc: bool = _parse_bool(path.d.?, &i) or_return
 			sweep: bool = _parse_bool(path.d.?, &i) or_return
 			end := _read_path_p(path.d.?, &i, op_.?, cur) or_return
 
-			end[1] *= -1
-			cur[1] *= -1
+			end.y *= -1
+			cur.y *= -1
 
 			sin_val := math.sin(x_angle)
 			cos_val := math.cos(x_angle)
 
 			pp := linalg.PointF{
-				cos_val * (cur[0] - end[0]) / 2 + sin_val * (cur[1] - end[1]) / 2,
-				-sin_val * (cur[0] - end[0]) / 2 + cos_val * (cur[1] - end[1]) / 2,
+				cos_val * (cur.x - end.x) / 2.0 + sin_val * (cur.y - end.y) / 2.0,
+				-sin_val * (cur.x - end.x) / 2.0 + cos_val * (cur.y - end.y) / 2.0,
 			}
 
 			prevS = nil
 			prevT = nil
-			if (pp[0] == 0 && pp[1] == 0) || (r[0] == 0 || r[1] == 0) {
-				end[1] *= -1
+			if (pp.x == 0.0 && pp.y == 0.0) || (r.x == 0.0 || r.y == 0.0) {
+				end.y *= -1
 				line = g_line_init(line.start, end)
 				cur = end
 			} else {
-				r = linalg.PointF{abs(r[0]), abs(r[1])}
+				r = linalg.PointF{abs(r.x), abs(r.y)}
 
-				lambda := (pp[0] * pp[0]) / (r[0] * r[0]) + (pp[1] * pp[1]) / (r[1] * r[1])
+				lambda := (pp.x * pp.x) / (r.x * r.x) + (pp.y * pp.y) / (r.y * r.y)
 
 				if lambda > 1 {
 					sqrt_lambda := math.sqrt(lambda)
-					r = linalg.PointF{r[0] * sqrt_lambda, r[1] * sqrt_lambda}
+					r = linalg.PointF{r.x * sqrt_lambda, r.y * sqrt_lambda}
 				}
-				r_sq := linalg.PointF{r[0] * r[0], r[1] * r[1]}
-				pp_sq := linalg.PointF{pp[0] * pp[0], pp[1] * pp[1]}
+				r_sq := linalg.PointF{r.x * r.x, r.y * r.y}
+				pp_sq := linalg.PointF{pp.x * pp.x, pp.y * pp.y}
 
-				radicant: f32 = r_sq[0] * r_sq[1] - r_sq[0] * pp_sq[1] - r_sq[1] * pp_sq[0]
+				radicant: f32 = r_sq.x * r_sq.y - r_sq.x * pp_sq.y - r_sq.y * pp_sq.x
 				if radicant < 0 do radicant = 0
-				radicant /= (r_sq[0] * pp_sq[1]) + (r_sq[1] * pp_sq[0])
+				radicant /= (r_sq.x * pp_sq.y) + (r_sq.y * pp_sq.x)
 				if large_arc == sweep {
 					radicant = -math.sqrt(radicant)
 				} else {
@@ -1005,16 +877,16 @@ init_parse :: proc(svg_data: []u8, allocator: mem.Allocator = context.allocator)
 				}
 
 				centerp := linalg.PointF{
-					radicant * r[0] / r[1] * pp[1],
-					radicant * -r[1] / r[0] * pp[0],
+					radicant * r.x / r.y * pp.y,
+					radicant * -r.y / r.x * pp.x,
 				}
 				center := linalg.PointF{
-					cos_val * centerp[0] - sin_val * centerp[1] + (cur[0] + end[0]) / 2,
-					sin_val * centerp[0] + cos_val * centerp[1] + (cur[1] + end[1]) / 2,
+					cos_val * centerp.x - sin_val * centerp.y + (cur.x + end.x) / 2.0,
+					sin_val * centerp.x + cos_val * centerp.y + (cur.y + end.y) / 2.0,
 				}
 
-				v1: linalg.PointF = linalg.PointF{(pp[0] - centerp[0]) / r[0], (pp[1] - centerp[1]) / r[1]}
-				v2: linalg.PointF = linalg.PointF{(-pp[0] - centerp[0]) / r[0], (-pp[1] - centerp[1]) / r[1]}
+				v1: linalg.PointF = linalg.PointF{(pp.x - centerp.x) / r.x, (pp.y - centerp.y) / r.y}
+				v2: linalg.PointF = linalg.PointF{(-pp.x - centerp.x) / r.x, (-pp.y - centerp.y) / r.y}
 
 				vector_angle :: proc(u: linalg.PointF, v: linalg.PointF) -> f32 {
 					sign: f32 = 0 > linalg.vector_cross2(u, v) ? -1 : 1
@@ -1025,14 +897,14 @@ init_parse :: proc(svg_data: []u8, allocator: mem.Allocator = context.allocator)
 				}
 				map_to_ellipse :: proc(_in: linalg.PointF, _r: linalg.PointF, _cos: f32, _sin: f32, _center: linalg.PointF) -> linalg.PointF {
 					__in := _in
-					__in = linalg.PointF{__in[0] * _r[0], __in[1] * _r[1]}
+					__in = linalg.PointF{__in.x * _r.x, __in.y * _r.y}
 					return linalg.PointF{
-						_cos * __in[0] - _sin * __in[1],
-						_sin * __in[0] + _cos * __in[1],
+						_cos * __in.x - _sin * __in.y,
+						_sin * __in.x + _cos * __in.y,
 					} + _center
 				}
 
-				ang1 := vector_angle(linalg.PointF{1, 0}, v1)
+				ang1 := vector_angle(linalg.PointF{1.0, 0.0}, v1)
 				ang2 := vector_angle(v1, v2)
 
 				if !sweep && ang2 > 0 {
@@ -1041,24 +913,24 @@ init_parse :: proc(svg_data: []u8, allocator: mem.Allocator = context.allocator)
 					ang2 += doublePI
 				}
 				ratio: f32 = abs(ang2) / (doublePI / 4.0)
-				if math.abs(1 - ratio) < math.F32_EPSILON do ratio = 1
+				if math.abs(1.0 - ratio) < math.F32_EPSILON do ratio = 1.0
 				nseg: int = int(math.max(1, math.ceil(ratio)))
 
 				ang2 /= f32(nseg)
 
 				for j in 0..<nseg {
 					_ = j
-					a := ang2 == 1.57079625 ? 0.551915024494 : (ang2 == -1.57079625 ? -0.551915024494 : 4.0 / 3.0 * math.tan(ang2 / 4))
+					a := ang2 == 1.57079625 ? 0.551915024494 : (ang2 == -1.57079625 ? -0.551915024494 : 4.0 / 3.0 * math.tan(ang2 / 4.0))
 					xy1 := linalg.PointF{math.cos(ang1), math.sin(ang1)}
 					xy2 := linalg.PointF{math.cos(ang1 + ang2), math.sin(ang1 + ang2)}
-					ellipse_0 := map_to_ellipse(linalg.PointF{xy1[0] - xy1[1] * a, xy1[1] + xy1[0] * a}, r, cos_val, sin_val, center)
-					ellipse_1 := map_to_ellipse(linalg.PointF{xy2[0] + xy2[1] * a, xy2[1] - xy2[0] * a}, r, cos_val, sin_val, center)
-					ellipse_2 := map_to_ellipse(linalg.PointF{xy2[0], xy2[1]}, r, cos_val, sin_val, center)
+					ellipse_0 := map_to_ellipse(linalg.PointF{xy1.x - xy1.y * a, xy1.y + xy1.x * a}, r, cos_val, sin_val, center)
+					ellipse_1 := map_to_ellipse(linalg.PointF{xy2.x + xy2.y * a, xy2.y - xy2.x * a}, r, cos_val, sin_val, center)
+					ellipse_2 := map_to_ellipse(linalg.PointF{xy2.x, xy2.y}, r, cos_val, sin_val, center)
 					line = g_cubic_init(line.start, 
-						linalg.PointF{ellipse_0[0], -ellipse_0[1]},
-						 linalg.PointF{ellipse_1[0], -ellipse_1[1]},
-						  linalg.PointF{ellipse_2[0], -ellipse_2[1]})
-					append_line(&shapes.polys, &shapes.types, &n_polys, &n_types, line)
+						linalg.PointF{ellipse_0.x, -ellipse_0.y},
+						 linalg.PointF{ellipse_1.x, -ellipse_1.y},
+						  linalg.PointF{ellipse_2.x, -ellipse_2.y})
+					non_zero_append(&shapes[cur_idx].lines, line)
 					line.start = line.end
 
 					ang1 += ang2
@@ -1071,52 +943,43 @@ init_parse :: proc(svg_data: []u8, allocator: mem.Allocator = context.allocator)
 		}
 		
 		if start {
-			append_line(&shapes.polys, &shapes.types, &n_polys, &n_types, line)
+			non_zero_append(&shapes[cur_idx].lines, line)
 			line.start = line.end
 		}
-	}	
-	if len(shapes.polys) <= start_idx do return .INVALID_NODE
-
-	non_zero_append(&shapes.n_polys, auto_cast n_polys)
-	non_zero_append(&shapes.n_types, auto_cast n_types)
-
-	non_zero_resize(&shapes.colors, len(shapes.colors) + color_len)
-	non_zero_resize(&shapes.strokeColors, len(shapes.strokeColors) + color_len)
-	non_zero_resize(&shapes.thickness, len(shapes.thickness) + color_len)
-
+	}
 	color__ := has_fill ? _parse_color(path._0.fill.?, path._0.fill_opacity) or_return : linalg.Point3DwF{0, 0, 0, 0}
 	stroke__ := has_stroke ? _parse_color(path._0.stroke.?, path._0.stroke_opacity) or_return : linalg.Point3DwF{0, 0, 0, 0}
 	thickness__ := has_stroke ? path._0.stroke_width.? : 0
-	for i in 0..<color_len {
-		shapes.colors[len(shapes.colors) - color_len + i] = color__
-		shapes.strokeColors[len(shapes.strokeColors) - color_len + i] = stroke__
-		shapes.thickness[len(shapes.thickness) - color_len + i] = thickness__
+	for i in start_idx..=cur_idx {
+		shapes[i].color = color__
+		shapes[i].stroke_color = stroke__
+		shapes[i].thickness = thickness__
 	}
 
 	return nil
 }
 
-@private _parse_rect :: proc(shapes: ^__shapes, rect: ^RECT, allocator: mem.Allocator) -> SVG_ERROR {
+@private _parse_rect :: proc(shapes: ^[dynamic]__shapes_node, rect: ^RECT, allocator: mem.Allocator) -> SVG_ERROR {
 	return nil
 }
 
-@private _parse_circle :: proc(shapes: ^__shapes, circle: ^CIRCLE, allocator: mem.Allocator) -> SVG_ERROR {
+@private _parse_circle :: proc(shapes: ^[dynamic]__shapes_node, circle: ^CIRCLE, allocator: mem.Allocator) -> SVG_ERROR {
 	return nil
 }
 
-@private _parse_ellipse :: proc(shapes: ^__shapes, ellipse: ^ELLIPSE, allocator: mem.Allocator) -> SVG_ERROR {
+@private _parse_ellipse :: proc(shapes: ^[dynamic]__shapes_node, ellipse: ^ELLIPSE, allocator: mem.Allocator) -> SVG_ERROR {
 	return nil
 }
 
-@private _parse_line :: proc(shapes: ^__shapes, line: ^LINE, allocator: mem.Allocator) -> SVG_ERROR {
+@private _parse_line :: proc(shapes: ^[dynamic]__shapes_node, line: ^LINE, allocator: mem.Allocator) -> SVG_ERROR {
 	return nil
 }
 
-@private _parse_polyline :: proc(shapes: ^__shapes, polyline: ^POLYLINE, allocator: mem.Allocator) -> SVG_ERROR {
+@private _parse_polyline :: proc(shapes: ^[dynamic]__shapes_node, polyline: ^POLYLINE, allocator: mem.Allocator) -> SVG_ERROR {
 	return nil
 }
 
-@private _parse_polygon :: proc(shapes: ^__shapes, polygon: ^POLYGON, allocator: mem.Allocator) -> SVG_ERROR {
+@private _parse_polygon :: proc(shapes: ^[dynamic]__shapes_node, polygon: ^POLYGON, allocator: mem.Allocator) -> SVG_ERROR {
 	return nil
 }
 

@@ -409,7 +409,7 @@ init_swap_chain :: proc() {
 	for f in vk_fmts {
 		if f.format == .R8G8B8A8_UNORM || f.format == .B8G8R8A8_UNORM {
 			when is_log {
-				fmt.printfln("XFIT SYSLOG : vulkan swapchain format : %s, colorspace : %ss", f.format, f.colorSpace)
+				fmt.printfln("XFIT SYSLOG : vulkan swapchain format : %s, colorspace : %s", f.format, f.colorSpace)
 			}
 			vk_fmt = f
 			break;
