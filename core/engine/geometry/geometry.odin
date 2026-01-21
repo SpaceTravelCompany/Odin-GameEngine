@@ -923,8 +923,8 @@ shapes_compute_polygon :: proc(poly:^shapes, allocator := context.allocator) -> 
     return
 }
 
-poly_transform_matrix :: proc "contextless" (poly: ^shapes, F: linalg.matrix44) {
-	for &node in poly.nodes {
+poly_transform_matrix :: proc "contextless" (inout_poly: ^shapes, F: linalg.matrix44) {
+	for &node in inout_poly.nodes {
 		for &line in node.lines {
 			start := linalg.mul(F, linalg.point3dw{line.start.x, line.start.y, 0, 1})
 			control0 := linalg.mul(F, linalg.point3dw{line.control0.x, line.control0.y, 0, 1})
