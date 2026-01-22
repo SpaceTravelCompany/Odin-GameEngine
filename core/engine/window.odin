@@ -37,7 +37,6 @@ monitor_info :: struct {
 @private prev_window_width: int
 @private prev_window_height: int
 
-@private __screen_idx: int = 0
 @private __screen_mode: screen_mode
 @private __window_title: cstring
 @private __screen_orientation:screen_orientation = .Unknown

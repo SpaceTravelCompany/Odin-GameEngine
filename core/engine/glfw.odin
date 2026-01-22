@@ -25,7 +25,7 @@ when !library.is_mobile {
     @(private="file") wnd:glfw.WindowHandle = nil
     @(private="file") glfw_monitors:[dynamic]glfw.MonitorHandle
 
-	glfw_start :: proc() {
+	glfw_start :: proc(_screen_idx: int) {
 		when !is_console {
 			//?default screen idx 0
 			if __window_width == nil do __window_width = int((monitors[0].rect.right - monitors[0].rect.left) / 2)
@@ -34,23 +34,34 @@ when !library.is_mobile {
 			if __window_y == nil do __window_y = int(monitors[0].rect.top + abs(monitors[0].rect.bottom - monitors[0].rect.top) / 4)
 
 			save_prev_window()
+			__screen_idx := _screen_idx
+			if len(monitors) - 1 < __screen_idx {
+				__screen_idx = 0
+			}
 
 			//? change use glfw.SetWindowAttrib()
 			if __screen_mode == .Fullscreen {
+				glfw.WindowHint (glfw.DECORATED, glfw.FALSE)
+				glfw.WindowHint(glfw.FLOATING, glfw.TRUE)
+
 				wnd = glfw.CreateWindow(monitors[__screen_idx].rect.right - monitors[__screen_idx].rect.left,
 					abs(monitors[__screen_idx].rect.bottom - monitors[__screen_idx].rect.top),
 					__window_title,
-					glfw_monitors[__screen_idx],
+					nil,
 					nil)
+
+				__window_x = int(monitors[__screen_idx].rect.left)
+				__window_y = int(monitors[__screen_idx].rect.top)
+				__window_width = int(monitors[__screen_idx].rect.right - monitors[__screen_idx].rect.left)
+				__window_height = int(abs(monitors[__screen_idx].rect.bottom - monitors[__screen_idx].rect.top))
 			} else {
 				wnd = glfw.CreateWindow(auto_cast __window_width.?,
 					auto_cast __window_height.?,
 					__window_title,
 					nil,
 					nil)
-
-				glfw.SetWindowPos(wnd, auto_cast __window_x.?, auto_cast __window_y.?)
 			}
+			glfw.SetWindowPos(wnd, auto_cast __window_x.?, auto_cast __window_y.?)
 
 			//CreateRenderFuncThread()
 		}
@@ -75,16 +86,11 @@ when !library.is_mobile {
 	}
 
 	glfw_set_full_screen_mode :: proc "contextless" (monitor:^monitor_info) {
-		for &m, i in monitors {
-			if raw_data(m.name) == raw_data(monitor.name) {
-				glfw.SetWindowMonitor(wnd, glfw_monitors[i], monitor.rect.left,
-					monitor.rect.top,
-					monitor.rect.right - monitor.rect.left,
-					abs(monitor.rect.bottom - monitor.rect.top),
-					glfw.DONT_CARE)
-				return
-			}
-		}
+		glfw.SetWindowMonitor(wnd, nil, monitor.rect.left,
+			monitor.rect.top,
+			monitor.rect.right - monitor.rect.left,
+			abs(monitor.rect.bottom - monitor.rect.top),
+			glfw.DONT_CARE)
 	}
 
 	glfw_set_window_icon :: #force_inline  proc "contextless" (icons:[]glfw.Image) {

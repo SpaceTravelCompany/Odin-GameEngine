@@ -122,6 +122,8 @@ engine_main :: proc(
 	window_width:Maybe(int) = nil,
 	window_height:Maybe(int) = nil,
 	v_sync:v_sync = .Double,
+	screen_mode:screen_mode = .Window,
+	screen_idx:int = 0,
 ) {
 	when ODIN_OS == .Windows {
 		windows_h_instance = auto_cast windows.GetModuleHandleA(nil)
@@ -149,6 +151,7 @@ engine_main :: proc(
 		}
 	}
 	__v_sync = v_sync
+	__screen_mode = screen_mode
 
 	when is_android {
 		android_start()
@@ -165,7 +168,7 @@ engine_main :: proc(
 			thread.pool_init(&g_thread_pool, context.allocator, get_processor_core_len())
 			thread.pool_start(&g_thread_pool)
 	
-			window_start()
+			window_start(screen_idx)
 
 			graphics_init()
 
@@ -179,6 +182,7 @@ engine_main :: proc(
 
 			destroy()
 
+			thread.pool_finish(&g_thread_pool)
 			graphics_destroy()
 
 			system_destroy()
@@ -214,10 +218,10 @@ engine_main :: proc(
 	}
 }
 
-@private window_start :: proc() {
+@private window_start :: proc(__screen_idx: int) {
 	when is_android {
 	} else {
-		glfw_start()
+		glfw_start(__screen_idx)
 	}
 }
 

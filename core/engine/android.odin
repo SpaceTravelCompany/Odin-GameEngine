@@ -444,6 +444,7 @@ when library.is_android {
 					} else {
 						graphics_wait_device_idle()
 						destroy()
+						thread.pool_finish(&g_thread_pool)
 						graphics_destroy()
 						system_destroy()
 						system_after_destroy()
