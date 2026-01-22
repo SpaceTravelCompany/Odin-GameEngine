@@ -5,10 +5,14 @@
 			"type": "object",
 			"properties": {
 				"is-android": {
-					"type": "boolean"
+					"type": "boolean",
+					"default": false,
+					"description": "Enable build Target Android"
 				},
 				"is-console": {
-					"type": "boolean"
+					"type": "boolean",
+					"default": false,
+					"description": "Enable console"
 				},
 				"main-package": {
 					"type": "string"
@@ -29,7 +33,9 @@
 					"description": "Build optimization type"
 				},
 				"log": {
-					"type": "boolean"
+					"type": "boolean",
+					"default": false,
+					"description": "Enable logging"
 				},
 				"resource": {
 					"type": "string",
@@ -49,7 +55,7 @@
 			},
 			"required": ["main-package", "out-path", "build-type"]
 		},
-		"android-paths": {
+		"android": {
 			"type": "object",
 			"properties": {
 				"ndk": {
@@ -61,6 +67,19 @@
 				"platform-version": {
 					"type": "string",
 					"description": "!Must be same as the Build Tool Version"
+				},
+				"keystore": {
+					"type": "string",
+					"default": "android/debug.keystore"
+				},
+				"keystore-password": {
+					"type": "string",
+					"default": "android"
+				},
+				"export_vulkan_validation_layer": {
+					"type": "boolean",
+					"description": "Copy vulkan validation layer so file to android/lib/lib/arm64-v8a (only supported for debug build)",
+					"default": false
 				}
 			},
 			"required": ["ndk", "sdk", "platform-version"]

@@ -6,7 +6,7 @@
         "out-path" : "bin/test",
         "build-type" : "minimal"
     },
-    "android-paths" : {
+    "android" : {
         "ndk" : "/usr/local/Android/ndk/29.0.14206865",
         "sdk" : "/usr/local/Android",
         "platform-version" : "36"

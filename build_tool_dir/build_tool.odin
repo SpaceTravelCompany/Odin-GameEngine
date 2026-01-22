@@ -56,14 +56,8 @@ main :: proc() {
 
 	setting := (json_data.(json.Object)["setting"]).(json.Object)
 
-	is_android :bool = false
-	if "is-android" in setting {
-		is_android = setting["is-android"].(json.Boolean)
-	}
-	log := true
-	if "log" in setting {
-		log = setting["log"].(json.Boolean)
-	}
+	is_android :bool = setting["is-android"].(json.Boolean)
+	log :bool = setting["log"].(json.Boolean)
 
 	// Sets the optimization mode for compilation.
 	// Available options:
@@ -99,6 +93,13 @@ main :: proc() {
 		
 		ndkPath := android_paths["ndk"].(json.String)
 		sdkPath := android_paths["sdk"].(json.String)
+		export_vulkan_validation_layer := false
+		if "export_vulkan_validation_layer" in android_paths && debug {
+			export_vulkan_validation_layer = android_paths["export_vulkan_validation_layer"].(json.Boolean)
+		}
+		keystore := android_paths["keystore"].(json.String)
+		keystore_password := android_paths["keystore-password"].(json.String)
+
 		PLATFORM := android_paths["platform-version"].(json.String)
 		//!use build-tools version same as platform version
 
@@ -119,7 +120,7 @@ main :: proc() {
 		// 	fmt.panicf("libc++_shared copy_file: %s", err)
 		// }
 
-		if debug {
+		if export_vulkan_validation_layer {
 			err := os2.copy_file("android/lib/lib/arm64-v8a/libVkLayer_khronos_validation.so", filepath.join({ODIN_ROOT, "/core/engine/lib/android/libVkLayer_khronos_validation_arm64.so"}, context.temp_allocator))
 			if err != nil {
 				fmt.panicf("libVkLayer_khronos_validation copy_file: %s", err)
@@ -171,7 +172,9 @@ main :: proc() {
 			}
 
 			//?"$ANDROID_JBR/bin/keytool" -genkey -v -keystore .keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000
-			if !runCmd({"odin", "bundle", "android", "android", "-android-keystore:android/debug.keystore", "-android-keystore-password:android",
+			keystore_cmd := strings.join({"-android-keystore:", keystore}, "", context.temp_allocator)
+			keystore_password_cmd := strings.join({"-android-keystore-password:", keystore_password}, "", context.temp_allocator)
+			if !runCmd({"odin", "bundle", "android", "android", keystore_cmd, keystore_password_cmd,
 			}) {
 				return
 			}
@@ -183,7 +186,7 @@ main :: proc() {
 
 			break//!only supports arm64 now
 		}
-		if debug {
+		if export_vulkan_validation_layer {
 			os2.remove("android/lib/lib/arm64-v8a/libVkLayer_khronos_validation.so")
 		}
 
