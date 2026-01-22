@@ -18,13 +18,13 @@ jobs:
       - name: Setup Odin
           
         run: |
-            docker run --rm -v "$PWD:/src" -w /src alpine sh -c '
+          docker run --rm -v "$PWD:/src" -w /src alpine sh -c '
             apk add --no-cache \
               musl-dev llvm20-dev clang20 git mold lz4 \
               libxml2-static llvm20-static zlib-static zstd-static \
               make &&
-            ./build_linux_static.sh &&
-            echo "${{ github.workspace }}" >> $GITHUB_PATH
+            ./build_linux_static.sh
+          ' && echo "${{ github.workspace }}" >> $GITHUB_PATH
 
       - name: Build Tool
         run: make tool
