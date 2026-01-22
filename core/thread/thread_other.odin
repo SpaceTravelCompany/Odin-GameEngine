@@ -1,4 +1,4 @@
-//#+build js, wasi // edited (xfitgd) : disable js target temporarily
+#+build js, wasi
 #+build !linux
 #+build !darwin
 #+build !freebsd

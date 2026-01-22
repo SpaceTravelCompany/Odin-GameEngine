@@ -895,8 +895,8 @@ gb_global NamedTargetMetrics named_targets[] = {
 	{ str_lit("haiku_amd64"),         &target_haiku_amd64    },
 
 	{ str_lit("freestanding_wasm32"), &target_freestanding_wasm32 },
-	//{ str_lit("wasi_wasm32"),         &target_wasi_wasm32 },
-	//{ str_lit("js_wasm32"),           &target_js_wasm32 }, //edited (xfitgd) : disable wasm targets temporarily
+	{ str_lit("wasi_wasm32"),         &target_wasi_wasm32 },
+	{ str_lit("js_wasm32"),           &target_js_wasm32 },
 
 	{ str_lit("freestanding_wasm64p32"), &target_freestanding_wasm64p32 },
 	{ str_lit("js_wasm64p32"),           &target_js_wasm64p32 },

@@ -4725,8 +4725,7 @@ gb_internal void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 							error(init, "For wasm related targets, it is required that you either define the"
 							            " @(default_calling_convention=<string>) on the foreign block or"
 							            " explicitly assign it on the procedure signature");
-							//error_line("\tSuggestion: when dealing with normal Odin code (e.g. js_wasm32), use \"contextless\"; when dealing with Emscripten like code, use \"c\"\n");
-							//edited (xfitgd) : disable wasm targets temporarily
+							error_line("\tSuggestion: when dealing with normal Odin code (e.g. js_wasm32), use \"contextless\"; when dealing with Emscripten like code, use \"c\"\n");
 						}
 					}
 					e->Procedure.link_prefix = c->foreign_context.link_prefix;

@@ -1,4 +1,4 @@
-//#+build !js // edited (xfitgd) : disable js target temporarily
+#+build !js
 package core_image_bmp
 
 import "core:os"

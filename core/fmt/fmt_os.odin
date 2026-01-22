@@ -1,5 +1,4 @@
-#+build !freestanding
-//#+build !js // edited (xfitgd)
+#+build !freestanding, !js
 package fmt
 
 import "base:runtime"

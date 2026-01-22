@@ -1,4 +1,4 @@
-//#+build !js // edited (xfitgd) : disable js target temporarily
+#+build !js
 package tga
 
 import "core:os"
