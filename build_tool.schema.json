@@ -59,10 +59,12 @@
 			"type": "object",
 			"properties": {
 				"ndk": {
-					"type": "string"
+					"type": "string",
+					"description": "Android NDK path : Default is env ODIN_ANDROID_NDK"
 				},
 				"sdk": {
-					"type": "string"
+					"type": "string",
+					"description": "Android SDK path : Default is env ODIN_ANDROID_SDK"
 				},
 				"platform-version": {
 					"type": "string",
@@ -82,7 +84,7 @@
 					"default": false
 				}
 			},
-			"required": ["ndk", "sdk", "platform-version"]
+			"required": ["platform-version"]
 		}
 	},
 	"required": ["setting"]

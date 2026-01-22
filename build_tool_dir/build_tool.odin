@@ -96,9 +96,27 @@ main :: proc() {
 
 		os2.make_directory("android/lib/lib/arm64-v8a")
 
-		
-		ndkPath := android_options["ndk"].(json.String)
-		sdkPath := android_options["sdk"].(json.String)
+		ndkPath := ""
+		sdkPath := ""
+		if "ndk" in android_options {
+			ndkPath = android_options["ndk"].(json.String)
+			os2.set_env("ODIN_ANDROID_NDK", ndkPath)
+		} else {
+			ndkPath = os2.get_env_alloc("ODIN_ANDROID_NDK", context.temp_allocator)
+			if ndkPath == "" {
+				fmt.panicf("ODIN_ANDROID_NDK is not set")
+			}
+		}
+		if "sdk" in android_options {
+			sdkPath = android_options["sdk"].(json.String)
+			os2.set_env("ODIN_ANDROID_SDK", sdkPath)
+		} else {
+			sdkPath = os2.get_env_alloc("ODIN_ANDROID_SDK", context.temp_allocator)
+			if sdkPath == "" {
+				fmt.panicf("ODIN_ANDROID_SDK is not set")
+			}
+		}
+
 		export_vulkan_validation_layer := false
 		if "export_vulkan_validation_layer" in android_options && debug {
 			export_vulkan_validation_layer = android_options["export_vulkan_validation_layer"].(json.Boolean)
@@ -116,8 +134,7 @@ main :: proc() {
 		//!use build-tools version same as platform version
 
 		toolchainPath : string
-		os2.set_env("ODIN_ANDROID_SDK", sdkPath)
-		os2.set_env("ODIN_ANDROID_NDK", ndkPath)
+
 		when ODIN_OS == .Windows {
 			toolchainPath = strings.join({ndkPath, "/toolchains/llvm/prebuilt/windows-x86_64"}, "", context.temp_allocator)
 		} else when ODIN_OS == .Linux {
@@ -177,8 +194,6 @@ main :: proc() {
 			target,
 			"-subtarget:android",
 			//"-show-debug-messages",//!for debug
-			fmt.aprint("-minimum-os-version:", PLATFORM, sep = "", allocator = context.temp_allocator),
-			//"-extra-linker-flags:\"-L lib/lib/arm64-v8a -lVkLayer_khronos_validation\"" if debug else ({}),
 			}) {
 				return
 			}

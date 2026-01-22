@@ -2,8 +2,9 @@
 
 package android
 
+// https://github.com/IllusionMan1212/ndk-odin
 //
-// Based on NDK r26b (26.1.10909125)
+// Based on NDK r29 29.0.14206865 (edited version)////(26.1.10909125)
 //
 
 // Apparently the app still needs to have a manifest, it also MUST use the nativeactivity activity.
