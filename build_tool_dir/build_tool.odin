@@ -56,8 +56,14 @@ main :: proc() {
 
 	setting := (json_data.(json.Object)["setting"]).(json.Object)
 
-	is_android :bool = setting["is-android"].(json.Boolean)
-	log :bool = setting["log"].(json.Boolean)
+	is_android :bool = false
+	if "is-android" in setting {
+		is_android = setting["is-android"].(json.Boolean)
+	}
+	log :bool = false
+	if "log" in setting {
+		log = setting["log"].(json.Boolean)
+	}
 
 	// Sets the optimization mode for compilation.
 	// Available options:
@@ -83,7 +89,7 @@ main :: proc() {
 	//if !findGLSLFileAndRunCmd() do return
 
 	if is_android {
-		android_paths := (json_data.(json.Object)["android"]).(json.Object)
+		android_options := (json_data.(json.Object)["android"]).(json.Object)
 		os2.make_directory("android")
 		os2.make_directory("android/lib")
 		os2.make_directory("android/lib/lib")
@@ -91,16 +97,22 @@ main :: proc() {
 		os2.make_directory("android/lib/lib/arm64-v8a")
 
 		
-		ndkPath := android_paths["ndk"].(json.String)
-		sdkPath := android_paths["sdk"].(json.String)
+		ndkPath := android_options["ndk"].(json.String)
+		sdkPath := android_options["sdk"].(json.String)
 		export_vulkan_validation_layer := false
-		if "export_vulkan_validation_layer" in android_paths && debug {
-			export_vulkan_validation_layer = android_paths["export_vulkan_validation_layer"].(json.Boolean)
+		if "export_vulkan_validation_layer" in android_options && debug {
+			export_vulkan_validation_layer = android_options["export_vulkan_validation_layer"].(json.Boolean)
 		}
-		keystore := android_paths["keystore"].(json.String)
-		keystore_password := android_paths["keystore-password"].(json.String)
+		keystore := "android/debug.keystore"
+		keystore_password := "android"
+		if "keystore" in android_options {
+			keystore = android_options["keystore"].(json.String)
+		}
+		if "keystore-password" in android_options {
+			keystore_password = android_options["keystore-password"].(json.String)
+		}
 
-		PLATFORM := android_paths["platform-version"].(json.String)
+		PLATFORM := android_options["platform-version"].(json.String)
 		//!use build-tools version same as platform version
 
 		toolchainPath : string
