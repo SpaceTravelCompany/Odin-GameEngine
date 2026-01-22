@@ -885,7 +885,7 @@ vk_start :: proc() {
 			   mem.compare((transmute([^]byte)DEVICE_EXTENSIONS[i])[:len(DEVICE_EXTENSIONS[i])],e.extensionName[:len(DEVICE_EXTENSIONS[i])]) == 0 {
 				non_zero_append(&deviceExtNames, DEVICE_EXTENSIONS[i])
 				DEVICE_EXTENSIONS_CHECK[i] = true
-				when is_log do fmt.println(
+				when is_log do fmt.printfln(
 					"XFIT SYSLOG : vulkan %s device ext support",
 					DEVICE_EXTENSIONS[i],
 				)
