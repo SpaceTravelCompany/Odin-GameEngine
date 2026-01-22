@@ -21,7 +21,7 @@ jobs:
           docker run --rm -v "$PWD:/src" -w /src alpine sh -c '
             apk add --no-cache \
               musl-dev llvm21-dev clang21 git mold lz4 \
-              libxml2-static llvm20-static zlib-static zstd-static \
+              libxml2-static llvm21-static zlib-static zstd-static \
               libstdc++ \
               make &&
             ./build_linux_static.sh
