@@ -1620,41 +1620,43 @@ vk_transition_image_layout :: proc(cmd:vk.CommandBuffer, image:vk.Image, mip_lev
 	&barrier)
 }
 
-vk_begin_single_time_cmd :: proc "contextless" () -> vk.CommandBuffer {
-	cmd:vk.CommandBuffer
-	res := vk.AllocateCommandBuffers(vk_device, &vk.CommandBufferAllocateInfo{
-		sType = vk.StructureType.COMMAND_BUFFER_ALLOCATE_INFO,
-		commandPool = vk_cmd_pool,
-		level = vk.CommandBufferLevel.PRIMARY,
-		commandBufferCount = 1,
-	}, &cmd)
-	if res != .SUCCESS do trace.panic_log("vk_begin_single_time_cmd vk.AllocateCommandBuffers(&cmd) : ", res)
+//!불완전한 기능
+// vk_begin_single_time_cmd :: proc "contextless" () -> vk.CommandBuffer {
+// 	cmd:vk.CommandBuffer
+// 	res := vk.AllocateCommandBuffers(vk_device, &vk.CommandBufferAllocateInfo{
+// 		sType = vk.StructureType.COMMAND_BUFFER_ALLOCATE_INFO,
+// 		commandPool = vk_cmd_pool,
+// 		level = vk.CommandBufferLevel.PRIMARY,
+// 		commandBufferCount = 1,
+// 	}, &cmd)
+// 	if res != .SUCCESS do trace.panic_log("vk_begin_single_time_cmd vk.AllocateCommandBuffers(&cmd) : ", res)
 
-	beginInfo := vk.CommandBufferBeginInfo {
-		flags = {.ONE_TIME_SUBMIT},
-		sType = vk.StructureType.COMMAND_BUFFER_BEGIN_INFO,
-	}
-	vk.BeginCommandBuffer(cmd, &beginInfo)
+// 	beginInfo := vk.CommandBufferBeginInfo {
+// 		flags = {.ONE_TIME_SUBMIT},
+// 		sType = vk.StructureType.COMMAND_BUFFER_BEGIN_INFO,
+// 	}
+// 	vk.BeginCommandBuffer(cmd, &beginInfo)
 
-	return cmd
-}
+// 	return cmd
+// }
 
-vk_end_single_time_cmd :: proc "contextless" (_cmd:vk.CommandBuffer)  {
-	cmd := _cmd
-	vk.EndCommandBuffer(cmd)
+//!불완전한 기능
+// vk_end_single_time_cmd :: proc "contextless" (_cmd:vk.CommandBuffer)  {
+// 	cmd := _cmd
+// 	vk.EndCommandBuffer(cmd)
 
-	submitInfo := vk.SubmitInfo {
-		commandBufferCount = 1,
-		pCommandBuffers    = &cmd,
-		sType              = .SUBMIT_INFO,
-	}
-	res := vk.QueueSubmit(vk_graphics_queue, 1, &submitInfo, 0)
-	if res != .SUCCESS do trace.panic_log("vk_end_single_time_cmd res := vk.QueueSubmit(vk_graphics_queue, 1, &submitInfo, 0) : ", res)
+// 	submitInfo := vk.SubmitInfo {
+// 		commandBufferCount = 1,
+// 		pCommandBuffers    = &cmd,
+// 		sType              = .SUBMIT_INFO,
+// 	}
+// 	res := vk.QueueSubmit(vk_graphics_queue, 1, &submitInfo, 0)
+// 	if res != .SUCCESS do trace.panic_log("vk_end_single_time_cmd res := vk.QueueSubmit(vk_graphics_queue, 1, &submitInfo, 0) : ", res)
 
-	vk_wait_graphics_idle()
+// 	vk_wait_graphics_idle()
 
-	vk.FreeCommandBuffers(vk_device, vk_cmd_pool, 1, &cmd)
-}
+// 	vk.FreeCommandBuffers(vk_device, vk_cmd_pool, 1, &cmd)
+// }
 
 vk_record_command_buffer :: proc(cmd:^render_cmd, frame:int, imageIndex:u32, _inheritanceInfo:vk.CommandBufferInheritanceInfo) {
 	inheritanceInfo := _inheritanceInfo

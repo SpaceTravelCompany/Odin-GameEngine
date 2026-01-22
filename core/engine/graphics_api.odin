@@ -284,15 +284,16 @@ graphics_execute_ops_destroy :: #force_inline proc() {
 }
 
 
-// 단일 시간 명령 버퍼 시작
-graphics_begin_single_time_cmd :: #force_inline proc "contextless" () -> command_buffer {
-	return command_buffer{__handle = vk_begin_single_time_cmd()}
-}
+//!불완전한 기능
+// // 단일 시간 명령 버퍼 시작
+// graphics_begin_single_time_cmd :: #force_inline proc "contextless" () -> command_buffer {
+// 	return command_buffer{__handle = vk_begin_single_time_cmd()}
+// }
 
-// 단일 시간 명령 버퍼 종료
-graphics_end_single_time_cmd :: #force_inline proc "contextless" (cmd: command_buffer) {
-	vk_end_single_time_cmd(cmd.__handle)
-}
+// // 단일 시간 명령 버퍼 종료
+// graphics_end_single_time_cmd :: #force_inline proc "contextless" (cmd: command_buffer) {
+// 	vk_end_single_time_cmd(cmd.__handle)
+// }
 
 /*
 Allocates command buffers from the command pool
