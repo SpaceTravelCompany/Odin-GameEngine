@@ -10,7 +10,7 @@ import "base:library"
 icon_image :: glfw.Image
 v_sync :: enum {Double, Triple, None}
 
-screen_mode :: enum {Window, Borderless, Fullscreen}
+screen_mode :: enum {Window, Fullscreen}
 
 screen_orientation :: enum {
 	Unknown,
@@ -95,24 +95,7 @@ set_full_screen_mode :: proc "contextless" (monitor:^monitor_info) {
 		__screen_mode = .Fullscreen
 	}
 }
-/*
-Sets the window to borderless fullscreen mode on the specified monitor
 
-Inputs:
-- monitor: Pointer to the monitor to use
-
-Returns:
-- None
-*/
-set_borderless_screen_mode :: proc "contextless" (monitor:^monitor_info) {
-	when !library.is_mobile {
-		sync.mutex_lock(&full_screen_mtx)
-		defer sync.mutex_unlock(&full_screen_mtx)
-		save_prev_window()
-		glfw_set_borderless_screen_mode(monitor)
-		__screen_mode = .Borderless
-	}
-}
 /*
 Sets the window to windowed mode
 

@@ -36,20 +36,7 @@ when !library.is_mobile {
 			save_prev_window()
 
 			//? change use glfw.SetWindowAttrib()
-			if __screen_mode ==.Borderless {
-				glfw.WindowHint (glfw.DECORATED, glfw.FALSE)
-				glfw.WindowHint(glfw.FLOATING, glfw.TRUE)
-
-				wnd = glfw.CreateWindow(monitors[__screen_idx].rect.right - monitors[__screen_idx].rect.left,
-					abs(monitors[__screen_idx].rect.bottom - monitors[__screen_idx].rect.top),
-					__window_title,
-					nil,
-					nil)
-
-				glfw.SetWindowPos(wnd, monitors[__screen_idx].rect.left, monitors[__screen_idx].rect.top)
-				glfw.SetWindowSize(wnd, monitors[__screen_idx].rect.right - monitors[__screen_idx].rect.left,
-					 abs(monitors[__screen_idx].rect.bottom - monitors[__screen_idx].rect.top))
-			} else if __screen_mode == .Fullscreen {
+			if __screen_mode == .Fullscreen {
 				wnd = glfw.CreateWindow(monitors[__screen_idx].rect.right - monitors[__screen_idx].rect.left,
 					abs(monitors[__screen_idx].rect.bottom - monitors[__screen_idx].rect.top),
 					__window_title,
@@ -102,14 +89,6 @@ when !library.is_mobile {
 
 	glfw_set_window_icon :: #force_inline  proc "contextless" (icons:[]glfw.Image) {
 		glfw.SetWindowIcon(wnd, icons)
-	}
-
-	glfw_set_borderless_screen_mode :: proc "contextless" (monitor:^monitor_info) {
-		glfw.SetWindowMonitor(wnd, nil, monitor.rect.left,
-			monitor.rect.top,
-		monitor.rect.right - monitor.rect.left,
-		abs(monitor.rect.bottom - monitor.rect.top),
-		glfw.DONT_CARE)
 	}
 
 	glfw_set_window_mode :: proc "contextless" () {
