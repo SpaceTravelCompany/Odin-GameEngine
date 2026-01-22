@@ -83,7 +83,7 @@ main :: proc() {
 	//if !findGLSLFileAndRunCmd() do return
 
 	if is_android {
-		android_paths := (json_data.(json.Object)["android-paths"]).(json.Object)
+		android_paths := (json_data.(json.Object)["android"]).(json.Object)
 		os2.make_directory("android")
 		os2.make_directory("android/lib")
 		os2.make_directory("android/lib/lib")
