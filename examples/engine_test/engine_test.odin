@@ -18,6 +18,7 @@ import "core:engine/shape"
 import "core:engine/geometry"
 import "core:engine/gui"
 import "core:debug/trace"
+import "vendor:svg"
 
 is_android :: engine.is_android// TODO ANDROID SUPPORT
 
@@ -57,6 +58,7 @@ GUI_Image :: struct {
 }
 
 panda_img : []u8 = #load("res/panda.qoi")
+github_mark_svg : []u8 = #load("res/github-mark.svg")
 
 panda_img_allocator_proc :: proc(allocator_data: rawptr, mode: runtime.Allocator_Mode,
                             size, alignment: int,
@@ -70,11 +72,39 @@ panda_img_allocator_proc :: proc(allocator_data: rawptr, mode: runtime.Allocator
 	return nil, nil
 }
 
+svg_shape_src : shape.shape_src
+init_svg :: proc() {
+    svg_parser, err := svg.init_parse(github_mark_svg, context.temp_allocator)
+    if err != nil {
+        trace.panic_log(err)
+    }
+    defer svg.deinit(&svg_parser)
+
+	geometry.poly_transform_matrix(&svg_parser.shapes, engine.srtc_2d_matrix(
+		t = {0,0,0},
+		cp = {-8,8},
+		s = {30,30},
+		r = 0.5,
+	))
+
+    svg_shape := new(shape.shape)
+    shape_err := shape.shape_src_init(&svg_shape_src, &svg_parser.shapes)
+    if shape_err != nil {
+        trace.panic_log(shape_err)
+    }
+
+    shape.shape_init(svg_shape, shape.shape, &svg_shape_src, 
+        {0,0,0}, )
+    engine.render_cmd_add_object(renderCmd, svg_shape)
+}
+
 Init ::proc() {
 	scene = make([dynamic]^engine.iobject)
     renderCmd = engine.render_cmd_init(&scene)
 
     engine.projection_update_ortho_window(engine.def_projection(), CANVAS_W, CANVAS_H)
+
+    init_svg()
 
     //Font Test
     shape_obj: ^shape.shape = new(shape.shape)
@@ -105,9 +135,9 @@ Init ::proc() {
     //font.Font_SetScale(ft, 2)
 
     renderOpt := font.font_render_opt{
-        color = linalg.Point3DwF{1,1,1,1},
+        color = linalg.point3dw{1,1,1,1},
         flag = .GPU,
-        scale = linalg.PointF{3,3},
+        scale = linalg.point{3,3},
     }
 
     rawText, shapeErr := font.font_render_string(ft, "안녕", renderOpt, context.allocator)
@@ -245,6 +275,7 @@ Destroy ::proc() {
 	delete(scene)
 
 	font.font_deinit(ft)
+	shape.shape_src_deinit(&svg_shape_src)
 
     sound.sound_src_deinit(bgSndSrc)
     delete(bgSndFileData)
