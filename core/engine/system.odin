@@ -204,8 +204,10 @@ engine_main :: proc(
 @private system_after_destroy :: #force_inline proc() {
 	delete(monitors)
 	virtual.arena_free_all(&__tempArena)
-	thread.pool_join(&g_thread_pool)
-	thread.pool_destroy(&g_thread_pool)
+	when !is_console {
+		thread.pool_join(&g_thread_pool)
+		thread.pool_destroy(&g_thread_pool)
+	}
 }
 
 
