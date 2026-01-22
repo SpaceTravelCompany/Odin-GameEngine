@@ -323,4 +323,3 @@ engine_test
 engine_test.bin
 
 *.apk
-*/android/lib/*
