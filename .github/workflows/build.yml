@@ -1,0 +1,47 @@
+name: Build Test
+
+# Sets up to deploy when a new commit is pushed to the master branch, or when you click
+# run in the GitHub UI.
+on:
+  push:
+    branches:
+      - master
+
+  workflow_dispatch:
+
+jobs:
+  build_linux:
+    name: Build Linux
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Odin
+        #   docker run --rm -v "$PWD:/src" -w /src alpine sh -c '
+        #     apk add --no-cache \
+        #       musl-dev llvm20-dev clang20 git mold lz4 \
+        #       libxml2-static llvm20-static zlib-static zstd-static \
+        #       make &&
+        #     ./build_linux_static.sh
+        run: |
+            sudo apt-get install -y \
+            clang-20 \
+            lldb-20 \
+            lld-20 \
+            libcmark-dev
+
+            sudo ln -sf /usr/bin/clang-20 /usr/bin/clang
+            sudo ln -sf /usr/bin/clang++-20 /usr/bin/clang++
+            make debug
+            echo "${{ github.workspace }}" >> $GITHUB_PATH
+
+      - name: Build Tool
+        run: make tool
+
+      - name: Odin run
+        run: odin run examples/demo
+
+      - name: Test
+        run: odin run examples/demo
+
+      - name: Test Engine
+        run: cd examples/engine_test && odin build . && ./engine_test
