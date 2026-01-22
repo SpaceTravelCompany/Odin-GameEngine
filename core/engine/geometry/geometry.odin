@@ -111,8 +111,7 @@ line_init :: proc "contextless" (_start: linalg.point, _end: linalg.point) -> sh
 quadratic_init :: proc "contextless" (_start: linalg.point, _control01: linalg.point, _end: linalg.point) -> shape_line {
 	return shape_line{
 		start = _start,
-		control0 = CvtQuadraticToCubic0(_start, _control01),
-		control1 = CvtQuadraticToCubic1(_end, _control01),
+		control0 = _control01,
 		end = _end,
 		type = .Quadratic,
 	}
@@ -706,7 +705,7 @@ shapes_compute_polygon :: proc(poly:^shapes, allocator := context.allocator) -> 
 					if line.type == .Line {
 						non_zero_append(&outPoly[poly_idx], CurveStruct{line.start, false})
 					} else if line.type == .Quadratic {
-						pts := [4]linalg.point{line.start, line.control0, line.control1, line.end}
+						pts := [3]linalg.point{line.start, line.control0, line.end}
 						err = _Shapes_ComputeLine(
 							vertList,
 							indList,

@@ -328,8 +328,7 @@ allocator : runtime.Allocator) -> (rect:linalg.rect, err:geometry.shape_error = 
     
         non_zero_append(&data.lines_da[data.polygonCount], geometry.shape_line{
             start = data.pen,
-            control0 = geometry.CvtQuadraticToCubic0(data.pen, ctl),
-            control1 = geometry.CvtQuadraticToCubic1(end, ctl),
+            control0 = ctl,
             end = end,
             type = .Quadratic,
         })
