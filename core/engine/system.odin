@@ -154,9 +154,9 @@ engine_main :: proc(
 	__screen_mode = screen_mode
 
 	when is_android {
-		android_start()
 		thread.pool_init(&g_thread_pool, context.allocator, get_processor_core_len())
 		thread.pool_start(&g_thread_pool)
+		android_start()
 	} else {
 		when is_console {
 			init()

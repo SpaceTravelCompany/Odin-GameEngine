@@ -7,9 +7,15 @@ import "base:runtime"
 import "core:strings"
 import "core:fmt"
 import "core:c"
+import "base:library"
 
-// NOTE: Relies on C++23 which adds <stacktrace> and becomes ABI and that can be used
-foreign import libbacktrace "system:backtrace"// edited (SpaceTravelCompany)
+// edited (SpaceTravelCompany)
+when library.is_android {
+	@private LIB :: library.LIBPATH + "/libbacktrace" + library.ARCH_end
+	foreign import libbacktrace {LIB}
+} else {
+	foreign import libbacktrace "system:backtrace"
+}
 
 foreign import libdl "system:dl"
 

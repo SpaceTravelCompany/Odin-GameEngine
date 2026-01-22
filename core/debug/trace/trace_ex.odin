@@ -16,30 +16,30 @@ import "core:sys/android"
 LOG_FILE_NAME: string = "odin_log.log"
 
 @(init, private) init_trace :: proc "contextless" () {
-	when !is_android {
+	//when !is_android {
 		sync.mutex_lock(&gTraceMtx)
 		defer sync.mutex_unlock(&gTraceMtx)
 
 		context = runtime.default_context()
 		init(&gTraceCtx)
-	}
+	//}
 }
 
 @(fini, private) deinit_trace :: proc "contextless" () {
-	when !is_android {
+	//when !is_android {
 		sync.mutex_lock(&gTraceMtx)
 		defer sync.mutex_unlock(&gTraceMtx)
 
 		context = runtime.default_context()
 		destroy(&gTraceCtx)
-	}
+	//}
 }
 
 @(private = "file") gTraceCtx: Context
 @(private = "file") gTraceMtx: sync.Mutex
 
 printTrace :: proc() {
-	when !is_android {
+	//when !is_android {
 		sync.mutex_lock(&gTraceMtx)
 		defer sync.mutex_unlock(&gTraceMtx)
 		if !in_resolve(&gTraceCtx) {
@@ -53,10 +53,10 @@ printTrace :: proc() {
 			}
 		}
 		fmt.printf("-------------------------------------------------\n")
-	}
+	//}
 }
 printTraceBuf :: proc(str:^strings.Builder) {
-	when !is_android {
+	//when !is_android {
 		sync.mutex_lock(&gTraceMtx)
 		defer sync.mutex_unlock(&gTraceMtx)
 		if !in_resolve(&gTraceCtx) {
@@ -70,31 +70,30 @@ printTraceBuf :: proc(str:^strings.Builder) {
 			}
 		}
 		fmt.sbprintln(str, "-------------------------------------------------\n")
-	}
+	//}
 }
 
 @(cold) panic_log :: proc "contextless" (args: ..any, loc := #caller_location) -> ! {
 	context = runtime.default_context()
 	
+	str: strings.Builder
+	strings.builder_init(&str)
+	fmt.sbprintln(&str,..args)
+	fmt.sbprintf(&str,"%s\n%s called by %s\n",
+		loc,
+		#procedure,
+		loc.procedure)
+
+	printTraceBuf(&str)
+
+	strings.write_byte(&str, 0)
+
 	when !is_android {
-		str: strings.Builder
-		strings.builder_init(&str)
-		fmt.sbprintln(&str,..args)
-		fmt.sbprintf(&str,"%s\n%s called by %s\n",
-			loc,
-			#procedure,
-			loc.procedure)
-
-		printTraceBuf(&str)
-
-		strings.write_byte(&str, 0)
 		printToFile(cstring(raw_data(str.buf)))
 		panic(string(str.buf[:len(str.buf)-1]), loc)
 	} else {
-		cstr := fmt.caprint(..args)
-		android.__android_log_write(android.LogPriority.ERROR, ODIN_BUILD_PROJECT_NAME, cstr)
-
-		printToFile(cstr)
+		android.__android_log_write(android.LogPriority.ERROR, ODIN_BUILD_PROJECT_NAME, cstring(raw_data(str.buf)))
+		printToFile(cstring(raw_data(str.buf)))
 
 		intrinsics.trap()
 	}
