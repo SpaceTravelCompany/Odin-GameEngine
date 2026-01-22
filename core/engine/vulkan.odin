@@ -1235,17 +1235,21 @@ vk_recreate_swap_chain :: proc() {
 			}
 		}
 		
+		thread_pool: thread.Pool
+		thread.pool_init(&thread_pool, context.allocator, get_processor_core_len())
+		thread.pool_start(&thread_pool)
 		// Add each render_cmd as a task to thread pool
 		for cmd in __g_render_cmd {
 			data := new(size_task_data, context.temp_allocator)
 			data.cmd = cmd
-			thread.pool_add_task(&g_thread_pool, context.temp_allocator, size_task_proc, data)
+			thread.pool_add_task(&thread_pool, context.allocator, size_task_proc, data)
+		}
+		for thread.pool_num_done(&thread_pool) < len(__g_render_cmd) {
+			thread.yield()
 		}
 		
-		thread.pool_finish(&g_thread_pool)
-		for {
-			thread.pool_pop_done(&g_thread_pool) or_break
-		}
+		thread.pool_join(&thread_pool)
+		thread.pool_destroy(&thread_pool)
 	}
 }
 vk_create_surface :: vk_recreate_surface
@@ -1351,31 +1355,30 @@ vk_draw_frame :: proc() {
 
 		record_task_data :: struct {
 			cmd: ^render_cmd,
-			frame: int,
-			imageIndex: u32,
 			inheritanceInfo: vk.CommandBufferInheritanceInfo,
 		}
 		
 		record_task_proc :: proc(task: thread.Task) {
 			data := cast(^record_task_data)task.data
-			vk_record_command_buffer(data.cmd, data.frame, data.imageIndex, data.inheritanceInfo)
-			free(data, context.temp_allocator)
+			vk_record_command_buffer(data.cmd, data.inheritanceInfo)
 		}
 		
+		thread_pool: thread.Pool
+		thread.pool_init(&thread_pool, context.allocator, get_processor_core_len())
+		thread.pool_start(&thread_pool)
 		// Add tasks to thread pool
 		for cmd in visible_commands {
 			data := new(record_task_data, context.temp_allocator)
 			data.cmd = cmd
-			data.frame = frame
-			data.imageIndex = imageIndex
 			data.inheritanceInfo = inheritanceInfo
-			thread.pool_add_task(&g_thread_pool, context.temp_allocator, record_task_proc, data)
+			thread.pool_add_task(&thread_pool, context.allocator, record_task_proc, data)
+		}
+		for thread.pool_num_done(&thread_pool) < len(visible_commands) {
+			thread.yield()
 		}
 		
-		thread.pool_finish(&g_thread_pool)
-		for {
-			thread.pool_pop_done(&g_thread_pool) or_break
-		}
+		thread.pool_join(&thread_pool)
+		thread.pool_destroy(&thread_pool)
 		
 		cmd_buffers := make([]vk.CommandBuffer, len(visible_commands), context.temp_allocator)
 		defer delete(cmd_buffers, context.temp_allocator)
@@ -1651,7 +1654,7 @@ vk_transition_image_layout :: proc(cmd:vk.CommandBuffer, image:vk.Image, mip_lev
 // 	vk.FreeCommandBuffers(vk_device, vk_cmd_pool, 1, &cmd)
 // }
 
-vk_record_command_buffer :: proc(cmd:^render_cmd, frame:int, imageIndex:u32, _inheritanceInfo:vk.CommandBufferInheritanceInfo) {
+vk_record_command_buffer :: proc(cmd:^render_cmd, _inheritanceInfo:vk.CommandBufferInheritanceInfo) {
 	inheritanceInfo := _inheritanceInfo
 	c := cmd.cmd
 	beginInfo := vk.CommandBufferBeginInfo {

@@ -239,9 +239,7 @@ Init ::proc() {
 }
 Update ::proc() {
 }
-Size :: proc() {
-    engine.projection_update_ortho_window(engine.def_projection(), CANVAS_W, CANVAS_H)
-}
+
 Destroy ::proc() {
     shape.shape_src_deinit(&shapeSrc)
     engine.texture_deinit(&texture)
@@ -274,7 +272,6 @@ main :: proc() {
     engine.init = Init
     engine.update = Update
     engine.destroy = Destroy
-    engine.size = Size
     engine.engine_main(window_width = int(CANVAS_W), window_height = int(CANVAS_H))
 
 	when ODIN_DEBUG && !is_android {

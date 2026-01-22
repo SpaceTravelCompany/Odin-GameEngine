@@ -42,14 +42,14 @@ when !library.is_mobile {
 			//? change use glfw.SetWindowAttrib()
 			if __screen_mode == .Fullscreen {
 				when ODIN_OS == .Windows {
+					glfw.WindowHint(glfw.DECORATED, glfw.FALSE)
+					glfw.WindowHint(glfw.FLOATING, glfw.TRUE)//미리 속성 지정한 뒤 생성
+
 					wnd = glfw.CreateWindow(monitors[__screen_idx].rect.right - monitors[__screen_idx].rect.left,
 						abs(monitors[__screen_idx].rect.bottom - monitors[__screen_idx].rect.top),
 						__window_title,
 						nil,
 						nil)
-	
-					glfw.SetWindowAttrib(wnd, glfw.DECORATED, glfw.FALSE)
-					glfw.glfwSetWindowAttrib(glfw.FLOATING, glfw.TRUE)
 				} else {
 					wnd = glfw.CreateWindow(monitors[__screen_idx].rect.right - monitors[__screen_idx].rect.left,
 						abs(monitors[__screen_idx].rect.bottom - monitors[__screen_idx].rect.top),
