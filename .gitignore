@@ -318,6 +318,6 @@ sandbox/
 
 
 !glslc.exe
-!engine_test/
 engine_test
+!engine_test/
 engine_test.bin
