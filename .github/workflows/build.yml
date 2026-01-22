@@ -25,7 +25,10 @@ jobs:
               make &&
             ./build_linux_static.sh
           ' && echo "${{ github.workspace }}" >> $GITHUB_PATH
-          && sudo apt-get install -y \
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get install -y \
           libstdc++
 
       - name: Build Tool
