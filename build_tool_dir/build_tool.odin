@@ -120,7 +120,7 @@ main :: proc() {
 		// }
 
 		if debug {
-			err := os2.copy_file("android/lib/lib/arm64-v8a/libVkLayer_khronos_validation.so", filepath.join({ODIN_ROOT, "/vendor/vulkan/lib/android/libVkLayer_khronos_validation_arm64.so"}, context.temp_allocator))
+			err := os2.copy_file("android/lib/lib/arm64-v8a/libVkLayer_khronos_validation.so", filepath.join({ODIN_ROOT, "/core/engine/lib/android/libVkLayer_khronos_validation_arm64.so"}, context.temp_allocator))
 			if err != nil {
 				fmt.panicf("libVkLayer_khronos_validation copy_file: %s", err)
 			}

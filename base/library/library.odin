@@ -4,16 +4,19 @@ is_android :: ODIN_PLATFORM_SUBTARGET == .Android
 is_mobile :: is_android
 
 when ODIN_ARCH == .amd64 {
-    ARCH_end :: "_amd64.a"
+    __ARCH_end :: "_amd64"
 } else when ODIN_ARCH == .i386 {
-    ARCH_end :: "_i386.a"
+    __ARCH_end :: "_i386"
 } else when ODIN_ARCH == .arm64 {
-    ARCH_end :: "_arm64.a"
+    __ARCH_end :: "_arm64"
 } else when ODIN_ARCH == .riscv64 {
-    ARCH_end :: "_riscv64.a"
+    __ARCH_end :: "_riscv64"
 } else when ODIN_ARCH == .arm32 {
-    ARCH_end :: "_arm32.a"
+    __ARCH_end :: "_arm32"
 }
+
+ARCH_end :: __ARCH_end + ".a"
+ARCH_end_so :: __ARCH_end + ".so"
 
 when !is_mobile {
 	when ODIN_OS == .Windows {
