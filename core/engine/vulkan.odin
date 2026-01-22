@@ -1243,6 +1243,9 @@ vk_recreate_swap_chain :: proc() {
 		}
 		
 		thread.pool_finish(&g_thread_pool)
+		for {
+			thread.pool_pop_done(&g_thread_pool) or_break
+		}
 	}
 }
 vk_create_surface :: vk_recreate_surface
@@ -1290,7 +1293,6 @@ vk_draw_frame :: proc() {
 	if vk_swapchain == 0 do return
 	if vk_extent.width <= 0 || vk_extent.height <= 0 {
 		vk_recreate_swap_chain()
-		frame = 0
 		return
 	}
 
@@ -1302,13 +1304,9 @@ vk_draw_frame :: proc() {
 	res = vk.AcquireNextImageKHR(vk_device, vk_swapchain, max(u64), vk_image_available_semaphore[frame], 0, &imageIndex)
 	if res == .ERROR_OUT_OF_DATE_KHR {
 		vk_recreate_swap_chain()
-		frame = 0
 		return
+	} else if res == .SUBOPTIMAL_KHR {
 	} else if res == .ERROR_SURFACE_LOST_KHR {
-		vk_recreate_surface()
-		vk_recreate_swap_chain()
-		frame = 0
-		return
 	} else if res != .SUCCESS { trace.panic_log("AcquireNextImageKHR : ", res) }
 
 	cmd_visible := false
@@ -1375,7 +1373,10 @@ vk_draw_frame :: proc() {
 		}
 		
 		thread.pool_finish(&g_thread_pool)
-
+		for {
+			thread.pool_pop_done(&g_thread_pool) or_break
+		}
+		
 		cmd_buffers := make([]vk.CommandBuffer, len(visible_commands), context.temp_allocator)
 		defer delete(cmd_buffers, context.temp_allocator)
 		for cmd, i in visible_commands {
@@ -1463,24 +1464,16 @@ vk_draw_frame :: proc() {
 
 	if res == .ERROR_OUT_OF_DATE_KHR {
 		vk_recreate_swap_chain()
-		frame = 0
 		return
 	} else if res == .SUBOPTIMAL_KHR {
-		prop : vk.SurfaceCapabilitiesKHR
-		res = 	vk.GetPhysicalDeviceSurfaceCapabilitiesKHR(vk_physical_device, vk_surface, &prop)
-		if res != .SUCCESS do trace.panic_log("GetPhysicalDeviceSurfaceCapabilitiesKHR : ", res)
-		if prop.currentExtent.width != vk_extent.width || prop.currentExtent.height != vk_extent.height {
-			vk_recreate_swap_chain()
-			return
-		}
+		//k_recreate_swap_chain()
+		return
 	} else if res == .ERROR_SURFACE_LOST_KHR {
 		vk_recreate_surface()
 		vk_recreate_swap_chain()
-		frame = 0
 		return
 	} else if size_updated {
 		vk_recreate_swap_chain()
-		frame = 0
 		return
 	} else if res != .SUCCESS { trace.panic_log("QueuePresentKHR : ", res) }
 

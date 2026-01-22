@@ -41,14 +41,22 @@ when !library.is_mobile {
 
 			//? change use glfw.SetWindowAttrib()
 			if __screen_mode == .Fullscreen {
-				glfw.WindowHint (glfw.DECORATED, glfw.FALSE)
-				glfw.WindowHint(glfw.FLOATING, glfw.TRUE)
-
-				wnd = glfw.CreateWindow(monitors[__screen_idx].rect.right - monitors[__screen_idx].rect.left,
-					abs(monitors[__screen_idx].rect.bottom - monitors[__screen_idx].rect.top),
-					__window_title,
-					nil,
-					nil)
+				when ODIN_OS == .Windows {
+					wnd = glfw.CreateWindow(monitors[__screen_idx].rect.right - monitors[__screen_idx].rect.left,
+						abs(monitors[__screen_idx].rect.bottom - monitors[__screen_idx].rect.top),
+						__window_title,
+						nil,
+						nil)
+	
+					glfw.SetWindowAttrib(wnd, glfw.DECORATED, glfw.FALSE)
+					glfw.glfwSetWindowAttrib(glfw.FLOATING, glfw.TRUE)
+				} else {
+					wnd = glfw.CreateWindow(monitors[__screen_idx].rect.right - monitors[__screen_idx].rect.left,
+						abs(monitors[__screen_idx].rect.bottom - monitors[__screen_idx].rect.top),
+						__window_title,
+						glfw_monitors[__screen_idx],
+						nil)
+				}	
 
 				__window_x = int(monitors[__screen_idx].rect.left)
 				__window_y = int(monitors[__screen_idx].rect.top)
@@ -86,11 +94,24 @@ when !library.is_mobile {
 	}
 
 	glfw_set_full_screen_mode :: proc "contextless" (monitor:^monitor_info) {
-		glfw.SetWindowMonitor(wnd, nil, monitor.rect.left,
-			monitor.rect.top,
-			monitor.rect.right - monitor.rect.left,
-			abs(monitor.rect.bottom - monitor.rect.top),
-			glfw.DONT_CARE)
+		when ODIN_OS == .Windows {
+			glfw.SetWindowMonitor(wnd, nil, monitor.rect.left,
+				monitor.rect.top,
+				monitor.rect.right - monitor.rect.left,
+				abs(monitor.rect.bottom - monitor.rect.top),
+				glfw.DONT_CARE)
+		} else {
+			for monitor_handle in glfw_monitors {
+				if strings.compare(glfw.GetMonitorName(monitor_handle), monitor.name) == 0 {
+					glfw.SetWindowMonitor(wnd, monitor_handle, monitor.rect.left,
+						monitor.rect.top,
+						monitor.rect.right - monitor.rect.left,
+						abs(monitor.rect.bottom - monitor.rect.top),
+						glfw.DONT_CARE)
+					break
+				}
+			}	
+		}
 	}
 
 	glfw_set_window_icon :: #force_inline  proc "contextless" (icons:[]glfw.Image) {

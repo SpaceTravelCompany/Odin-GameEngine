@@ -182,7 +182,6 @@ engine_main :: proc(
 
 			destroy()
 
-			thread.pool_finish(&g_thread_pool)
 			graphics_destroy()
 
 			system_destroy()
@@ -357,6 +356,9 @@ close :: proc "contextless" () {
 		}
 		
 		thread.pool_finish(&g_thread_pool)
+		for {
+			thread.pool_pop_done(&g_thread_pool) or_break
+		}
 	}
 
 	if !paused_ {
