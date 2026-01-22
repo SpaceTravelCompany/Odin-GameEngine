@@ -96,6 +96,8 @@ when library.is_android {
 @private delta_time: u64
 @private processor_core_len: int
 
+@private g_thread_pool: thread.Pool
+
 
 /*
 Main entry point for the engine
@@ -153,8 +155,8 @@ engine_main :: proc(
 
 	when is_android {
 		android_start()
-
 		thread.pool_init(&g_thread_pool, context.allocator, get_processor_core_len())
+		thread.pool_start(&g_thread_pool)
 	} else {
 		when is_console {
 			init()
@@ -162,6 +164,8 @@ engine_main :: proc(
 			system_destroy()
 			system_after_destroy()
 		} else {
+			thread.pool_init(&g_thread_pool, context.allocator, get_processor_core_len())
+			thread.pool_start(&g_thread_pool)
 			window_start(screen_idx)
 
 			graphics_init()
@@ -200,6 +204,8 @@ engine_main :: proc(
 @private system_after_destroy :: #force_inline proc() {
 	delete(monitors)
 	virtual.arena_free_all(&__tempArena)
+	thread.pool_join(&g_thread_pool)
+	thread.pool_destroy(&g_thread_pool)
 }
 
 
@@ -341,21 +347,18 @@ close :: proc "contextless" () {
 			}
 		}
 		
-		thread_pool: thread.Pool
-		thread.pool_init(&thread_pool, context.allocator, get_processor_core_len())
-		thread.pool_start(&thread_pool)
 		// Add each render_cmd as a task to thread pool
 		for cmd in __g_render_cmd {
 			data := new(update_task_data, context.temp_allocator)
 			data.cmd = cmd
-			thread.pool_add_task(&thread_pool, context.allocator, update_task_proc, data)
+			thread.pool_add_task(&g_thread_pool, context.allocator, update_task_proc, data)
 		}
-		for thread.pool_num_done(&thread_pool) < len(__g_render_cmd) {
+		for thread.pool_num_done(&g_thread_pool) < len(__g_render_cmd) {
 			thread.yield()
 		}
-		
-		thread.pool_join(&thread_pool)
-		thread.pool_destroy(&thread_pool)
+		for {
+			thread.pool_pop_done(&g_thread_pool) or_break
+		}
 	}
 
 	if !paused_ {
