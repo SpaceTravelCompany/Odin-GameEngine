@@ -26,11 +26,6 @@ jobs:
             ./build_linux_static.sh
           ' && echo "${{ github.workspace }}" >> $GITHUB_PATH
 
-      - name: Install dependencies
-        run: |
-          sudo apt-get update && sudo apt-get install -y \
-          libbacktrace \
-
       - name: Build Tool
         run: make tool
 

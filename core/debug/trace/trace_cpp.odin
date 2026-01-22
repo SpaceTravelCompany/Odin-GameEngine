@@ -9,7 +9,7 @@ import "core:fmt"
 import "core:c"
 
 // NOTE: Relies on C++23 which adds <stacktrace> and becomes ABI and that can be used
-foreign import stdcpplibbacktrace "system:stdc++_libbacktrace"
+foreign import libbacktrace "system:backtrace"// edited (SpaceTravelCompany)
 
 foreign import libdl "system:dl"
 
@@ -19,8 +19,8 @@ backtrace_simple_callback  :: proc "c" (data: rawptr, pc: uintptr) -> c.int
 backtrace_full_callback    :: proc "c" (data: rawptr, pc: uintptr, filename: cstring, lineno: c.int, function: cstring) -> c.int
 backtrace_syminfo_callback :: proc "c" (data: rawptr, pc: uintptr, symname: cstring, symval: uintptr, symsize: uintptr)
 
-@(default_calling_convention="c", link_prefix="__glibcxx_")
-foreign stdcpplibbacktrace {
+@(default_calling_convention="c")
+foreign libbacktrace {
 	backtrace_create_state :: proc(
 		filename:       cstring,
 		threaded:       c.int,
