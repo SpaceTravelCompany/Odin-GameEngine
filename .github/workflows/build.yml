@@ -1,12 +1,7 @@
 name: Build Test
 
-# Sets up to deploy when a new commit is pushed to the master branch, or when you click
-# run in the GitHub UI.
+# Not used yet
 on:
-  push:
-    branches:
-      - master
-
   workflow_dispatch:
 
 jobs:

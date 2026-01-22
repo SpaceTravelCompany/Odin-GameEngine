@@ -1,1 +1,3 @@
-libengine_test.so
+engine_test
+engine_test.bin
+android/lib/*
