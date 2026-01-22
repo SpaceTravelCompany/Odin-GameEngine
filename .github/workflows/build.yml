@@ -16,22 +16,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Setup Odin
-        #   docker run --rm -v "$PWD:/src" -w /src alpine sh -c '
-        #     apk add --no-cache \
-        #       musl-dev llvm20-dev clang20 git mold lz4 \
-        #       libxml2-static llvm20-static zlib-static zstd-static \
-        #       make &&
-        #     ./build_linux_static.sh
+          
         run: |
-            sudo apt-get install -y \
-            clang-20 \
-            lldb-20 \
-            lld-20 \
-            libcmark-dev
-
-            sudo ln -sf /usr/bin/clang-20 /usr/bin/clang
-            sudo ln -sf /usr/bin/clang++-20 /usr/bin/clang++
-            make debug
+            docker run --rm -v "$PWD:/src" -w /src alpine sh -c '
+            apk add --no-cache \
+              musl-dev llvm20-dev clang20 git mold lz4 \
+              libxml2-static llvm20-static zlib-static zstd-static \
+              make &&
+            ./build_linux_static.sh &&
             echo "${{ github.workspace }}" >> $GITHUB_PATH
 
       - name: Build Tool
