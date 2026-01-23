@@ -129,10 +129,10 @@ cubic_init :: proc "contextless" (_start: linalg.point, _control0: linalg.point,
 
 rect_line_init :: proc "contextless" (_rect: linalg.rect) -> [4]shape_line {
 	return [4]shape_line{
-		line_init(linalg.point{_rect.left, _rect.top}, linalg.point{_rect.right, _rect.top}),
-		line_init(linalg.point{_rect.right, _rect.top}, linalg.point{_rect.right, _rect.bottom}),
-		line_init(linalg.point{_rect.right, _rect.bottom}, linalg.point{_rect.left, _rect.bottom}),
-		line_init(linalg.point{_rect.left, _rect.bottom}, linalg.point{_rect.left, _rect.top}),
+		line_init(linalg.point{_rect.left, _rect.top}, linalg.point{_rect.left, _rect.bottom}),
+		line_init(linalg.point{_rect.left, _rect.bottom}, linalg.point{_rect.right, _rect.bottom}),
+		line_init(linalg.point{_rect.right, _rect.bottom}, linalg.point{_rect.right, _rect.top}),
+		line_init(linalg.point{_rect.right, _rect.top}, linalg.point{_rect.left, _rect.top}),
 	}
 }
 
@@ -142,26 +142,26 @@ circle_cubic_init :: proc "contextless" (_center: linalg.point, _r: f32) -> [4]s
 	return [4]shape_line{
 		shape_line{
 			start = linalg.point{_center.x - _r, _center.y},
-			control0 = linalg.point{_center.x - _r, _center.y + tt},
-			control1 = linalg.point{_center.x - tt, _center.y + _r},
-			end = linalg.point{_center.x, _center.y + _r},
-		},
-		shape_line{
-			start = linalg.point{_center.x, _center.y + _r},
-			control0 = linalg.point{_center.x + tt, _center.y + _r},
-			control1 = linalg.point{_center.x + _r, _center.y + tt},
-			end = linalg.point{_center.x + _r, _center.y},
-		},
-		shape_line{
-			start = linalg.point{_center.x + _r, _center.y},
-			control0 = linalg.point{_center.x + _r, _center.y - tt},
-			control1 = linalg.point{_center.x + tt, _center.y - _r},
+			control0 = linalg.point{_center.x - _r, _center.y - tt},
+			control1 = linalg.point{_center.x - tt, _center.y - _r},
 			end = linalg.point{_center.x, _center.y - _r},
 		},
 		shape_line{
 			start = linalg.point{_center.x, _center.y - _r},
-			control0 = linalg.point{_center.x - tt, _center.y - _r},
-			control1 = linalg.point{_center.x - _r, _center.y - tt},
+			control0 = linalg.point{_center.x + tt, _center.y - _r},
+			control1 = linalg.point{_center.x + _r, _center.y - tt},
+			end = linalg.point{_center.x + _r, _center.y},
+		},
+		shape_line{
+			start = linalg.point{_center.x + _r, _center.y},
+			control0 = linalg.point{_center.x + _r, _center.y + tt},
+			control1 = linalg.point{_center.x + tt, _center.y + _r},
+			end = linalg.point{_center.x, _center.y + _r},
+		},
+		shape_line{
+			start = linalg.point{_center.x, _center.y + _r},
+			control0 = linalg.point{_center.x - tt, _center.y + _r},
+			control1 = linalg.point{_center.x - _r, _center.y + tt},
 			end = linalg.point{_center.x - _r, _center.y},
 		},
 	}
@@ -174,26 +174,26 @@ ellipse_cubic_init :: proc "contextless" (_center: linalg.point, _rxy: linalg.po
 	return [4]shape_line{
 		shape_line{
 			start = linalg.point{_center.x - _rxy.x, _center.y},
-			control0 = linalg.point{_center.x - _rxy.x, _center.y + tty},
-			control1 = linalg.point{_center.x - ttx, _center.y + _rxy.y},
-			end = linalg.point{_center.x, _center.y + _rxy.y},
-		},
-		shape_line{
-			start = linalg.point{_center.x, _center.y + _rxy.y},
-			control0 = linalg.point{_center.x + ttx, _center.y + _rxy.y},
-			control1 = linalg.point{_center.x + _rxy.x, _center.y + tty},
-			end = linalg.point{_center.x + _rxy.x, _center.y},
-		},
-		shape_line{
-			start = linalg.point{_center.x + _rxy.x, _center.y},
-			control0 = linalg.point{_center.x + _rxy.x, _center.y - tty},
-			control1 = linalg.point{_center.x + ttx, _center.y - _rxy.y},
+			control0 = linalg.point{_center.x - _rxy.x, _center.y - tty},
+			control1 = linalg.point{_center.x - ttx, _center.y - _rxy.y},
 			end = linalg.point{_center.x, _center.y - _rxy.y},
 		},
 		shape_line{
 			start = linalg.point{_center.x, _center.y - _rxy.y},
-			control0 = linalg.point{_center.x - ttx, _center.y - _rxy.y},
-			control1 = linalg.point{_center.x - _rxy.x, _center.y - tty},
+			control0 = linalg.point{_center.x + ttx, _center.y - _rxy.y},
+			control1 = linalg.point{_center.x + _rxy.x, _center.y - tty},
+			end = linalg.point{_center.x + _rxy.x, _center.y},
+		},
+		shape_line{
+			start = linalg.point{_center.x + _rxy.x, _center.y},
+			control0 = linalg.point{_center.x + _rxy.x, _center.y + tty},
+			control1 = linalg.point{_center.x + ttx, _center.y + _rxy.y},
+			end = linalg.point{_center.x, _center.y + _rxy.y},
+		},
+		shape_line{
+			start = linalg.point{_center.x, _center.y + _rxy.y},
+			control0 = linalg.point{_center.x - ttx, _center.y + _rxy.y},
+			control1 = linalg.point{_center.x - _rxy.x, _center.y + tty},
 			end = linalg.point{_center.x - _rxy.x, _center.y},
 		},
 	}

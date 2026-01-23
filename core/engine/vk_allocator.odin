@@ -1074,7 +1074,7 @@ vk_mem_buffer_CreateFromResource :: proc(
 
 	memProp_ := memProp
 	if ((vkMemBlockLen == vkMemSpcialBlockLen) ||
-		   ((T == vk.Buffer && maxSize_ <= 256))) &&
+		   ((T == vk.Buffer && maxSize_ <= 1024*1024*1))) &&
 	   (.HOST_VISIBLE in memProp_) {
 		if vkSupportCacheLocal {
 			memProp_ = {.HOST_VISIBLE, .HOST_CACHED, .DEVICE_LOCAL}

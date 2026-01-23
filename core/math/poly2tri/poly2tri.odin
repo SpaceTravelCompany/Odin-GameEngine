@@ -1245,8 +1245,9 @@ TrianguateSinglePolygon :: proc(poly:[]linalg.point, baseIdx:[]u32, holes:[][]li
 
 
 TrianguatePolygons :: proc(poly:[]linalg.point,  nPoly:[]u32, allocator := context.allocator) -> (indices:[]u32, err:Trianguate_Error = .None) {
-    indices_ := mem.make_non_zeroed_dynamic_array([dynamic]u32, allocator)
-    
+    indices_ := mem.make_non_zeroed_dynamic_array([dynamic]u32, context.temp_allocator)
+    defer delete(indices_)
+
     idx :u32 = 0
     for n:u32 = 0;n < u32(len(nPoly));n += 1 {
         isHole := linalg.GetPolygonOrientation( poly[idx:idx+nPoly[n]]) == .Clockwise
@@ -1293,8 +1294,7 @@ TrianguatePolygons :: proc(poly:[]linalg.point,  nPoly:[]u32, allocator := conte
         idx += nPoly[n]
     }
 
-    shrink(&indices_)
-
-    indices = indices_[:]
-    return
+    indices = mem.make_non_zeroed_aligned_slice([]u32, len(indices_), 64, allocator)
+    intrinsics.mem_copy_non_overlapping(raw_data(indices), raw_data(indices_), len(indices_) * size_of(u32))
+	return
 }
