@@ -105,18 +105,20 @@ Main entry point for the engine
 Initializes the engine, creates a window, and runs the main loop
 
 Inputs:
-- window_title: Title of the window (default: "xfit")
+- window_title: Title of the window (default: "SpaceEngine")
 - window_x: X position of the window (default: nil)
 - window_y: Y position of the window (default: nil)
 - window_width: Width of the window (default: nil)
 - window_height: Height of the window (default: nil)
 - v_sync: Vertical sync mode (default: .Double)
+- screen_mode: Screen mode (default: .Window)
+- screen_idx: Screen index (default: 0)
 
 Returns:
 - None
 */
 engine_main :: proc(
-	window_title:cstring = "xfit",
+	window_title:cstring = "SpaceEngine",
 	window_x:Maybe(int) = nil,
 	window_y:Maybe(int) = nil,
 	window_width:Maybe(int) = nil,
