@@ -417,7 +417,7 @@ when !library.is_mobile {
 		glfw.SetWindowFocusCallback(wnd, glfw_window_focus_proc)
 		glfw.SetFramebufferSizeCallback(wnd, glfw_window_size_proc)
 		glfw.SetWindowPosCallback(wnd, glfw_window_pos_proc)
-		glfw.SetWindowRefreshCallback(wnd, glfw_window_refresh_proc)
+		//glfw.SetWindowRefreshCallback(wnd, glfw_window_refresh_proc)
 
 		x, y: c.int
 		x, y = glfw.GetWindowPos(wnd)
@@ -427,7 +427,6 @@ when !library.is_mobile {
 		}
 		__exiting = true
 		wnd = nil
-       // thread.join(render_th)
     }
     glfw_get_window :: proc "contextless" () -> glfw.WindowHandle {
         return wnd
