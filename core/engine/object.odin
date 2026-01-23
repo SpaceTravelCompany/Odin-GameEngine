@@ -220,7 +220,7 @@ get_uniform_resources_default :: #force_inline proc(self:^iobject) -> []iresourc
     mem.ICheckInit_Check(&self.check_init)
 
     //업데이트 하면 tempArenaAllocator를 다 지우니 중복 할당해도 됨.
-    self.set.__resources = mem.make_non_zeroed_slice([]iresource, len(resources), __temp_arena_allocator)
+    self.set.__resources = mem.make_non_zeroed_slice([]iresource, len(resources), temp_arena_allocator())
     mem.copy_non_overlapping(&self.set.__resources[0], &resources[0], len(resources) * size_of(iresource))
     update_descriptor_sets(mem.slice_ptr(&self.set, 1))
 }

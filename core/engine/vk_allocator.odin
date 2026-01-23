@@ -1028,11 +1028,18 @@ vk_mem_buffer_UnBindBufferNode :: proc(
 }
 
 @(private = "file")
+__buffer_and_texture_type :: union {
+	buffer_type,
+	texture_type,
+}
+
+@(private = "file")
 vk_mem_buffer_CreateFromResource :: proc(
 	vkResource: $T,
 	memProp: vk.MemoryPropertyFlags,
 	outIdx: ^resource_range,
 	maxSize: vk.DeviceSize,
+	buf_type: __buffer_and_texture_type,
 ) -> (memBuf: ^vk_mem_buffer) where T == vk.Buffer || T == vk.Image {
 	memType: u32
 	ok: bool
@@ -1073,9 +1080,8 @@ vk_mem_buffer_CreateFromResource :: proc(
 	if maxSize_ < memRequire.size do maxSize_ = memRequire.size
 
 	memProp_ := memProp
-	if ((vkMemBlockLen == vkMemSpcialBlockLen) ||
-		   ((T == vk.Buffer && maxSize_ <= 1024*1024*1))) &&
-	   (.HOST_VISIBLE in memProp_) {
+	if (.HOST_VISIBLE in memProp_) && ((vkMemBlockLen == vkMemSpcialBlockLen) ||
+		   ((buf_type == .__STAGING || maxSize_ <= 1024*1024*1)))  {
 		if vkSupportCacheLocal {
 			memProp_ = {.HOST_VISIBLE, .HOST_CACHED, .DEVICE_LOCAL}
 		} else if vkSupportNonCacheLocal {
@@ -1496,7 +1502,8 @@ executeCreateBuffer :: proc(
 	res := vk.CreateBuffer(vk_device, &bufInfo, nil, &self.__resource)
 	if res != .SUCCESS do trace.panic_log("res := vk.CreateBuffer(vk_device, &bufInfo, nil, &self.__resource) : ", res)
 
-	self.mem_buffer = auto_cast vk_mem_buffer_CreateFromResourceSingle(self.__resource) if self.option.single else auto_cast vk_mem_buffer_CreateFromResource(self.__resource, memProp, &self.idx, 0)
+	self.mem_buffer = auto_cast vk_mem_buffer_CreateFromResourceSingle(self.__resource) if self.option.single else 
+	auto_cast vk_mem_buffer_CreateFromResource(self.__resource, memProp, &self.idx, 0, self.option.type)
 
 	if data != nil {
 		if self.option.resource_usage != .GPU {
@@ -1589,7 +1596,8 @@ executeCreateTexture :: proc(
 	res := vk.CreateImage(vk_device, &imgInfo, nil, &self.__resource)
 	if res != .SUCCESS do trace.panic_log("res := vk.CreateImage(vk_device, &bufInfo, nil, &self.__resource) : ", res)
 
-	self.mem_buffer = auto_cast vk_mem_buffer_CreateFromResourceSingle(self.__resource) if self.option.single else auto_cast vk_mem_buffer_CreateFromResource(self.__resource, memProp, &self.idx, 0)
+	self.mem_buffer = auto_cast vk_mem_buffer_CreateFromResourceSingle(self.__resource) if self.option.single else
+	 auto_cast vk_mem_buffer_CreateFromResource(self.__resource, memProp, &self.idx, 0, self.option.type)
 
 	imgViewInfo := vk.ImageViewCreateInfo {
 		sType      = .IMAGE_VIEW_CREATE_INFO,
@@ -1707,7 +1715,7 @@ create_new_uniform_buffer :: proc(
 	res := vk.CreateBuffer(vk_device, &bufInfo, nil, &g.buf)
 	if res != .SUCCESS do trace.panic_log("res := vk.CreateBuffer(vk_device, &bufInfo, nil, &self.__resource) : ", res)
 
-	g.mem_buffer = vk_mem_buffer_CreateFromResource(g.buf, {.HOST_CACHED, .HOST_VISIBLE}, &g.idx, 0)
+	g.mem_buffer = vk_mem_buffer_CreateFromResource(g.buf, {.HOST_CACHED, .HOST_VISIBLE}, &g.idx, 0, .UNIFORM)
 
 	off: vk.DeviceSize = 0
 	for &t, i in uniforms {
