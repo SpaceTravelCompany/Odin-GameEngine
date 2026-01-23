@@ -10,6 +10,7 @@ import "core:mem/virtual"
 import "core:debug/trace"
 import "core:slice"
 import "core:sync"
+import "core:thread"
 import "core:fmt"
 import vk "vendor:vulkan"
 
@@ -540,10 +541,6 @@ vk_op_execute_destroy :: proc() {
 
 	clear(&opDestroyQueue)
 	sync.mutex_unlock(&gDestroyQueueMtx)
-
-	virtual.arena_free_all(&__tempArena)
-
-	sync.sema_post(&gWaitOpSem)
 }
 
 vk_op_execute :: proc() {
@@ -569,7 +566,7 @@ vk_op_execute :: proc() {
 		}
 	}
 
-	for &node in opSaveQueue {
+	for node in opSaveQueue {
 		#partial switch n in node {
 		case OpCreateBuffer:
 			executeCreateBuffer(n.src, n.data, n.allocator)
@@ -580,17 +577,15 @@ vk_op_execute :: proc() {
 		case:
 			continue
 		}
-		node = nil
 	}
 
-	for &node in opSaveQueue {
+	for node in opSaveQueue {
 		#partial switch n in node {
 		case OpReleaseUniform:
 			executeReleaseUniform(n.src)
 		case:
 			continue
 		}
-		node = nil
 	}
 
 	if len(gTempUniforms) > 0 {
@@ -675,8 +670,35 @@ vk_op_execute :: proc() {
 	}
 	clear(&opMapCopyQueue)
 
+	vk_op_execute_task :: proc(task: thread.Task) {
+		haveCmds := (^bool)(task.data)
+		for node in opSaveQueue {
+			#partial switch n in node {
+			case Op__Updatedescriptor_sets:
+				execute_update_descriptor_sets(n.sets)
+			case OpCopyBuffer:
+				haveCmds^ = true
+			case OpCopyBufferToTexture:
+				haveCmds^ = true
+			}
+		}
+		if len(gVkUpdateDesciptorSetList) > 0 {
+			vk.UpdateDescriptorSets(
+				vk_device,
+				auto_cast len(gVkUpdateDesciptorSetList),
+				raw_data(gVkUpdateDesciptorSetList),
+				0,
+				nil,
+			)
+			clear(&gVkUpdateDesciptorSetList)
+		}
+	}
+	haveCmds := false
+	thread.pool_add_task(&g_thread_pool, context.allocator, vk_op_execute_task, auto_cast &haveCmds)
+
+	vk_op_execute_destroy()
 	sync.mutex_lock(&gDestroyQueueMtx)
-	for &node in opSaveQueue {
+	for node in opSaveQueue {
 		#partial switch n in node {
 		case OpDestroyBuffer:
 			non_zero_append(&opDestroyQueue, node)
@@ -685,7 +707,6 @@ vk_op_execute :: proc() {
 		case:
 			continue
 		}
-		node = nil
 	}
 	sync.mutex_unlock(&gDestroyQueueMtx)
 
@@ -698,27 +719,11 @@ vk_op_execute :: proc() {
 		save_to_map_queue(&memBufT)
 	}
 
-	haveCmds := false
-	for node in opSaveQueue {
-		#partial switch n in node {
-		case OpCopyBuffer:
-			haveCmds = true
-		case OpCopyBufferToTexture:
-			haveCmds = true
-		case Op__Updatedescriptor_sets:
-			execute_update_descriptor_sets(n.sets)
-		}
+	for thread.pool_num_done(&g_thread_pool) < 1 {
+		thread.yield()
 	}
-	if len(gVkUpdateDesciptorSetList) > 0 {
-		vk.UpdateDescriptorSets(
-			vk_device,
-			auto_cast len(gVkUpdateDesciptorSetList),
-			raw_data(gVkUpdateDesciptorSetList),
-			0,
-			nil,
-		)
-		clear(&gVkUpdateDesciptorSetList)
-	}
+	thread.pool_pop_done(&g_thread_pool)
+
 
 	if haveCmds {
 		vk.ResetCommandPool(vk_device, cmdPool, {})
@@ -745,8 +750,6 @@ vk_op_execute :: proc() {
 		res := vk.QueueSubmit(vk_graphics_queue, 1, &submitInfo, 0)
 		if res != .SUCCESS do trace.panic_log("res := vk.QueueSubmit(vk_graphics_queue, 1, &submitInfo, 0) : ", res)
 
-		vk_wait_graphics_idle()
-
 		for node in opSaveQueue {
 			#partial switch &n in node {
 			case OpCopyBuffer:
@@ -764,11 +767,12 @@ vk_op_execute :: proc() {
 			}
 		}
 		clear(&opSaveQueue)
-		vk_op_execute_destroy()
 	} else {
 		clear(&opSaveQueue)
 		vk_op_execute_destroy()
 	}
+	virtual.arena_free_all(&__tempArena)
+	sync.sema_post(&gWaitOpSem)
 }
 
 

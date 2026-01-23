@@ -396,7 +396,7 @@ allocator : runtime.Allocator) -> (rect:linalg.rect, err:geometry.shape_error = 
 
             if self.face.glyph.outline.n_points == 0 {
                 charData : char_data = {
-                    advance_x = f32(self.face.glyph.advance.x) / (64.0 * SCALE_DEFAULT),
+                    advance_x = f32(self.face.glyph.advance.x) / (64.0 * self.scale),
                     raw_shape = nil,
                 }
                 self.char_array[FONT_KEY{ch, thickness2}] = charData
