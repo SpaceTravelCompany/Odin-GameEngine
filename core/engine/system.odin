@@ -338,10 +338,10 @@ close :: proc "contextless" () {
 	calc_frame_time(paused_)
 
 	update()
-	if len(__g_render_cmd) > 0 {
+	if len(__g_layer) > 0 {
 		//thread pool 사용해서 각각 처리
 		update_task_data :: struct {
-			cmd: ^render_cmd,
+			cmd: ^layer,
 		}
 		
 		update_task_proc :: proc(task: thread.Task) {
@@ -352,12 +352,12 @@ close :: proc "contextless" () {
 		}
 		
 		// Add each render_cmd as a task to thread pool
-		for cmd in __g_render_cmd {
+		for cmd in __g_layer {
 			data := new(update_task_data, context.temp_allocator)
 			data.cmd = cmd
 			thread.pool_add_task(&g_thread_pool, context.allocator, update_task_proc, data)
 		}
-		for thread.pool_num_done(&g_thread_pool) < len(__g_render_cmd) {
+		for thread.pool_num_done(&g_thread_pool) < len(__g_layer) {
 			thread.yield()
 		}
 		for {

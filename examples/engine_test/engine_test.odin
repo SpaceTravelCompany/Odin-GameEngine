@@ -22,7 +22,7 @@ import "vendor:svg"
 
 is_android :: engine.is_android
 
-renderCmd : ^engine.render_cmd
+renderCmd : ^engine.layer
 scene: [dynamic]^engine.iobject
 
 shapeSrc: shape.shape_src
@@ -95,12 +95,12 @@ init_svg :: proc() {
 
     shape.shape_init(svg_shape, shape.shape, &svg_shape_src, 
         {0,0,0}, )
-    engine.render_cmd_add_object(renderCmd, svg_shape)
+    engine.layer_add_object(renderCmd, svg_shape)
 }
 
 Init ::proc() {
 	scene = make([dynamic]^engine.iobject)
-    renderCmd = engine.render_cmd_init(&scene)
+    renderCmd = engine.layer_init(&scene)
 
     engine.projection_update_ortho_window(engine.def_projection(), CANVAS_W, CANVAS_H)
 
@@ -151,7 +151,7 @@ Init ::proc() {
     shape.shape_init(shape_obj, shape.shape, &shapeSrc, {-0.0, 0, 10}, math.to_radians_f32(45.0), {3, 3},
     pivot = {0.0, 0.0})
 
-    engine.render_cmd_add_object(renderCmd, shape_obj)
+    engine.layer_add_object(renderCmd, shape_obj)
 
     //Sound Test
     when is_android {
@@ -232,10 +232,10 @@ Init ::proc() {
     fmt.printfln("texture width: %d, height: %d", qoi.qoi_converter_width(qoiD), qoi.qoi_converter_height(qoiD))
     
 
-    engine.render_cmd_add_object(renderCmd, auto_cast img)
+    engine.layer_add_object(renderCmd, auto_cast img)
 
     //Show
-    engine.render_cmd_show(renderCmd)
+    engine.layer_show(renderCmd)
 }
 Update ::proc() {
 }
@@ -243,13 +243,13 @@ Update ::proc() {
 Destroy ::proc() {
     shape.shape_src_deinit(&shapeSrc)
     engine.texture_deinit(&texture)
-    len := engine.render_cmd_get_object_len(renderCmd)
+    len := engine.layer_get_object_len(renderCmd)
     for i in 0..<len {
-        obj := engine.render_cmd_get_object(renderCmd, i)
+        obj := engine.layer_get_object(renderCmd, i)
         engine.iobject_deinit(obj)
         free(obj)
     }
-    engine.render_cmd_deinit(renderCmd)
+    engine.layer_deinit(renderCmd)
 
 	delete(scene)
 

@@ -12,7 +12,7 @@ Render command structure for managing render objects
 
 Manages a collection of objects to be rendered and their command buffers
 */
-render_cmd :: struct {
+layer :: struct {
 	visible: bool,
 	scene: ^[dynamic]^iobject,
     cmd:command_buffer,
@@ -22,8 +22,8 @@ render_cmd :: struct {
 	cmd_pool: vk.CommandPool,
 }
 
-@private __g_render_cmd : [dynamic]^render_cmd = nil
-@private __g_render_cmd_mtx : sync.Mutex
+@private __g_layer : [dynamic]^layer = nil
+@private __g_layer_mtx : sync.Mutex
 
 @private __g_viewports: [dynamic]^viewport = nil
 
@@ -34,14 +34,14 @@ render_cmd :: struct {
 /*
 Initializes a new render command structure
 
-Make render_cmd.scene manually.
+Make layer.scene manually.
 
 Returns:
 - Pointer to the initialized render command
 - Allocator error if allocation failed
 */
-render_cmd_init :: proc(_scene: ^[dynamic]^iobject, allocator := context.allocator) -> (cmd: ^render_cmd, err: mem.Allocator_Error) #optional_allocator_error {
-    cmd = new(render_cmd, allocator) or_return
+layer_init :: proc(_scene: ^[dynamic]^iobject, allocator := context.allocator) -> (cmd: ^layer, err: mem.Allocator_Error) #optional_allocator_error {
+    cmd = new(layer, allocator) or_return
 
 	res := vk.CreateCommandPool(vk_device, &vk.CommandPoolCreateInfo{
 		sType = vk.StructureType.COMMAND_POOL_CREATE_INFO,
@@ -54,9 +54,9 @@ render_cmd_init :: proc(_scene: ^[dynamic]^iobject, allocator := context.allocat
 
     cmd.obj_lock = sync.Mutex{}
 
-    sync.mutex_lock(&__g_render_cmd_mtx)
-    non_zero_append(&__g_render_cmd, cmd)
-    sync.mutex_unlock(&__g_render_cmd_mtx)
+    sync.mutex_lock(&__g_layer_mtx)
+    non_zero_append(&__g_layer, cmd)
+    sync.mutex_unlock(&__g_layer_mtx)
 
 	cmd.scene = _scene
 
@@ -74,19 +74,19 @@ Inputs:
 Returns:
 - None
 */
-render_cmd_deinit :: proc(cmd: ^render_cmd) {
+layer_deinit :: proc(cmd: ^layer) {
 	mem.ICheckInit_Deinit(&cmd.check_init)
 
     free_command_buffers(&cmd.cmd, 1, cmd.cmd_pool)
 
-    sync.mutex_lock(&__g_render_cmd_mtx)
-    for cmd, i in __g_render_cmd {
+    sync.mutex_lock(&__g_layer_mtx)
+    for cmd, i in __g_layer {
         if cmd == cmd {
-            ordered_remove(&__g_render_cmd, i)
+            ordered_remove(&__g_layer, i)
             break
         }
     }
-    sync.mutex_unlock(&__g_render_cmd_mtx)
+    sync.mutex_unlock(&__g_layer_mtx)
 	vk.DestroyCommandPool(vk_device, cmd.cmd_pool, nil)
     free(cmd, cmd.creation_allocator)
 }
@@ -100,12 +100,12 @@ Inputs:
 Returns:
 - `true` if successful, `false` if the command was not found
 */
-render_cmd_show :: proc "contextless" (_cmd: ^render_cmd) -> bool {
+layer_show :: proc "contextless" (_cmd: ^layer) -> bool {
 	mem.ICheckInit_Check(&_cmd.check_init)
 	
-    sync.mutex_lock(&__g_render_cmd_mtx)
-    defer sync.mutex_unlock(&__g_render_cmd_mtx)
-    for cmd in __g_render_cmd {
+    sync.mutex_lock(&__g_layer_mtx)
+    defer sync.mutex_unlock(&__g_layer_mtx)
+    for cmd in __g_layer {
         if cmd == _cmd {
             cmd.visible = true
             return true
@@ -123,12 +123,12 @@ Inputs:
 Returns:
 - `true` if successful, `false` if the command was not found
 */
-render_cmd_hide :: proc "contextless" (_cmd: ^render_cmd) -> bool {
+layer_hide :: proc "contextless" (_cmd: ^layer) -> bool {
 	mem.ICheckInit_Check(&_cmd.check_init)
 	
-    sync.mutex_lock(&__g_render_cmd_mtx)
-    defer sync.mutex_unlock(&__g_render_cmd_mtx)
-    for cmd in __g_render_cmd {
+    sync.mutex_lock(&__g_layer_mtx)
+    defer sync.mutex_unlock(&__g_layer_mtx)
+    for cmd in __g_layer {
         if cmd == _cmd {
             cmd.visible = false
             return true
@@ -141,7 +141,7 @@ render_cmd_hide :: proc "contextless" (_cmd: ^render_cmd) -> bool {
 /*
 Changes the scene of the render command
 */
-render_cmd_change_scene :: proc "contextless" (cmd: ^render_cmd, _scene: ^[dynamic]^iobject) {
+layer_change_scene :: proc "contextless" (cmd: ^layer, _scene: ^[dynamic]^iobject) {
 	sync.mutex_lock(&cmd.obj_lock)
 	defer sync.mutex_unlock(&cmd.obj_lock)
 	
@@ -160,7 +160,7 @@ Inputs:
 Returns:
 - None
 */
-render_cmd_add_object :: proc(cmd: ^render_cmd, obj: ^iobject) {
+layer_add_object :: proc(cmd: ^layer, obj: ^iobject) {
 	mem.ICheckInit_Check(&cmd.check_init)
 	
     sync.mutex_lock(&cmd.obj_lock)
@@ -185,7 +185,7 @@ Inputs:
 Returns:
 - None
 */
-render_cmd_add_objects :: proc(cmd: ^render_cmd, objs: ..^iobject) {
+layer_add_objects :: proc(cmd: ^layer, objs: ..^iobject) {
 	mem.ICheckInit_Check(&cmd.check_init)
 	
     sync.mutex_lock(&cmd.obj_lock)
@@ -213,7 +213,7 @@ Inputs:
 Returns:
 - None
 */
-render_cmd_remove_object :: proc(cmd: ^render_cmd, obj: ^iobject) {
+layer_remove_object :: proc(cmd: ^layer, obj: ^iobject) {
 	mem.ICheckInit_Check(&cmd.check_init)
 	
     sync.mutex_lock(&cmd.obj_lock)
@@ -236,7 +236,7 @@ Inputs:
 Returns:
 - None
 */
-render_cmd_remove_all :: proc(cmd: ^render_cmd) {
+layer_remove_all :: proc(cmd: ^layer) {
 	mem.ICheckInit_Check(&cmd.check_init)
 	
     sync.mutex_lock(&cmd.obj_lock)
@@ -255,7 +255,7 @@ Inputs:
 Returns:
 - `true` if the object is in the scene, `false` otherwise
 */
-render_cmd_has_object :: proc "contextless"(cmd: ^render_cmd, obj: ^iobject) -> bool {
+layer_has_object :: proc "contextless"(cmd: ^layer, obj: ^iobject) -> bool {
 	mem.ICheckInit_Check(&cmd.check_init)
 	
     sync.mutex_lock(&cmd.obj_lock)
@@ -278,7 +278,7 @@ Inputs:
 Returns:
 - The number of objects in the scene
 */
-render_cmd_get_object_len :: proc "contextless" (cmd: ^render_cmd) -> int {
+layer_get_object_len :: proc "contextless" (cmd: ^layer) -> int {
 	mem.ICheckInit_Check(&cmd.check_init)
 	
     sync.mutex_lock(&cmd.obj_lock)
@@ -296,7 +296,7 @@ Inputs:
 Returns:
 - Pointer to the object at the specified index
 */
-render_cmd_get_object :: proc "contextless" (cmd: ^render_cmd, index: int) -> ^iobject {
+layer_get_object :: proc "contextless" (cmd: ^layer, index: int) -> ^iobject {
 	mem.ICheckInit_Check(&cmd.check_init)
 	
     sync.mutex_lock(&cmd.obj_lock)
@@ -314,7 +314,7 @@ Inputs:
 Returns:
 - The index of the object, or -1 if not found
 */
-render_cmd_get_object_idx :: proc "contextless"(cmd: ^render_cmd, obj: ^iobject) -> int {
+layer_get_object_idx :: proc "contextless"(cmd: ^layer, obj: ^iobject) -> int {
     for obj_t, i in cmd.scene^ {
         if obj_t == obj {
             return i
@@ -334,22 +334,22 @@ Inputs:
 Returns:
 - A slice of all objects in the scene
 */
-render_cmd_get_objects :: proc(cmd: ^render_cmd) -> []^iobject {
+layer_get_objects :: proc(cmd: ^layer) -> []^iobject {
     return cmd.scene^[:]
 }
 
 
 
-@(private) __render_cmd_clean :: proc () {
-	delete(__g_render_cmd)
+@(private) __layer_clean :: proc () {
+	delete(__g_layer)
 	delete(__g_viewports)
 
 	camera_deinit(&__g_default_camera)
 	projection_deinit(&__g_default_projection)
 }
 
-@(private) __render_cmd_create :: proc() {
-	__g_render_cmd = mem.make_non_zeroed([dynamic]^render_cmd)
+@(private) __layer_create :: proc() {
+	__g_layer = mem.make_non_zeroed([dynamic]^layer)
 	__g_viewports = mem.make_non_zeroed([dynamic]^viewport)
 
 	camera_init(&__g_default_camera)
@@ -373,9 +373,9 @@ Inputs:
 Returns:
 - None
 */
-render_cmd_size_all :: proc () {
-	sync.mutex_lock(&__g_render_cmd_mtx)
-	defer sync.mutex_unlock(&__g_render_cmd_mtx)
+layer_size_all :: proc () {
+	sync.mutex_lock(&__g_layer_mtx)
+	defer sync.mutex_unlock(&__g_layer_mtx)
 	for cmd in __g_viewports {
 		projection_size(cmd.projection)
 	}

@@ -1135,11 +1135,11 @@ vk_start :: proc() {
 
 	vk_wait_all_op()//reset wait
 
-	__render_cmd_create()
+	__layer_create()
 }
 
 vk_destroy :: proc() {
-	__render_cmd_clean()
+	__layer_clean()
 
 	graphics_clean()
 
@@ -1220,12 +1220,12 @@ vk_recreate_swap_chain :: proc() {
 
 	sync.mutex_unlock(&full_screen_mtx)
 
-	render_cmd_size_all()
+	layer_size_all()
 	size()
-	if len(__g_render_cmd) > 0 {
+	if len(__g_layer) > 0 {
 		//thread pool 사용해서 각각 처리
 		size_task_data :: struct {
-			cmd: ^render_cmd,
+			cmd: ^layer,
 		}
 		
 		size_task_proc :: proc(task: thread.Task) {
@@ -1235,13 +1235,13 @@ vk_recreate_swap_chain :: proc() {
 			}
 		}
 
-		// Add each render_cmd as a task to thread pool
-		for cmd in __g_render_cmd {
+		// Add each layer as a task to thread pool
+		for cmd in __g_layer {
 			data := new(size_task_data, context.temp_allocator)
 			data.cmd = cmd
 			thread.pool_add_task(&g_thread_pool, context.allocator, size_task_proc, data)
 		}
-		for thread.pool_num_done(&g_thread_pool) < len(__g_render_cmd) {
+		for thread.pool_num_done(&g_thread_pool) < len(__g_layer) {
 			thread.yield()
 		}
 		for {
@@ -1311,14 +1311,14 @@ vk_draw_frame :: proc() {
 	} else if res != .SUCCESS { trace.panic_log("AcquireNextImageKHR : ", res) }
 
 	cmd_visible := false
-	sync.mutex_lock(&__g_render_cmd_mtx)
-	visible_commands := make([dynamic]^render_cmd, 0, len(__g_render_cmd), context.temp_allocator)
-	defer delete(visible_commands)
-	if __g_render_cmd != nil && len(__g_render_cmd) > 0 {
+	sync.mutex_lock(&__g_layer_mtx)
+	visible_layers := make([dynamic]^layer, 0, len(__g_layer), context.temp_allocator)
+	defer delete(visible_layers)
+	if __g_layer != nil && len(__g_layer) > 0 {
 		// Collect visible commands
-		for &cmd in __g_render_cmd {
+		for &cmd in __g_layer {
 			if cmd.visible {
-				append(&visible_commands, cmd)
+				append(&visible_layers, cmd)
 				cmd_visible = true
 			}
 		}
@@ -1351,7 +1351,7 @@ vk_draw_frame :: proc() {
 		}
 
 		record_task_data :: struct {
-			cmd: ^render_cmd,
+			cmd: ^layer,
 			inheritanceInfo: vk.CommandBufferInheritanceInfo,
 		}
 		
@@ -1362,22 +1362,22 @@ vk_draw_frame :: proc() {
 		
 
 		// Add tasks to thread pool
-		for cmd in visible_commands {
+		for cmd in visible_layers {
 			data := new(record_task_data, context.temp_allocator)
 			data.cmd = cmd
 			data.inheritanceInfo = inheritanceInfo
 			thread.pool_add_task(&g_thread_pool, context.allocator, record_task_proc, data)
 		}
-		for thread.pool_num_done(&g_thread_pool) < len(visible_commands) {
+		for thread.pool_num_done(&g_thread_pool) < len(visible_layers) {
 			thread.yield()
 		}
 		for {
 			thread.pool_pop_done(&g_thread_pool) or_break
 		}
 		
-		cmd_buffers := make([]vk.CommandBuffer, len(visible_commands), context.temp_allocator)
+		cmd_buffers := make([]vk.CommandBuffer, len(visible_layers), context.temp_allocator)
 		defer delete(cmd_buffers, context.temp_allocator)
-		for cmd, i in visible_commands {
+		for cmd, i in visible_layers {
 			cmd_buffers[i] = cmd.cmd.__handle
 		}
 		vk.CmdExecuteCommands(vk_cmd_buffer[frame], auto_cast len(cmd_buffers), &cmd_buffers[0])
@@ -1402,7 +1402,7 @@ vk_draw_frame :: proc() {
 		res = vk.QueueSubmit(vk_graphics_queue, 1, &submitInfo, vk_in_flight_fence[frame])
 		if res != .SUCCESS do trace.panic_log("QueueSubmit : ", res)
 
-		sync.mutex_unlock(&__g_render_cmd_mtx)
+		sync.mutex_unlock(&__g_layer_mtx)
 	} else {
 		//?그릴 오브젝트가 없는 경우
 		waitStages := vk.PipelineStageFlags{.COLOR_ATTACHMENT_OUTPUT}
@@ -1447,7 +1447,7 @@ vk_draw_frame :: proc() {
 		res = vk.QueueSubmit(vk_graphics_queue, 1, &submitInfo, 	vk_in_flight_fence[frame])
 		if res != .SUCCESS do trace.panic_log("QueueSubmit : ", res)
 
-		sync.mutex_unlock(&__g_render_cmd_mtx)
+		sync.mutex_unlock(&__g_layer_mtx)
 	}
 	presentInfo := vk.PresentInfoKHR {
 		sType = vk.StructureType.PRESENT_INFO_KHR,
@@ -1464,7 +1464,6 @@ vk_draw_frame :: proc() {
 		vk_recreate_swap_chain()
 		return
 	} else if res == .SUBOPTIMAL_KHR {
-		//k_recreate_swap_chain()
 		return
 	} else if res == .ERROR_SURFACE_LOST_KHR {
 		vk_recreate_surface()
@@ -1649,7 +1648,7 @@ vk_transition_image_layout :: proc(cmd:vk.CommandBuffer, image:vk.Image, mip_lev
 // 	vk.FreeCommandBuffers(vk_device, vk_cmd_pool, 1, &cmd)
 // }
 
-vk_record_command_buffer :: proc(cmd:^render_cmd, _inheritanceInfo:vk.CommandBufferInheritanceInfo) {
+vk_record_command_buffer :: proc(cmd:^layer, _inheritanceInfo:vk.CommandBufferInheritanceInfo) {
 	inheritanceInfo := _inheritanceInfo
 	c := cmd.cmd
 	beginInfo := vk.CommandBufferBeginInfo {
