@@ -827,41 +827,27 @@ shapes_compute_polygon :: proc(poly:^shapes, allocator := context.allocator) -> 
         
         node_idx := 0
         for node in poly.nodes {
-            if node.stroke_color.a > 0 && node.thickness > 0 {
-				// 폴리곤의 점들을 수집
-				poly_points := mem.make_non_zeroed_dynamic_array([dynamic]linalg.point, arena)
-				defer delete(poly_points)
-				
+            if node.stroke_color.a > 0 && node.thickness > 0 {	
 				node_len :u32 = auto_cast len(node.lines)
-				for i:u32 = 0; i < node_len; i += 1 {
-					line := node.lines[i]
-					non_zero_append(&poly_points, line.start)
-				}
-				
-				polyOri := linalg.GetPolygonOrientation(poly_points[:])
-
-
 				// 외부 스트로크
 				outer_lines := mem.make_non_zeroed([]shape_line, node_len, 64, arena)
 
-				set_line_points_outer :: proc "contextless" (out_line:^shape_line, line:shape_line, prev_line:shape_line, next_line:shape_line, polyOri:linalg.PolyOrientation, thickness:f32) {
+				set_line_points_outer :: proc "contextless" (out_line:^shape_line, line:shape_line, prev_line:shape_line, next_line:shape_line, thickness:f32) {
 					current_point := line.start
 					next_point:linalg.point
 					prev_point :linalg.point
 					control0, control1:linalg.point = {0,0}, {0,0}
 
 					#partial switch line.type {
-						case .Line:
-							next_point = next_line.start
-							prev_point = prev_line.start
-						case .Quadratic:
-							next_point = line.control0
-							prev_point = prev_line.control0
-						case:
-							next_point = line.control0
-							prev_point = prev_line.control1
+						case .Line:next_point = next_line.start
+						case:next_point = line.control0
 					}
-					start_point := linalg.LineExtendPoint(prev_point, current_point, next_point, thickness, polyOri)
+					#partial switch prev_line.type {
+						case .Line:prev_point = prev_line.start
+						case .Quadratic:prev_point = prev_line.control0
+						case:prev_point = prev_line.control1
+					}
+					start_point := linalg.LineExtendPoint(prev_point, current_point, next_point, thickness, .CounterClockwise)
 
 					#partial switch line.type {
 						case .Line:
@@ -869,12 +855,12 @@ shapes_compute_polygon :: proc(poly:^shapes, allocator := context.allocator) -> 
 							current_point = line.control0
 							prev_point = line.start
 							next_point = next_line.start
-							control0 = linalg.LineExtendPoint(prev_point, current_point, next_point, thickness, polyOri)
+							control0 = linalg.LineExtendPoint(prev_point, current_point, next_point, thickness, .CounterClockwise)
 						case:
 							current_point = line.control0
 							prev_point = line.start
 							next_point = line.control1
-							control0 = linalg.LineExtendPoint(prev_point, current_point, next_point, thickness, polyOri)
+							control0 = linalg.LineExtendPoint(prev_point, current_point, next_point, thickness, .CounterClockwise)
 					}
 
 					#partial switch line.type {
@@ -884,7 +870,7 @@ shapes_compute_polygon :: proc(poly:^shapes, allocator := context.allocator) -> 
 							current_point = line.control1
 							prev_point = line.control0
 							next_point = next_line.start
-							control1 = linalg.LineExtendPoint(prev_point, current_point, next_point, thickness, polyOri)
+							control1 = linalg.LineExtendPoint(prev_point, current_point, next_point, thickness, .CounterClockwise)
 					}
 
 					out_line^ = shape_line{
@@ -895,24 +881,22 @@ shapes_compute_polygon :: proc(poly:^shapes, allocator := context.allocator) -> 
 					}
 				}
 
-				set_line_points_inner :: proc "contextless" (out_line:^shape_line, line:shape_line, prev_line:shape_line, next_line:shape_line, polyOri:linalg.PolyOrientation, thickness:f32) {
+				set_line_points_inner :: proc "contextless" (out_line:^shape_line, line:shape_line, prev_line:shape_line, next_line:shape_line, thickness:f32) {
 					current_point := line.end
 					next_point:linalg.point
 					prev_point :linalg.point
 					control0, control1:linalg.point = {0,0}, {0,0}
 
 					#partial switch line.type {
-						case .Line:
-							next_point = line.start
-							prev_point = prev_line.start
-						case .Quadratic:
-							next_point = line.control0
-							prev_point = prev_line.control0
-						case:
-							next_point = line.control1
-							prev_point = prev_line.control0
+						case .Line:next_point = line.start
+						case .Quadratic:next_point = line.control0
+						case:next_point = line.control1
 					}
-					start_point := linalg.LineExtendPoint(prev_point, current_point, next_point, thickness, polyOri)
+					#partial switch prev_line.type {
+						case .Line:prev_point = prev_line.end
+						case:prev_point = prev_line.control0
+					}
+					start_point := linalg.LineExtendPoint(prev_point, current_point, next_point, thickness, .CounterClockwise)
 
 					#partial switch line.type {
 						case .Line:
@@ -920,12 +904,12 @@ shapes_compute_polygon :: proc(poly:^shapes, allocator := context.allocator) -> 
 							current_point = line.control0
 							prev_point = line.end
 							next_point = line.start
-							control0 = linalg.LineExtendPoint(prev_point, current_point, next_point, thickness, polyOri)
+							control0 = linalg.LineExtendPoint(prev_point, current_point, next_point, thickness, .CounterClockwise)
 						case:
 							current_point = line.control1
 							prev_point = line.end
 							next_point = line.control0
-							control0 = linalg.LineExtendPoint(prev_point, current_point, next_point, thickness, polyOri)
+							control0 = linalg.LineExtendPoint(prev_point, current_point, next_point, thickness, .CounterClockwise)
 					}
 
 					#partial switch line.type {
@@ -935,7 +919,7 @@ shapes_compute_polygon :: proc(poly:^shapes, allocator := context.allocator) -> 
 							current_point = line.control0
 							prev_point = line.control1
 							next_point = line.start
-							control1 = linalg.LineExtendPoint(prev_point, current_point, next_point, thickness, polyOri)
+							control1 = linalg.LineExtendPoint(prev_point, current_point, next_point, thickness, .CounterClockwise)
 					}
 
 					out_line^ = shape_line{
@@ -953,7 +937,7 @@ shapes_compute_polygon :: proc(poly:^shapes, allocator := context.allocator) -> 
 					prev_line := node.lines[prev_idx]
 					next_line := node.lines[next_idx]
 
-					set_line_points_outer(&outer_lines[i], line, prev_line, next_line, polyOri, node.thickness)
+					set_line_points_outer(&outer_lines[i], line, prev_line, next_line, node.thickness)
 				}
 				for i:u32 = 0; i < node_len; i += 1 {
 					if i == node_len - 1 {
@@ -981,7 +965,7 @@ shapes_compute_polygon :: proc(poly:^shapes, allocator := context.allocator) -> 
 					prev_line := node.lines[prev_idx]
 					next_line := node.lines[next_idx]
 
-					set_line_points_inner(&inner_lines[j], line, prev_line, next_line, polyOri, node.thickness)
+					set_line_points_inner(&inner_lines[j], line, prev_line, next_line, node.thickness)
 					j += 1
 				}
 				for i:u32 = 0; i < node_len; i += 1 {
