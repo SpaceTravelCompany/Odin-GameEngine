@@ -287,7 +287,6 @@ allocator : runtime.Allocator) -> (rect:linalg.rect, err:geometry.shape_error = 
     stroke_color:linalg.point3dw,
     thickness:f32,
 ) -> (shapeErr:geometry.shape_error = nil) {
-    ok := FONT_KEY{_char, thickness} in self.char_array
     charD : ^char_data
 
     FTMoveTo :: proc "c" (to: ^freetype.Vector, user: rawptr) -> c.int {
@@ -373,6 +372,7 @@ allocator : runtime.Allocator) -> (rect:linalg.rect, err:geometry.shape_error = 
 
     thickness2 := color != nil ? -thickness : thickness
     thickness2 = f32(int(thickness2 * 10000 / 10000)) //소수점 아래 4자리 이하로 자른다. //!need test
+	ok := FONT_KEY{_char, thickness2} in self.char_array
 
     if ok {
         charD = &self.char_array[FONT_KEY{_char, thickness2}]
@@ -463,9 +463,6 @@ allocator : runtime.Allocator) -> (rect:linalg.rect, err:geometry.shape_error = 
 
                 rawP : ^geometry.raw_shape
                 rawP , shapeErr = geometry.shapes_compute_polygon(&poly, self.allocator)//높은 부하 작업 High load operations		
-                defer if shapeErr != nil {
-                    geometry.raw_shape_free(rawP, self.allocator)
-                }
 
                 if shapeErr != nil do return
 
