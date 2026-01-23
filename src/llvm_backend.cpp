@@ -239,9 +239,9 @@ gb_internal lbContextData *lb_push_context_onto_stack(lbProcedure *p, lbAddr ctx
 
 gb_internal String lb_internal_gen_name_from_type(char const *prefix, Type *type) {
 	gbString str = gb_string_make(permanent_allocator(), prefix);
-	u64 hash = type_hash_canonical_type(type);
-	str = gb_string_appendc(str, "-");
-	str = gb_string_append_fmt(str, "%llu", cast(unsigned long long)hash);
+	str = gb_string_appendc(str, "$$");
+	gbString ct = temp_canonical_string(type);
+	str = gb_string_append_length(str, ct, gb_string_length(ct));
 	String proc_name = make_string(cast(u8 const *)str, gb_string_length(str));
 	return proc_name;
 }
@@ -2045,6 +2045,11 @@ gb_internal bool lb_init_global_var(lbModule *m, lbProcedure *p, Entity *e, Ast 
 			lb_emit_store(p, data, lb_emit_conv(p, gp, t_rawptr));
 			lb_emit_store(p, ti,   lb_typeid(p->module, var_type));
 		} else {
+			i64 sz = type_size_of(e->type);
+			if (sz >= 4 * 1024) {
+				warning(init_expr, "[Possible Code Generation Issue] Non-constant initialization is large (%lld bytes), and might cause problems with LLVM", cast(long long)sz);
+			}
+
 			LLVMTypeRef vt = llvm_addr_type(p->module, var.var);
 			lbValue src0 = lb_emit_conv(p, var.init, t);
 			LLVMValueRef src = OdinLLVMBuildTransmute(p, src0.value, vt);
