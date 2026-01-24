@@ -63,8 +63,6 @@ Returns:
 - None
 */
 custom_object_pipeline_deinit :: proc(self:^object_pipeline) {
-    mem.ICheckInit_Deinit(&self.check_init)
-
     for l in self.__descriptor_set_layouts {
         vk.DestroyDescriptorSetLayout(engine.graphics_device(), l, nil)
     }
@@ -111,7 +109,6 @@ custom_object_pipeline_init :: proc(self:^object_pipeline,
     geometry_shader:Maybe(shader_code) = nil,
     shader_lang:shader_lang = .GLSL,
     depth_stencil_state:Maybe(vk.PipelineDepthStencilStateCreateInfo) = nil) -> bool {
-    mem.ICheckInit_Init(&self.check_init)
 
     self.draw_method = draw_method
     self.pool_sizes = mem.make_non_zeroed_slice([][]engine.descriptor_pool_size, len(pool_sizes))
@@ -373,8 +370,6 @@ _super_custom_object_deinit :: proc(self:^custom_object) {
 
 
 _super_custom_object_draw :: proc(self:^custom_object, cmd:engine.command_buffer) {
-    mem.ICheckInit_Check(&self.check_init)
-
     sets := mem.make_non_zeroed_slice([]vk.DescriptorSet, len(self.pipeline_p_sets))
     defer delete(sets)
     for i in 0..<len(self.pipeline_p_sets) {
@@ -449,8 +444,6 @@ create_graphics_pipeline :: proc(
 }
 
 object_pipeline :: struct {
-    check_init: mem.ICheckInit,
-
     __pipeline:vk.Pipeline,
     __pipeline_layout:vk.PipelineLayout,
     __descriptor_set_layouts:[]vk.DescriptorSetLayout,

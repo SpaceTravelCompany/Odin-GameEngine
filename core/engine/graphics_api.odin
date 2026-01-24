@@ -134,14 +134,12 @@ command_buffer :: struct #packed {
 color_transform :: struct {
 	mat: linalg.matrix44,
 	mat_uniform: iresource,
-	check_init: mem.ICheckInit,
 }
 
 texture :: struct {
 	texture: iresource,
 	set: descriptor_set,
 	sampler: vk.Sampler,
-	check_init: mem.ICheckInit,
 }
 
 resource_usage :: enum {
@@ -466,7 +464,6 @@ color_transform_init_matrix_raw :: proc(self: ^color_transform, mat: linalg.matr
 }
 
 @private __color_transform_init :: #force_inline proc(self: ^color_transform) {
-	mem.ICheckInit_Init(&self.check_init)
 	self.mat_uniform = buffer_resource_create_buffer({
 		len = size_of(linalg.matrix44),
 		type = .UNIFORM,
@@ -484,7 +481,6 @@ Returns:
 - None
 */
 color_transform_deinit :: proc(self: ^color_transform) {
-	mem.ICheckInit_Deinit(&self.check_init)
 	buffer_resource_deinit(self.mat_uniform)
 	self.mat_uniform = nil
 }
@@ -500,7 +496,6 @@ Returns:
 - None
 */
 color_transform_update_matrix_raw :: proc(self: ^color_transform, _mat: linalg.matrix44) {
-	mem.ICheckInit_Check(&self.check_init)
 	self.mat = _mat
 	buffer_resource_copy_update(self.mat_uniform, &self.mat)
 }

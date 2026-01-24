@@ -188,7 +188,6 @@ Returns:
 - None
 */
 projection_update_matrix_raw :: proc(self:^projection, _mat:linalg.matrix44) {
-    mem.ICheckInit_Check(&self.check_init)
     mat : linalg.matrix44
     when is_mobile {
         mat = linalg.matrix_mul(rotation_matrix, _mat)
@@ -251,7 +250,6 @@ projection_update_matrix_raw :: proc(self:^projection, _mat:linalg.matrix44) {
 
 //? uniform object is all small, so use_gcpu_mem is true by default
 @private __projection_init :: #force_inline proc(self:^projection) {
-    mem.ICheckInit_Init(&self.check_init)
     mat : linalg.matrix44
     when is_mobile {
         mat = linalg.matrix_mul(rotation_matrix, self.mat)
@@ -277,8 +275,6 @@ Returns:
 - None
 */
 projection_deinit :: proc(self:^projection) {
-    mem.ICheckInit_Deinit(&self.check_init)
-
     buffer_resource_deinit(self.mat_uniform)
 	self.mat_uniform = nil
 }

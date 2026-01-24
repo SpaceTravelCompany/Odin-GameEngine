@@ -147,32 +147,3 @@ make_resize_slice_error_loc :: #force_inline proc "contextless" (loc := #caller_
 	}
 	handle_error(loc, oldLen, newLen)
 }
-
-
-ICheckInit :: struct {
-	init: bool,
-}
-
-
-ICheckInit_IsInited :: #force_inline proc "contextless" (t: ^ICheckInit) -> bool {
-	return t.init
-}
-ICheckInit_Init :: #force_inline proc "contextless" (t: ^ICheckInit) {
-	when ODIN_DEBUG {
-		if t.init {
-			panic_contextless("ICheckInit_Init: already initialized")
-		}
-	}
-	t.init = true
-}
-ICheckInit_Check :: #force_inline proc "contextless" (t: ^ICheckInit) {
-	when ODIN_DEBUG {
-		if !t.init do panic_contextless("ICheckInit_Check: uninitialized")
-	}
-}
-ICheckInit_Deinit :: #force_inline proc "contextless" (t: ^ICheckInit) {
-	when ODIN_DEBUG {
-		if !t.init do panic_contextless("ICheckInit_Check: uninitialized")
-	}
-	t.init = false
-}

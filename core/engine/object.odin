@@ -27,14 +27,27 @@ iobject_vtable :: struct {
 /*
 Base object interface structure for all renderable objects
 
-Contains transformation matrix, descriptor set, camera, projection, and vtable for polymorphic behavior
+Contains vtable for polymorphic behavior
 */
 iobject :: struct {
+    actual_type: typeid,
+    vtable: ^iobject_vtable,
+}
+@private __itransform_object_vtable :iobject_vtable = iobject_vtable {
+    get_uniform_resources = auto_cast get_uniform_resources_transform_object,
+    deinit = auto_cast _super_itransform_object_deinit,
+}
+
+/*
+Transformable object interface structure for all renderable objects
+
+Contains transformation matrix, descriptor set for polymorphic behavior
+*/
+itransform_object :: struct {
+	using _: iobject,
     using _: __matrix_in,
     set:descriptor_set,
     color_transform: ^color_transform,
-    actual_type: typeid,
-    vtable: ^iobject_vtable,
 }
 
 iresource :: distinct rawptr
@@ -42,7 +55,6 @@ iresource :: distinct rawptr
 @private __matrix_in :: struct {
     mat: linalg.matrix44,
     mat_uniform:iresource,
-    check_init: mem.ICheckInit,
 }
 
 @(require_results)
@@ -146,56 +158,23 @@ sr_2d_matrix2 :: proc "contextless" (s: linalg.point, r: f32, cp:linalg.point) -
     return nil
 }
 
-/*
-Initializes an iobject with transformation parameters
-
-Inputs:
-- self: Pointer to the object to initialize
-- actual_type: The actual type of the object (must be a subtype of iobject)
-- pos: Position of the object
-- rotation: Rotation angle in radians
-- scale: Scale factors (default: {1, 1})
-- _camera: Pointer to the camera
-- _projection: Pointer to the projection
-- _color_transform: Pointer to color transform (default: nil)
-- pivot: Pivot point for transformations (default: {0.0, 0.0})
-*/
-iobject_init :: proc(self:^iobject, $actual_type:typeid,
-    pos:linalg.point3d, rotation:f32, scale:linalg.point = {1,1},
-    _color_transform:^color_transform = nil, pivot:linalg.point = {0.0, 0.0})
-    where actual_type != iobject && intrinsics.type_is_subtype_of(actual_type, iobject) {
-
-    mem.ICheckInit_Init(&self.check_init)
-    self.color_transform = _color_transform == nil ? &__def_color_transform : _color_transform
-    
-    self.mat = srt_2d_matrix2(pos, scale, rotation, pivot)
-
-    self.mat_uniform = buffer_resource_create_buffer({
-        len = size_of(linalg.matrix44),
-        type = .UNIFORM,
-        resource_usage = .CPU,
-    }, mem.ptr_to_bytes(&self.mat), true)
-
-    resources := get_uniform_resources(self)
-    defer delete(resources, context.temp_allocator)
-    __iobject_update_uniform(self, resources)
-
-    self.actual_type = actual_type
+_super_itransform_object_deinit :: #force_inline proc (self:^itransform_object) {
+	buffer_resource_deinit(self.mat_uniform)
+	self.mat_uniform = nil
 }
 
-_super_iobject_deinit :: #force_inline proc (self:^iobject) {
-    mem.ICheckInit_Deinit(&self.check_init)
-    buffer_resource_deinit(self.mat_uniform)
+iobject_init :: proc(self:^iobject) {
+    self.actual_type = typeid_of(iobject)
 }
 
-iobject_init2 :: proc(self:^iobject, $actual_type:typeid,
-    _color_transform:^color_transform = nil)
-    where actual_type != iobject && intrinsics.type_is_subtype_of(actual_type, iobject) {
-
-    mem.ICheckInit_Init(&self.check_init)
+itransform_object_init :: proc(self:^itransform_object, _color_transform:^color_transform = nil, vtable:^iobject_vtable = nil) {
     self.color_transform = _color_transform == nil ? def_color_transform() : _color_transform
 
-    self.actual_type = actual_type
+	self.vtable = vtable == nil ? &__itransform_object_vtable : vtable
+	if self.vtable.get_uniform_resources == nil do self.vtable.get_uniform_resources = auto_cast get_uniform_resources_transform_object
+	if self.vtable.deinit == nil do self.vtable.deinit = auto_cast _super_itransform_object_deinit
+
+    self.actual_type = typeid_of(itransform_object)
 }
 
 //!alloc result array in temp_allocator
@@ -207,7 +186,7 @@ iobject_init2 :: proc(self:^iobject, $actual_type:typeid,
     }
 }
 
-get_uniform_resources_default :: #force_inline proc(self:^iobject) -> []iresource {
+get_uniform_resources_transform_object :: #force_inline proc(self:^itransform_object) -> []iresource {
     res := mem.make_non_zeroed([]iresource, 2, context.temp_allocator)
     res[0] = self.mat_uniform
     res[1] = self.color_transform.mat_uniform
@@ -216,9 +195,7 @@ get_uniform_resources_default :: #force_inline proc(self:^iobject) -> []iresourc
 }
 
 
-@private __iobject_update_uniform :: proc(self:^iobject, resources:[]iresource) {
-    mem.ICheckInit_Check(&self.check_init)
-
+@private __itransform_object_update_uniform :: proc(self:^itransform_object, resources:[]iresource) {
     //업데이트 하면 tempArenaAllocator를 다 지우니 중복 할당해도 됨.
     self.set.__resources = mem.make_non_zeroed_slice([]iresource, len(resources), temp_arena_allocator())
     mem.copy_non_overlapping(&self.set.__resources[0], &resources[0], len(resources) * size_of(iresource))
@@ -238,8 +215,7 @@ Inputs:
 Returns:
 - None
 */
-iobject_update_transform :: proc(self:^iobject, pos:linalg.point3d, rotation:f32 = 0.0, scale:linalg.point = {1.0,1.0}, pivot:linalg.point = {0.0,0.0}) {
-    mem.ICheckInit_Check(&self.check_init)
+itransform_object_update_transform :: proc(self:^itransform_object, pos:linalg.point3d, rotation:f32 = 0.0, scale:linalg.point = {1.0,1.0}, pivot:linalg.point = {0.0,0.0}) {
     self.mat = srt_2d_matrix2(pos, scale, rotation, pivot)
 
     if self.mat_uniform == nil {
@@ -251,13 +227,12 @@ iobject_update_transform :: proc(self:^iobject, pos:linalg.point3d, rotation:f32
 
         resources := get_uniform_resources(self)
         defer delete(resources, context.temp_allocator)
-        __iobject_update_uniform(self, resources)
+        __itransform_object_update_uniform(self, resources)
     } else {
         buffer_resource_copy_update(auto_cast self.mat_uniform, &self.mat)
     }
 }
-iobject_update_transform_matrix_raw :: proc(self:^iobject, _mat:linalg.matrix44) {
-    mem.ICheckInit_Check(&self.check_init)
+itransform_object_update_transform_matrix_raw :: proc(self:^itransform_object, _mat:linalg.matrix44) {
     self.mat = _mat
     
     if self.mat_uniform == nil {
@@ -269,15 +244,13 @@ iobject_update_transform_matrix_raw :: proc(self:^iobject, _mat:linalg.matrix44)
 
         resources := get_uniform_resources(self)
         defer delete(resources, context.temp_allocator)
-        __iobject_update_uniform(self, resources)
+        __itransform_object_update_uniform(self, resources)
     } else {
         buffer_resource_copy_update(auto_cast self.mat_uniform, &self.mat)
     }
 }
 
-iobject_update_transform_matrix :: proc(self:^iobject) {
-    mem.ICheckInit_Check(&self.check_init)
-    
+itransform_object_update_transform_matrix :: proc(self:^itransform_object) {
     if self.mat_uniform == nil {
         self.mat_uniform = buffer_resource_create_buffer({
             len = size_of(linalg.matrix44),
@@ -287,41 +260,21 @@ iobject_update_transform_matrix :: proc(self:^iobject) {
 
         resources := get_uniform_resources(self)
         defer delete(resources, context.temp_allocator)
-        __iobject_update_uniform(self, resources)
+        __itransform_object_update_uniform(self, resources)
     } else {
         buffer_resource_copy_update(self.mat_uniform, &self.mat)
     }
 }
 
-iobject_change_color_transform :: proc(self:^iobject, _color_transform:^color_transform) {
-    mem.ICheckInit_Check(&self.check_init)
+itransform_object_change_color_transform :: proc(self:^itransform_object, _color_transform:^color_transform) {
     self.color_transform = _color_transform
-    __iobject_update_uniform(self, get_uniform_resources(self))
+    __itransform_object_update_uniform(self, get_uniform_resources(self))
 }
-// iobject_update_camera :: proc(self:^iobject, _camera:^camera) {
-//     mem.ICheckInit_Check(&self.check_init)
-//     self.camera = _camera
-//     __iobject_update_uniform(self, get_uniform_resources(self))
-// }
-// iobject_update_projection :: proc(self:^iobject, _projection:^projection) {
-//     mem.ICheckInit_Check(&self.check_init)
-//     self.projection = _projection
-//     __iobject_update_uniform(self, get_uniform_resources(self))
-// }
-iobject_get_color_transform :: #force_inline proc "contextless" (self:^iobject) -> ^color_transform {
-    mem.ICheckInit_Check(&self.check_init)
+itransform_object_get_color_transform :: #force_inline proc "contextless" (self:^itransform_object) -> ^color_transform {
     return self.color_transform
 }
-// iobject_get_camera :: #force_inline proc "contextless" (self:^iobject) -> ^camera {
-//     mem.ICheckInit_Check(&self.check_init)
-//     return self.camera
-// }
-// iobject_get_projection :: #force_inline proc "contextless" (self:^iobject) -> ^projection {
-//     mem.ICheckInit_Check(&self.check_init)
-//     return self.projection
-// }
 
-iobject_get_actual_type :: #force_inline proc "contextless" (self:^iobject) -> typeid {
+itransform_object_get_actual_type :: #force_inline proc "contextless" (self:^itransform_object) -> typeid {
     return self.actual_type
 }
 
@@ -339,9 +292,8 @@ Returns:
 iobject_draw :: proc (self:^iobject, cmd:command_buffer, viewport:^viewport) {
     if self.vtable != nil && self.vtable.draw != nil {
         self.vtable.draw(self, cmd, viewport)
-    } else {
-        trace.panic_log("iobjectType_Draw: unknown object type")
     }
+	//Draw Not Required Default
 }
 
 /*
@@ -380,7 +332,6 @@ set_render_clear_color :: proc "contextless" (_color:linalg.point3dw) {
 }
 
 __vertex_buf_init :: proc (self:^__vertex_buf($NodeType), array:[]NodeType, _flag:resource_usage, _useGPUMem := false, allocator :Maybe(runtime.Allocator) = nil) {
-    mem.ICheckInit_Init(&self.check_init)
     if len(array) == 0 do trace.panic_log("vertex_buf_init: array is empty")
     self.buf = buffer_resource_create_buffer({
         len = vk.DeviceSize(len(array) * size_of(NodeType)),
@@ -392,8 +343,6 @@ __vertex_buf_init :: proc (self:^__vertex_buf($NodeType), array:[]NodeType, _fla
 }
 
 __vertex_buf_deinit :: proc (self:^__vertex_buf($NodeType)) {
-    mem.ICheckInit_Deinit(&self.check_init)
-
     buffer_resource_deinit(self.buf)
 	self.buf = nil
 }
@@ -403,7 +352,6 @@ __vertex_buf_update :: proc (self:^__vertex_buf($NodeType), array:[]NodeType, al
 }
 
 __storage_buf_init :: proc (self:^__storage_buf($NodeType), array:[]NodeType, _flag:resource_usage, _useGPUMem := false) {
-    mem.ICheckInit_Init(&self.check_init)
     if len(array) == 0 do trace.panic_log("storage_buf_init: array is empty")
     self.buf = buffer_resource_create_buffer({
         len = vk.DeviceSize(len(array) * size_of(NodeType)),
@@ -415,8 +363,6 @@ __storage_buf_init :: proc (self:^__storage_buf($NodeType), array:[]NodeType, _f
 }
 
 __storage_buf_deinit :: proc (self:^__storage_buf($NodeType)) {
-    mem.ICheckInit_Deinit(&self.check_init)
-
     buffer_resource_deinit(self.buf)
 	self.buf = nil
 }
@@ -426,7 +372,6 @@ __storage_buf_update :: proc (self:^__storage_buf($NodeType), array:[]NodeType) 
 }
 
 __index_buf_init :: proc (self:^__index_buf, array:[]u32, _flag:resource_usage, _useGPUMem := false, allocator :Maybe(runtime.Allocator) = nil) {
-    mem.ICheckInit_Init(&self.check_init)
     if len(array) == 0 do trace.panic_log("index_buf_init: array is empty")
     self.buf = buffer_resource_create_buffer({
         len = vk.DeviceSize(len(array) * size_of(u32)),
@@ -438,8 +383,6 @@ __index_buf_init :: proc (self:^__index_buf, array:[]u32, _flag:resource_usage, 
 
 
 __index_buf_deinit :: proc (self:^__index_buf) {
-    mem.ICheckInit_Deinit(&self.check_init)
-
     buffer_resource_deinit(self.buf)
 	self.buf = nil
 }
@@ -450,13 +393,11 @@ __index_buf_update :: #force_inline proc (self:^__index_buf, array:[]u32, alloca
 
 __vertex_buf :: struct($NodeType:typeid) {
     buf:iresource,
-    check_init: mem.ICheckInit,
 }
 
 __index_buf :: distinct __vertex_buf(u32)
 __storage_buf :: struct($NodeType:typeid) {
     buf:iresource,
-    check_init: mem.ICheckInit,
 }
 
 /*
@@ -473,7 +414,7 @@ Inputs:
 Returns:
 - Area in window coordinates
 */
-iobject_cvt_area_window_coord :: proc(self:^iobject, area:linalg.AreaF, viewport:^viewport, allocator := context.allocator) -> linalg.AreaF {
+itransform_object_cvt_area_window_coord :: proc(self:^itransform_object, area:linalg.AreaF, viewport:^viewport, allocator := context.allocator) -> linalg.AreaF {
 	viewport_ := viewport
 	if viewport_ == nil {
 		viewport_ = def_viewport()

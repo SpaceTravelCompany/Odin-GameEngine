@@ -11,7 +11,7 @@ Animated object structure that extends iobject with frame animation support
 Contains frame information and uniform buffer for frame data
 */
 ianimate_object :: struct {
-    using _:engine.iobject,
+    using _:engine.itransform_object,
     frame_uniform:engine.iresource,
     frame:u32,
 }
@@ -223,34 +223,8 @@ ianimate_object_vtable :: struct {
     get_frame_cnt = auto_cast _super_animate_image_get_frame_cnt,
 }
 
-animate_image_init :: proc(self:^animate_image, $actualType:typeid, src:^engine.texture_array, pos:linalg.point3d, rotation:f32, scale:linalg.point = {1,1}, 
-colorTransform:^engine.color_transform = nil, pivot:linalg.point = {0.0, 0.0}, vtable:^ianimate_object_vtable = nil) 
-where intrinsics.type_is_subtype_of(actualType, animate_image) {
-    self.src = src
-    
-    self.set.bindings = engine.descriptor_set_binding__animate_img_uniform_pool[:]
-    self.set.size = engine.descriptor_pool_size__animate_img_uniform_pool[:]
-    self.set.layout = engine.get_animate_img_descriptor_set_layout()
-
-    self.vtable = auto_cast (vtable == nil ? &animate_image_vtable : vtable)
-    if self.vtable.draw == nil do self.vtable.draw = auto_cast _super_animate_image_draw
-    if self.vtable.deinit == nil do self.vtable.deinit = auto_cast _super_animate_image_deinit
-    if ((^animator.ianimate_object_vtable)(self.vtable)).get_frame_cnt == nil do ((^animator.ianimate_object_vtable)(self.vtable)).get_frame_cnt = auto_cast _super_animate_image_get_frame_cnt
-
-    if self.vtable.get_uniform_resources == nil do self.vtable.get_uniform_resources = auto_cast get_uniform_resources_animate_image
-
-    self.frame_uniform = engine.buffer_resource_create_buffer({
-        len = size_of(u32),
-        type = .UNIFORM,
-        resource_usage = .CPU,
-    }, mem.ptr_to_bytes(&self.frame), true)
-
-    iobject_init(self, actualType, pos, rotation, scale, colorTransform, pivot)
-}
-
-animate_image_init2 :: proc(self:^animate_image, $actualType:typeid, src:^engine.texture_array,
-colorTransform:^engine.color_transform = nil, vtable:^ianimate_object_vtable = nil) 
-where intrinsics.type_is_subtype_of(actualType, animate_image) {
+animate_image_init :: proc(self:^animate_image, src:^engine.texture_array,
+colorTransform:^engine.color_transform = nil, vtable:^ianimate_object_vtable = nil) {
     self.src = src
     
     self.set.bindings = engine.descriptor_set_binding__animate_img_uniform_pool[:]
@@ -270,13 +244,14 @@ where intrinsics.type_is_subtype_of(actualType, animate_image) {
         resource_usage = .CPU,
     }, mem.ptr_to_bytes(&self.frame), true)
 
-    iobject_init2(self, actualType, colorTransform)
+    engine.itransform_object_init(self, colorTransform, vtable)
+    self.actual_type = typeid_of(animate_image)
 }
 
 _super_animate_image_deinit :: proc(self:^animate_image) {
     engine.buffer_resource_deinit(self.frame_uniform)
     self.frame_uniform = nil
-    engine._super_iobject_deinit(auto_cast self)
+    engine._super_itransform_object_deinit(auto_cast self)
 }
 
 animate_image_get_frame_cnt :: _super_animate_image_get_frame_cnt
@@ -347,13 +322,13 @@ animate_image_get_color_transform :: proc "contextless" (self:^animate_image) ->
 }
 
 animate_image_update_transform :: #force_inline proc(self:^animate_image, pos:linalg.point3d, rotation:f32, scale:linalg.point = {1,1}, pivot:linalg.point = {0.0,0.0}) {
-    engine.iobject_update_transform(self, pos, rotation, scale, pivot)
+    engine.itransform_object_update_transform(self, pos, rotation, scale, pivot)
 }
 animate_image_update_transform_matrix_raw :: #force_inline proc(self:^animate_image, _mat:linalg.matrix44) {
-    engine.iobject_update_transform_matrix_raw(self, _mat)
+    engine.itransform_object_update_transform_matrix_raw(self, _mat)
 }
 animate_image_change_color_transform :: #force_inline proc(self:^animate_image, colorTransform:^engine.color_transform) {
-    engine.iobject_change_color_transform(self, colorTransform)
+    engine.itransform_object_change_color_transform(self, colorTransform)
 }
 // animate_image_update_camera :: #force_inline proc(self:^animate_image, camera:^engine.camera) {
 //     engine.iobject_update_camera(self, camera)
@@ -366,9 +341,6 @@ animate_image_update_texture_array :: #force_inline proc "contextless" (self:^an
 // }
 
 _super_animate_image_draw :: proc (self:^animate_image, cmd:engine.command_buffer, viewport:^engine.viewport) {
-    mem.ICheckInit_Check(&self.check_init)
-    mem.ICheckInit_Check(&self.src.check_init)
-
     engine.graphics_cmd_bind_pipeline(cmd, .GRAPHICS, engine.get_animate_img_pipeline())
     engine.graphics_cmd_bind_descriptor_sets(cmd, .GRAPHICS, engine.get_animate_img_pipeline_layout(), 0, 3,
         &([]vk.DescriptorSet{self.set.__set, viewport.set.__set, self.src.set.__set})[0], 0, nil)
@@ -376,12 +348,10 @@ _super_animate_image_draw :: proc (self:^animate_image, cmd:engine.command_buffe
     engine.graphics_cmd_draw(cmd, 6, 1, 0, 0)
 }
 
-@private get_uniform_resources_animate_image :: #force_inline proc(self:^engine.iobject) -> []engine.iresource {
+@private get_uniform_resources_animate_image :: #force_inline proc(self:^animate_image) -> []engine.iresource {
     res := mem.make_non_zeroed([]engine.iresource, 3, context.temp_allocator)
     res[0] = self.mat_uniform
     res[1] = self.color_transform.mat_uniform
-
-    animate_image_ : ^animate_image = auto_cast self
-    res[2] = animate_image_.frame_uniform
+    res[2] = self.frame_uniform
     return res[:]
 }

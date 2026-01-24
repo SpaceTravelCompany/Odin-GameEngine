@@ -15,10 +15,8 @@ import "core:engine"
 /*
 Shape source structure containing vertex and index buffers
 
-**Note:** `vertexBuf` and `indexBuf` have `check_init: ICheckInit`, so no separate initialization check is needed
 */
 shape_src :: struct {
-    //?vertexBuf, indexBuf에 check_init: ICheckInit 있으므로 따로 필요없음
     vertexBuf:engine.__vertex_buf(geometry.shape_vertex2d),
     indexBuf:engine.__index_buf,
     rect:linalg.rect,
@@ -30,19 +28,18 @@ Shape object structure for rendering geometric shapes
 Extends iobject with shape source data
 */
 shape :: struct {
-    using _:engine.iobject,
+    using _:engine.itransform_object,
     src: ^shape_src,
 }
 
+_super_shape_deinit :: engine._super_itransform_object_deinit
+
 @private shape_vtable :engine.iobject_vtable = engine.iobject_vtable{
     draw = auto_cast _super_shape_draw,
-    deinit = auto_cast _super_shape_deinit,
 }
 
-
-shape_init :: proc(self:^shape, $actualType:typeid, src:^shape_src, pos:linalg.point3d,
-rotation:f32 = 0.0, scale:linalg.point = {1,1}, colorTransform:^engine.color_transform = nil, pivot:linalg.point = {0.0, 0.0}, vtable:^engine.iobject_vtable = nil)
- where intrinsics.type_is_subtype_of(actualType, shape) {
+shape_init :: proc(self:^shape, src:^shape_src,
+colorTransform:^engine.color_transform = nil, vtable:^engine.iobject_vtable = nil) {
     self.src = src
 
     self.set.bindings = engine.descriptor_set_binding__base_uniform_pool[:]
@@ -51,41 +48,15 @@ rotation:f32 = 0.0, scale:linalg.point = {1,1}, colorTransform:^engine.color_tra
 
     self.vtable = vtable == nil ? &shape_vtable : vtable
     if self.vtable.draw == nil do self.vtable.draw = auto_cast _super_shape_draw
-    if self.vtable.deinit == nil do self.vtable.deinit = auto_cast _super_shape_deinit
 
-    if self.vtable.get_uniform_resources == nil do self.vtable.get_uniform_resources = auto_cast engine.get_uniform_resources_default
-
-    engine.iobject_init(self, actualType, pos, rotation, scale, colorTransform, pivot)
-}
-
-shape_init2 :: proc(self:^shape, $actualType:typeid, src:^shape_src,
-colorTransform:^engine.color_transform = nil, vtable:^engine.iobject_vtable = nil)
- where intrinsics.type_is_subtype_of(actualType, shape) {
-    self.src = src
-
-    self.set.bindings = engine.descriptor_set_binding__base_uniform_pool[:]
-    self.set.size = engine.descriptor_pool_size__base_uniform_pool[:]
-    self.set.layout = engine.get_base_descriptor_set_layout()
-
-    self.vtable = vtable == nil ? &shape_vtable : vtable
-    if self.vtable.draw == nil do self.vtable.draw = auto_cast _super_shape_draw
-    if self.vtable.deinit == nil do self.vtable.deinit = auto_cast _super_shape_deinit
-
-    if self.vtable.get_uniform_resources == nil do self.vtable.get_uniform_resources = auto_cast engine.get_uniform_resources_default
-
-    engine.iobject_init2(self, actualType, colorTransform)
-}
-
-_super_shape_deinit :: proc(self:^shape) {
-    engine._super_iobject_deinit(auto_cast self)
+    engine.itransform_object_init(self, colorTransform, vtable)
+	self.actual_type = typeid_of(shape)
 }
 
 shape_update_src :: #force_inline proc "contextless" (self:^shape, src:^shape_src) {
-    mem.ICheckInit_Check(&self.check_init)
     self.src = src
 }
 shape_get_src :: #force_inline proc "contextless" (self:^shape) -> ^shape_src {
-    mem.ICheckInit_Check(&self.check_init)
     return self.src
 }
 // shape_get_camera :: #force_inline proc "contextless" (self:^shape) -> ^engine.camera {
@@ -95,16 +66,16 @@ shape_get_src :: #force_inline proc "contextless" (self:^shape) -> ^shape_src {
 //     return engine.iobject_get_projection(self)
 // }
 shape_get_color_transform :: #force_inline proc "contextless" (self:^shape) -> ^engine.color_transform {
-    return engine.iobject_get_color_transform(self)
+    return engine.itransform_object_get_color_transform(self)
 }
 shape_update_transform :: #force_inline proc(self:^shape, pos:linalg.point3d, rotation:f32, scale:linalg.point = {1,1}, pivot:linalg.point = {0.0,0.0}) {
-    engine.iobject_update_transform(self, pos, rotation, scale, pivot)
+    engine.itransform_object_update_transform(self, pos, rotation, scale, pivot)
 }
 shape_update_transform_matrix_raw :: #force_inline proc(self:^shape, _mat:linalg.matrix44) {
-    engine.iobject_update_transform_matrix_raw(self, _mat)
+    engine.itransform_object_update_transform_matrix_raw(self, _mat)
 }
 shape_change_color_transform :: #force_inline proc(self:^shape, colorTransform:^engine.color_transform) {
-    engine.iobject_change_color_transform(self, colorTransform)
+    engine.itransform_object_change_color_transform(self, colorTransform)
 }
 // shape_update_camera :: #force_inline proc(self:^shape, camera:^engine.camera) {
 //     engine.iobject_update_camera(self, camera)
@@ -114,15 +85,10 @@ shape_change_color_transform :: #force_inline proc(self:^shape, colorTransform:^
 // }
 
 _super_shape_draw :: proc (self:^shape, cmd:engine.command_buffer, viewport:^engine.viewport) {
-    mem.ICheckInit_Check(&self.check_init)
-
     shape_src_bind_and_draw(self.src, &self.set, cmd, viewport)
 }
 
 shape_src_bind_and_draw :: proc(self:^shape_src, set:^engine.descriptor_set, cmd:engine.command_buffer, viewport:^engine.viewport) {
-    mem.ICheckInit_Check(&self.vertexBuf.check_init)
-    mem.ICheckInit_Check(&self.indexBuf.check_init)
-
     engine.graphics_cmd_bind_pipeline(cmd, .GRAPHICS, engine.get_shape_pipeline())
     engine.graphics_cmd_bind_descriptor_sets(cmd, .GRAPHICS, engine.get_shape_pipeline_layout(), 0, 2,
         &([]vk.DescriptorSet{set.__set, viewport.set.__set})[0], 0, nil)
@@ -209,7 +175,7 @@ shape_src_deinit :: proc(self:^shape_src) {
 
 
 shape_src_is_inited :: proc "contextless" (self:^shape_src) -> bool {
-    return mem.ICheckInit_IsInited(&self.vertexBuf.check_init)
+    return self.vertexBuf.buf != nil
 }
 
 

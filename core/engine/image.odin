@@ -37,7 +37,7 @@ Image object structure for rendering textures
 Extends iobject with texture source data
 */
 image :: struct {
-    using _:iobject,
+    using _:itransform_object,
     src: ^texture,
 }
 
@@ -50,31 +50,12 @@ is_any_image_type :: #force_inline proc "contextless" ($any_image:typeid) -> boo
 
 @private image_vtable :iobject_vtable = iobject_vtable {
     draw = auto_cast _super_image_draw,
-    deinit = auto_cast _super_image_deinit,
 }
 
-/*
-Initializes an image object
+_super_image_deinit :: _super_itransform_object_deinit
 
-Inputs:
-- self: Pointer to the image to initialize
-- actualType: The actual type of the image (must be a subtype of image)
-- src: Pointer to the texture source
-- pos: Position of the image
-- camera: Pointer to the camera
-- projection: Pointer to the projection
-- rotation: Rotation angle in radians (default: 0.0)
-- scale: Scale factors (default: {1, 1})
-- colorTransform: Pointer to color transform (default: nil)
-- pivot: Pivot point for transformations (default: {0.0, 0.0})
-- vtable: Custom vtable (default: nil, uses default image vtable)
-
-Returns:
-- None
-*/
-image_init :: proc(self:^image, $actualType:typeid, src:^texture, pos:linalg.point3d,
-rotation:f32 = 0.0, scale:linalg.point = {1,1}, colorTransform:^color_transform = nil, pivot:linalg.point = {0.0, 0.0},
- vtable:^iobject_vtable = nil) where intrinsics.type_is_subtype_of(actualType, image) {
+image_init :: proc(self:^image, src:^texture,
+colorTransform:^color_transform = nil, vtable:^iobject_vtable = nil) {
     self.src = src
         
     self.set.bindings = descriptor_set_binding__base_uniform_pool[:]
@@ -83,32 +64,9 @@ rotation:f32 = 0.0, scale:linalg.point = {1,1}, colorTransform:^color_transform 
 
     self.vtable = vtable == nil ? &image_vtable : vtable
     if self.vtable.draw == nil do self.vtable.draw = auto_cast _super_image_draw
-    if self.vtable.deinit == nil do self.vtable.deinit = auto_cast _super_image_deinit
 
-    if self.vtable.get_uniform_resources == nil do self.vtable.get_uniform_resources = auto_cast get_uniform_resources_default
-
-    iobject_init(self, actualType, pos, rotation, scale, colorTransform, pivot)
-}
-
-image_init2 :: proc(self:^image, $actualType:typeid, src:^texture,
-colorTransform:^color_transform = nil, vtable:^iobject_vtable = nil) where intrinsics.type_is_subtype_of(actualType, image) {
-    self.src = src
-        
-    self.set.bindings = descriptor_set_binding__base_uniform_pool[:]
-    self.set.size = descriptor_pool_size__base_uniform_pool[:]
-    self.set.layout = base_descriptor_set_layout
-
-    self.vtable = vtable == nil ? &image_vtable : vtable
-    if self.vtable.draw == nil do self.vtable.draw = auto_cast _super_image_draw
-    if self.vtable.deinit == nil do self.vtable.deinit = auto_cast _super_image_deinit
-
-    if self.vtable.get_uniform_resources == nil do self.vtable.get_uniform_resources = auto_cast get_uniform_resources_default
-
-    iobject_init2(self, actualType, colorTransform)
-}
-
-_super_image_deinit :: proc(self:^image) {
-    _super_iobject_deinit(self)
+    itransform_object_init(self, colorTransform, vtable)
+	self.actual_type = typeid_of(image)
 }
 
 /*
@@ -160,14 +118,14 @@ Returns:
 - Pointer to the color transform
 */
 image_get_color_transform :: proc "contextless" (self:^image) -> ^color_transform {
-    return iobject_get_color_transform(self)
+    return itransform_object_get_color_transform(self)
 }
 
 image_update_transform :: #force_inline proc(self:^image, pos:linalg.point3d, rotation:f32 = 0.0, scale:linalg.point = {1,1}, pivot:linalg.point = {0.0,0.0}) {
-    iobject_update_transform(self, pos, rotation, scale, pivot)
+    itransform_object_update_transform(self, pos, rotation, scale, pivot)
 }
 image_update_transform_matrix_raw :: #force_inline proc(self:^image, _mat:linalg.matrix44) {
-    iobject_update_transform_matrix_raw(self, _mat)
+    itransform_object_update_transform_matrix_raw(self, _mat)
 }
 // image_update_camera :: #force_inline proc(self:^image, camera:^camera) {
 //     iobject_update_camera(self, camera)
@@ -179,13 +137,10 @@ image_update_texture :: #force_inline proc "contextless" (self:^image, src:^text
     self.src = src
 }
 image_change_color_transform :: #force_inline proc(self:^image, colorTransform:^color_transform) {
-    iobject_change_color_transform(self, colorTransform)
+    itransform_object_change_color_transform(self, colorTransform)
 }
 
 _super_image_draw :: proc (self:^image, cmd:command_buffer, viewport:^viewport) {
-    mem.ICheckInit_Check(&self.check_init)
-    mem.ICheckInit_Check(&self.src.check_init)
-
    image_binding_sets_and_draw(cmd, self.set, viewport.set, self.src.set)
 }
 
@@ -272,7 +227,6 @@ texture_init :: proc(
 	resource_usage: resource_usage = .GPU,
 	in_pixel_fmt: img.color_fmt = .RGBA,
 ) {
-	mem.ICheckInit_Init(&self.check_init)
 	self.sampler = sampler == 0 ? linear_sampler : sampler
 	self.set.bindings = descriptor_set_binding__single_pool[:]
 	self.set.size = descriptor_pool_size__single_sampler_pool[:]
@@ -321,7 +275,6 @@ texture_init_grey :: proc(
 	sampler: vk.Sampler = 0,
 	resource_usage: resource_usage = .GPU,
 ) {
-	mem.ICheckInit_Init(&self.check_init)
 	self.sampler = sampler == 0 ? linear_sampler : sampler
 	self.set.bindings = descriptor_set_binding__single_pool[:]
 	self.set.size = descriptor_pool_size__single_sampler_pool[:]
@@ -348,7 +301,6 @@ texture_init_grey :: proc(
 
 //sampler nil default //TODO (xfitgd)
 // texture_init_r8 :: proc(self:^texture, width:u32, height:u32) {
-//     mem.ICheckInit_Init(&self.check_init)
 //     self.sampler = 0
 //     self.set.bindings = nil
 //     self.set.size = nil
@@ -382,7 +334,6 @@ Returns:
 - None
 */
 texture_init_depth_stencil :: proc(self:^texture, width:u32, height:u32) {
-    mem.ICheckInit_Init(&self.check_init)
     self.sampler = 0
     self.set.bindings = nil
     self.set.size = nil
@@ -415,7 +366,6 @@ Returns:
 - None
 */
 texture_init_msaa :: proc(self:^texture, width:u32, height:u32) {
-    mem.ICheckInit_Init(&self.check_init)
     self.sampler = 0
     self.set.bindings = nil
     self.set.size = nil
@@ -446,7 +396,6 @@ Returns:
 - None
 */
 texture_deinit :: #force_inline proc(self:^texture) {
-    mem.ICheckInit_Deinit(&self.check_init)
     buffer_resource_deinit(self.texture)
 	self.texture = nil
 }
@@ -548,7 +497,6 @@ Returns:
 - None
 */
 texture_array_init :: proc(self:^texture_array, width:u32, height:u32, count:u32, pixels:[]byte, sampler:vk.Sampler = 0, inPixelFmt:img.color_fmt = .RGBA) {
-    mem.ICheckInit_Init(&self.check_init)
     self.sampler = sampler == 0 ? linear_sampler : sampler
     self.set.bindings = descriptor_set_binding__single_pool[:]
     self.set.size = descriptor_pool_size__single_sampler_pool[:]
@@ -585,7 +533,6 @@ Returns:
 - None
 */
 texture_array_deinit :: #force_inline proc(self:^texture_array) {
-    mem.ICheckInit_Deinit(&self.check_init)
     buffer_resource_deinit(self.texture)
 	self.texture = nil
 }

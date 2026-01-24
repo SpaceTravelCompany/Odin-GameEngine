@@ -98,7 +98,7 @@ button_pointer_move :: proc (self:^button, pointerPos:linalg.point, pointerIdx:u
 }
 
 button :: struct {
-    using _:engine.iobject,
+    using _:engine.itransform_object,
     area:linalg.AreaF,
     state : button_state,
     pointerIdx:Maybe(u8),
@@ -129,20 +129,13 @@ button_vtable :: struct {
 
 @private image_button_vtable :button_vtable = button_vtable {
     draw = auto_cast _super_image_button_draw,
-    deinit = auto_cast _super_image_button_deinit,
 }
 
 @private shape_button_vtable :button_vtable = button_vtable {
     draw = auto_cast _super_shape_button_draw,
-    deinit = auto_cast _super_shape_button_deinit,
-}
-
-_super_image_button_deinit :: proc(self:^image_button) {
-    engine._super_iobject_deinit(auto_cast self)
 }
 
 _super_image_button_draw :: proc (self:^image_button, cmd:engine.command_buffer, viewport:engine.viewport) {
-    mem.ICheckInit_Check(&self.check_init)
     texture :^engine.texture
 
     switch self.state {
@@ -152,37 +145,14 @@ _super_image_button_draw :: proc (self:^image_button, cmd:engine.command_buffer,
     }
     when ODIN_DEBUG {
         if texture == nil do panic_contextless("texture: uninitialized")
-        mem.ICheckInit_Check(&texture.check_init)
     }
 
     engine.image_binding_sets_and_draw(cmd, self.set, viewport.set, texture.set)
 }
 
 
-/*
-Initializes an image button
-
-Inputs:
-- self: Pointer to the image button to initialize
-- actualType: The actual type of the button (must be a subtype of image_button)
-- pos: Position of the button
-- camera: Pointer to the camera
-- projection: Pointer to the projection
-- rotation: Rotation angle in radians (default: 0.0)
-- scale: Scale factors (default: {1, 1})
-- colorTransform: Pointer to color transform (default: nil)
-- pivot: Pivot point for transformations (default: {0.0, 0.0})
-- up: Texture for the up state (default: nil)
-- over: Texture for the over state (default: nil)
-- down: Texture for the down state (default: nil)
-- vtable: Custom vtable (default: nil)
-
-Returns:
-- None
-*/
-image_button_init :: proc(self:^image_button, $actualType:typeid, pos:linalg.point3d,
-rotation:f32 = 0.0, scale:linalg.point = {1,1}, colorTransform:^engine.color_transform = nil, pivot:linalg.point = {0.0, 0.0},
-up:^engine.texture = nil, over:^engine.texture = nil, down:^engine.texture = nil, vtable:^button_vtable = nil) where intrinsics.type_is_subtype_of(actualType, image_button) {
+image_button_init :: proc(self:^image_button,
+up:^engine.texture = nil, over:^engine.texture = nil, down:^engine.texture = nil, colorTransform:^engine.color_transform = nil, vtable:^button_vtable = nil) {
     self.up_texture = up
     self.over_texture = over
     self.down_texture = down
@@ -193,39 +163,13 @@ up:^engine.texture = nil, over:^engine.texture = nil, down:^engine.texture = nil
 
 	self.vtable = vtable == nil ? &image_button_vtable : vtable
     if self.vtable.draw == nil do self.vtable.draw = auto_cast _super_image_button_draw
-    if self.vtable.deinit == nil do self.vtable.deinit = auto_cast _super_image_button_deinit
 
-	if self.vtable.get_uniform_resources == nil do self.vtable.get_uniform_resources = auto_cast engine.get_uniform_resources_default
-
-	engine.iobject_init(auto_cast self, actualType, pos, rotation, scale, colorTransform, pivot)
+	engine.itransform_object_init(self, colorTransform, vtable)
+	self.actual_type = typeid_of(image_button)
 }
 
-image_button_init2 :: proc(self:^image_button, $actualType:typeid, colorTransform:^engine.color_transform = nil,
-up:^engine.texture = nil, over:^engine.texture = nil, down:^engine.texture = nil, vtable:^button_vtable = nil) where intrinsics.type_is_subtype_of(actualType, image_button) {
-    self.up_texture = up
-    self.over_texture = over
-    self.down_texture = down
-
-	self.set.bindings = engine.descriptor_set_binding__base_uniform_pool[:]
-    self.set.size = engine.descriptor_pool_size__base_uniform_pool[:]
-    self.set.layout = engine.get_base_descriptor_set_layout()
-
-	self.vtable = vtable == nil ? &image_button_vtable : vtable
-    if self.vtable.draw == nil do self.vtable.draw = auto_cast _super_image_button_draw
-    if self.vtable.deinit == nil do self.vtable.deinit = auto_cast _super_image_button_deinit
-
-	if self.vtable.get_uniform_resources == nil do self.vtable.get_uniform_resources = auto_cast engine.get_uniform_resources_default
-
-	engine.iobject_init2(auto_cast self, actualType, colorTransform)
-}
-
-
-_super_shape_button_deinit :: proc(self:^shape_button) {
-    engine._super_iobject_deinit(auto_cast self)
-}
 
 _super_shape_button_draw :: proc (self:^shape_button, cmd:engine.command_buffer, viewport:^engine.viewport) {
-    mem.ICheckInit_Check(&self.check_init)
     shape_src :^shape.shape_src
 
     switch self.state {
@@ -235,36 +179,13 @@ _super_shape_button_draw :: proc (self:^shape_button, cmd:engine.command_buffer,
     }
     when ODIN_DEBUG {
         if shape_src == nil do panic_contextless("shape: uninitialized")
-        mem.ICheckInit_Check(&shape_src.vertexBuf.check_init)
     }
 
 	shape.shape_src_bind_and_draw(shape_src, &self.set, cmd, viewport)
 }
 
-/*
-Initializes a shape button
-
-Inputs:
-- self: Pointer to the shape button to initialize
-- actualType: The actual type of the button (must be a subtype of shape_button)
-- pos: Position of the button
-- camera: Pointer to the camera
-- projection: Pointer to the projection
-- rotation: Rotation angle in radians (default: 0.0)
-- scale: Scale factors (default: {1, 1})
-- colorTransform: Pointer to color transform (default: nil)
-- pivot: Pivot point for transformations (default: {0.0, 0.0})
-- up: Shape for the up state (default: nil)
-- over: Shape for the over state (default: nil)
-- down: Shape for the down state (default: nil)
-- vtable: Custom vtable (default: nil)
-
-Returns:
-- None
-*/
-shape_button_init :: proc(self:^shape_button, $actualType:typeid, pos:linalg.point3d,
-rotation:f32 = 0.0, scale:linalg.point = {1,1}, colorTransform:^engine.color_transform = nil, pivot:linalg.point = {0.0, 0.0},
-up:^shape.shape_src = nil, over:^shape.shape_src = nil, down:^shape.shape_src = nil, vtable:^button_vtable = nil) where intrinsics.type_is_subtype_of(actualType, shape_button) {
+shape_button_init :: proc(self:^shape_button,
+up:^shape.shape_src = nil, over:^shape.shape_src = nil, down:^shape.shape_src = nil, colorTransform:^engine.color_transform = nil, vtable:^button_vtable = nil) {
     self.up_shape_src = up
     self.over_shape_src = over
     self.down_shape_src = down
@@ -275,28 +196,10 @@ up:^shape.shape_src = nil, over:^shape.shape_src = nil, down:^shape.shape_src = 
 
 	self.vtable = vtable == nil ? &shape_button_vtable : vtable
     if self.vtable.draw == nil do self.vtable.draw = auto_cast _super_shape_button_draw
-    if self.vtable.deinit == nil do self.vtable.deinit = auto_cast _super_shape_button_deinit
 
-	if self.vtable.get_uniform_resources == nil do self.vtable.get_uniform_resources = auto_cast engine.get_uniform_resources_default
-
-	engine.iobject_init(auto_cast self, actualType, pos, rotation, scale, colorTransform, pivot)
+	engine.itransform_object_init(self, colorTransform, vtable)
+	self.actual_type = typeid_of(shape_button)
 }
 
-shape_button_init2 :: proc(self:^shape_button, $actualType:typeid, colorTransform:^engine.color_transform = nil,
-up:^shape.shape_src = nil, over:^shape.shape_src = nil, down:^shape.shape_src = nil, vtable:^button_vtable = nil) where intrinsics.type_is_subtype_of(actualType, shape_button) {
-    self.up_shape_src = up
-    self.over_shape_src = over
-    self.down_shape_src = down
-
-	self.set.bindings = engine.descriptor_set_binding__base_uniform_pool[:]
-    self.set.size = engine.descriptor_pool_size__base_uniform_pool[:]
-    self.set.layout = engine.get_base_descriptor_set_layout()
-
-	self.vtable = vtable == nil ? &shape_button_vtable : vtable
-    if self.vtable.draw == nil do self.vtable.draw = auto_cast _super_shape_button_draw
-    if self.vtable.deinit == nil do self.vtable.deinit = auto_cast _super_shape_button_deinit
-
-	if self.vtable.get_uniform_resources == nil do self.vtable.get_uniform_resources = auto_cast engine.get_uniform_resources_default
-
-	engine.iobject_init2(auto_cast self, actualType, colorTransform)
-}
+_super_shape_button_deinit :: engine._super_itransform_object_deinit
+_super_image_button_deinit :: engine._super_itransform_object_deinit

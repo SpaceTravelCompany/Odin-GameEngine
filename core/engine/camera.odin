@@ -46,13 +46,11 @@ Returns:
 - None
 */
 camera_init_matrix_raw :: proc (self:^camera, mat:linalg.matrix44) {
-    mem.ICheckInit_Init(&self.check_init)
     self.mat = mat
     __camera_init(self)
 }
 
 @private __camera_init :: #force_inline proc(self:^camera) {
-    mem.ICheckInit_Init(&self.check_init)
     self.mat_uniform = buffer_resource_create_buffer({
         len = size_of(linalg.matrix44),
         type = .UNIFORM,
@@ -88,7 +86,6 @@ Returns:
 - None
 */
 camera_update_matrix_raw :: proc(self:^camera, _mat:linalg.matrix44) {
-    mem.ICheckInit_Check(&self.check_init)
     self.mat = _mat
     buffer_resource_copy_update(self.mat_uniform, &self.mat)
 }
@@ -118,8 +115,6 @@ Returns:
 - None
 */
 camera_deinit :: proc(self:^camera) {
-    mem.ICheckInit_Deinit(&self.check_init)
-
     buffer_resource_deinit(self.mat_uniform)
 	self.mat_uniform = nil
 }

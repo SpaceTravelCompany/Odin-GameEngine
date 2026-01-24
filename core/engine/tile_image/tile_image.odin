@@ -16,19 +16,17 @@ Tile image object structure for rendering tiled textures
 Extends iobject with tile texture array and tile index
 */
 tile_image :: struct {
-    using _:engine.iobject,
+    using _:engine.itransform_object,
     tile_uniform:engine.iresource,
     tile_idx:u32,
     src: ^tile_texture_array,
 }
 
-@private get_uniform_resources_tile_image :: #force_inline proc(self:^engine.iobject) -> []engine.iresource {
+@private get_uniform_resources_tile_image :: #force_inline proc(self:^tile_image) -> []engine.iresource {
     res := mem.make_non_zeroed([]engine.iresource, 3, context.temp_allocator)
     res[0] = self.mat_uniform
     res[1] = self.color_transform.mat_uniform
-
-    tile_image_ : ^tile_image = auto_cast self
-    res[2] = tile_image_.tile_uniform
+    res[2] = self.tile_uniform
     return res[:]
 }
 
@@ -36,33 +34,10 @@ tile_image :: struct {
 @private tile_image_vtable :engine.iobject_vtable = engine.iobject_vtable {
     draw = auto_cast _super_tile_image_draw,
     deinit = auto_cast _super_tile_image_deinit,
+    get_uniform_resources = auto_cast get_uniform_resources_tile_image,
 }
 
-tile_image_init :: proc(self:^tile_image, $actualType:typeid, src:^tile_texture_array, pos:linalg.point3d, rotation:f32, scale:linalg.point = {1,1}, 
-colorTransform:^engine.color_transform = nil, pivot:linalg.point = {0, 0}, vtable:^engine.iobject_vtable = nil) where intrinsics.type_is_subtype_of(actualType, tile_image) {
-    self.src = src
-
-    self.set.bindings = engine.descriptor_set_binding__animate_img_uniform_pool[:]
-    self.set.size = engine.descriptor_pool_size__animate_img_uniform_pool[:]
-    self.set.layout = engine.get_animate_img_descriptor_set_layout() //animate_img_descriptor_set_layout 공용
-
-    self.vtable = vtable == nil ? &tile_image_vtable : vtable
-    if self.vtable.draw == nil do self.vtable.draw = auto_cast _super_tile_image_draw
-    if self.vtable.deinit == nil do self.vtable.deinit = auto_cast _super_tile_image_deinit
-
-    if self.vtable.get_uniform_resources == nil do self.vtable.get_uniform_resources = auto_cast get_uniform_resources_tile_image
-
-
-    self.tile_uniform = engine.buffer_resource_create_buffer({
-        len = size_of(u32),
-        type = .UNIFORM,
-        resource_usage = .CPU,
-    }, mem.ptr_to_bytes(&self.tile_idx), true)
-
-    iobject_init(self, actualType, pos, rotation, scale, colorTransform, pivot)
-}
-
-tile_image_init2 :: proc(self:^tile_image, $actualType:typeid, src:^tile_texture_array,
+tile_image_init :: proc(self:^tile_image, src:^tile_texture_array,
 colorTransform:^engine.color_transform = nil, vtable:^engine.iobject_vtable = nil) where intrinsics.type_is_subtype_of(actualType, tile_image) {
     self.src = src
 
@@ -76,14 +51,15 @@ colorTransform:^engine.color_transform = nil, vtable:^engine.iobject_vtable = ni
 
     if self.vtable.get_uniform_resources == nil do self.vtable.get_uniform_resources = auto_cast get_uniform_resources_tile_image
 
-    iobject_init2(self, actualType, colorTransform)
+    itransform_object_init(self, colorTransform, vtable)
+	self.actual_type = typeid_of(tile_image)
 }
 
 _super_tile_image_deinit :: proc(self:^tile_image) {
     engine.buffer_resource_deinit(self.tile_uniform)
     self.tile_uniform = nil
 
-    engine._super_iobject_deinit(auto_cast self)
+    engine._super_itransform_object_deinit(auto_cast self)
 }
 
 
@@ -115,7 +91,7 @@ tile_image_update_tile_texture_array :: #force_inline proc "contextless" (self:^
 }
 
 tile_image_change_color_transform :: #force_inline proc(self:^tile_image, colorTransform:^engine.color_transform) {
-    engine.iobject_change_color_transform(self, colorTransform)
+    engine.itransform_object_change_color_transform(self, colorTransform)
 }
 // tile_image_update_camera :: #force_inline proc(self:^tile_image, camera:^engine.camera) {
 //     engine.iobject_update_camera(self, camera)
@@ -160,15 +136,15 @@ Returns:
 - Pointer to the color transform
 */
 tile_image_get_color_transform :: proc "contextless" (self:^tile_image) -> ^engine.color_transform {
-    return engine.iobject_get_color_transform(self)
+    return engine.itransform_object_get_color_transform(self)
 }
 
 tile_image_update_transform :: #force_inline proc(self:^tile_image, pos:linalg.point3d, rotation:f32, scale:linalg.point = {1,1}, pivot:linalg.point = {0.0, 0.0}) {
-    engine.iobject_update_transform(self, pos, rotation, scale, pivot)
+    engine.itransform_object_update_transform(self, pos, rotation, scale, pivot)
 }
 
 tile_image_update_transform_matrix_raw :: #force_inline proc(self:^tile_image, _mat:linalg.matrix44) {
-    engine.iobject_update_transform_matrix_raw(self, _mat)
+    engine.itransform_object_update_transform_matrix_raw(self, _mat)
 }
 
 /*
@@ -182,16 +158,12 @@ Returns:
 - None
 */
 tile_image_update_idx :: proc(self:^tile_image, idx:u32) {
-    mem.ICheckInit_Check(&self.check_init)
     self.tile_idx = idx
 
     engine.buffer_resource_copy_update(self.tile_uniform, &self.tile_idx)
 }
 
 _super_tile_image_draw :: proc (self:^tile_image, cmd:engine.command_buffer, viewport:^engine.viewport) {
-    mem.ICheckInit_Check(&self.check_init)
-    mem.ICheckInit_Check(&self.src.check_init)
-
     engine.graphics_cmd_bind_pipeline(cmd, .GRAPHICS, engine.get_animate_img_pipeline())
     engine.graphics_cmd_bind_descriptor_sets(cmd, .GRAPHICS, engine.get_animate_img_pipeline_layout(), 0, 3,
         &([]vk.DescriptorSet{self.set.__set,  viewport.set.__set, self.src.set.__set,})[0], 0, nil)
@@ -218,7 +190,6 @@ Returns:
 */
 tile_texture_array_init :: proc(self:^tile_texture_array, tile_width:u32, tile_height:u32, width:u32, count:u32, pixels:[]byte, sampler:vk.Sampler = 0, 
 inPixelFmt:img.color_fmt = .RGBA, allocator := context.allocator) {
-    mem.ICheckInit_Init(&self.check_init)
     self.sampler = sampler == 0 ? engine.get_linear_sampler() : sampler
     self.set.bindings = engine.descriptor_set_binding__single_pool[:]
     self.set.size = engine.descriptor_pool_size__single_sampler_pool[:]
@@ -269,7 +240,6 @@ Returns:
 - None
 */
 tile_texture_array_deinit :: #force_inline proc(self:^tile_texture_array) {
-    mem.ICheckInit_Deinit(&self.check_init)
     engine.buffer_resource_deinit(self.texture)
 	self.texture = nil
 }

@@ -17,7 +17,6 @@ layer :: struct {
 	scene: ^[dynamic]^iobject,
     cmd:command_buffer,
     obj_lock:sync.Mutex,
-	check_init:mem.ICheckInit,
 	creation_allocator: runtime.Allocator,
 	cmd_pool: vk.CommandPool,
 }
@@ -61,7 +60,6 @@ layer_init :: proc(_scene: ^[dynamic]^iobject, allocator := context.allocator) -
 
 	cmd.scene = _scene
 
-	mem.ICheckInit_Init(&cmd.check_init)
 	cmd.creation_allocator = allocator
     return
 }
@@ -76,8 +74,6 @@ Returns:
 - None
 */
 layer_deinit :: proc(cmd: ^layer) {
-	mem.ICheckInit_Deinit(&cmd.check_init)
-
     free_command_buffers(&cmd.cmd, 1, cmd.cmd_pool)
 
     sync.mutex_lock(&__g_layer_mtx)
@@ -102,8 +98,6 @@ Returns:
 - `true` if successful, `false` if the command was not found
 */
 layer_show :: proc "contextless" (_cmd: ^layer) {
-	mem.ICheckInit_Check(&_cmd.check_init)
-	
     sync.mutex_lock(&__g_layer_mtx)
     for cmd in __g_layer {
         if cmd == _cmd {
@@ -125,8 +119,6 @@ Returns:
 - `true` if successful, `false` if the command was not found
 */
 layer_hide :: proc "contextless" (_cmd: ^layer) -> bool {
-	mem.ICheckInit_Check(&_cmd.check_init)
-	
     sync.mutex_lock(&__g_layer_mtx)
     defer sync.mutex_unlock(&__g_layer_mtx)
     for cmd in __g_layer {
@@ -162,7 +154,6 @@ Returns:
 - None
 */
 layer_add_object :: proc(cmd: ^layer, obj: ^iobject) {
-	mem.ICheckInit_Check(&cmd.check_init)
 	if cmd.scene == nil {
 		trace.panic_log("layer_add_object: cmd.scene is nil")
 	}
@@ -190,7 +181,6 @@ Returns:
 - None
 */
 layer_add_objects :: proc(cmd: ^layer, objs: ..^iobject) {
-	mem.ICheckInit_Check(&cmd.check_init)
 	if cmd.scene == nil {
 		trace.panic_log("layer_add_object: cmd.scene is nil")
 	}
@@ -221,7 +211,6 @@ Returns:
 - None
 */
 layer_remove_object :: proc(cmd: ^layer, obj: ^iobject) {
-	mem.ICheckInit_Check(&cmd.check_init)
 	if cmd.scene == nil {
 		trace.panic_log("layer_add_object: cmd.scene is nil")
 	}
@@ -247,7 +236,6 @@ Returns:
 - None
 */
 layer_remove_all :: proc(cmd: ^layer) {
-	mem.ICheckInit_Check(&cmd.check_init)
 	if cmd.scene == nil {
 		trace.panic_log("layer_add_object: cmd.scene is nil")
 	}
@@ -269,7 +257,6 @@ Returns:
 - `true` if the object is in the scene, `false` otherwise
 */
 layer_has_object :: proc "contextless"(cmd: ^layer, obj: ^iobject) -> bool {
-	mem.ICheckInit_Check(&cmd.check_init)
 	if cmd.scene == nil {
 		trace.panic_log("layer_add_object: cmd.scene is nil")
 	}
@@ -295,7 +282,6 @@ Returns:
 - The number of objects in the scene
 */
 layer_get_object_len :: proc "contextless" (cmd: ^layer) -> int {
-	mem.ICheckInit_Check(&cmd.check_init)
 	if cmd.scene == nil {
 		trace.panic_log("layer_add_object: cmd.scene is nil")
 	}
@@ -316,7 +302,6 @@ Returns:
 - Pointer to the object at the specified index
 */
 layer_get_object :: proc "contextless" (cmd: ^layer, index: int) -> ^iobject {
-	mem.ICheckInit_Check(&cmd.check_init)
 	if cmd.scene == nil {
 		trace.panic_log("layer_add_object: cmd.scene is nil")
 	}
