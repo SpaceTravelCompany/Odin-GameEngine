@@ -35,6 +35,7 @@ layer :: struct {
 Initializes a new render command structure
 
 Make layer.scene manually.
+**_scene can be nil**
 
 Returns:
 - Pointer to the initialized render command
@@ -100,18 +101,18 @@ Inputs:
 Returns:
 - `true` if successful, `false` if the command was not found
 */
-layer_show :: proc "contextless" (_cmd: ^layer) -> bool {
+layer_show :: proc "contextless" (_cmd: ^layer) {
 	mem.ICheckInit_Check(&_cmd.check_init)
 	
     sync.mutex_lock(&__g_layer_mtx)
-    defer sync.mutex_unlock(&__g_layer_mtx)
     for cmd in __g_layer {
         if cmd == _cmd {
             cmd.visible = true
-            return true
+			sync.mutex_unlock(&__g_layer_mtx)
+            return
         }
     }
-    return false
+    trace.panic_log("layer_show: layer not found")
 }
 
 /*
@@ -162,16 +163,19 @@ Returns:
 */
 layer_add_object :: proc(cmd: ^layer, obj: ^iobject) {
 	mem.ICheckInit_Check(&cmd.check_init)
-	
+	if cmd.scene == nil {
+		trace.panic_log("layer_add_object: cmd.scene is nil")
+	}
+
     sync.mutex_lock(&cmd.obj_lock)
     defer sync.mutex_unlock(&cmd.obj_lock)
 
-    for obj_t,i in cmd.scene^ {
-        if obj_t == obj {
-            ordered_remove(cmd.scene, i)
-            break
-        }
-    }
+    // for obj_t,i in cmd.scene^ {
+    //     if obj_t == obj {
+    //         ordered_remove(cmd.scene, i)
+    //         break
+    //     }
+    // }
     non_zero_append(cmd.scene, obj)
 }
 
@@ -187,6 +191,9 @@ Returns:
 */
 layer_add_objects :: proc(cmd: ^layer, objs: ..^iobject) {
 	mem.ICheckInit_Check(&cmd.check_init)
+	if cmd.scene == nil {
+		trace.panic_log("layer_add_object: cmd.scene is nil")
+	}
 	
     sync.mutex_lock(&cmd.obj_lock)
     defer sync.mutex_unlock(&cmd.obj_lock)
@@ -215,6 +222,9 @@ Returns:
 */
 layer_remove_object :: proc(cmd: ^layer, obj: ^iobject) {
 	mem.ICheckInit_Check(&cmd.check_init)
+	if cmd.scene == nil {
+		trace.panic_log("layer_add_object: cmd.scene is nil")
+	}
 	
     sync.mutex_lock(&cmd.obj_lock)
     defer sync.mutex_unlock(&cmd.obj_lock)
@@ -238,6 +248,9 @@ Returns:
 */
 layer_remove_all :: proc(cmd: ^layer) {
 	mem.ICheckInit_Check(&cmd.check_init)
+	if cmd.scene == nil {
+		trace.panic_log("layer_add_object: cmd.scene is nil")
+	}
 	
     sync.mutex_lock(&cmd.obj_lock)
     defer sync.mutex_unlock(&cmd.obj_lock)
@@ -257,6 +270,9 @@ Returns:
 */
 layer_has_object :: proc "contextless"(cmd: ^layer, obj: ^iobject) -> bool {
 	mem.ICheckInit_Check(&cmd.check_init)
+	if cmd.scene == nil {
+		trace.panic_log("layer_add_object: cmd.scene is nil")
+	}
 	
     sync.mutex_lock(&cmd.obj_lock)
     defer sync.mutex_unlock(&cmd.obj_lock)
@@ -280,6 +296,9 @@ Returns:
 */
 layer_get_object_len :: proc "contextless" (cmd: ^layer) -> int {
 	mem.ICheckInit_Check(&cmd.check_init)
+	if cmd.scene == nil {
+		trace.panic_log("layer_add_object: cmd.scene is nil")
+	}
 	
     sync.mutex_lock(&cmd.obj_lock)
     defer sync.mutex_unlock(&cmd.obj_lock)
@@ -298,6 +317,9 @@ Returns:
 */
 layer_get_object :: proc "contextless" (cmd: ^layer, index: int) -> ^iobject {
 	mem.ICheckInit_Check(&cmd.check_init)
+	if cmd.scene == nil {
+		trace.panic_log("layer_add_object: cmd.scene is nil")
+	}
 	
     sync.mutex_lock(&cmd.obj_lock)
     defer sync.mutex_unlock(&cmd.obj_lock)
@@ -315,6 +337,9 @@ Returns:
 - The index of the object, or -1 if not found
 */
 layer_get_object_idx :: proc "contextless"(cmd: ^layer, obj: ^iobject) -> int {
+	if cmd.scene == nil {
+		trace.panic_log("layer_add_object: cmd.scene is nil")
+	}
     for obj_t, i in cmd.scene^ {
         if obj_t == obj {
             return i
@@ -322,22 +347,6 @@ layer_get_object_idx :: proc "contextless"(cmd: ^layer, obj: ^iobject) -> int {
     }
     return -1
 }
-
-/*
-Gets all objects from the render command's scene
-
-**Note:** This function is not thread-safe
-
-Inputs:
-- cmd: Pointer to the render command
-
-Returns:
-- A slice of all objects in the scene
-*/
-layer_get_objects :: proc(cmd: ^layer) -> []^iobject {
-    return cmd.scene^[:]
-}
-
 
 
 @(private) __layer_clean :: proc () {

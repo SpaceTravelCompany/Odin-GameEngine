@@ -1317,7 +1317,7 @@ vk_draw_frame :: proc() {
 	if __g_layer != nil && len(__g_layer) > 0 {
 		// Collect visible commands
 		for &cmd in __g_layer {
-			if cmd.visible {
+			if cmd.visible && cmd.scene != nil && len(cmd.scene^) > 0 {
 				append(&visible_layers, cmd)
 				cmd_visible = true
 			}
