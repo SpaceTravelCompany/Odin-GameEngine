@@ -120,7 +120,7 @@ Inputs:
 Returns:
 - An error if initialization failed
 */
-@require_results shape_src_init :: proc(self:^shape_src, shapes:^geometry.shapes, flag:engine.resource_usage = .GPU, allocator :runtime.Allocator = context.allocator) -> (err:geometry.shape_error = nil) {
+shape_src_init :: proc(self:^shape_src, shapes:^geometry.shapes, flag:engine.resource_usage = .GPU, allocator :runtime.Allocator = context.allocator) -> (err:geometry.shape_error = nil) {
     raw : ^geometry.raw_shape
     raw, err = geometry.shapes_compute_polygon(shapes, allocator)
     if err != nil do return

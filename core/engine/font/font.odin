@@ -222,6 +222,7 @@ allocator : runtime.Allocator) -> (rect:linalg.rect, err:geometry.shape_error = 
     offset : linalg.point = {}
 
     sync.mutex_lock(&self.mutex)
+	defer sync.mutex_unlock(&self.mutex)
     for s in _str {
         if _renderOpt.area != nil && offset.y <= -_renderOpt.area.?.y do break
         if s == '\n' {
@@ -240,7 +241,6 @@ allocator : runtime.Allocator) -> (rect:linalg.rect, err:geometry.shape_error = 
         
         maxP = math.max_array(maxP,linalg.point{offset.x, offset.y + f32(self.face.size.metrics.height) / (64.0 * self.scale) })
     }
-    sync.mutex_unlock(&self.mutex)
     if len(_vertArr) == 0 {
         err = .EmptyPolygon
         return
@@ -444,9 +444,6 @@ allocator : runtime.Allocator) -> (rect:linalg.rect, err:geometry.shape_error = 
                 charD = &self.char_array[FONT_KEY{ch, thickness2}]
                 break
             } else {
-                sync.mutex_unlock(&self.mutex)// else 부분은 mutex 해제 후 작업 후 다시 잠금
-                defer sync.mutex_lock(&self.mutex)
-               
                 // 마지막 폴리곤의 선분 개수 추가
                 if data.lineCount > 0 {
 					data.polygonCount += 1
@@ -462,7 +459,7 @@ allocator : runtime.Allocator) -> (rect:linalg.rect, err:geometry.shape_error = 
                 }
 
                 rawP : ^geometry.raw_shape
-                rawP , shapeErr = geometry.shapes_compute_polygon(&poly, self.allocator)//높은 부하 작업 High load operations		
+                rawP , shapeErr = geometry.shapes_compute_polygon(&poly, self.allocator)//높은 부하 작업 High load operations	
 
                 if shapeErr != nil do return
 
