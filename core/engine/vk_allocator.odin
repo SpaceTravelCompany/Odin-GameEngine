@@ -283,6 +283,8 @@ vk_init_block_len :: proc() {
 	gVkMinUniformBufferOffsetAlignment = vk_physical_prop.limits.minUniformBufferOffsetAlignment
 }
 
+vk_allocator_fence : vk.Fence
+
 vk_allocator_init :: proc() {
 	__vk_def_allocator = context.allocator
 
@@ -319,6 +321,11 @@ vk_allocator_init :: proc() {
 	gUniforms = mem.make_non_zeroed([dynamic]vk_uniform_alloc, vk_def_allocator())
 	gTempUniforms = mem.make_non_zeroed([dynamic]vk_temp_uniform_struct, vk_def_allocator())
 	gNonInsertedUniforms = mem.make_non_zeroed([dynamic]vk_temp_uniform_struct, vk_def_allocator())
+
+	vk.CreateFence(vk_device, &vk.FenceCreateInfo{
+			sType = vk.StructureType.FENCE_CREATE_INFO,
+			flags = {vk.FenceCreateFlag.SIGNALED},
+		}, nil, &vk_allocator_fence)
 }
 
 vk_allocator_destroy :: proc() {
@@ -328,6 +335,7 @@ vk_allocator_destroy :: proc() {
 	}
 	delete(gVkMemBufs)
 
+	vk.DestroyFence(vk_device, vk_allocator_fence, nil)
 	vk.DestroyCommandPool(vk_device, cmdPool, nil)
 
 	for _, &value in gDesciptorPools {
@@ -726,13 +734,15 @@ vk_op_execute :: proc() {
 
 
 	if haveCmds {
-		vk.ResetCommandPool(vk_device, cmdPool, {})
+		res := vk.ResetCommandPool(vk_device, cmdPool, {})
+		if res != .SUCCESS do trace.panic_log("res := vk.ResetCommandPool(vk_device, cmdPool, {}) : ", res)
 
 		beginInfo := vk.CommandBufferBeginInfo {
 			flags = {.ONE_TIME_SUBMIT},
 			sType = vk.StructureType.COMMAND_BUFFER_BEGIN_INFO,
 		}
-		vk.BeginCommandBuffer(gCmd, &beginInfo)
+		res = vk.BeginCommandBuffer(gCmd, &beginInfo)
+		if res != .SUCCESS do trace.panic_log("res := vk.BeginCommandBuffer(gCmd, &beginInfo) : ", res)
 		for node in opSaveQueue {
 			#partial switch n in node {
 			case OpCopyBuffer:
@@ -741,13 +751,15 @@ vk_op_execute :: proc() {
 				execute_copy_buffer_to_texture(n.src, n.target)
 			}
 		}
-		vk.EndCommandBuffer(gCmd)
+		res = vk.EndCommandBuffer(gCmd)
+		if res != .SUCCESS do trace.panic_log("res := vk.EndCommandBuffer(gCmd) : ", res)
 		submitInfo := vk.SubmitInfo {
 			commandBufferCount = 1,
 			pCommandBuffers    = &gCmd,
 			sType              = .SUBMIT_INFO,
 		}
-		res := vk.QueueSubmit(vk_graphics_queue, 1, &submitInfo, 0)
+		vk.ResetFences(vk_device, 1, &vk_allocator_fence)
+		res = vk.QueueSubmit(vk_graphics_queue, 1, &submitInfo, vk_allocator_fence)
 		if res != .SUCCESS do trace.panic_log("res := vk.QueueSubmit(vk_graphics_queue, 1, &submitInfo, 0) : ", res)
 
 		for node in opSaveQueue {

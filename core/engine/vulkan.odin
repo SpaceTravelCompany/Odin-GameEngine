@@ -1324,7 +1324,10 @@ vk_draw_frame :: proc() {
 		}
 	}
 	
-	if cmd_visible {	
+	if cmd_visible {
+		res := vk.WaitForFences(vk_device, 1, &vk_allocator_fence, true, max(u64))
+		if res != .SUCCESS do trace.panic_log("res := vk.WaitForFences(vk_device, 1, &vk_allocator_fence, true, max(u64)) : ", res)
+
 		vk.BeginCommandBuffer(vk_cmd_buffer[frame], &vk.CommandBufferBeginInfo {
 			sType = vk.StructureType.COMMAND_BUFFER_BEGIN_INFO,
 			flags = {vk.CommandBufferUsageFlag.RENDER_PASS_CONTINUE},
