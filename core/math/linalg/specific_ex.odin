@@ -403,8 +403,8 @@ LineExtendPoint :: proc "contextless" (prev:[2]$T, cur:[2]T, next:[2]T, thicknes
 	ccw_ : T = (ccw == .Clockwise ? -1 : 1)
 	vp : [2]T = cur - prev
 	vpn: [2]T = normalize(vp)
-	npnX := vpn.y 
-	npnY := -vpn.x 
+	npnX := vpn.y //* ccw_
+	npnY := -vpn.x// * ccw_
 
 	bis := [2]T{(nnnX + npnX) * ccw_, (nnnY + npnY) * ccw_}
 	bisn : [2]T = normalize(bis)

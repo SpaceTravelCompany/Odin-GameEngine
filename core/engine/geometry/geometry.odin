@@ -136,6 +136,75 @@ rect_line_init :: proc "contextless" (_rect: linalg.rect) -> [4]shape_line {
 	}
 }
 
+round_rect_line_init :: proc "contextless" (_rect: linalg.rect, _radius: f32) -> [8]shape_line {
+	r := _radius
+	// Clamp radius to fit within rect
+	half_width := (_rect.right - _rect.left) * 0.5
+	half_height := abs(_rect.bottom - _rect.top) * 0.5
+	r = min(r, min(half_width, half_height))
+	
+	t: f32 = (4.0 / 3.0) * math.tan_f32(math.PI / 8.0)
+	tt := t * r
+	
+	// Corner centers
+	top_left := linalg.point{_rect.left + r, _rect.top + r}
+	top_right := linalg.point{_rect.right - r, _rect.top + r}
+	bottom_right := linalg.point{_rect.right - r, _rect.bottom - r}
+	bottom_left := linalg.point{_rect.left + r, _rect.bottom - r}
+	
+	return [8]shape_line{
+		// Top-left corner (cubic) - counter-clockwise: from top to left
+		// Note: y increases upward, _rect.top is top (larger y), _rect.bottom is bottom (smaller y)
+		cubic_init(
+			linalg.point{_rect.left + r, _rect.top},
+			linalg.point{_rect.left + r - tt, _rect.top},
+			linalg.point{_rect.left, _rect.top - r + tt},
+			linalg.point{_rect.left, _rect.top - r},
+		),
+		// Left line - counter-clockwise: from top to bottom (y decreases)
+		line_init(
+			linalg.point{_rect.left, _rect.top - r},
+			linalg.point{_rect.left, _rect.bottom + r},
+		),
+		// Bottom-left corner (cubic) - counter-clockwise: from left to bottom
+		cubic_init(
+			linalg.point{_rect.left, _rect.bottom + r},
+			linalg.point{_rect.left, _rect.bottom + r - tt},
+			linalg.point{_rect.left + r - tt, _rect.bottom},
+			linalg.point{_rect.left + r, _rect.bottom},
+		),
+		// Bottom line - counter-clockwise: from left to right
+		line_init(
+			linalg.point{_rect.left + r, _rect.bottom},
+			linalg.point{_rect.right - r, _rect.bottom},
+		),
+		// Bottom-right corner (cubic) - counter-clockwise: from bottom to right
+		cubic_init(
+			linalg.point{_rect.right - r, _rect.bottom},
+			linalg.point{_rect.right - r + tt, _rect.bottom},
+			linalg.point{_rect.right, _rect.bottom + r - tt},
+			linalg.point{_rect.right, _rect.bottom + r},
+		),
+		// Right line - counter-clockwise: from bottom to top (y increases)
+		line_init(
+			linalg.point{_rect.right, _rect.bottom + r},
+			linalg.point{_rect.right, _rect.top - r},
+		),
+		// Top-right corner (cubic) - counter-clockwise: from right to top
+		cubic_init(
+			linalg.point{_rect.right, _rect.top - r},
+			linalg.point{_rect.right, _rect.top - r + tt},
+			linalg.point{_rect.right - r + tt, _rect.top},
+			linalg.point{_rect.right - r, _rect.top},
+		),
+		// Top line - counter-clockwise: from right to left
+		line_init(
+			linalg.point{_rect.right - r, _rect.top},
+			linalg.point{_rect.left + r, _rect.top},
+		),
+	}
+}
+
 circle_cubic_init :: proc "contextless" (_center: linalg.point, _r: f32) -> [4]shape_line {
 	t: f32 = (4.0 / 3.0) * math.tan_f32(math.PI / 8.0)
 	tt := t * _r
@@ -829,10 +898,16 @@ shapes_compute_polygon :: proc(poly:^shapes, allocator := context.allocator) -> 
         for node in poly.nodes {
             if node.stroke_color.a > 0 && node.thickness > 0 {	
 				node_len :u32 = auto_cast len(node.lines)
+				poly_points := mem.make_non_zeroed([]linalg.point, node_len, 64, arena)
+				for i:u32 = 0; i < node_len; i += 1 {
+					poly_points[i] = node.lines[i].start
+				}
+				poly_ori := linalg.GetPolygonOrientation(poly_points[:])
+				
 				// 외부 스트로크
 				outer_lines := mem.make_non_zeroed([]shape_line, node_len, 64, arena)
 
-				set_line_points_outer :: proc "contextless" (out_line:^shape_line, line:shape_line, prev_line:shape_line, next_line:shape_line, thickness:f32) {
+				set_line_points_outer :: proc "contextless" (out_line:^shape_line, line:shape_line, prev_line:shape_line, next_line:shape_line, thickness:f32, poly_ori:linalg.PolyOrientation) {
 					current_point := line.start
 					next_point:linalg.point
 					prev_point :linalg.point
@@ -847,7 +922,7 @@ shapes_compute_polygon :: proc(poly:^shapes, allocator := context.allocator) -> 
 						case .Quadratic:prev_point = prev_line.control0
 						case:prev_point = prev_line.control1
 					}
-					start_point := linalg.LineExtendPoint(prev_point, current_point, next_point, thickness, .CounterClockwise)
+					start_point := linalg.LineExtendPoint(prev_point, current_point, next_point, thickness, poly_ori)
 
 					#partial switch line.type {
 						case .Line:
@@ -855,12 +930,12 @@ shapes_compute_polygon :: proc(poly:^shapes, allocator := context.allocator) -> 
 							current_point = line.control0
 							prev_point = line.start
 							next_point = next_line.start
-							control0 = linalg.LineExtendPoint(prev_point, current_point, next_point, thickness, .CounterClockwise)
+							control0 = linalg.LineExtendPoint(prev_point, current_point, next_point, thickness, poly_ori)
 						case:
 							current_point = line.control0
 							prev_point = line.start
 							next_point = line.control1
-							control0 = linalg.LineExtendPoint(prev_point, current_point, next_point, thickness, .CounterClockwise)
+							control0 = linalg.LineExtendPoint(prev_point, current_point, next_point, thickness, poly_ori)
 					}
 
 					#partial switch line.type {
@@ -870,7 +945,7 @@ shapes_compute_polygon :: proc(poly:^shapes, allocator := context.allocator) -> 
 							current_point = line.control1
 							prev_point = line.control0
 							next_point = next_line.start
-							control1 = linalg.LineExtendPoint(prev_point, current_point, next_point, thickness, .CounterClockwise)
+							control1 = linalg.LineExtendPoint(prev_point, current_point, next_point, thickness, poly_ori)
 					}
 
 					out_line^ = shape_line{
@@ -881,55 +956,6 @@ shapes_compute_polygon :: proc(poly:^shapes, allocator := context.allocator) -> 
 					}
 				}
 
-				set_line_points_inner :: proc "contextless" (out_line:^shape_line, line:shape_line, prev_line:shape_line, next_line:shape_line, thickness:f32) {
-					current_point := line.end
-					next_point:linalg.point
-					prev_point :linalg.point
-					control0, control1:linalg.point = {0,0}, {0,0}
-
-					#partial switch line.type {
-						case .Line:next_point = line.start
-						case .Quadratic:next_point = line.control0
-						case:next_point = line.control1
-					}
-					#partial switch prev_line.type {
-						case .Line:prev_point = prev_line.end
-						case:prev_point = prev_line.control0
-					}
-					start_point := linalg.LineExtendPoint(prev_point, current_point, next_point, thickness, .CounterClockwise)
-
-					#partial switch line.type {
-						case .Line:
-						case .Quadratic:
-							current_point = line.control0
-							prev_point = line.end
-							next_point = line.start
-							control0 = linalg.LineExtendPoint(prev_point, current_point, next_point, thickness, .CounterClockwise)
-						case:
-							current_point = line.control1
-							prev_point = line.end
-							next_point = line.control0
-							control0 = linalg.LineExtendPoint(prev_point, current_point, next_point, thickness, .CounterClockwise)
-					}
-
-					#partial switch line.type {
-						case .Line:
-						case .Quadratic:
-						case:
-							current_point = line.control0
-							prev_point = line.control1
-							next_point = line.start
-							control1 = linalg.LineExtendPoint(prev_point, current_point, next_point, thickness, .CounterClockwise)
-					}
-
-					out_line^ = shape_line{
-						start = start_point,
-						control0 = control0,
-						control1 = control1,
-						type = line.type,
-					}
-				}
-				
 				for i:u32 = 0; i < node_len; i += 1 {
 					line := node.lines[i]
 					prev_idx := i == 0 ? node_len - 1 : i - 1
@@ -937,7 +963,7 @@ shapes_compute_polygon :: proc(poly:^shapes, allocator := context.allocator) -> 
 					prev_line := node.lines[prev_idx]
 					next_line := node.lines[next_idx]
 
-					set_line_points_outer(&outer_lines[i], line, prev_line, next_line, node.thickness)
+					set_line_points_outer(&outer_lines[i], line, prev_line, next_line, node.thickness, poly_ori)
 				}
 				for i:u32 = 0; i < node_len; i += 1 {
 					if i == node_len - 1 {
@@ -956,28 +982,42 @@ shapes_compute_polygon :: proc(poly:^shapes, allocator := context.allocator) -> 
 				node_idx += 1
 				
 				// 내부 스트로크
-				inner_lines := mem.make_non_zeroed([]shape_line, node_len,64, arena)
-				j := 0
-				for i :int = auto_cast node_len - 1; i >= 0; i -= 1 {
-					line := node.lines[i]
-					prev_idx :u32 = u32(i) == node_len - 1 ? 0 : u32(i) + 1
-					next_idx :u32 = u32(i) == 0 ? node_len - 1 : u32(i) - 1
-					prev_line := node.lines[prev_idx]
-					next_line := node.lines[next_idx]
+				inner_lines := mem.make_aligned([]shape_line, node_len,64, arena)	
+				inner_lines2 := mem.make_aligned([]shape_line, node_len, 64, arena)
 
-					set_line_points_inner(&inner_lines[j], line, prev_line, next_line, node.thickness)
-					j += 1
+				for i:u32 = 0; i < node_len; i += 1 {
+					origin_line := node.lines[node_len - 1 - i]
+					inner_lines[i].start = origin_line.end
+					inner_lines[i].end = origin_line.start
+					#partial switch origin_line.type {
+						case .Quadratic:
+							inner_lines[i].control0 = origin_line.control0
+						case:
+							inner_lines[i].control1 = origin_line.control0
+							inner_lines[i].control0 = origin_line.control1
+					}
+					inner_lines[i].type = origin_line.type
+				}
+
+				for i:u32 = 0; i < node_len; i += 1 {
+					line := inner_lines[i]
+					prev_idx := i == 0 ? node_len - 1 : i - 1
+					next_idx := i == node_len - 1 ? 0 : i + 1
+					prev_line := inner_lines[prev_idx]
+					next_line := inner_lines[next_idx]
+
+					set_line_points_outer(&inner_lines2[i], line, prev_line, next_line, -node.thickness, poly_ori == .Clockwise ? .CounterClockwise : .Clockwise)
 				}
 				for i:u32 = 0; i < node_len; i += 1 {
 					if i == node_len - 1 {
-						inner_lines[i].end = inner_lines[0].start
+						inner_lines2[i].end = inner_lines2[0].start
 					} else {
-						inner_lines[i].end = inner_lines[i + 1].start
+						inner_lines2[i].end = inner_lines2[i + 1].start
 					}
 				}
 				
 				stroke_nodes[node_idx] = shape_node{
-					lines = inner_lines,
+					lines = inner_lines2,
 					color = node.stroke_color,
 					stroke_color = {},
 					thickness = 0,
