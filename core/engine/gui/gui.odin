@@ -109,6 +109,6 @@ gui_component_size ::  proc (self:^$T, self_component:^gui_component)
     where intrinsics.type_is_subtype_of(T, engine.iobject) {
     gui_component_init(self, self_component)
 
-    engine.iobject_update_transform_matrix(auto_cast self)
+    engine.image_update_transform_matrix_raw(auto_cast self, self.mat)
 }
 

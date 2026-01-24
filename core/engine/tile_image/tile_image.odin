@@ -51,7 +51,7 @@ colorTransform:^engine.color_transform = nil, vtable:^engine.iobject_vtable = ni
 
     if self.vtable.get_uniform_resources == nil do self.vtable.get_uniform_resources = auto_cast get_uniform_resources_tile_image
 
-    itransform_object_init(self, colorTransform, vtable)
+    itransform_object_init(self, colorTransform, self.vtable)
 	self.actual_type = typeid_of(tile_image)
 }
 

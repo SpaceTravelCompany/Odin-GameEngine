@@ -49,7 +49,7 @@ colorTransform:^engine.color_transform = nil, vtable:^engine.iobject_vtable = ni
     self.vtable = vtable == nil ? &shape_vtable : vtable
     if self.vtable.draw == nil do self.vtable.draw = auto_cast _super_shape_draw
 
-    engine.itransform_object_init(self, colorTransform, vtable)
+    engine.itransform_object_init(self, colorTransform, self.vtable)
 	self.actual_type = typeid_of(shape)
 }
 

@@ -164,7 +164,7 @@ up:^engine.texture = nil, over:^engine.texture = nil, down:^engine.texture = nil
 	self.vtable = vtable == nil ? &image_button_vtable : vtable
     if self.vtable.draw == nil do self.vtable.draw = auto_cast _super_image_button_draw
 
-	engine.itransform_object_init(self, colorTransform, vtable)
+	engine.itransform_object_init(self, colorTransform, self.vtable)
 	self.actual_type = typeid_of(image_button)
 }
 
@@ -197,7 +197,7 @@ up:^shape.shape_src = nil, over:^shape.shape_src = nil, down:^shape.shape_src = 
 	self.vtable = vtable == nil ? &shape_button_vtable : vtable
     if self.vtable.draw == nil do self.vtable.draw = auto_cast _super_shape_button_draw
 
-	engine.itransform_object_init(self, colorTransform, vtable)
+	engine.itransform_object_init(self, colorTransform, self.vtable)
 	self.actual_type = typeid_of(shape_button)
 }
 

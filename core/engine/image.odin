@@ -65,7 +65,7 @@ colorTransform:^color_transform = nil, vtable:^iobject_vtable = nil) {
     self.vtable = vtable == nil ? &image_vtable : vtable
     if self.vtable.draw == nil do self.vtable.draw = auto_cast _super_image_draw
 
-    itransform_object_init(self, colorTransform, vtable)
+    itransform_object_init(self, colorTransform, self.vtable)
 	self.actual_type = typeid_of(image)
 }
 

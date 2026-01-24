@@ -24,7 +24,7 @@ Custom object structure for rendering with custom shaders
 Extends iobject with custom pipeline and descriptor sets
 */
 custom_object :: struct {
-    using _:engine.iobject,
+    using _:engine.itransform_object,
     p_pipeline:^object_pipeline,
     pipeline_set_idx:int, // The index of the pipeline set to use for this 
     pipeline_p_sets:[]^engine.descriptor_set
@@ -313,37 +313,13 @@ custom_object_pipeline_init :: proc(self:^object_pipeline,
     deinit = auto_cast _super_custom_object_deinit,
 }
 
-/*
-Initializes a custom object
-
-Inputs:
-- self: Pointer to the custom object to initialize
-- actual_type: The actual type of the object (must be a subtype of custom_object)
-- p_pipeline: Pointer to the custom pipeline
-- pipeline_p_sets: Array of descriptor sets for the pipeline
-- pipeline_set_idx: Index of the pipeline set to use (default: 0)
-- pos: Position of the object
-- rotation: Rotation angle in radians
-- scale: Scale factors (default: {1, 1})
-- camera: Pointer to the camera
-- projection: Pointer to the projection
-- color_transform: Pointer to color transform (default: nil)
-- pivot: Pivot point for transformations (default: {0.0, 0.0})
-- vtable: Custom vtable (default: nil, uses default custom_object vtable)
-
-Returns:
-- None
-*/
-custom_object_init :: proc(self:^custom_object, $actual_type:typeid,
+custom_object_init :: proc(self:^custom_object,
     p_pipeline:^object_pipeline,
     pipeline_p_sets:[]^engine.descriptor_set,
-    pipeline_set_idx:int = 0,
-    pos:linalg.point3d, rotation:f32, scale:linalg.point = {1,1},
-    camera:^engine.camera, projection:^engine.projection, color_transform:^engine.color_transform = nil, pivot:linalg.point = {0.0, 0.0}, vtable:^engine.iobject_vtable = nil)
-    where intrinsics.type_is_subtype_of(actual_type, custom_object) {
+    pipeline_set_idx:int = 0, vtable:^engine.iobject_vtable = nil) {
 
     self.pipeline_p_sets = mem.make_non_zeroed_slice([]^engine.descriptor_set, len(pipeline_p_sets))
-    mem.copy_non_overlapping(&self.pipeline_p_sets[0], &pipeline_p_sets[0], len(pipeline_p_sets) * size_of(^descriptor_set))
+    mem.copy_non_overlapping(&self.pipeline_p_sets[0], &pipeline_p_sets[0], len(pipeline_p_sets) * size_of(^engine.descriptor_set))
 
     self.p_pipeline = p_pipeline
     self.pipeline_set_idx = pipeline_set_idx
@@ -356,14 +332,13 @@ custom_object_init :: proc(self:^custom_object, $actual_type:typeid,
     if self.vtable.draw == nil do self.vtable.draw = auto_cast _super_custom_object_draw
     if self.vtable.deinit == nil do self.vtable.deinit = auto_cast _super_custom_object_deinit
 
-    if self.vtable.get_uniform_resources == nil do self.vtable.get_uniform_resources = auto_cast get_uniform_resources_default
-
-    iobject_init(self, actual_type, pos, rotation, scale, camera, projection, color_transform, pivot)
+    engine.itransform_object_init(self, nil, self.vtable)
+    self.actual_type = typeid_of(custom_object)
 }
 
 
 _super_custom_object_deinit :: proc(self:^custom_object) {
-    engine._super_iobject_deinit(auto_cast self)
+    engine._super_itransform_object_deinit(auto_cast self)
 
     delete(self.pipeline_p_sets)
 }

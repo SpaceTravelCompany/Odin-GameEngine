@@ -43,8 +43,9 @@ GUI_Image_Vtable: engine.iobject_vtable = {
 }
 GUI_Image_Init :: proc(self:^GUI_Image, src:^engine.texture,
 colorTransform:^engine.color_transform = nil) {
-    engine.image_init2(auto_cast self, GUI_Image, src, colorTransform,&GUI_Image_Vtable)
+    engine.image_init(auto_cast self, src, colorTransform, &GUI_Image_Vtable)
     gui.gui_component_size(self, &self.com)
+	self.actual_type = typeid_of(GUI_Image)
 }
 
 GUI_Image_Size :: proc(self:^GUI_Image) {
@@ -93,8 +94,8 @@ init_svg :: proc() {
         trace.panic_log(shape_err)
     }
 
-    shape.shape_init(svg_shape, shape.shape, &svg_shape_src, 
-        {0,0,0}, )
+    shape.shape_init(svg_shape, &svg_shape_src)
+    engine.itransform_object_update_transform(svg_shape, {0,0,0}, 0.0, {1, 1})
     engine.layer_add_object(renderCmd, svg_shape)
 }
 
@@ -148,9 +149,8 @@ Init ::proc() {
 
     shape.shape_src_init_raw(&shapeSrc, rawText, allocator = context.allocator)
 
-    shape.shape_init(shape_obj, shape.shape, &shapeSrc, {-0.0, 0, 10}, math.to_radians_f32(45.0), {3, 3},
-    pivot = {0.0, 0.0})
-
+    shape.shape_init(shape_obj, &shapeSrc)
+	engine.itransform_object_update_transform(shape_obj, {-0.0, 0, 10}, math.to_radians_f32(45.0), {3, 3})
     engine.layer_add_object(renderCmd, shape_obj)
 
     //Sound Test

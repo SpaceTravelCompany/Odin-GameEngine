@@ -244,7 +244,7 @@ colorTransform:^engine.color_transform = nil, vtable:^ianimate_object_vtable = n
         resource_usage = .CPU,
     }, mem.ptr_to_bytes(&self.frame), true)
 
-    engine.itransform_object_init(self, colorTransform, vtable)
+    engine.itransform_object_init(self, colorTransform, self.vtable)
     self.actual_type = typeid_of(animate_image)
 }
 
