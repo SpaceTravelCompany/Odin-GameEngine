@@ -811,22 +811,19 @@ shapes_compute_polygon :: proc(poly:^shapes, allocator := context.allocator) -> 
                 }
             }
 
-            if linalg.GetPolygonOrientation(pT[:]) == .Clockwise {
-                for p in ps {
-                    non_zero_append(&outPoly2, p.p)
-                    np += 1
-                }
-            } else {
-                for p,i in ps {
-                    if p.isCurve {
-                        if linalg.PointInPolygon(p.p, pT[:]) {
-                            non_zero_append(&outPoly2, p.p)
-                            np += 1
-                        }
-                    } else {
+            // Check each curve control point individually
+            // Add curve points only if they are inside the polygon (regardless of polygon orientation)
+            for p in ps {
+                if p.isCurve {
+                    // Curve control point: add only if inside the polygon
+                    if linalg.PointInPolygon(p.p, pT[:]) {
                         non_zero_append(&outPoly2, p.p)
                         np += 1
                     }
+                } else {
+                    // Regular vertex: always add
+                    non_zero_append(&outPoly2, p.p)
+                    np += 1
                 }
             }
 
@@ -929,7 +926,7 @@ shapes_compute_polygon :: proc(poly:^shapes, allocator := context.allocator) -> 
 						case .Quadratic:
 							current_point = line.control0
 							prev_point = line.start
-							next_point = next_line.start
+							next_point = line.end  // control0 → end direction
 							control0 = linalg.LineExtendPoint(prev_point, current_point, next_point, thickness, poly_ori)
 						case:
 							current_point = line.control0
@@ -944,7 +941,7 @@ shapes_compute_polygon :: proc(poly:^shapes, allocator := context.allocator) -> 
 						case:
 							current_point = line.control1
 							prev_point = line.control0
-							next_point = next_line.start
+							next_point = line.end  // control1 → end direction
 							control1 = linalg.LineExtendPoint(prev_point, current_point, next_point, thickness, poly_ori)
 					}
 
