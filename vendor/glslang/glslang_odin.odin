@@ -1,4 +1,3 @@
-//!NEED TEST
 package glslang
 
 import "core:c"

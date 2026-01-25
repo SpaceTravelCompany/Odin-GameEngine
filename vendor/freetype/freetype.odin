@@ -2,32 +2,33 @@ package freetype
 
 import "core:c"
 import "base:library"
-import "vendor:compress/brotli"
-import "vendor:compress/bzip2"
 
 FREETYPE_SHARED :: #config(FREETYPE_SHARED, false)
 when FREETYPE_SHARED {
 	#panic("Shared linking for freetype is not supported yet")
 }
 
-LIB :: library.LIBPATH + "/libfreetype" + library.ARCH_end
+@private BROTLI_COMMON_LIB :: library.LIBPATH + "/libbrotlicommon" + library.ARCH_end
+@private BROTLI_DEC_LIB :: library.LIBPATH + "/libbrotlidec" + library.ARCH_end
+@private BROTLI_ENC_LIB :: library.LIBPATH + "/libbrotlienc" + library.ARCH_end
+@private LIB :: library.LIBPATH + "/libfreetype" + library.ARCH_end
 
 when ODIN_OS == .Windows && !library.is_android {
     foreign import freetype {
         LIB,
-        "../compress/brotli" + brotli.BROTLI_DEC_LIB,
-        "../compress/brotli" + brotli.BROTLI_ENC_LIB,
-        "../compress/brotli" + brotli.BROTLI_COMMON_LIB,
-        "../compress/bzip2" + bzip2.BZIP2_LIB,
+        "../compress/brotli/" + BROTLI_DEC_LIB,
+        "../compress/brotli/" + BROTLI_ENC_LIB,
+        "../compress/brotli/" + BROTLI_COMMON_LIB,
+        "../compress/bzip2/" + library.LIBPATH + "/libbz2" + library.ARCH_end,
 
     }
 } else {
     foreign import freetype {
         LIB,
-        "../compress/brotli" + brotli.BROTLI_DEC_LIB,
-        "../compress/brotli" + brotli.BROTLI_ENC_LIB,
-        "../compress/brotli" + brotli.BROTLI_COMMON_LIB,
-        "../compress/bzip2" + bzip2.BZIP2_LIB,
+        "../compress/brotli/" + BROTLI_DEC_LIB,
+        "../compress/brotli/" + BROTLI_ENC_LIB,
+        "../compress/brotli/" + BROTLI_COMMON_LIB,
+        "../compress/bzip2/" + library.LIBPATH + "/libbz2" + library.ARCH_end,
         "system:z",
     }
 }

@@ -7,7 +7,7 @@ import "../ogg"
 import "base:library"
 
 
-LIBOPUSFILE :: library.LIBPATH + "/libopusfile" + library.ARCH_end
+@private LIBOPUSFILE :: library.LIBPATH + "/libopusfile" + library.ARCH_end
 
 foreign import lib { LIBOPUSFILE }
 

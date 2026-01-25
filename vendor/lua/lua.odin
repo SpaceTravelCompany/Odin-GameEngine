@@ -12,7 +12,7 @@ import "base:library"
 import "core:sys/android"
 
 
-LIB :: library.LIBPATH + "/liblua" + library.ARCH_end
+@private LIB :: library.LIBPATH + "/liblua" + library.ARCH_end
 
 foreign import lua { LIB }
 

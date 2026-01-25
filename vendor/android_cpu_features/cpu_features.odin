@@ -3,7 +3,7 @@ package android_cpu_features
 import "core:c"
 import "base:library"
 
-LIB :: "/lib/android/libcpu-features" + library.ARCH_end
+@private LIB :: "/lib/android/libcpu-features" + library.ARCH_end
 
 foreign import lib {
 	LIB,

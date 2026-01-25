@@ -8,12 +8,12 @@ import "../vorbis"
 import "../ogg"
 import "base:library"
 
-LIB_VORBIS :: library.LIBPATH + "/libminiaudio_libvorbis" + library.ARCH_end
+@private LIB_VORBIS :: library.LIBPATH + "/libminiaudio_libvorbis" + library.ARCH_end
 foreign import lib {
     LIB_VORBIS,
-    "../vorbisfile" + vorbisfile.LIB,
-    "../vorbis" + vorbis.LIB,
-    "../ogg" + ogg.LIB,
+    "../vorbisfile/" + library.LIBPATH + "/libvorbisfile" + library.ARCH_end,
+    "../vorbis/" + library.LIBPATH + "/libvorbis" + library.ARCH_end,
+    "../ogg/" + library.LIBPATH + "/libogg" + library.ARCH_end,
 }
 
 libvorbis :: struct {

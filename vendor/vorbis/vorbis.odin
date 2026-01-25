@@ -5,8 +5,8 @@ import "base:library"
 import "../ogg"
 
 
-LIB :: library.LIBPATH + "/libvorbis" + library.ARCH_end
-LIBENC :: library.LIBPATH + "/libvorbisenc" + library.ARCH_end
+@private LIB :: library.LIBPATH + "/libvorbis" + library.ARCH_end
+@private LIBENC :: library.LIBPATH + "/libvorbisenc" + library.ARCH_end
 foreign import lib { LIB, LIBENC }
 
 

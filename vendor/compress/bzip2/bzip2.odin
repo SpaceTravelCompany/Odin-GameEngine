@@ -5,7 +5,7 @@ package bzip2
 import "core:c"
 import "base:library"
 
-BZIP2_LIB :: library.LIBPATH + "/libbz2" + library.ARCH_end
+@private BZIP2_LIB :: library.LIBPATH + "/libbz2" + library.ARCH_end
 
 foreign import lib {
 	BZIP2_LIB,

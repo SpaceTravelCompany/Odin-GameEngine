@@ -5,9 +5,9 @@ package brotli
 import "core:c"
 import "base:library"
 
-BROTLI_COMMON_LIB :: library.LIBPATH + "/libbrotlicommon" + library.ARCH_end
-BROTLI_DEC_LIB :: library.LIBPATH + "/libbrotlidec" + library.ARCH_end
-BROTLI_ENC_LIB :: library.LIBPATH + "/libbrotlienc" + library.ARCH_end
+@private BROTLI_COMMON_LIB :: library.LIBPATH + "/libbrotlicommon" + library.ARCH_end
+@private BROTLI_DEC_LIB :: library.LIBPATH + "/libbrotlidec" + library.ARCH_end
+@private BROTLI_ENC_LIB :: library.LIBPATH + "/libbrotlienc" + library.ARCH_end
 
 foreign import lib {
 	BROTLI_COMMON_LIB,

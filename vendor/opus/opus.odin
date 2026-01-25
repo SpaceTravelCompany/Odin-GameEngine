@@ -3,7 +3,7 @@ package opus
 import "base:library"
 import "core:c"
 
-LIBOPUS :: library.LIBPATH + "/libopus" + library.ARCH_end
+@private LIBOPUS :: library.LIBPATH + "/libopus" + library.ARCH_end
 foreign import lib { LIBOPUS }
 
 // opus_types.h

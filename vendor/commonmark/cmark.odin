@@ -12,11 +12,10 @@ when COMMONMARK_SHARED {
 }
 
 when ODIN_OS == .Linux && !library.is_mobile {
-	LIB :: "system:cmark"
+	@private LIB :: "system:cmark"
 } else {
-	LIB :: library.LIBPATH + "/libcmark" + library.ARCH_end
+	@private LIB :: library.LIBPATH + "/libcmark" + library.ARCH_end
 }
-
 
 foreign import lib {
 	LIB,

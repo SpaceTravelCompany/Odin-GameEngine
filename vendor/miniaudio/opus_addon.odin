@@ -8,12 +8,12 @@ import "../ogg"
 import "../opus"
 import "base:library"
 
-LIB_OPUS :: library.LIBPATH + "/libminiaudio_libopus" + library.ARCH_end
+@private LIB_OPUS :: library.LIBPATH + "/libminiaudio_libopus" + library.ARCH_end
 
 foreign import lib {
     LIB_OPUS,
-    "../opusfile" + opusfile.LIBOPUSFILE,
-    "../opus" + opus.LIBOPUS,
+    "../opusfile/" + library.LIBPATH + "/libopusfile" + library.ARCH_end,
+    "../opus/" + library.LIBPATH + "/libopus" + library.ARCH_end,
 }
 
 libopus :: struct {
