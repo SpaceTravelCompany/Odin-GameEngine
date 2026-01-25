@@ -118,7 +118,7 @@ printTraceBuf :: proc(str:^strings.Builder) {
 
 @private _print :: proc (cstr:cstring) {
 	when !is_android {
-		os.write(os.stdout, (transmute([^]u8)(cstr))[:len(cstr)])
+		fmt.fprint(os.stdout, string(cstr))
 	} else {
 		android.__android_log_write(android.LogPriority.INFO, ODIN_BUILD_PROJECT_NAME, cstr)
 	}
