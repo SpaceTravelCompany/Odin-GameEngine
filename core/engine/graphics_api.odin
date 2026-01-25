@@ -558,6 +558,7 @@ descriptor_set_layout_binding_init :: vk.DescriptorSetLayoutBindingInit
 
 
 object_pipeline_deinit :: proc(self:^object_pipeline) {
+	graphics_wait_graphics_idle()
     vk.DestroyPipelineLayout(graphics_device(), self.__pipeline_layout, nil)
     vk.DestroyPipeline(graphics_device(), self.__pipeline, nil)
     delete(self.__descriptor_set_layouts, self.allocator)
