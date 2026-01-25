@@ -749,7 +749,6 @@ custom_object_pipeline_init :: proc(self:^object_pipeline,
 						spv_options.disable_optimizer = true
 						spv_options.emit_nonsemantic_shader_debug_info = true
 						spv_options.emit_nonsemantic_shader_debug_source = true
-						spv_options.emit_nonsemantic_shader_debug_source = true
 					}
                     glslang.program_SPIRV_generate_with_options(program, shader_kinds[i], &spv_options)
                     
