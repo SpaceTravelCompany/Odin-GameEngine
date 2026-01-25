@@ -246,52 +246,42 @@ get_nearest_sampler :: #force_inline proc "contextless" () -> vk.Sampler {
 }
 
 
-// Graphics API 초기화
 @private graphics_init :: #force_inline proc() {
 	vk_start()
 }
 
-// Graphics API 정리
 @private graphics_destroy :: #force_inline proc() {
 	vk_destroy()
 }
 
-// 프레임 렌더링
 @private graphics_draw_frame :: #force_inline proc() {
 	vk_draw_frame()
 }
 
-// 디바이스 대기
 graphics_wait_device_idle :: #force_inline proc "contextless" () {
 	vk_wait_device_idle()
 }
 
-// 그래픽 큐 대기
 graphics_wait_graphics_idle :: #force_inline proc "contextless" () {
 	vk_wait_graphics_idle()
 }
 
-// 프레젠트 큐 대기
 graphics_wait_present_idle :: #force_inline proc "contextless" () {
 	vk_wait_present_idle()
 }
 
-// 모든 비동기 작업 대기
 graphics_wait_all_ops :: #force_inline proc () {
     vk_wait_all_op()
 }
 
-// 렌더링 까지 대기
 graphics_wait_rendering :: #force_inline proc () {
     sync.sema_wait(&g_wait_rendering_sem)
 }
 
-// 작업 실행
 graphics_execute_ops :: #force_inline proc() {
 	vk_op_execute()
 }
 
-// 작업 실행 (파괴만)
 graphics_execute_ops_destroy :: #force_inline proc() {
 	vk_op_execute_destroy()
 }
@@ -311,12 +301,10 @@ free_command_buffers :: proc(p_cmd_buffer: [^]command_buffer, count: u32, cmd_po
 	vk.FreeCommandBuffers(graphics_device(), cmd_pool, count, auto_cast p_cmd_buffer)
 }
 
-// 파이프라인 바인딩
 graphics_cmd_bind_pipeline :: #force_inline proc "contextless" (cmd: command_buffer, pipeline_bind_point: vk.PipelineBindPoint, pipeline: vk.Pipeline) {
 	vk.CmdBindPipeline(cmd.__handle, pipeline_bind_point, pipeline)
 }
 
-// 디스크립터 셋 바인딩
 graphics_cmd_bind_descriptor_sets :: #force_inline proc "contextless" (
 	cmd: command_buffer,
 	pipeline_bind_point: vk.PipelineBindPoint,
@@ -330,7 +318,6 @@ graphics_cmd_bind_descriptor_sets :: #force_inline proc "contextless" (
 	vk.CmdBindDescriptorSets(cmd.__handle, pipeline_bind_point, layout, first_set, descriptor_set_count, p_descriptor_sets, dynamic_offset_count, p_dynamic_offsets)
 }
 
-// 버텍스 버퍼 바인딩
 graphics_cmd_bind_vertex_buffers :: proc (
 	cmd: command_buffer,
 	first_binding: u32,
@@ -346,7 +333,7 @@ graphics_cmd_bind_vertex_buffers :: proc (
 	vk.CmdBindVertexBuffers(cmd.__handle, first_binding, binding_count, &buffers[0], p_offsets)
 }
 
-// 인덱스 버퍼 바인딩
+
 graphics_cmd_bind_index_buffer :: #force_inline proc "contextless" (
 	cmd: command_buffer,
 	buffer: iresource,
@@ -356,7 +343,6 @@ graphics_cmd_bind_index_buffer :: #force_inline proc "contextless" (
 	vk.CmdBindIndexBuffer(cmd.__handle, (^buffer_resource)(buffer).__resource, offset, index_type)
 }
 
-// 드로우
 graphics_cmd_draw :: #force_inline proc "contextless" (
 	cmd: command_buffer,
 	vertex_count: u32,
@@ -367,7 +353,6 @@ graphics_cmd_draw :: #force_inline proc "contextless" (
 	vk.CmdDraw(cmd.__handle, vertex_count, instance_count, first_vertex, first_instance)
 }
 
-// 인덱스 드로우
 graphics_cmd_draw_indexed :: #force_inline proc "contextless" (
 	cmd: command_buffer,
 	index_count: u32,
@@ -380,12 +365,10 @@ graphics_cmd_draw_indexed :: #force_inline proc "contextless" (
 }
 
 
-// 풀스크린 독점 모드 설정
 graphics_set_fullscreen_exclusive :: #force_inline proc() {
 	vk_set_full_screen_ex()
 }
 
-// 풀스크린 독점 모드 해제
 graphics_release_fullscreen_exclusive :: #force_inline proc() {
 	vk_release_full_screen_ex()
 }
@@ -710,7 +693,6 @@ custom_object_pipeline_init :: proc(self:^object_pipeline,
                         return false
                     }
                     
-                    // 프로그램 생성 및 링크
                     program := glslang.program_create()
                     if program == nil {
                         trace.printlnLog("custom_object_pipeline_init: failed to create program")
@@ -732,7 +714,6 @@ custom_object_pipeline_init :: proc(self:^object_pipeline,
                         return false
                     }
                     
-                    // SPIR-V 생성
                     spv_options := glslang.SPV_Options{
                         generate_debug_info = false,
                         strip_debug_info = false,
@@ -753,12 +734,10 @@ custom_object_pipeline_init :: proc(self:^object_pipeline,
 					}
                     glslang.program_SPIRV_generate_with_options(program, shader_kinds[i], &spv_options)
                     
-                    // SPIR-V 데이터 가져오기
                     spirv_size := glslang.program_SPIRV_get_size(program)
                     spirv_data = mem.make_non_zeroed([]u8, size_of(u32) * spirv_size, 64, context.temp_allocator)
                     glslang.program_SPIRV_get(program, cast(^c.uint)&spirv_data[0])
                     
-                    // SPIR-V 메시지 확인
                     spirv_messages := glslang.program_SPIRV_get_messages(program)
                     if spirv_messages != nil {
                         trace.printlnLog(spirv_messages)
