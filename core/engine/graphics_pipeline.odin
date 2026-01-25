@@ -3,6 +3,7 @@ package engine
 
 import vk "vendor:vulkan"
 import "core:debug/trace"
+import "core:thread"
 import "core:engine/geometry"
 
 
@@ -24,24 +25,11 @@ init_pipelines :: proc() {
 			vk.DescriptorSetLayoutBindingInit(2, 1),},
 	)
 
-	nullVertexInputInfo := vk.PipelineVertexInputStateCreateInfo{
-		sType = .PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
-		vertexBindingDescriptionCount = 0,
-		pVertexBindingDescriptions = nil,
-		vertexAttributeDescriptionCount = 0,
-		pVertexAttributeDescriptions = nil,
-	}
-
-	defaultDepthStencilState := vk.PipelineDepthStencilStateCreateInfoInit()
-	pipelines:[3]vk.Pipeline
-	pipelineCreateInfos:[len(pipelines)]vk.GraphicsPipelineCreateInfo
-
 	shapeVertexInputBindingDescription := [1]vk.VertexInputBindingDescription{{
 		binding = 0,
 		stride = size_of(geometry.shape_vertex2d),
 		inputRate = .VERTEX,
 	}}
-
 	shapeVertexInputAttributeDescription := [3]vk.VertexInputAttributeDescription{{
 		location = 0,
 		binding = 0,
@@ -61,32 +49,43 @@ init_pipelines :: proc() {
 		offset = size_of(f32) * (2 + 3),
 	}}
 
-	custom_object_pipeline_init(&shape_pipeline,
-		[]vk.DescriptorSetLayout{base_descriptor_set_layout(), viewport_descriptor_set_layout()},
-		shapeVertexInputBindingDescription[:], shapeVertexInputAttributeDescription[:],
-		object_draw_method{type = .DrawIndexed,}, 
-		#load("shaders/shape.vert", string),
-		#load("shaders/shape.frag", string),
-		nil,
-		defaultDepthStencilState)
-	
-	custom_object_pipeline_init(&img_pipeline,
+	thread.pool_add_task(&g_thread_pool, context.allocator, proc(task: thread.Task) {
+		custom_object_pipeline_init(&img_pipeline,
 				[]vk.DescriptorSetLayout{base_descriptor_set_layout(), viewport_descriptor_set_layout(), img_descriptor_set_layout()},
 				nil, nil,
 				object_draw_method{type = .Draw,}, 
 				#load("shaders/tex.vert", string),
 				#load("shaders/tex.frag", string),
 				nil,
-				defaultDepthStencilState)
-				
-	custom_object_pipeline_init(&animate_img_pipeline,
+				vk.PipelineDepthStencilStateCreateInfoInit())
+	}, nil)
+
+	thread.pool_add_task(&g_thread_pool, context.allocator, proc(task: thread.Task) {
+		custom_object_pipeline_init(&animate_img_pipeline,
 				[]vk.DescriptorSetLayout{animate_img_descriptor_set_layout, viewport_descriptor_set_layout(), img_descriptor_set_layout()},
 				nil, nil,
 				object_draw_method{type = .Draw,}, 
 				#load("shaders/animate_tex.vert", string),
 				#load("shaders/animate_tex.frag", string),
 				nil,
-				defaultDepthStencilState)
+				vk.PipelineDepthStencilStateCreateInfoInit())
+	}, nil)
+
+	custom_object_pipeline_init(&shape_pipeline,
+				[]vk.DescriptorSetLayout{base_descriptor_set_layout(), viewport_descriptor_set_layout()},
+				shapeVertexInputBindingDescription[:], shapeVertexInputAttributeDescription[:],
+				object_draw_method{type = .DrawIndexed,}, 
+				#load("shaders/shape.vert", string),
+				#load("shaders/shape.frag", string),
+				nil,
+				vk.PipelineDepthStencilStateCreateInfoInit())
+
+	for thread.pool_num_done(&g_thread_pool) < 2 {
+			thread.yield()
+	}
+	for {
+		thread.pool_pop_done(&g_thread_pool) or_break
+	}
 }
 
  clean_pipelines :: proc() {

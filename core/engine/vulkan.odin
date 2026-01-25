@@ -641,12 +641,6 @@ vk_start :: proc() {
 	}
 	queueCnt: u32 = 1 if vk_graphics_family_index == vk_present_family_index else 2
 
-	physicalDeviceFeatures := vk.PhysicalDeviceFeatures {
-		samplerAnisotropy = true,
-		//sampleRateShading = true, //FOR ANTI-ALISING
-		//geometryShader = true,
-	}
-
 	deviceExtCnt: u32
 	vk.EnumerateDeviceExtensionProperties(vk_physical_device, nil, &deviceExtCnt, nil)
 	deviceExts := mem.make_non_zeroed([]vk.ExtensionProperties, deviceExtCnt, context.temp_allocator)
@@ -671,14 +665,41 @@ vk_start :: proc() {
 		}
 	}
 
+	
+	REQUIRED_VK_13_FEATURES := vk.PhysicalDeviceVulkan13Features {
+		sType            = .PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
+		//dynamicRendering = true,
+		//synchronization2 = true,
+		shaderDemoteToHelperInvocation = true,
+	}
+	REQUIRED_VK_12_FEATURES := vk.PhysicalDeviceVulkan12Features {
+		sType = .PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
+	}
+	if get_vulkan_version().major > 1 || get_vulkan_version().minor >= 3 do REQUIRED_VK_12_FEATURES.pNext = &REQUIRED_VK_13_FEATURES
+	REQUIRED_VK_11_FEATURES := vk.PhysicalDeviceVulkan11Features {
+		sType                         = .PHYSICAL_DEVICE_VULKAN_1_1_FEATURES,
+		//variablePointers              = true,
+		//variablePointersStorageBuffer = true,
+	}
+	if get_vulkan_version().major > 1 || get_vulkan_version().minor >= 2 do REQUIRED_VK_11_FEATURES.pNext = &REQUIRED_VK_12_FEATURES
+	REQUIRED_FEATURES := vk.PhysicalDeviceFeatures2 {
+		sType    = .PHYSICAL_DEVICE_FEATURES_2,
+		features = {
+			samplerAnisotropy = true
+		},
+	}
+	if get_vulkan_version().major > 1 || get_vulkan_version().minor >= 1 do REQUIRED_FEATURES.pNext = &REQUIRED_VK_11_FEATURES
+
 	deviceCreateInfo := vk.DeviceCreateInfo {
 		sType                   = vk.StructureType.DEVICE_CREATE_INFO,
 		pQueueCreateInfos       = &deviceQueueCreateInfos[0],
 		queueCreateInfoCount    = queueCnt,
-		pEnabledFeatures        = &physicalDeviceFeatures,
+		pEnabledFeatures        = nil,
 		ppEnabledExtensionNames = &deviceExtNames[0],
 		enabledExtensionCount   = auto_cast len(deviceExtNames),
+		pNext = &REQUIRED_FEATURES,
 	}
+
 	res = vk.CreateDevice(vk_physical_device, &deviceCreateInfo, nil, &vk_device)
 	if (res != vk.Result.SUCCESS) do trace.panic_log("res = vk.CreateDevice(vk_physical_device, &deviceCreateInfo, nil, &vk_device) : ", res)
 	vk.load_proc_addresses_device(vk_device)
@@ -1074,11 +1095,10 @@ vk_draw_frame :: proc() {
 			}
 		}
 	}
-	
-	if cmd_visible {
-		res := vk.WaitForFences(vk_device, 1, &vk_allocator_fence, true, max(u64))
-		if res != .SUCCESS do trace.panic_log("res := vk.WaitForFences(vk_device, 1, &vk_allocator_fence, true, max(u64)) : ", res)
+	res = vk.WaitForFences(vk_device, 1, &vk_allocator_fence, true, max(u64))
+	if res != .SUCCESS do trace.panic_log("res := vk.WaitForFences(vk_device, 1, &vk_allocator_fence, true, max(u64)) : ", res)
 
+	if cmd_visible {
 		vk.BeginCommandBuffer(vk_cmd_buffer[frame], &vk.CommandBufferBeginInfo {
 			sType = vk.StructureType.COMMAND_BUFFER_BEGIN_INFO,
 			flags = {vk.CommandBufferUsageFlag.RENDER_PASS_CONTINUE},
@@ -1115,7 +1135,6 @@ vk_draw_frame :: proc() {
 		}
 		
 
-		// Add tasks to thread pool
 		for cmd in visible_layers {
 			data := new(record_task_data, context.temp_allocator)
 			data.cmd = cmd
