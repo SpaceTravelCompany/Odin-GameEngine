@@ -165,7 +165,7 @@ tile_image_update_idx :: proc(self:^tile_image, idx:u32) {
 
 _super_tile_image_draw :: proc (self:^tile_image, cmd:engine.command_buffer, viewport:^engine.viewport) {
     engine.graphics_cmd_bind_pipeline(cmd, .GRAPHICS, engine.get_animate_img_pipeline().__pipeline)
-    engine.graphics_cmd_bind_descriptor_sets(cmd, .GRAPHICS, engine.get_animate_img_pipeline_layout(), 0, 3,
+    engine.graphics_cmd_bind_descriptor_sets(cmd, .GRAPHICS, engine.get_animate_img_pipeline().__pipeline_layout, 0, 3,
         &([]vk.DescriptorSet{self.set.__set,  viewport.set.__set, self.src.set.__set,})[0], 0, nil)
 
     engine.graphics_cmd_draw(cmd, 6, 1, 0, 0)
