@@ -1,14 +1,16 @@
 package debug_trace
 
-import "core:c"
+
 import "core:strings"
 import "core:os"
 import "core:fmt"
 import "core:sync"
-import "core:mem"
 import "base:runtime"
 import "base:intrinsics"
-import "core:sys/android"
+
+@require import "core:c"
+@require import "core:mem"
+@require import "core:sys/android"
 
 @(private = "file") is_android :: ODIN_PLATFORM_SUBTARGET == .Android
 @(private = "file") is_mobile :: is_android
