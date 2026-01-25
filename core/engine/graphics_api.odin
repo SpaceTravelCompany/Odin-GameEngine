@@ -1,20 +1,21 @@
 package engine
 
+import "base:intrinsics"
 import "base:library"
 import "base:runtime"
 import "core:debug/trace"
+import "core:strings"
 import "core:math/linalg"
 import "core:mem"
+import "core:c"
 import "core:sync"
-import "core:time"
-import "core:engine"
+import "vendor:glslang"
 
 import vk "vendor:vulkan"
 
 
 MAX_FRAMES_IN_FLIGHT :: #config(MAX_FRAMES_IN_FLIGHT, 2)
 
-wire_mode :: #config(WIRE_MODE, false)
 @private swap_img_cnt : u32 = 3
 
 
@@ -29,21 +30,14 @@ graphics_device :: #force_inline proc "contextless" () -> vk.Device {
 
 
 
-// Pipeline Layouts
-@private shape_pipeline_layout: vk.PipelineLayout
-@private img_pipeline_layout: vk.PipelineLayout
-@private animate_img_pipeline_layout: vk.PipelineLayout
-// copy_screen_pipeline_layout: vk.PipelineLayout
-
 // Pipelines
-@private shape_pipeline: vk.Pipeline
-@private img_pipeline: vk.Pipeline
-@private animate_img_pipeline: vk.Pipeline
-// copy_screen_pipeline: vk.Pipeline
+@private shape_pipeline: object_pipeline
+@private img_pipeline: object_pipeline
+@private animate_img_pipeline: object_pipeline
 
 // Descriptor Set Layouts
-@private base_descriptor_set_layout: vk.DescriptorSetLayout
-@private tex_descriptor_set_layout: vk.DescriptorSetLayout
+@private __base_descriptor_set_layout: vk.DescriptorSetLayout
+@private __img_descriptor_set_layout: vk.DescriptorSetLayout
 @private animate_img_descriptor_set_layout: vk.DescriptorSetLayout
 // copy_screen_descriptor_set_layout: vk.DescriptorSetLayout
 
@@ -53,6 +47,8 @@ graphics_device :: #force_inline proc "contextless" () -> vk.Device {
 
 // Default Color Transform
 @private __def_color_transform: color_transform
+
+@private g_wait_rendering_sem: sync.Sema
 
 @private resource_type :: enum {
 	BUFFER,
@@ -117,6 +113,41 @@ graphics_size :: vk.DeviceSize
 resource_range :: rawptr
 
 
+object_pipeline :: struct {
+    __pipeline:vk.Pipeline,
+    __pipeline_layout:vk.PipelineLayout,
+    __descriptor_set_layouts:[]vk.DescriptorSetLayout,
+
+    draw_method:object_draw_method,
+	allocator: runtime.Allocator,
+}
+
+object_draw_type :: enum {
+    Draw,
+    DrawIndexed,
+}
+
+object_draw_method :: struct {
+    type:object_draw_type,
+    vertex_count:u32,
+    instance_count:u32,
+    index_count:u32,
+    using _:struct #raw_union {
+        first_vertex:u32,
+        vertex_offset:i32,
+    },
+    first_instance:u32,
+    first_index:u32,
+}
+
+
+VULKAN_VERSION :: struct {
+	major, minor, patch:u32
+}
+
+get_vulkan_version :: proc "contextless" () -> VULKAN_VERSION {
+	return vulkan_version
+}
 
 descriptor_set :: struct {
 	layout: vk.DescriptorSetLayout,
@@ -194,33 +225,17 @@ def_color_transform :: #force_inline proc "contextless" () -> ^color_transform {
 	return &__def_color_transform
 }
 
-get_shape_pipeline_layout :: #force_inline proc "contextless" () -> vk.PipelineLayout {
-	return shape_pipeline_layout
+get_shape_pipeline :: #force_inline proc "contextless" () -> ^object_pipeline {
+	return &shape_pipeline
 }
-get_img_pipeline_layout :: #force_inline proc "contextless" () -> vk.PipelineLayout {
-	return img_pipeline_layout
+get_img_pipeline :: #force_inline proc "contextless" () -> ^object_pipeline {
+	return &img_pipeline
 }
-get_animate_img_pipeline_layout :: #force_inline proc "contextless" () -> vk.PipelineLayout {
-	return animate_img_pipeline_layout
+get_animate_img_pipeline :: #force_inline proc "contextless" () -> ^object_pipeline {
+	return &animate_img_pipeline
 }
-
-get_shape_pipeline :: #force_inline proc "contextless" () -> vk.Pipeline {
-	return shape_pipeline
-}
-get_img_pipeline :: #force_inline proc "contextless" () -> vk.Pipeline {
-	return img_pipeline
-}
-get_animate_img_pipeline :: #force_inline proc "contextless" () -> vk.Pipeline {
-	return animate_img_pipeline
-}
-get_base_descriptor_set_layout :: #force_inline proc "contextless" () -> vk.DescriptorSetLayout {
-	return base_descriptor_set_layout
-}
-get_tex_descriptor_set_layout :: #force_inline proc "contextless" () -> vk.DescriptorSetLayout {
-	return tex_descriptor_set_layout
-}
-get_animate_img_descriptor_set_layout :: #force_inline proc "contextless" () -> vk.DescriptorSetLayout {
-	return animate_img_descriptor_set_layout
+base_descriptor_set_layout :: #force_inline proc "contextless" () -> vk.DescriptorSetLayout {
+	return __base_descriptor_set_layout
 }
 
 get_linear_sampler :: #force_inline proc "contextless" () -> vk.Sampler {
@@ -268,7 +283,7 @@ graphics_wait_all_ops :: #force_inline proc () {
 
 // 렌더링 까지 대기
 graphics_wait_rendering :: #force_inline proc () {
-    vk_wait_rendering()
+    sync.sema_wait(&g_wait_rendering_sem)
 }
 
 // 작업 실행
@@ -281,28 +296,6 @@ graphics_execute_ops_destroy :: #force_inline proc() {
 	vk_op_execute_destroy()
 }
 
-
-//!불완전한 기능
-// // 단일 시간 명령 버퍼 시작
-// graphics_begin_single_time_cmd :: #force_inline proc "contextless" () -> command_buffer {
-// 	return command_buffer{__handle = vk_begin_single_time_cmd()}
-// }
-
-// // 단일 시간 명령 버퍼 종료
-// graphics_end_single_time_cmd :: #force_inline proc "contextless" (cmd: command_buffer) {
-// 	vk_end_single_time_cmd(cmd.__handle)
-// }
-
-/*
-Allocates command buffers from the command pool
-
-Inputs:
-- p_cmd_buffer: Pointer to the array of command buffers to allocate
-- count: Number of command buffers to allocate
-
-Returns:
-- None
-*/
 allocate_command_buffers :: proc(p_cmd_buffer: [^]command_buffer, count: u32, cmd_pool: vk.CommandPool) {
 	alloc_info := vk.CommandBufferAllocateInfo{
 		sType = vk.StructureType.COMMAND_BUFFER_ALLOCATE_INFO,
@@ -314,16 +307,6 @@ allocate_command_buffers :: proc(p_cmd_buffer: [^]command_buffer, count: u32, cm
 	if res != .SUCCESS do trace.panic_log("res = vk.AllocateCommandBuffers(graphics_device(), &alloc_info, &cmd.cmds[i][0]) : ", res)
 }
 
-/*
-Frees command buffers back to the command pool
-
-Inputs:
-- p_cmd_buffer: Pointer to the array of command buffers to free
-- count: Number of command buffers to free
-
-Returns:
-- None
-*/
 free_command_buffers :: proc(p_cmd_buffer: [^]command_buffer, count: u32, cmd_pool: vk.CommandPool) {
 	vk.FreeCommandBuffers(graphics_device(), cmd_pool, count, auto_cast p_cmd_buffer)
 }
@@ -537,4 +520,328 @@ when ODIN_DEBUG {
 	@private SHADER_COMPILE_OPTION :: "none"
 } else {
 	@private SHADER_COMPILE_OPTION :: "speed"
+}
+
+@(private) refresh_pre_matrix :: proc() {
+	if library.is_mobile {
+		orientation := __screen_orientation
+		if orientation == .Landscape90 {
+			rotation_matrix = linalg.matrix4_rotate_f32(linalg.to_radians(f32(90.0)), {0, 0, 1})
+		} else if orientation == .Landscape270 {
+			rotation_matrix = linalg.matrix4_rotate_f32(linalg.to_radians(f32(270.0)), {0, 0, 1})
+		} else if orientation == .Vertical180 {
+			rotation_matrix = linalg.matrix4_rotate_f32(linalg.to_radians(f32(180.0)), {0, 0, 1})
+		} else if orientation == .Vertical360 {
+			rotation_matrix = linalg.identity_matrix(linalg.matrix44)
+		} else {
+			rotation_matrix = linalg.identity_matrix(linalg.matrix44)
+		}
+	}
+}
+
+
+descriptor_set_layout_binding :: vk.DescriptorSetLayoutBinding
+vertex_input_binding_description :: vk.VertexInputBindingDescription
+vertex_input_attribute_description :: vk.VertexInputAttributeDescription
+
+shader_code ::union {
+    []byte,
+    string,
+}
+
+shader_lang :: enum {
+    GLSL,
+    HLSL,
+}
+
+descriptor_set_layout_binding_init :: vk.DescriptorSetLayoutBindingInit
+
+
+object_pipeline_deinit :: proc(self:^object_pipeline) {
+    vk.DestroyPipelineLayout(graphics_device(), self.__pipeline_layout, nil)
+    vk.DestroyPipeline(graphics_device(), self.__pipeline, nil)
+    delete(self.__descriptor_set_layouts, self.allocator)
+}
+
+
+@private __shader_inited := false
+@private __shader_mtx:sync.Mutex
+
+@private __shader_init :: proc "contextless" () {
+	// glslang 초기화 (한 번만 호출) (프로세스 별로 호출 필요, 스레드 아님)
+	if !intrinsics.atomic_load_explicit(&__shader_inited, .Relaxed) {
+		sync.mutex_lock(&__shader_mtx)
+		defer sync.mutex_unlock(&__shader_mtx)
+		if glslang.initialize_process() == 0 {
+			trace.panic_log("__shader_init: glslang initialization failed")
+		}
+		intrinsics.atomic_store_explicit(&__shader_inited, true, .Relaxed)
+	}
+}
+
+@(private, fini) __shader_deinit :: proc "contextless" () {
+	if intrinsics.atomic_load_explicit(&__shader_inited, .Relaxed) {
+		sync.mutex_lock(&__shader_mtx)
+		defer sync.mutex_unlock(&__shader_mtx)
+		glslang.finalize_process()
+		intrinsics.atomic_store_explicit(&__shader_inited, false, .Relaxed)
+	}
+}
+
+custom_object_pipeline_init :: proc(self:^object_pipeline,
+    descriptor_set_layouts:[]vk.DescriptorSetLayout,
+    vertex_input_binding:Maybe([]vertex_input_binding_description),
+    vertex_input_attribute:Maybe([]vertex_input_attribute_description),
+    draw_method:object_draw_method,
+    vertex_shader:Maybe(shader_code),
+    pixel_shader:Maybe(shader_code),
+    geometry_shader:Maybe(shader_code) = nil,
+    depth_stencil_state:Maybe(vk.PipelineDepthStencilStateCreateInfo) = nil,
+    color_blend_state:Maybe(vk.PipelineColorBlendStateCreateInfo) = nil,
+	shader_lang:shader_lang = .GLSL, allocator := context.allocator) -> bool {
+
+    self.draw_method = draw_method
+	self.allocator = allocator
+
+    shaders := [?]Maybe(shader_code){vertex_shader, pixel_shader, geometry_shader}
+    shader_kinds := [?]glslang.Shader_Stage{.VERTEX, .FRAGMENT, .GEOMETRY}
+    shader_vkflags := [?]vk.ShaderStageFlags{{.VERTEX}, {.FRAGMENT}, {.GEOMETRY}}
+    shader_programs : [len(shaders)]^glslang.Program
+    shader_modules : [len(shaders)]vk.ShaderModule
+    defer {
+        for s in shader_modules {
+            if s != 0 {
+                vk.DestroyShaderModule(graphics_device(), s, nil)
+            }
+        }
+    }
+
+    if vertex_shader == nil || pixel_shader == nil {
+        trace.panic_log("custom_object_pipeline_init: vertex_shader and pixel_shader cannot be nil")
+    }
+
+    
+    defer for i in 0..<len(shader_programs) {
+        if shader_programs[i] != nil {
+            glslang.program_delete(shader_programs[i])
+        }
+    }
+	spirv_data : []u8 = nil
+    for i in 0..<len(shaders) {
+        shader_bytes:[]byte
+        if shaders[i] != nil {
+            switch s in shaders[i].? {
+                case string:
+					__shader_init()
+
+					code_str := strings.clone_to_cstring(s, context.temp_allocator)
+					defer delete(code_str, context.temp_allocator)
+
+                    // Input 구조체 설정
+                    input := glslang.Input{
+                        language = shader_lang == .HLSL ? glslang.Source.HLSL : glslang.Source.GLSL,
+                        stage = shader_kinds[i],
+                        client = glslang.Client.VULKAN,
+                        client_version = glslang.Target_Client_Version.VULKAN_1_4,
+                        target_language = glslang.Target_Language.SPV,
+                        target_language_version = glslang.Target_Language_Version.SPV_1_6,
+                        code = code_str,
+                        default_version = 100,
+                        default_profile = glslang.Profile.NO_PROFILE,
+                        force_default_version_and_profile = 0,
+                        forward_compatible = 0,
+                        messages = glslang.Messages.DEFAULT_BIT,
+                        resource = glslang.default_resource(),
+                        callbacks = {},
+                        callbacks_ctx = nil,
+                    }
+					ver := get_vulkan_version()
+					if ver.major == 1 {
+						switch ver.minor {
+							case 0:
+								input.target_language_version = glslang.Target_Language_Version.SPV_1_0
+								input.client_version = glslang.Target_Client_Version.VULKAN_1_0
+							case 1:
+								input.target_language_version = glslang.Target_Language_Version.SPV_1_3
+								input.client_version = glslang.Target_Client_Version.VULKAN_1_1
+							case 2:
+								input.target_language_version = glslang.Target_Language_Version.SPV_1_5
+								input.client_version = glslang.Target_Client_Version.VULKAN_1_2
+							case 3:
+								input.client_version = glslang.Target_Client_Version.VULKAN_1_3
+							case://4 and above
+						}
+					}
+                    
+                    // 셰이더 생성 및 파싱
+                    shader := glslang.shader_create(&input)
+                    if shader == nil {
+                        trace.printlnLog("custom_object_pipeline_init: failed to create shader")
+                        return false
+                    }
+                    defer glslang.shader_delete(shader)
+                    
+                    // Entry point 설정
+                    glslang.shader_set_entry_point(shader, "main")
+
+					if glslang.shader_preprocess(shader, &input) == 0 {
+						info_log := glslang.shader_get_info_log(shader)
+                        debug_log := glslang.shader_get_info_debug_log(shader)
+                        if info_log != nil {
+                            trace.printlnLog(info_log)
+                        }
+                        if debug_log != nil {
+                            trace.printlnLog(debug_log)
+                        }
+                        return false
+					}
+                    
+                    // 파싱
+                    if glslang.shader_parse(shader, &input) == 0 {
+                        info_log := glslang.shader_get_info_log(shader)
+                        debug_log := glslang.shader_get_info_debug_log(shader)
+                        if info_log != nil {
+                            trace.printlnLog(info_log)
+                        }
+                        if debug_log != nil {
+                            trace.printlnLog(debug_log)
+                        }
+                        return false
+                    }
+                    
+                    // 프로그램 생성 및 링크
+                    program := glslang.program_create()
+                    if program == nil {
+                        trace.printlnLog("custom_object_pipeline_init: failed to create program")
+                        return false
+                    }
+                    glslang.program_add_shader(program, shader)
+                    
+                    link_messages := cast(c.int)(glslang.Messages.SPV_RULES_BIT) | cast(c.int)(glslang.Messages.VULKAN_RULES_BIT)
+                    if glslang.program_link(program, link_messages) == 0 {
+                        info_log := glslang.program_get_info_log(program)
+                        debug_log := glslang.program_get_info_debug_log(program)
+                        if info_log != nil {
+                            trace.printlnLog(info_log)
+                        }
+                        if debug_log != nil {
+                            trace.printlnLog(debug_log)
+                        }
+                        glslang.program_delete(program)
+                        return false
+                    }
+                    
+                    // SPIR-V 생성
+                    spv_options := glslang.SPV_Options{
+                        generate_debug_info = false,
+                        strip_debug_info = false,
+                        disable_optimizer = false,
+                        optimize_size = false,
+                        disassemble = false,
+                        validate = true,
+                        emit_nonsemantic_shader_debug_info = false,
+                        emit_nonsemantic_shader_debug_source = false,
+                        compile_only = false,
+                        optimize_allow_expanded_id_bound = false,
+                    }
+					when ODIN_DEBUG {
+						spv_options.generate_debug_info = true
+						spv_options.disable_optimizer = true
+						spv_options.emit_nonsemantic_shader_debug_info = true
+						spv_options.emit_nonsemantic_shader_debug_source = true
+						spv_options.emit_nonsemantic_shader_debug_source = true
+					}
+                    glslang.program_SPIRV_generate_with_options(program, shader_kinds[i], &spv_options)
+                    
+                    // SPIR-V 데이터 가져오기
+                    spirv_size := glslang.program_SPIRV_get_size(program)
+                    spirv_data = mem.make_non_zeroed([]u8, size_of(u32) * spirv_size, 64, context.temp_allocator)
+                    glslang.program_SPIRV_get(program, cast(^c.uint)&spirv_data[0])
+                    
+                    // SPIR-V 메시지 확인
+                    spirv_messages := glslang.program_SPIRV_get_messages(program)
+                    if spirv_messages != nil {
+                        trace.printlnLog(spirv_messages)
+                    }
+                    
+                    shader_bytes = spirv_data
+                    shader_programs[i] = program
+                case []byte:
+                    shader_bytes = s
+            }
+            shader_modules[i] = vk.CreateShaderModule2(graphics_device(), shader_bytes) or_else trace.panic_log("custom_object_pipeline_init: CreateShaderModule2")
+			if spirv_data != nil do delete(spirv_data, context.temp_allocator)
+			spirv_data = nil
+        }
+    }
+    shaderCreateInfo : [len(shaders)]vk.PipelineShaderStageCreateInfo
+    shaderCreateInfoLen :int
+    if geometry_shader == nil {
+        tmp := vk.CreateShaderStages(shader_modules[0], shader_modules[1])
+        shaderCreateInfo = {tmp[0], tmp[1], {}}
+        shaderCreateInfoLen = 2
+    } else {
+        tmp := vk.CreateShaderStagesGS(shader_modules[0], shader_modules[1], shader_modules[2])
+        shaderCreateInfo = {tmp[0], tmp[1], tmp[2]}
+        shaderCreateInfoLen = 3
+    }
+
+    viewportState := vk.PipelineViewportStateCreateInfoInit()
+
+    self.__descriptor_set_layouts = mem.make_non_zeroed_slice([]vk.DescriptorSetLayout, len(descriptor_set_layouts), allocator)
+	mem.copy_non_overlapping(&self.__descriptor_set_layouts[0], &descriptor_set_layouts[0], len(descriptor_set_layouts) * size_of(vk.DescriptorSetLayout))
+    self.__pipeline_layout = vk.PipelineLayoutInit(graphics_device(), self.__descriptor_set_layouts)
+
+    vertexInputState:Maybe(vk.PipelineVertexInputStateCreateInfo)
+    if vertex_input_binding != nil && vertex_input_attribute != nil {
+        vertexInputState = vk.PipelineVertexInputStateCreateInfoInit(vertex_input_binding.?, vertex_input_attribute.?)
+    } else {
+        vertexInputState = nil
+    }
+
+    if !create_graphics_pipeline(self,
+        shaderCreateInfo[:shaderCreateInfoLen],
+        depth_stencil_state == nil ? vk.PipelineDepthStencilStateCreateInfoInit() : depth_stencil_state.?,
+        viewportState,
+        vertexInputState == nil ? nil : &vertexInputState.?,
+		color_blend_state == nil ? vk.DefaultPipelineColorBlendStateCreateInfo : color_blend_state.?) {
+        return false
+    }
+    return true
+}
+
+
+create_graphics_pipeline :: proc(
+	self: ^object_pipeline,
+	stages: []vk.PipelineShaderStageCreateInfo,
+	depth_stencil_state: vk.PipelineDepthStencilStateCreateInfo,
+	viewport_state: vk.PipelineViewportStateCreateInfo,
+	pVertex_input_state: ^vk.PipelineVertexInputStateCreateInfo,
+	color_blend_state: vk.PipelineColorBlendStateCreateInfo,
+) -> bool {
+	color_blend_state_tmp := color_blend_state
+	viewport_state_tmp := viewport_state
+	depth_stencil_state_tmp := depth_stencil_state
+
+	pipeline_create_info := vk.GraphicsPipelineCreateInfoInit(
+		stages = stages,
+		layout = self.__pipeline_layout,
+		pDepthStencilState = &depth_stencil_state_tmp,
+		pViewportState = &viewport_state_tmp,
+		pVertexInputState = pVertex_input_state,
+		renderPass = default_render_pass(),
+		pMultisampleState = default_multisample_state(),
+		pColorBlendState = &color_blend_state_tmp,
+	)
+
+	res := vk.CreateGraphicsPipelines(graphics_device(), 0, 1, &pipeline_create_info, nil, &self.__pipeline)
+	if res != .SUCCESS {
+		trace.printlnLog("create_graphics_pipeline: Failed to create graphics pipeline:", res)
+		return false
+	}
+	return true
+}
+
+graphics_destriptor_set_layout_init :: proc(bindings: []vk.DescriptorSetLayoutBinding) -> vk.DescriptorSetLayout {
+	return vk.DescriptorSetLayoutInit(graphics_device(), bindings)
 }

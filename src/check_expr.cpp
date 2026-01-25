@@ -8234,8 +8234,7 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 		    name == "load_directory" ||
 		    name == "load_hash" ||
 		    name == "hash" ||
-		    name == "caller_expression" ||
-		    name == "shader_load"
+		    name == "caller_expression"
 		) {
 			operand->mode = Addressing_Builtin;
 			operand->builtin_id = BuiltinProc_DIRECTIVE;
@@ -9207,8 +9206,7 @@ gb_internal ExprKind check_basic_directive_expr(CheckerContext *c, Operand *o, A
 		    name == "load" ||
 		    name == "load_hash" ||
 		    name == "load_directory" ||
-		    name == "load_or" ||
-		    name == "shader_load"
+		    name == "load_or"
 		) {
 			error(node, "'#%.*s' must be used as a call", LIT(name));
 			o->type = t_invalid;

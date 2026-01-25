@@ -475,3 +475,18 @@ DefaultPipelineDepthStencilStateCreateInfo := PipelineDepthStencilStateCreateInf
 		blendConstants = blendConstants,
 	}
 }
+
+@(require_results) 
+VK_VERSION_MAJOR :: proc "contextless"(#any_int ver : int) -> u32 {
+	return u32(ver) >> 22
+}
+
+@(require_results) 
+VK_VERSION_MINOR :: proc "contextless"(#any_int ver : int) -> u32 {
+	return ((u32(ver) >> 12) & 0x3FF)
+}
+
+@(require_results) 
+VK_VERSION_PATCH :: proc "contextless"(#any_int ver : int) -> u32 {
+	return (u32(ver) & 0x3FF)
+}

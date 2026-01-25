@@ -60,7 +60,7 @@ colorTransform:^color_transform = nil, vtable:^iobject_vtable = nil) {
         
     self.set.bindings = descriptor_set_binding__base_uniform_pool[:]
     self.set.size = descriptor_pool_size__base_uniform_pool[:]
-    self.set.layout = base_descriptor_set_layout
+    self.set.layout = base_descriptor_set_layout()
 
     self.vtable = vtable == nil ? &image_vtable : vtable
     if self.vtable.draw == nil do self.vtable.draw = auto_cast _super_image_draw
@@ -156,8 +156,8 @@ Returns:
 - None
 */
 image_binding_sets_and_draw :: proc "contextless" (cmd:command_buffer, imageSet:descriptor_set, viewSet:descriptor_set, textureSet:descriptor_set) {
-    graphics_cmd_bind_pipeline(cmd, .GRAPHICS, img_pipeline)
-    graphics_cmd_bind_descriptor_sets(cmd, .GRAPHICS, img_pipeline_layout, 0, 3,
+    graphics_cmd_bind_pipeline(cmd, .GRAPHICS, get_img_pipeline().__pipeline)
+    graphics_cmd_bind_descriptor_sets(cmd, .GRAPHICS, get_img_pipeline().__pipeline_layout, 0, 3,
         &([]vk.DescriptorSet{imageSet.__set, viewSet.__set, textureSet.__set})[0], 0, nil)
 
     graphics_cmd_draw(cmd, 6, 1, 0, 0)
@@ -230,7 +230,7 @@ texture_init :: proc(
 	self.sampler = sampler == 0 ? linear_sampler : sampler
 	self.set.bindings = descriptor_set_binding__single_pool[:]
 	self.set.size = descriptor_pool_size__single_sampler_pool[:]
-	self.set.layout = tex_descriptor_set_layout
+	self.set.layout = __img_descriptor_set_layout
 	self.set.__set = 0
 
 	color_fmt_convert_default_overlap(pixels, pixels, in_pixel_fmt)
@@ -278,7 +278,7 @@ texture_init_grey :: proc(
 	self.sampler = sampler == 0 ? linear_sampler : sampler
 	self.set.bindings = descriptor_set_binding__single_pool[:]
 	self.set.size = descriptor_pool_size__single_sampler_pool[:]
-	self.set.layout = tex_descriptor_set_layout
+	self.set.layout = __img_descriptor_set_layout
 	self.set.__set = 0
 
 	self.texture = buffer_resource_create_texture({
@@ -500,7 +500,7 @@ texture_array_init :: proc(self:^texture_array, width:u32, height:u32, count:u32
     self.sampler = sampler == 0 ? linear_sampler : sampler
     self.set.bindings = descriptor_set_binding__single_pool[:]
     self.set.size = descriptor_pool_size__single_sampler_pool[:]
-    self.set.layout = tex_descriptor_set_layout
+    self.set.layout = __img_descriptor_set_layout
     self.set.__set = 0
 
     allocPixels := mem.make_non_zeroed_slice([]byte, count * width * height * 4, context.allocator)
@@ -845,4 +845,8 @@ create_random_texture_grey :: proc(width, height: u32, out_texture:^texture, all
         texture_data[i] = u8(rand.uint32() % 256)
     }
     texture_init_grey(out_texture, width, height, texture_data, allocator)
+}
+
+img_descriptor_set_layout :: proc "contextless" () -> vk.DescriptorSetLayout {
+	return __img_descriptor_set_layout
 }

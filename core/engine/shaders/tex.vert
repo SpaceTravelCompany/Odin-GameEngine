@@ -1,6 +1,4 @@
-#version 450
-
-precision highp float;
+#version 460
 
 layout(set = 0, binding = 0) uniform UniformBufferObject0 {
     mat4 model;

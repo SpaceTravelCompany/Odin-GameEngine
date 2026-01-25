@@ -52,12 +52,10 @@ vk_graphics_family_index: u32 = max(u32)
 vk_present_family_index: u32 = max(u32)
 
 
-
 vk_render_pass: vk.RenderPass
 vk_render_pass_clear: vk.RenderPass
 vk_render_pass_sample: vk.RenderPass
 vk_render_pass_sample_clear: vk.RenderPass
-vk_render_pass_copy: vk.RenderPass
 
 vk_frame_buffers: []vk.Framebuffer
 vk_frame_depth_stencil_texture: texture
@@ -79,6 +77,8 @@ vk_get_instance_proc_addr: proc "system" (
 DEVICE_EXTENSIONS_CHECK: [len(DEVICE_EXTENSIONS)]bool
 INSTANCE_EXTENSIONS_CHECK: [len(INSTANCE_EXTENSIONS)]bool
 LAYERS_CHECK: [len(LAYERS)]bool
+
+vulkan_version : VULKAN_VERSION
 
 vk_debug_callback :: proc "system" (
 	messageSeverity: vk.DebugUtilsMessageSeverityFlagsEXT,
@@ -103,27 +103,35 @@ validation_layer_support :: #force_inline proc "contextless" () -> bool {return 
 vk_khr_portability_enumeration_support :: #force_inline proc "contextless" () -> bool {return INSTANCE_EXTENSIONS_CHECK[1]}
 VK_EXT_full_screen_exclusive_support :: #force_inline proc "contextless" () -> bool {return DEVICE_EXTENSIONS_CHECK[1]}
 
-vkShapeVertShader: vk.ShaderModule
-vkShapeFragShader: vk.ShaderModule
-vkShapeWireFragShader: vk.ShaderModule
-vkTexVertShader: vk.ShaderModule
-vkTexFragShader: vk.ShaderModule
-vkAnimateTexVertShader: vk.ShaderModule
-vkAnimateTexFragShader: vk.ShaderModule
-//vkCopyScreenVertShader: vk.ShaderModule
-//vkCopyScreenFragShader: vk.ShaderModule
 
-shapeShaderStages: [2]vk.PipelineShaderStageCreateInfo
-shapeWireShaderStages: [2]vk.PipelineShaderStageCreateInfo
-texShaderStages: [2]vk.PipelineShaderStageCreateInfo
-animateTexShaderStages: [2]vk.PipelineShaderStageCreateInfo
-//copyScreenShaderStages: [2]vk.PipelineShaderStageCreateInfo
+vk_fmts:[]vk.SurfaceFormatKHR
+vk_fmt:vk.SurfaceFormatKHR = {
+	format = .UNDEFINED,
+	colorSpace = .SRGB_NONLINEAR
+}
+vkPresentModes:[]vk.PresentModeKHR
+vkPresentMode:vk.PresentModeKHR
+vk_surface_cap:vk.SurfaceCapabilitiesKHR
+vk_extent:vk.Extent2D
+vk_extent_rotation:vk.Extent2D
+
+vkDepthHasOptimal:=false
+vkDepthHasTransferSrcOptimal:=false
+vkDepthHasTransferDstOptimal:=false
+vkDepthHasSampleOptimal:=false
+
+vkColorHasAttachOptimal:=false
+vkColorHasSampleOptimal:=false
+vkColorHasTransferSrcOptimal:=false
+vkColorHasTransferDstOptimal:=false
+
+is_released_full_screen_ex := true
 
 
 vk_cmd_pool:vk.CommandPool
 vk_cmd_buffer:[MAX_FRAMES_IN_FLIGHT]vk.CommandBuffer
 
-msaa_count :: #config(MSAA_COUNT, 1)
+msaa_count :: 1//#config(MSAA_COUNT, 1)
 
 when msaa_count == 4 {
 	VK_SAMPLE_COUNT_FLAGS :: vk.SampleCountFlags{._4}
@@ -171,229 +179,6 @@ when msaa_count == 1 {
 vkColorAlphaBlendingExternal := vk.PipelineColorBlendStateCreateInfoInit(__vkColorAlphaBlendingExternalState[:1])
 vkNoBlending := vk.PipelineColorBlendStateCreateInfoInit(__vkNoBlendingState[:1])
 vkCopyBlending := vk.PipelineColorBlendStateCreateInfoInit(__vkNoBlendingState[:1])
-
-vk_init_shader_modules :: proc() {
-	vkShapeVertShader, _ = vk.CreateShaderModule2(vk_device, #shader_load("shaders/shape.vert", SHADER_COMPILE_OPTION))
-	vkShapeFragShader, _ = vk.CreateShaderModule2(vk_device, #shader_load("shaders/shape.frag", SHADER_COMPILE_OPTION))
-	when wire_mode do vkShapeWireFragShader, _ = vk.CreateShaderModule2(vk_device, #shader_load("shaders/shape_wire.frag", SHADER_COMPILE_OPTION))
-	vkTexVertShader, _ = vk.CreateShaderModule2(vk_device, #shader_load("shaders/tex.vert", SHADER_COMPILE_OPTION))
-	vkTexFragShader, _ = vk.CreateShaderModule2(vk_device, #shader_load("shaders/tex.frag", SHADER_COMPILE_OPTION))
-	vkAnimateTexVertShader, _ = vk.CreateShaderModule2(vk_device, #shader_load("shaders/animate_tex.vert", SHADER_COMPILE_OPTION))
-	vkAnimateTexFragShader, _ = vk.CreateShaderModule2(vk_device, #shader_load("shaders/animate_tex.frag", SHADER_COMPILE_OPTION))
-	//vkCopyScreenVertShader, _ = vk.CreateShaderModule2(vk_device, #shader_load("shaders/screen_copy.vert", SHADER_COMPILE_OPTION))
-	//vkCopyScreenFragShader, _ = vk.CreateShaderModule2(vk_device, #shader_load("shaders/screen_copy.frag", SHADER_COMPILE_OPTION))
-
-	shapeShaderStages = vk.CreateShaderStages(vkShapeVertShader, vkShapeFragShader)
-	when wire_mode do shapeWireShaderStages = vk.CreateShaderStages(vkShapeVertShader, vkShapeWireFragShader)
-	texShaderStages = vk.CreateShaderStages(vkTexVertShader, vkTexFragShader)
-	animateTexShaderStages = vk.CreateShaderStages(vkAnimateTexVertShader, vkAnimateTexFragShader)
-	//copyScreenShaderStages = vk.CreateShaderStages(vkCopyScreenVertShader, vkCopyScreenFragShader)
-}
-
-vk_clean_shader_modules :: proc() {
-	vk.DestroyShaderModule(vk_device, vkShapeVertShader, nil)
-	vk.DestroyShaderModule(vk_device, vkShapeFragShader, nil)
-	when wire_mode do vk.DestroyShaderModule(vk_device, vkShapeWireFragShader, nil)
-	vk.DestroyShaderModule(vk_device, vkTexVertShader, nil)
-	vk.DestroyShaderModule(vk_device, vkTexFragShader, nil)
-	vk.DestroyShaderModule(vk_device, vkAnimateTexVertShader, nil)
-	vk.DestroyShaderModule(vk_device, vkAnimateTexFragShader, nil)
-	//vk.DestroyShaderModule(vk_device, vkCopyScreenVertShader, nil)
-	//vk.DestroyShaderModule(vk_device, vkCopyScreenFragShader, nil)
-}
-
-vk_init_pipelines :: proc() {
-	//vk.InitVulkanTemplate()
-
-	base_descriptor_set_layout = vk.DescriptorSetLayoutInit(vk_device,
-		[]vk.DescriptorSetLayoutBinding {
-			vk.DescriptorSetLayoutBindingInit(0, 1),
-			vk.DescriptorSetLayoutBindingInit(1, 1),
-		}
-	)
-	shape_pipeline_layout = vk.PipelineLayoutInit(vk_device,
-		[]vk.DescriptorSetLayout{base_descriptor_set_layout, base_descriptor_set_layout},
-	)
-
-	// vk_copy_screen_descriptor_set_layout = vk.DescriptorSetLayoutInit(vk_device,
-	// 	[]vk.DescriptorSetLayoutBinding {
-	// 		vk.DescriptorSetLayoutBindingInit(0, 1, descriptorType = .INPUT_ATTACHMENT, stageFlags = {.FRAGMENT}),},
-	// )
-	// vk_copy_screen_pipeline_layout = vk.PipelineLayoutInit(vk_device,
-	// 	[]vk.DescriptorSetLayout{vk_copy_screen_descriptor_set_layout},
-	// )
-
-	tex_descriptor_set_layout = vk.DescriptorSetLayoutInit(vk_device,
-		[]vk.DescriptorSetLayoutBinding {
-			vk.DescriptorSetLayoutBindingInit(0, 1, descriptorType = .COMBINED_IMAGE_SAMPLER),},
-	)
-	img_pipeline_layout = vk.PipelineLayoutInit(vk_device,
-		[]vk.DescriptorSetLayout{base_descriptor_set_layout, base_descriptor_set_layout, tex_descriptor_set_layout},
-	)
-
-	animate_img_descriptor_set_layout = vk.DescriptorSetLayoutInit(vk_device,
-		[]vk.DescriptorSetLayoutBinding {
-			vk.DescriptorSetLayoutBindingInit(0, 1),
-			vk.DescriptorSetLayoutBindingInit(1, 1),
-			vk.DescriptorSetLayoutBindingInit(2, 1),},
-	)
-	animate_img_pipeline_layout = vk.PipelineLayoutInit(vk_device,
-		[]vk.DescriptorSetLayout{animate_img_descriptor_set_layout, base_descriptor_set_layout, tex_descriptor_set_layout},
-	)
-
-	// vkCopyScreenDescriptorSetLayout = vk.DescriptorSetLayoutInit(vk_device,
-	// 	[]vk.DescriptorSetLayoutBinding {
-	// 		vk.DescriptorSetLayoutBindingInit(
-	// 			0, 1, descriptorType = .INPUT_ATTACHMENT, stageFlags = {.FRAGMENT}),},
-	// )
-	//vkCopyScreenPipelineLayout = vk.PipelineLayoutInit(vk_device,
-	//	[]vk.DescriptorSetLayout{vkCopyScreenDescriptorSetLayout},
-	//)
-
-	nullVertexInputInfo := vk.PipelineVertexInputStateCreateInfo{
-		sType = .PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
-		vertexBindingDescriptionCount = 0,
-		pVertexBindingDescriptions = nil,
-		vertexAttributeDescriptionCount = 0,
-		pVertexAttributeDescriptions = nil,
-	}
-
-	defaultDepthStencilState := vk.PipelineDepthStencilStateCreateInfoInit()
-	pipelines:[3]vk.Pipeline
-	pipelineCreateInfos:[len(pipelines)]vk.GraphicsPipelineCreateInfo
-
-	shapeVertexInputBindingDescription := [1]vk.VertexInputBindingDescription{{
-		binding = 0,
-		stride = size_of(geometry.shape_vertex2d),
-		inputRate = .VERTEX,
-	}}
-
-	shapeVertexInputAttributeDescription := [3]vk.VertexInputAttributeDescription{{
-		location = 0,
-		binding = 0,
-		format = vk.Format.R32G32_SFLOAT,
-		offset = 0,
-	},
-	{
-		location = 1,
-		binding = 0,
-		format = vk.Format.R32G32B32_SFLOAT,
-		offset = size_of(f32) * 2,
-	},
-	{
-		location = 2,
-		binding = 0,
-		format = vk.Format.R32G32B32A32_SFLOAT,
-		offset = size_of(f32) * (2 + 3),
-	}}
-	viewportState := vk.PipelineViewportStateCreateInfoInit()
-	shapeVertexInputState := vk.PipelineVertexInputStateCreateInfoInit(shapeVertexInputBindingDescription[:], shapeVertexInputAttributeDescription[:])
-	wireFrame := vk.PipelineRasterizationStateCreateInfoInit(.LINE)
-
-	
-	when wire_mode {
-		pipelineCreateInfos[0] = vk.GraphicsPipelineCreateInfoInit(
-			stages = shapeWireShaderStages[:],
-			layout = shape_pipeline_layout,
-			renderPass = vk_render_pass,
-			pMultisampleState = &vkPipelineMultisampleStateCreateInfo,
-			pDepthStencilState = &defaultDepthStencilState,
-			pColorBlendState = &vk.DefaultPipelineColorBlendStateCreateInfo,
-			pVertexInputState = &shapeVertexInputState,
-			pViewportState = &viewportState,
-			pRasterizationState = &wireFrame,
-		)
-	} else {
-		pipelineCreateInfos[0] = vk.GraphicsPipelineCreateInfoInit(
-			stages = shapeShaderStages[:],
-			layout = shape_pipeline_layout,
-			renderPass = vk_render_pass,
-			pMultisampleState = &vkPipelineMultisampleStateCreateInfo,
-			pDepthStencilState = &defaultDepthStencilState,
-			pColorBlendState = &vk.DefaultPipelineColorBlendStateCreateInfo,
-			pVertexInputState = &shapeVertexInputState,
-			pViewportState = &viewportState,
-		)
-	}
-
-	pipelineCreateInfos[1] = vk.GraphicsPipelineCreateInfoInit(
-		stages = texShaderStages[:],
-		layout = img_pipeline_layout,
-		renderPass = vk_render_pass,
-		pMultisampleState = &vkPipelineMultisampleStateCreateInfo,
-		pDepthStencilState = &defaultDepthStencilState,
-		pColorBlendState = &vk.DefaultPipelineColorBlendStateCreateInfo,
-		pViewportState = &viewportState,
-	)
-	pipelineCreateInfos[2] = vk.GraphicsPipelineCreateInfoInit(
-		stages = animateTexShaderStages[:],
-		layout = animate_img_pipeline_layout,
-		renderPass = vk_render_pass,
-		pMultisampleState = &vkPipelineMultisampleStateCreateInfo,
-		pDepthStencilState = &defaultDepthStencilState,
-		pColorBlendState = &vk.DefaultPipelineColorBlendStateCreateInfo,
-		pViewportState = &viewportState,
-	)
-	// pipelineCreateInfos[3] = vk.GraphicsPipelineCreateInfoInit(
-	// 	stages = copyScreenShaderStages[:],
-	// 	layout = vkCopyScreenPipelineLayout,
-	// 	renderPass = vkRenderPassCopy,
-	// 	pMultisampleState = &vk.DefaultPipelineMultisampleStateCreateInfo,
-	// 	pDepthStencilState = nil,
-	// 	pColorBlendState = &vkCopyBlending,
-	// 	pViewportState = &viewportState,
-	// )
-	res := vk.CreateGraphicsPipelines(vk_device, 0, len(pipelines), raw_data(pipelineCreateInfos[:]), nil, raw_data(pipelines[:]))
-	if res != .SUCCESS {
-		trace.panic_log(res)
-	}
-
-	shape_pipeline = pipelines[0]
-	img_pipeline = pipelines[1]
-	animate_img_pipeline = pipelines[2]
-	//vk_copy_screen_pipeline = pipelines[3]
-}
-
-vk_clean_pipelines :: proc() {
-	vk.DestroyDescriptorSetLayout(vk_device, base_descriptor_set_layout, nil)
-	vk.DestroyDescriptorSetLayout(vk_device, tex_descriptor_set_layout, nil)
-	vk.DestroyDescriptorSetLayout(vk_device, animate_img_descriptor_set_layout, nil)
-	//vk.DestroyDescriptorSetLayout(vk_device, copy_screen_descriptor_set_layout, nil)
-
-	vk.DestroyPipelineLayout(vk_device, shape_pipeline_layout, nil)
-	vk.DestroyPipelineLayout(vk_device, img_pipeline_layout, nil)
-	vk.DestroyPipelineLayout(vk_device, animate_img_pipeline_layout, nil)
-	//vk.DestroyPipelineLayout(vk_device, copy_screen_pipeline_layout, nil)
-
-	vk.DestroyPipeline(vk_device, shape_pipeline, nil)
-	vk.DestroyPipeline(vk_device, img_pipeline, nil)
-	vk.DestroyPipeline(vk_device, animate_img_pipeline, nil)
-	//vk.DestroyPipeline(vk_device, copy_screen_pipeline, nil)
-}
-
-vk_fmts:[]vk.SurfaceFormatKHR
-vk_fmt:vk.SurfaceFormatKHR = {
-	format = .UNDEFINED,
-	colorSpace = .SRGB_NONLINEAR
-}
-vkPresentModes:[]vk.PresentModeKHR
-vkPresentMode:vk.PresentModeKHR
-vk_surface_cap:vk.SurfaceCapabilitiesKHR
-vk_extent:vk.Extent2D
-vk_extent_rotation:vk.Extent2D
-
-vkDepthHasOptimal:=false
-vkDepthHasTransferSrcOptimal:=false
-vkDepthHasTransferDstOptimal:=false
-vkDepthHasSampleOptimal:=false
-
-vkColorHasAttachOptimal:=false
-vkColorHasSampleOptimal:=false
-vkColorHasTransferSrcOptimal:=false
-vkColorHasTransferDstOptimal:=false
-
-is_released_full_screen_ex := true
-
 
 init_swap_chain :: proc() {
 	fmtCnt:u32
@@ -604,8 +389,8 @@ vk_create_swap_chain_and_image_views :: proc() -> bool {
 		texture_init_msaa(&vk_msaa_frame_texture, vk_extent_rotation.width, vk_extent_rotation.height)
 	}
 
-	vk_refresh_pre_matrix()
-	vk_op_execute()
+	refresh_pre_matrix()
+	graphics_execute_ops()
 
 	for img, i in swapImgs {
 		imageViewCreateInfo := vk.ImageViewCreateInfo{
@@ -655,10 +440,6 @@ vk_create_swap_chain_and_image_views :: proc() -> bool {
 		}
 		res = vk.CreateFramebuffer(vk_device, &frameBufferCreateInfo, nil, &vk_frame_buffers[i])
 		if res != .SUCCESS do trace.panic_log("res = vk.CreateFramebuffer(vk_device, &frameBufferCreateInfo, nil, &vk_frame_buffers[i]) : ", res)
-
-		// frameBufferCreateInfo.renderPass = vkRenderPassClear
-		// res = vk.CreateFramebuffer(vk_device, &frameBufferCreateInfo, nil, &vkClearFrameBuffers[i])
-		// if res != .SUCCESS do trace.panic_log("res = vk.CreateFramebuffer(vk_device, &frameBufferCreateInfo, nil, &vkClearFrameBuffers[i]) : ", res)
 	}
 
 	return true
@@ -689,10 +470,16 @@ vk_start :: proc() {
 		pEngineName        = "Xfit",
 		pApplicationName   = ODIN_BUILD_PROJECT_NAME,
 	}
-	vk_get_instance_proc_addr := vk.GetInstanceProcAddr(nil, "vkEnumerateInstanceVersion")
-	if vk_get_instance_proc_addr == nil {
+	FN_vkEnumerateInstanceVersion := vk.ProcEnumerateInstanceVersion(vk.GetInstanceProcAddr(nil, "vkEnumerateInstanceVersion"))
+	if FN_vkEnumerateInstanceVersion == nil {
 		when is_log do fmt.println("XFIT SYSLOG : vulkan 1.0 device, set api version 1.0")
 		appInfo.apiVersion = vk.API_VERSION_1_0
+		vulkan_version = {1,0,0}
+	} else {
+		vk_ver:u32
+		FN_vkEnumerateInstanceVersion(&vk_ver)
+		vulkan_version = { vk.VK_VERSION_MAJOR(vk_ver), vk.VK_VERSION_MINOR(vk_ver), vk.VK_VERSION_PATCH(vk_ver) }
+		when is_log do fmt.println("XFIT SYSLOG : vulkan version : ", vulkan_version)
 	}
 	glfwLen := 0
 	glfwExtensions : []cstring
@@ -854,19 +641,10 @@ vk_start :: proc() {
 	}
 	queueCnt: u32 = 1 if vk_graphics_family_index == vk_present_family_index else 2
 
-	when wire_mode {
-		physicalDeviceFeatures := vk.PhysicalDeviceFeatures {
-			samplerAnisotropy = true,
-			sampleRateShading = true, //FOR ANTI-ALISING
-			fillModeNonSolid = true,
-			//geometryShader = true,
-		}
-	} else {
-		physicalDeviceFeatures := vk.PhysicalDeviceFeatures {
-			samplerAnisotropy = true,
-			sampleRateShading = true, //FOR ANTI-ALISING
-			//geometryShader = true,
-		}
+	physicalDeviceFeatures := vk.PhysicalDeviceFeatures {
+		samplerAnisotropy = true,
+		//sampleRateShading = true, //FOR ANTI-ALISING
+		//geometryShader = true,
 	}
 
 	deviceExtCnt: u32
@@ -1109,26 +887,7 @@ vk_start :: proc() {
 	
 	vk.CreateRenderPass(vk_device, &renderPassInfo, nil, &vk_render_pass)
 
-
-	// renderPassClearInfo := vk.RenderPassCreateInfoInit(
-	// 	pAttachments = []vk.AttachmentDescription{colorAttachmentClear, depthAttachmentClear},
-	// 	pSubpasses = []vk.SubpassDescription{subpassDesc},
-	// 	pDependencies = []vk.SubpassDependency{subpassDependency},
-	// )
-	// vk.CreateRenderPass(vk_device, &renderPassClearInfo, nil, &vkRenderPassClear)
-
-	//TODO (xfitgd)
-	renderPassCopyInfo := vk.RenderPassCreateInfoInit(
-		pAttachments = []vk.AttachmentDescription{colorAttachment, colorAttachmentLoadResolve},
-		pSubpasses = []vk.SubpassDescription{subpassCopyDesc},
-		pDependencies = []vk.SubpassDependency{subpassDependencyCopy},
-	)
-	vk.CreateRenderPass(vk_device, &renderPassCopyInfo, nil, &vk_render_pass_copy)
-
-
-	vk_init_shader_modules()
-
-	vk_init_pipelines()
+	init_pipelines()
 
 	vk_create_swap_chain_and_image_views()
 	vk_create_sync_object()
@@ -1143,10 +902,10 @@ vk_destroy :: proc() {
 
 	graphics_clean()
 
+	clean_pipelines()
+
 	vk_clean_sync_object()
 	vk_clean_swap_chain()
-	vk_clean_pipelines()
-	vk_clean_shader_modules()
 
 	vk_allocator_destroy()
 
@@ -1156,7 +915,6 @@ vk_destroy :: proc() {
 	vk.DestroySampler(vk_device, nearest_sampler, nil)
 
 	vk.DestroyRenderPass(vk_device, vk_render_pass, nil)
-	vk.DestroyRenderPass(vk_device, vk_render_pass_copy, nil)
 	// vk.DestroyRenderPass(vk_device, vkRenderPassClear, nil)
 
 	delete(vk_fmts)
@@ -1279,17 +1037,10 @@ vk_recreate_surface :: proc() {
 	}
 }
 
-
-@private g_wait_rendering_sem: sync.Sema
-
-vk_wait_rendering :: proc() {
-	sync.sema_wait(&g_wait_rendering_sem)
-}
-
 vk_draw_frame :: proc() {
 	@(static) frame:int = 0
 
-	vk_op_execute()
+	graphics_execute_ops()
 
 	if vk_swapchain == 0 do return
 	if vk_extent.width <= 0 || vk_extent.height <= 0 {
@@ -1481,23 +1232,6 @@ vk_draw_frame :: proc() {
 	sync.sema_post(&g_wait_rendering_sem)
 }
 
-vk_refresh_pre_matrix :: proc() {
-	if library.is_mobile {
-		orientation := __screen_orientation
-		if orientation == .Landscape90 {
-			rotation_matrix = linalg.matrix4_rotate_f32(linalg.to_radians(f32(90.0)), {0, 0, 1})
-		} else if orientation == .Landscape270 {
-			rotation_matrix = linalg.matrix4_rotate_f32(linalg.to_radians(f32(270.0)), {0, 0, 1})
-		} else if orientation == .Vertical180 {
-			rotation_matrix = linalg.matrix4_rotate_f32(linalg.to_radians(f32(180.0)), {0, 0, 1})
-		} else if orientation == .Vertical360 {
-			rotation_matrix = linalg.identity_matrix(linalg.matrix44)
-		} else {
-			rotation_matrix = linalg.identity_matrix(linalg.matrix44)
-		}
-	}
-}
-
 vk_create_sync_object :: proc() {
 	for i in 0..<MAX_FRAMES_IN_FLIGHT {
 		vk.CreateSemaphore(vk_device, &vk.SemaphoreCreateInfo{
@@ -1541,7 +1275,7 @@ vk_clean_swap_chain :: proc() {
 		when msaa_count > 1 {
 			texture_deinit(&vk_msaa_frame_texture)
 		}
-		vk_op_execute()
+		graphics_execute_ops()
 
 		delete(vk_frame_buffers)
 		//delete(vkClearFrameBuffers)
@@ -1612,44 +1346,6 @@ vk_transition_image_layout :: proc(cmd:vk.CommandBuffer, image:vk.Image, mip_lev
 	1,
 	&barrier)
 }
-
-//!불완전한 기능
-// vk_begin_single_time_cmd :: proc "contextless" () -> vk.CommandBuffer {
-// 	cmd:vk.CommandBuffer
-// 	res := vk.AllocateCommandBuffers(vk_device, &vk.CommandBufferAllocateInfo{
-// 		sType = vk.StructureType.COMMAND_BUFFER_ALLOCATE_INFO,
-// 		commandPool = vk_cmd_pool,
-// 		level = vk.CommandBufferLevel.PRIMARY,
-// 		commandBufferCount = 1,
-// 	}, &cmd)
-// 	if res != .SUCCESS do trace.panic_log("vk_begin_single_time_cmd vk.AllocateCommandBuffers(&cmd) : ", res)
-
-// 	beginInfo := vk.CommandBufferBeginInfo {
-// 		flags = {.ONE_TIME_SUBMIT},
-// 		sType = vk.StructureType.COMMAND_BUFFER_BEGIN_INFO,
-// 	}
-// 	vk.BeginCommandBuffer(cmd, &beginInfo)
-
-// 	return cmd
-// }
-
-//!불완전한 기능
-// vk_end_single_time_cmd :: proc "contextless" (_cmd:vk.CommandBuffer)  {
-// 	cmd := _cmd
-// 	vk.EndCommandBuffer(cmd)
-
-// 	submitInfo := vk.SubmitInfo {
-// 		commandBufferCount = 1,
-// 		pCommandBuffers    = &cmd,
-// 		sType              = .SUBMIT_INFO,
-// 	}
-// 	res := vk.QueueSubmit(vk_graphics_queue, 1, &submitInfo, 0)
-// 	if res != .SUCCESS do trace.panic_log("vk_end_single_time_cmd res := vk.QueueSubmit(vk_graphics_queue, 1, &submitInfo, 0) : ", res)
-
-// 	vk_wait_graphics_idle()
-
-// 	vk.FreeCommandBuffers(vk_device, vk_cmd_pool, 1, &cmd)
-// }
 
 vk_record_command_buffer :: proc(cmd:^layer, _inheritanceInfo:vk.CommandBufferInheritanceInfo) {
 	inheritanceInfo := _inheritanceInfo

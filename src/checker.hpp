@@ -412,15 +412,6 @@ struct LoadDirectoryCache {
 	Array<LoadFileCache *> files;
 };
 
-struct ShaderLoadCache {
-	String      source_path;      // Original shader file path
-	String      compiled_data;    // Compiled SPIR-V binary
-	gbFileError file_error;
-	bool        compilation_success;
-	String      error_message;    // glslc error message
-};
-
-
 struct GenProcsData {
 	Array<Entity *> procs;
 	RwMutex         mutex;
@@ -537,9 +528,6 @@ struct CheckerInfo {
 	BlockingMutex                       load_directory_mutex;
 	StringMap<LoadDirectoryCache *>     load_directory_cache;
 	PtrMap<Ast *, LoadDirectoryCache *> load_directory_map; // Key: Ast_CallExpr *
-
-	BlockingMutex                      shader_load_mutex;
-	StringMap<ShaderLoadCache *>       shader_load_cache;
 
 };
 

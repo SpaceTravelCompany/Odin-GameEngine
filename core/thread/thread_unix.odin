@@ -5,6 +5,7 @@ package thread
 import "base:runtime"
 import "core:sync"
 import "core:sys/posix"
+import "core:debug/trace"
 
 _IS_SUPPORTED :: true
 
@@ -58,7 +59,8 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 
 		if .Self_Cleanup in sync.atomic_load(&t.flags) {
 			res := posix.pthread_detach(t.unix_thread)
-			assert_contextless(res == nil)
+			if res != nil do trace.panic_log("pthread_detach ", res)
+			//assert_contextless(res == nil)
 
 			t.unix_thread = {}
 			// NOTE(ftphikari): It doesn't matter which context 'free' received, right?

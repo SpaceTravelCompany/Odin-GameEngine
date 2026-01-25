@@ -159,7 +159,7 @@ up:^engine.texture = nil, over:^engine.texture = nil, down:^engine.texture = nil
 
 	self.set.bindings = engine.descriptor_set_binding__base_uniform_pool[:]
     self.set.size = engine.descriptor_pool_size__base_uniform_pool[:]
-    self.set.layout = engine.get_base_descriptor_set_layout()
+    self.set.layout = engine.base_descriptor_set_layout()
 
 	self.vtable = vtable == nil ? &image_button_vtable : vtable
     if self.vtable.draw == nil do self.vtable.draw = auto_cast _super_image_button_draw
@@ -192,7 +192,7 @@ up:^shape.shape_src = nil, over:^shape.shape_src = nil, down:^shape.shape_src = 
 
 	self.set.bindings = engine.descriptor_set_binding__base_uniform_pool[:]
     self.set.size = engine.descriptor_pool_size__base_uniform_pool[:]
-    self.set.layout = engine.get_base_descriptor_set_layout()
+    self.set.layout = engine.base_descriptor_set_layout()
 
 	self.vtable = vtable == nil ? &shape_button_vtable : vtable
     if self.vtable.draw == nil do self.vtable.draw = auto_cast _super_shape_button_draw

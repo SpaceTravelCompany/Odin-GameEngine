@@ -330,18 +330,12 @@ animate_image_update_transform_matrix_raw :: #force_inline proc(self:^animate_im
 animate_image_change_color_transform :: #force_inline proc(self:^animate_image, colorTransform:^engine.color_transform) {
     engine.itransform_object_change_color_transform(self, colorTransform)
 }
-// animate_image_update_camera :: #force_inline proc(self:^animate_image, camera:^engine.camera) {
-//     engine.iobject_update_camera(self, camera)
-// }
 animate_image_update_texture_array :: #force_inline proc "contextless" (self:^animate_image, src:^engine.texture_array) {
     self.src = src
 }
-// animate_image_update_projection :: #force_inline proc(self:^animate_image, projection:^engine.projection) {
-//     engine.iobject_update_projection(self, projection)
-// }
 
 _super_animate_image_draw :: proc (self:^animate_image, cmd:engine.command_buffer, viewport:^engine.viewport) {
-    engine.graphics_cmd_bind_pipeline(cmd, .GRAPHICS, engine.get_animate_img_pipeline())
+    engine.graphics_cmd_bind_pipeline(cmd, .GRAPHICS, engine.get_animate_img_pipeline().__pipeline)
     engine.graphics_cmd_bind_descriptor_sets(cmd, .GRAPHICS, engine.get_animate_img_pipeline_layout(), 0, 3,
         &([]vk.DescriptorSet{self.set.__set, viewport.set.__set, self.src.set.__set})[0], 0, nil)
 

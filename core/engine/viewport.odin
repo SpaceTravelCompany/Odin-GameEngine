@@ -2,6 +2,7 @@ package engine
 
 import "core:math/linalg"
 import "core:mem"
+import vk "vendor:vulkan"
 
 /*
 Viewport structure for managing rendering areas and camera/projection settings
@@ -19,6 +20,10 @@ viewport :: struct {
 	set:descriptor_set,
 }
 
+viewport_descriptor_set_layout :: proc "contextless" () -> vk.DescriptorSetLayout {
+	return __base_descriptor_set_layout
+}
+
 /*
 Initializes or updates the viewport's descriptor set.
 You should call this function after changing the camera, projection pointer or initializing the viewport.
@@ -33,7 +38,7 @@ viewport_init_update :: proc (self:^viewport) {
 	if self.set.bindings == nil {
 		self.set.bindings = descriptor_set_binding__base_uniform_pool[:]
     	self.set.size = descriptor_pool_size__base_uniform_pool[:]
-    	self.set.layout = base_descriptor_set_layout
+    	self.set.layout = viewport_descriptor_set_layout()
 	}
 	
 	//__temp_arena_allocator update 하면 다 지우니 중복 할당해도 됨.

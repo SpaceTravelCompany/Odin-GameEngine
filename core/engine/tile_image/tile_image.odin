@@ -38,7 +38,7 @@ tile_image :: struct {
 }
 
 tile_image_init :: proc(self:^tile_image, src:^tile_texture_array,
-colorTransform:^engine.color_transform = nil, vtable:^engine.iobject_vtable = nil) where intrinsics.type_is_subtype_of(actualType, tile_image) {
+colorTransform:^engine.color_transform = nil, vtable:^engine.iobject_vtable = nil) {
     self.src = src
 
     self.set.bindings = engine.descriptor_set_binding__animate_img_uniform_pool[:]
@@ -51,7 +51,7 @@ colorTransform:^engine.color_transform = nil, vtable:^engine.iobject_vtable = ni
 
     if self.vtable.get_uniform_resources == nil do self.vtable.get_uniform_resources = auto_cast get_uniform_resources_tile_image
 
-    itransform_object_init(self, colorTransform, self.vtable)
+    engine.itransform_object_init(self, colorTransform, self.vtable)
 	self.actual_type = typeid_of(tile_image)
 }
 
@@ -164,7 +164,7 @@ tile_image_update_idx :: proc(self:^tile_image, idx:u32) {
 }
 
 _super_tile_image_draw :: proc (self:^tile_image, cmd:engine.command_buffer, viewport:^engine.viewport) {
-    engine.graphics_cmd_bind_pipeline(cmd, .GRAPHICS, engine.get_animate_img_pipeline())
+    engine.graphics_cmd_bind_pipeline(cmd, .GRAPHICS, engine.get_animate_img_pipeline().__pipeline)
     engine.graphics_cmd_bind_descriptor_sets(cmd, .GRAPHICS, engine.get_animate_img_pipeline_layout(), 0, 3,
         &([]vk.DescriptorSet{self.set.__set,  viewport.set.__set, self.src.set.__set,})[0], 0, nil)
 
