@@ -223,6 +223,7 @@ ianimate_object_vtable :: struct {
     get_frame_cnt = auto_cast _super_animate_image_get_frame_cnt,
 }
 
+
 animate_image_init :: proc(self:^animate_image, src:^engine.texture_array,
 colorTransform:^engine.color_transform = nil, vtable:^ianimate_object_vtable = nil) {
     self.src = src

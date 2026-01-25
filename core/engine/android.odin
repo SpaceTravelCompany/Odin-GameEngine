@@ -191,7 +191,7 @@ when library.is_android {
 		}
 
 		input_state.handle = transmute(rawptr)(int(android.AInputEvent_getDeviceId(evt)))
-		general_input_callback(input_state)
+		if general_input_callback != nil do general_input_callback(input_state)
 		return true
 	}
 
@@ -208,45 +208,47 @@ when library.is_android {
 			toolType := android.AMotionEvent_getToolType(evt, 0)
 			//https://github.com/gameplay3d/GamePlay/blob/master/gameplay/src/PlatformAndroid.cpp
 			if android.InputSourceDevice.JOYSTICK in transmute(android.InputSourceDevice)(src.device) {
-				xAxis := android.AMotionEvent_getAxisValue(evt, android.MotionEventAxis.HAT_X, 0)
-				yAxis := android.AMotionEvent_getAxisValue(evt, android.MotionEventAxis.HAT_Y, 0)
+				if general_input_callback != nil {
+					xAxis := android.AMotionEvent_getAxisValue(evt, android.MotionEventAxis.HAT_X, 0)
+					yAxis := android.AMotionEvent_getAxisValue(evt, android.MotionEventAxis.HAT_Y, 0)
 
-				leftTrigger := android.AMotionEvent_getAxisValue(evt, android.MotionEventAxis.BRAKE, 0)
-				rightTrigger := android.AMotionEvent_getAxisValue(evt, android.MotionEventAxis.GAS, 0)
+					leftTrigger := android.AMotionEvent_getAxisValue(evt, android.MotionEventAxis.BRAKE, 0)
+					rightTrigger := android.AMotionEvent_getAxisValue(evt, android.MotionEventAxis.GAS, 0)
 
-				x := android.AMotionEvent_getAxisValue(evt, android.MotionEventAxis.X, 0)
-				y := android.AMotionEvent_getAxisValue(evt, android.MotionEventAxis.Y, 0)
-				z := android.AMotionEvent_getAxisValue(evt, android.MotionEventAxis.Z, 0)
-				rz := android.AMotionEvent_getAxisValue(evt, android.MotionEventAxis.RZ, 0)
+					x := android.AMotionEvent_getAxisValue(evt, android.MotionEventAxis.X, 0)
+					y := android.AMotionEvent_getAxisValue(evt, android.MotionEventAxis.Y, 0)
+					z := android.AMotionEvent_getAxisValue(evt, android.MotionEventAxis.Z, 0)
+					rz := android.AMotionEvent_getAxisValue(evt, android.MotionEventAxis.RZ, 0)
 
-				if xAxis == -1.0 {
-					input_state.buttons.dpad_left = true
-					input_state.buttons.dpad_right = false
-				} else if xAxis == 1.0 {
-					input_state.buttons.dpad_left = false
-					input_state.buttons.dpad_right = true
-				} else {
-					input_state.buttons.dpad_left = false
-					input_state.buttons.dpad_right = false
+					if xAxis == -1.0 {
+						input_state.buttons.dpad_left = true
+						input_state.buttons.dpad_right = false
+					} else if xAxis == 1.0 {
+						input_state.buttons.dpad_left = false
+						input_state.buttons.dpad_right = true
+					} else {
+						input_state.buttons.dpad_left = false
+						input_state.buttons.dpad_right = false
+					}
+					if yAxis == -1.0 {
+						input_state.buttons.dpad_up = true
+						input_state.buttons.dpad_down = false
+					} else if yAxis == 1.0 {
+						input_state.buttons.dpad_up = false
+						input_state.buttons.dpad_down = true
+					} else {
+						input_state.buttons.dpad_up = false
+						input_state.buttons.dpad_down = false
+					}
+
+					input_state.left_trigger = leftTrigger
+					input_state.right_trigger = rightTrigger
+					input_state.left_thumb = linalg.point{x, y}
+					input_state.right_thumb = linalg.point{z, rz}
+
+					input_state.handle = transmute(rawptr)(int(android.AInputEvent_getDeviceId(evt)))
+					general_input_callback(input_state)
 				}
-				if yAxis == -1.0 {
-					input_state.buttons.dpad_up = true
-					input_state.buttons.dpad_down = false
-				} else if yAxis == 1.0 {
-					input_state.buttons.dpad_up = false
-					input_state.buttons.dpad_down = true
-				} else {
-					input_state.buttons.dpad_up = false
-					input_state.buttons.dpad_down = false
-				}
-
-				input_state.left_trigger = leftTrigger
-				input_state.right_trigger = rightTrigger
-				input_state.left_thumb = linalg.point{x, y}
-				input_state.right_thumb = linalg.point{z, rz}
-
-				input_state.handle = transmute(rawptr)(int(android.AInputEvent_getDeviceId(evt)))
-				general_input_callback(input_state)
 			} else {
 				count:uint
 				act := android.AMotionEvent_getAction(evt)

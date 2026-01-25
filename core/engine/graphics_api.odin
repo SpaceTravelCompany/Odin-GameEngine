@@ -38,7 +38,7 @@ graphics_device :: #force_inline proc "contextless" () -> vk.Device {
 // Descriptor Set Layouts
 @private __base_descriptor_set_layout: vk.DescriptorSetLayout
 @private __img_descriptor_set_layout: vk.DescriptorSetLayout
-@private animate_img_descriptor_set_layout: vk.DescriptorSetLayout
+@private __animate_img_descriptor_set_layout: vk.DescriptorSetLayout
 // copy_screen_descriptor_set_layout: vk.DescriptorSetLayout
 
 // Samplers
@@ -844,4 +844,8 @@ create_graphics_pipeline :: proc(
 
 graphics_destriptor_set_layout_init :: proc(bindings: []vk.DescriptorSetLayoutBinding) -> vk.DescriptorSetLayout {
 	return vk.DescriptorSetLayoutInit(graphics_device(), bindings)
+}
+
+animate_img_descriptor_set_layout :: proc() -> vk.DescriptorSetLayout {
+	return __animate_img_descriptor_set_layout
 }

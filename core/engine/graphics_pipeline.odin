@@ -18,7 +18,7 @@ init_pipelines :: proc() {
 		[]vk.DescriptorSetLayoutBinding {
 			vk.DescriptorSetLayoutBindingInit(0, 1, descriptorType = .COMBINED_IMAGE_SAMPLER),},
 	)
-	animate_img_descriptor_set_layout = graphics_destriptor_set_layout_init(
+	__animate_img_descriptor_set_layout = graphics_destriptor_set_layout_init(
 		[]vk.DescriptorSetLayoutBinding {
 			vk.DescriptorSetLayoutBindingInit(0, 1),
 			vk.DescriptorSetLayoutBindingInit(1, 1),
@@ -62,7 +62,7 @@ init_pipelines :: proc() {
 
 	thread.pool_add_task(&g_thread_pool, context.allocator, proc(task: thread.Task) {
 		custom_object_pipeline_init(&animate_img_pipeline,
-				[]vk.DescriptorSetLayout{animate_img_descriptor_set_layout, viewport_descriptor_set_layout(), img_descriptor_set_layout()},
+				[]vk.DescriptorSetLayout{animate_img_descriptor_set_layout(), viewport_descriptor_set_layout(), img_descriptor_set_layout()},
 				nil, nil,
 				object_draw_method{type = .Draw,}, 
 				#load("shaders/animate_tex.vert", string),
@@ -95,5 +95,5 @@ init_pipelines :: proc() {
 
 	vk.DestroyDescriptorSetLayout(graphics_device(), __base_descriptor_set_layout, nil)
 	vk.DestroyDescriptorSetLayout(graphics_device(), __img_descriptor_set_layout, nil)
-	vk.DestroyDescriptorSetLayout(graphics_device(), animate_img_descriptor_set_layout, nil)
+	vk.DestroyDescriptorSetLayout(graphics_device(), __animate_img_descriptor_set_layout, nil)
 }

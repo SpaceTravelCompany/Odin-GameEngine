@@ -353,4 +353,5 @@ general_input_buttons :: struct #packed {
     volume_down:bool,
 }
 
-general_input_callback : proc (state:general_input_state) = proc (state:general_input_state) {}
+general_input_callback : proc (state:general_input_state) = nil
+general_input_change_callback : proc (device:rawptr, is_connected:bool) = nil

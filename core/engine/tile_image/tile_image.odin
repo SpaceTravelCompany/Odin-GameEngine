@@ -193,7 +193,7 @@ inPixelFmt:img.color_fmt = .RGBA, allocator := context.allocator) {
     self.sampler = sampler == 0 ? engine.get_linear_sampler() : sampler
     self.set.bindings = engine.descriptor_set_binding__single_pool[:]
     self.set.size = engine.descriptor_pool_size__single_sampler_pool[:]
-    self.set.layout = engine.get_tex_descriptor_set_layout()
+    self.set.layout = engine.img_descriptor_set_layout()
     self.set.__set = 0
     bit :: 4//outBit count default 4
     allocPixels := mem.make_non_zeroed_slice([]byte, count * tile_width * tile_height * bit, allocator)
