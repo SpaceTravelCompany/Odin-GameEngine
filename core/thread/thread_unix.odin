@@ -59,7 +59,7 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 
 		if .Self_Cleanup in sync.atomic_load(&t.flags) {
 			res := posix.pthread_detach(t.unix_thread)
-			if res != nil do trace.panic_log("pthread_detach ", res)
+			if res != nil && res != .EINVAL do trace.panic_log("pthread_detach ", res) // edited (SpaceTravelCompany) Set this for now
 			//assert_contextless(res == nil)
 
 			t.unix_thread = {}
@@ -182,7 +182,9 @@ _terminate :: proc(t: ^Thread, exit_code: int) {
 	//
 	// This is in contrast to behavior I have seen on Linux where the thread is
 	// just terminated.
-	posix.pthread_cancel(t.unix_thread)
+	when ODIN_PLATFORM_SUBTARGET != .Android {
+		posix.pthread_cancel(t.unix_thread)
+	}
 }
 
 _yield :: proc() {
