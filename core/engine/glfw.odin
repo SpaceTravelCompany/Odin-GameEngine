@@ -296,6 +296,10 @@ when !library.is_mobile {
 
         glfw_init_monitors()
         glfw.SetMonitorCallback(glfw_monitor_proc)
+
+		when ODIN_OS == .Windows {
+			init_gamepad()
+		}
     }
 
     glfw_destroy :: proc "contextless" () {
@@ -315,7 +319,7 @@ when !library.is_mobile {
 			delete(linux_platform.release)
 			delete(linux_platform.version)
 		} else when ODIN_OS == .Windows {
-			//TODO (xfitgd)
+			cleanup_gamepad()
 		}
   
         glfw.Terminate()

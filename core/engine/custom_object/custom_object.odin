@@ -39,6 +39,8 @@ custom_object :: struct {
 custom_object_init :: proc(self:^custom_object,
     p_pipeline:^engine.object_pipeline,
     pipeline_p_sets:[]^engine.descriptor_set,
+	pool_binding:[]u32,
+	pool_sizes:[]descriptor_pool_size,
    vtable:^engine.iobject_vtable = nil, allocator := context.allocator) {
 
     self.pipeline_p_sets = mem.make_non_zeroed_slice([]^engine.descriptor_set, len(pipeline_p_sets))
@@ -49,8 +51,8 @@ custom_object_init :: proc(self:^custom_object,
     
 	self.sets = make([]engine.descriptor_set, len(pipeline_p_sets), allocator)
 	for i in 0..<len(pipeline_p_sets) {
-		 self.sets[i].bindings = p_pipeline.__pool_binding[i]
-		 self.sets[i].size = p_pipeline.pool_sizes[i]
+		 self.sets[i].bindings = pool_binding[i]
+		 self.sets[i].size = pool_sizes[i]
 		 self.sets[i].layout = p_pipeline.__descriptor_set_layouts[i]
 	}
 
@@ -69,8 +71,9 @@ _super_custom_object_deinit :: proc(self:^custom_object) {
 
 
 _super_custom_object_draw :: proc(self:^custom_object, cmd:engine.command_buffer) {
-    sets := mem.make_non_zeroed_slice([]vk.DescriptorSet, len(self.pipeline_p_sets))
-    defer delete(sets)
+    sets := mem.make_non_zeroed_slice([]vk.DescriptorSet, len(self.pipeline_p_sets), context.temp_allocator)
+    defer delete(sets, context.temp_allocator)
+	
     for i in 0..<len(self.pipeline_p_sets) {
         sets[i] = self.pipeline_p_sets[i].__set
     }

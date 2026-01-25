@@ -229,7 +229,7 @@ colorTransform:^engine.color_transform = nil, vtable:^ianimate_object_vtable = n
     
     self.set.bindings = engine.descriptor_set_binding__animate_img_uniform_pool[:]
     self.set.size = engine.descriptor_pool_size__animate_img_uniform_pool[:]
-    self.set.layout = engine.get_animate_img_descriptor_set_layout()
+    self.set.layout = engine.animate_img_descriptor_set_layout()
 
     self.vtable = auto_cast (vtable == nil ? &animate_image_vtable : vtable)
     if self.vtable.draw == nil do self.vtable.draw = auto_cast _super_animate_image_draw
