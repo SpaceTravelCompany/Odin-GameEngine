@@ -14,7 +14,7 @@ Manages a collection of objects to be rendered and their command buffers
 */
 layer :: struct {
 	scene: ^[dynamic]^iobject,
-    cmd:command_buffer,
+    cmd:[MAX_FRAMES_IN_FLIGHT]command_buffer,
     obj_lock:sync.Mutex,
 	cmd_pool: vk.CommandPool,
 	creation_allocator: runtime.Allocator,
@@ -50,7 +50,7 @@ layer_init :: proc(_scene: ^[dynamic]^iobject, allocator := context.allocator) -
 	}, nil, &cmd.cmd_pool)
 	if res != .SUCCESS do trace.panic_log("vk.CreateCommandPool(&vk_cmd_pool) : ", res)
 
-    allocate_command_buffers(&cmd.cmd, 1, cmd.cmd_pool)
+    allocate_command_buffers(&cmd.cmd[0], MAX_FRAMES_IN_FLIGHT, cmd.cmd_pool)
 
     cmd.obj_lock = sync.Mutex{}
 
@@ -74,7 +74,7 @@ Returns:
 - None
 */
 layer_deinit :: proc(cmd: ^layer) {
-    free_command_buffers(&cmd.cmd, 1, cmd.cmd_pool)
+    free_command_buffers(&cmd.cmd[0], MAX_FRAMES_IN_FLIGHT, cmd.cmd_pool)
 
     sync.mutex_lock(&__g_layer_mtx)
     for cmd, i in __g_layer {

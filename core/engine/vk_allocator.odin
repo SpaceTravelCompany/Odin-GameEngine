@@ -555,8 +555,8 @@ vk_op_execute :: proc() {
 	sync.atomic_mutex_lock(&gQueueMtx)
 	if len(opQueue) == 0 {
 		sync.atomic_mutex_unlock(&gQueueMtx)
-		vk_wait_graphics_idle()
-		vk_op_execute_destroy()
+		//vk_wait_graphics_idle()
+		//vk_op_execute_destroy()
 		return
 	}
 	resize(&opSaveQueue, len(opQueue))

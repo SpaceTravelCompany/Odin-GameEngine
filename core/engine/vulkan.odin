@@ -1127,11 +1127,12 @@ vk_draw_frame :: proc() {
 		record_task_data :: struct {
 			cmd: ^layer,
 			inheritanceInfo: vk.CommandBufferInheritanceInfo,
+			frame: int,
 		}
 		
 		record_task_proc :: proc(task: thread.Task) {
 			data := cast(^record_task_data)task.data
-			vk_record_command_buffer(data.cmd, data.inheritanceInfo)
+			vk_record_command_buffer(data.cmd, data.inheritanceInfo, data.frame)
 		}
 		
 
@@ -1139,6 +1140,7 @@ vk_draw_frame :: proc() {
 			data := new(record_task_data, context.temp_allocator)
 			data.cmd = cmd
 			data.inheritanceInfo = inheritanceInfo
+			data.frame = frame
 			thread.pool_add_task(&g_thread_pool, context.allocator, record_task_proc, data)
 		}
 		for thread.pool_num_done(&g_thread_pool) < len(visible_layers) {
@@ -1151,7 +1153,7 @@ vk_draw_frame :: proc() {
 		cmd_buffers := make([]vk.CommandBuffer, len(visible_layers), context.temp_allocator)
 		defer delete(cmd_buffers, context.temp_allocator)
 		for cmd, i in visible_layers {
-			cmd_buffers[i] = cmd.cmd.__handle
+			cmd_buffers[i] = cmd.cmd[frame].__handle
 		}
 		vk.CmdExecuteCommands(vk_cmd_buffer[frame], auto_cast len(cmd_buffers), &cmd_buffers[0])
 		vk.CmdEndRenderPass(vk_cmd_buffer[frame])
@@ -1366,9 +1368,9 @@ vk_transition_image_layout :: proc(cmd:vk.CommandBuffer, image:vk.Image, mip_lev
 	&barrier)
 }
 
-vk_record_command_buffer :: proc(cmd:^layer, _inheritanceInfo:vk.CommandBufferInheritanceInfo) {
+vk_record_command_buffer :: proc(cmd:^layer, _inheritanceInfo:vk.CommandBufferInheritanceInfo, frame:int) {
 	inheritanceInfo := _inheritanceInfo
-	c := cmd.cmd
+	c := cmd.cmd[frame]
 	beginInfo := vk.CommandBufferBeginInfo {
 		sType = vk.StructureType.COMMAND_BUFFER_BEGIN_INFO,
 		flags = {vk.CommandBufferUsageFlag.RENDER_PASS_CONTINUE, vk.CommandBufferUsageFlag.ONE_TIME_SUBMIT},
