@@ -960,18 +960,156 @@ shapes_compute_polygon :: proc(poly:^shapes, allocator := context.allocator) -> 
 					prev_line := node.lines[prev_idx]
 					next_line := node.lines[next_idx]
 
-					set_line_points_outer(&outer_lines[i], line, prev_line, next_line, node.thickness, poly_ori)
+					set_line_points_outer(&outer_lines[i], line, prev_line, next_line, 
+						poly_ori == .Clockwise ? -node.thickness : node.thickness, poly_ori)
 				}
-				for i:u32 = 0; i < node_len; i += 1 {
-					if i == node_len - 1 {
-						outer_lines[i].end = outer_lines[0].start
-					} else {
-						outer_lines[i].end = outer_lines[i + 1].start
+				// Convert shape_lines to CurveStruct points
+				shape_lines_to_points :: proc(lines: []shape_line, out_points: ^[dynamic]CurveStruct) {
+					for line in lines {
+						non_zero_append(out_points, CurveStruct{line.start, false})
+						#partial switch line.type {
+							case .Quadratic:
+								non_zero_append(out_points, CurveStruct{line.control0, true})
+							case .Line:
+							case:  // Cubic
+								non_zero_append(out_points, CurveStruct{line.control0, true})
+								non_zero_append(out_points, CurveStruct{line.control1, true})
+						}
 					}
 				}
 				
+				// Merge intersecting points (remove self-intersections)
+				// When segment i-(i+1) intersects with segment j-(j+1), remove points between i+1 and j
+				// Example: A->B->C->D, if A-B intersects C-D, result is A->intersection->D
+				merge_intersecting_points :: proc (in_points: []CurveStruct, out_points: ^[dynamic]CurveStruct, allocator: runtime.Allocator) {
+					n := len(in_points)
+					if n < 4 {
+						for p in in_points {
+							non_zero_append(out_points, p)
+						}
+						return
+					}
+					
+					// Check all segment pairs for intersection
+					for i := 0; i < n; i += 1 {
+						next_i := (i + 1) % n
+						a1 := in_points[i].p
+						a2 := in_points[next_i].p
+						
+						// Check against segments that are at least 2 away
+						for j := i + 2; j < n; j += 1 {
+							next_j := (j + 1) % n
+							
+							// Skip if segments share a point (adjacent in circular sense)
+							if next_j == i do continue
+							
+							b1 := in_points[j].p
+							b2 := in_points[next_j].p
+							
+							// Check line intersection
+							_, intersects, intersection := linalg.LinesIntersect2(a1, a2, b1, b2)
+							
+							if intersects {
+								// Found intersection!
+								// Keep: points 0 to i, intersection point, points j+1 to end
+								// Remove: points i+1 to j (inclusive)
+								
+								new_points := make([dynamic]CurveStruct, allocator)
+								
+								// Add points from 0 to i (inclusive)
+								for k := 0; k <= i; k += 1 {
+									append(&new_points, in_points[k])
+								}
+								
+								// Add intersection point
+								append(&new_points, CurveStruct{intersection, false})
+								
+								// Add points from j+1 to end
+								for k := j + 1; k < n; k += 1 {
+									append(&new_points, in_points[k])
+								}
+								
+								// Recursively process (there might be more intersections)
+								merge_intersecting_points(new_points[:], out_points, allocator)
+								return
+							}
+						}
+					}
+					
+					// No intersections found, copy all points
+					for p in in_points {
+						non_zero_append(out_points, p)
+					}
+				}
+				
+				// Convert CurveStruct points back to shape_lines (closed polygon)
+				points_to_shape_lines :: proc(points: []CurveStruct, out_lines: ^[dynamic]shape_line) {
+					points_len := len(points)
+					if points_len < 2 do return
+					
+					// Helper to get point with wrap-around for closed polygon
+					get_point :: proc(pts: []CurveStruct, idx: int) -> CurveStruct {
+						return pts[idx % len(pts)]
+					}
+					
+					i := 0
+					for i < points_len {
+						// Find how many consecutive curve points follow
+						curve_count := 0
+						for j := 1; j < points_len; j += 1 {
+							if get_point(points, i + j).isCurve {
+								curve_count += 1
+							} else {
+								break
+							}
+						}
+						
+						if curve_count == 2 {
+							// Cubic: start, ctrl0, ctrl1, end
+							non_zero_append(out_lines, shape_line{
+								start = get_point(points, i).p,
+								control0 = get_point(points, i + 1).p,
+								control1 = get_point(points, i + 2).p,
+								end = get_point(points, i + 3).p,
+								type = .Unknown,  // Cubic
+							})
+							i += 3
+						} else if curve_count == 1 {
+							// Quadratic: start, ctrl0, end
+							non_zero_append(out_lines, shape_line{
+								start = get_point(points, i).p,
+								control0 = get_point(points, i + 1).p,
+								control1 = {0,0},
+								end = get_point(points, i + 2).p,
+								type = .Quadratic,
+							})
+							i += 2
+						} else {
+							// Line: start, end
+							non_zero_append(out_lines, shape_line{
+								start = get_point(points, i).p,
+								control0 = {0,0},
+								control1 = {0,0},
+								end = get_point(points, i + 1).p,
+								type = .Line,
+							})
+							i += 1
+						}
+					}
+				}
+				
+				// Process outer stroke
+				out_points := mem.make_non_zeroed([dynamic]CurveStruct, arena)
+				shape_lines_to_points(outer_lines, &out_points)
+				
+				out_points2 := mem.make_non_zeroed([dynamic]CurveStruct, arena)
+				merge_intersecting_points(out_points[:], &out_points2, arena)
+				
+				outer_lines2 := mem.make_non_zeroed([dynamic]shape_line, arena)
+				points_to_shape_lines(out_points2[:], &outer_lines2)
+				
 				stroke_nodes[node_idx] = shape_node{
-					lines = outer_lines,
+					lines = outer_lines2[:],
 					color = node.stroke_color,
 					stroke_color = {},
 					thickness = 0,
@@ -979,7 +1117,7 @@ shapes_compute_polygon :: proc(poly:^shapes, allocator := context.allocator) -> 
 				node_idx += 1
 				
 				// 내부 스트로크
-				inner_lines := mem.make_aligned([]shape_line, node_len,64, arena)	
+				inner_lines := mem.make_aligned([]shape_line, node_len, 64, arena)	
 				inner_lines2 := mem.make_aligned([]shape_line, node_len, 64, arena)
 
 				for i:u32 = 0; i < node_len; i += 1 {
@@ -1003,18 +1141,23 @@ shapes_compute_polygon :: proc(poly:^shapes, allocator := context.allocator) -> 
 					prev_line := inner_lines[prev_idx]
 					next_line := inner_lines[next_idx]
 
-					set_line_points_outer(&inner_lines2[i], line, prev_line, next_line, -node.thickness, poly_ori == .Clockwise ? .CounterClockwise : .Clockwise)
-				}
-				for i:u32 = 0; i < node_len; i += 1 {
-					if i == node_len - 1 {
-						inner_lines2[i].end = inner_lines2[0].start
-					} else {
-						inner_lines2[i].end = inner_lines2[i + 1].start
-					}
+					set_line_points_outer(&inner_lines2[i], line, prev_line, next_line, 
+						poly_ori == .Clockwise ? node.thickness : -node.thickness,
+						poly_ori == .Clockwise ? .CounterClockwise : .Clockwise)
 				}
 				
+				//Process inner stroke
+				in_points := mem.make_non_zeroed([dynamic]CurveStruct, arena)
+				shape_lines_to_points(inner_lines2, &in_points)
+				
+				in_points2 := mem.make_non_zeroed([dynamic]CurveStruct, arena)
+				merge_intersecting_points(in_points[:], &in_points2, arena)
+				
+				inner_lines3 := mem.make_non_zeroed([dynamic]shape_line, arena)
+				points_to_shape_lines(in_points2[:], &inner_lines3)
+				
 				stroke_nodes[node_idx] = shape_node{
-					lines = inner_lines2,
+					lines = inner_lines3[:],
 					color = node.stroke_color,
 					stroke_color = {},
 					thickness = 0,
