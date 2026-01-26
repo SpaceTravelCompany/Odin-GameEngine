@@ -1058,25 +1058,28 @@ vk_recreate_surface :: proc() {
 	}
 }
 
+vk_frame:int = 0
+
 vk_draw_frame :: proc() {
-	@(static) frame:int = 0
 
 	graphics_execute_ops()
 
 	if vk_swapchain == 0 do return
 	if vk_extent.width <= 0 || vk_extent.height <= 0 {
 		vk_recreate_swap_chain()
+		vk_frame = 0
 		return
 	}
 
-	res := vk.WaitForFences(vk_device, 1, &vk_in_flight_fence[frame], true, max(u64))
+	res := vk.WaitForFences(vk_device, 1, &vk_in_flight_fence[vk_frame], true, max(u64))
 	if res != .SUCCESS do trace.panic_log("WaitForFences : ", res)
 
 
 	imageIndex: u32
-	res = vk.AcquireNextImageKHR(vk_device, vk_swapchain, max(u64), vk_image_available_semaphore[frame], 0, &imageIndex)
+	res = vk.AcquireNextImageKHR(vk_device, vk_swapchain, max(u64), vk_image_available_semaphore[vk_frame], 0, &imageIndex)
 	if res == .ERROR_OUT_OF_DATE_KHR {
 		vk_recreate_swap_chain()
+		vk_frame = 0
 		return
 	} else if res == .SUBOPTIMAL_KHR {
 	} else if res == .ERROR_SURFACE_LOST_KHR {
@@ -1099,7 +1102,7 @@ vk_draw_frame :: proc() {
 	if res != .SUCCESS do trace.panic_log("res := vk.WaitForFences(vk_device, 1, &vk_allocator_fence, true, max(u64)) : ", res)
 
 	if cmd_visible {
-		vk.BeginCommandBuffer(vk_cmd_buffer[frame], &vk.CommandBufferBeginInfo {
+		vk.BeginCommandBuffer(vk_cmd_buffer[vk_frame], &vk.CommandBufferBeginInfo {
 			sType = vk.StructureType.COMMAND_BUFFER_BEGIN_INFO,
 			flags = {vk.CommandBufferUsageFlag.RENDER_PASS_CONTINUE},
 		})
@@ -1117,7 +1120,7 @@ vk_draw_frame :: proc() {
 			clearValueCount = 2,
 			pClearValues = &([]vk.ClearValue{clsColor, clsDepthStencil})[0],
 		}
-		vk.CmdBeginRenderPass(vk_cmd_buffer[frame], &renderPassBeginInfo, vk.SubpassContents.SECONDARY_COMMAND_BUFFERS)
+		vk.CmdBeginRenderPass(vk_cmd_buffer[vk_frame], &renderPassBeginInfo, vk.SubpassContents.SECONDARY_COMMAND_BUFFERS)
 		inheritanceInfo := vk.CommandBufferInheritanceInfo {
 			sType = vk.StructureType.COMMAND_BUFFER_INHERITANCE_INFO,
 			renderPass = vk_render_pass,
@@ -1127,20 +1130,19 @@ vk_draw_frame :: proc() {
 		record_task_data :: struct {
 			cmd: ^layer,
 			inheritanceInfo: vk.CommandBufferInheritanceInfo,
-			frame: int,
+			vk_frame: int,
 		}
 		
 		record_task_proc :: proc(task: thread.Task) {
 			data := cast(^record_task_data)task.data
-			vk_record_command_buffer(data.cmd, data.inheritanceInfo, data.frame)
+			vk_record_command_buffer(data.cmd, data.inheritanceInfo, data.vk_frame)
 		}
-		
 
 		for cmd in visible_layers {
 			data := new(record_task_data, context.temp_allocator)
 			data.cmd = cmd
 			data.inheritanceInfo = inheritanceInfo
-			data.frame = frame
+			data.vk_frame = vk_frame
 			thread.pool_add_task(&g_thread_pool, context.allocator, record_task_proc, data)
 		}
 		for thread.pool_num_done(&g_thread_pool) < len(visible_layers) {
@@ -1153,28 +1155,30 @@ vk_draw_frame :: proc() {
 		cmd_buffers := make([]vk.CommandBuffer, len(visible_layers), context.temp_allocator)
 		defer delete(cmd_buffers, context.temp_allocator)
 		for cmd, i in visible_layers {
-			cmd_buffers[i] = cmd.cmd[frame].__handle
+			cmd_buffers[i] = cmd.cmd[vk_frame].__handle
 		}
-		vk.CmdExecuteCommands(vk_cmd_buffer[frame], auto_cast len(cmd_buffers), &cmd_buffers[0])
-		vk.CmdEndRenderPass(vk_cmd_buffer[frame])
-		res = vk.EndCommandBuffer(vk_cmd_buffer[frame])
+		vk.CmdExecuteCommands(vk_cmd_buffer[vk_frame], auto_cast len(cmd_buffers), &cmd_buffers[0])
+		vk.CmdEndRenderPass(vk_cmd_buffer[vk_frame])
+		res = vk.EndCommandBuffer(vk_cmd_buffer[vk_frame])
 		if res != .SUCCESS do trace.panic_log("EndCommandBuffer : ", res)
 
-		res = vk.ResetFences(vk_device, 1, &vk_in_flight_fence[frame])
+		res = vk.ResetFences(vk_device, 1, &vk_in_flight_fence[vk_frame])
 		if res != .SUCCESS do trace.panic_log("ResetFences : ", res)
 
 		waitStages := vk.PipelineStageFlags{.COLOR_ATTACHMENT_OUTPUT}
 		submitInfo := vk.SubmitInfo {
 			sType = vk.StructureType.SUBMIT_INFO,
 			waitSemaphoreCount = 1,
-			pWaitSemaphores = &vk_image_available_semaphore[frame],
+			pWaitSemaphores = &[]vk.Semaphore{vk_image_available_semaphore[vk_frame]}[0],
 			pWaitDstStageMask = &waitStages,
 			commandBufferCount = 1,
-			pCommandBuffers = &vk_cmd_buffer[frame],
+			pCommandBuffers = &vk_cmd_buffer[vk_frame],
 			signalSemaphoreCount = 1,
-			pSignalSemaphores = &vk_render_finished_semaphore[frame][imageIndex],
+			pSignalSemaphores = &vk_render_finished_semaphore[vk_frame][imageIndex],
 		}
-		res = vk.QueueSubmit(vk_graphics_queue, 1, &submitInfo, vk_in_flight_fence[frame])
+		vk.WaitForFences(vk_device, 1, &vk_in_flight_fence[(vk_frame + 1) % MAX_FRAMES_IN_FLIGHT], true, max(u64))
+		if res != .SUCCESS do trace.panic_log("WaitForFences : ", res)
+		res = vk.QueueSubmit(vk_graphics_queue, 1, &submitInfo, vk_in_flight_fence[vk_frame])
 		if res != .SUCCESS do trace.panic_log("QueueSubmit : ", res)
 
 		sync.mutex_unlock(&__g_layer_mtx)
@@ -1196,30 +1200,30 @@ vk_draw_frame :: proc() {
 			clearValueCount = 2,
 			pClearValues = &([]vk.ClearValue{clsColor, clsDepthStencil})[0],
 		}
-		vk.BeginCommandBuffer(vk_cmd_buffer[frame], &vk.CommandBufferBeginInfo {
+		vk.BeginCommandBuffer(vk_cmd_buffer[vk_frame], &vk.CommandBufferBeginInfo {
 			sType = vk.StructureType.COMMAND_BUFFER_BEGIN_INFO,
 			flags = {vk.CommandBufferUsageFlag.ONE_TIME_SUBMIT},
 		})
-		vk.CmdBeginRenderPass(vk_cmd_buffer[frame], &renderPassBeginInfo, vk.SubpassContents.INLINE)
-		vk.CmdEndRenderPass(vk_cmd_buffer[frame])
-		res = vk.EndCommandBuffer(vk_cmd_buffer[frame])
+		vk.CmdBeginRenderPass(vk_cmd_buffer[vk_frame], &renderPassBeginInfo, vk.SubpassContents.INLINE)
+		vk.CmdEndRenderPass(vk_cmd_buffer[vk_frame])
+		res = vk.EndCommandBuffer(vk_cmd_buffer[vk_frame])
 		if res != .SUCCESS do trace.panic_log("EndCommandBuffer : ", res)
 
 		submitInfo := vk.SubmitInfo {
 			sType = vk.StructureType.SUBMIT_INFO,
 			waitSemaphoreCount = 1,
-			pWaitSemaphores = &vk_image_available_semaphore[frame],
+			pWaitSemaphores = &vk_image_available_semaphore[vk_frame],
 			pWaitDstStageMask = &waitStages,
 			commandBufferCount = 1,
-			pCommandBuffers = &vk_cmd_buffer[frame],
+			pCommandBuffers = &vk_cmd_buffer[vk_frame],
 			signalSemaphoreCount = 1,
-			pSignalSemaphores = &vk_render_finished_semaphore[frame][imageIndex],
+			pSignalSemaphores = &vk_render_finished_semaphore[vk_frame][imageIndex],
 		}
 
-		res = vk.ResetFences(vk_device, 1, &vk_in_flight_fence[frame])
+		res = vk.ResetFences(vk_device, 1, &vk_in_flight_fence[vk_frame])
 		if res != .SUCCESS do trace.panic_log("ResetFences : ", res)
 
-		res = vk.QueueSubmit(vk_graphics_queue, 1, &submitInfo, 	vk_in_flight_fence[frame])
+		res = vk.QueueSubmit(vk_graphics_queue, 1, &submitInfo, 	vk_in_flight_fence[vk_frame])
 		if res != .SUCCESS do trace.panic_log("QueueSubmit : ", res)
 
 		sync.mutex_unlock(&__g_layer_mtx)
@@ -1227,7 +1231,7 @@ vk_draw_frame :: proc() {
 	presentInfo := vk.PresentInfoKHR {
 		sType = vk.StructureType.PRESENT_INFO_KHR,
 		waitSemaphoreCount = 1,
-		pWaitSemaphores = &vk_render_finished_semaphore[frame][imageIndex],
+		pWaitSemaphores = &vk_render_finished_semaphore[vk_frame][imageIndex],
 		swapchainCount = 1,
 		pSwapchains = &vk_swapchain,
 		pImageIndices = &imageIndex,
@@ -1237,19 +1241,23 @@ vk_draw_frame :: proc() {
 
 	if res == .ERROR_OUT_OF_DATE_KHR {
 		vk_recreate_swap_chain()
+		vk_frame = 0
 		return
 	} else if res == .SUBOPTIMAL_KHR {
+		vk_frame = 0
 		return
 	} else if res == .ERROR_SURFACE_LOST_KHR {
 		vk_recreate_surface()
 		vk_recreate_swap_chain()
+		vk_frame = 0
 		return
 	} else if size_updated {
 		vk_recreate_swap_chain()
+		vk_frame = 0
 		return
 	} else if res != .SUCCESS { trace.panic_log("QueuePresentKHR : ", res) }
 
-	frame = (frame + 1) % MAX_FRAMES_IN_FLIGHT
+	vk_frame = (vk_frame + 1) % MAX_FRAMES_IN_FLIGHT
 	sync.sema_post(&g_wait_rendering_sem)
 }
 
@@ -1368,9 +1376,9 @@ vk_transition_image_layout :: proc(cmd:vk.CommandBuffer, image:vk.Image, mip_lev
 	&barrier)
 }
 
-vk_record_command_buffer :: proc(cmd:^layer, _inheritanceInfo:vk.CommandBufferInheritanceInfo, frame:int) {
+vk_record_command_buffer :: proc(cmd:^layer, _inheritanceInfo:vk.CommandBufferInheritanceInfo, vk_frame:int) {
 	inheritanceInfo := _inheritanceInfo
-	c := cmd.cmd[frame]
+	c := cmd.cmd[vk_frame]
 	beginInfo := vk.CommandBufferBeginInfo {
 		sType = vk.StructureType.COMMAND_BUFFER_BEGIN_INFO,
 		flags = {vk.CommandBufferUsageFlag.RENDER_PASS_CONTINUE, vk.CommandBufferUsageFlag.ONE_TIME_SUBMIT},
