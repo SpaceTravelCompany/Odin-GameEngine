@@ -18,8 +18,8 @@ Extends iobject with tile texture array and tile index
 tile_image :: struct {
     using _:engine.itransform_object,
     tile_uniform:engine.iresource,
-    tile_idx:u32,
     src: ^tile_texture_array,
+    tile_idx:u32,
 }
 
 @private get_uniform_resources_tile_image :: #force_inline proc(self:^tile_image) -> []engine.iresource {

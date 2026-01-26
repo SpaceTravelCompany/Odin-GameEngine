@@ -322,10 +322,10 @@ mouse_pos :: #force_inline proc "contextless" () -> linalg.point {
 
 general_input_state :: struct {
     handle:rawptr,
-    left_trigger:f32,
-    right_trigger:f32,
     left_thumb: linalg.point,
     right_thumb: linalg.point,
+    left_trigger:f32,
+    right_trigger:f32,
     buttons:general_input_buttons,
 }
 

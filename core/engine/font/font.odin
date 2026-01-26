@@ -50,9 +50,9 @@ font_render_opt :: struct {
     scale:linalg.point,    //(0,0) -> (1,1)
     offset:linalg.point,
     pivot:linalg.point,
-    area:Maybe(linalg.point),
-    color:Maybe(linalg.point3dw),
     stroke_color:linalg.point3dw,//if thickness == 0, ignore
+    color:Maybe(linalg.point3dw),
+    area:Maybe(linalg.point),
     thickness:f32,//if 0, no stroke
     flag:engine.resource_usage,
 }

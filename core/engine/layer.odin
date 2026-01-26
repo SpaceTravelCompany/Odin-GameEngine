@@ -13,12 +13,12 @@ Render command structure for managing render objects
 Manages a collection of objects to be rendered and their command buffers
 */
 layer :: struct {
-	visible: bool,
 	scene: ^[dynamic]^iobject,
     cmd:command_buffer,
     obj_lock:sync.Mutex,
-	creation_allocator: runtime.Allocator,
 	cmd_pool: vk.CommandPool,
+	creation_allocator: runtime.Allocator,
+	visible: bool,
 }
 
 @private __g_layer : [dynamic]^layer = nil

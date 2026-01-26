@@ -18,15 +18,15 @@ pos_align_y :: enum {
     bottom,
 }
 
-//do subtype to iobject
+//do subtype to itransform_object
 gui_component :: struct {
     gui_pos : linalg.point,
     gui_center_pt : linalg.point,
     gui_scale : linalg.point,
+    gui_match_proj:^engine.projection,
     gui_rotation : f32,
     gui_align_x : pos_align_x,
     gui_align_y : pos_align_y,
-	gui_match_proj:^engine.projection,
 }
 
 
@@ -45,7 +45,7 @@ Returns:
 - None
 */
  gui_component_init :: proc (self:^$T, self_component:^gui_component)
-    where intrinsics.type_is_subtype_of(T, engine.iobject)  {
+    where intrinsics.type_is_subtype_of(T, engine.itransform_object)  {
     
     window_width :f32 = 2.0 / (self_component.gui_match_proj == nil ? engine.def_projection().mat[0][0] : self_component.gui_match_proj.mat[0][0])
     window_height :f32 = 2.0 / (self_component.gui_match_proj == nil ? engine.def_projection().mat[1][1] : self_component.gui_match_proj.mat[1][1])

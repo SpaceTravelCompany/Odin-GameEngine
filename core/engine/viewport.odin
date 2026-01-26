@@ -8,16 +8,16 @@ import vk "vendor:vulkan"
 Viewport structure for managing rendering areas and camera/projection settings
 
 Contains:
-- viewport_area: Optional rectangle defining the viewport area (default: nil means window size)
 - camera: Pointer to the camera for view transformations
 - projection: Pointer to the projection for projection transformations
 - set: Descriptor set for uniform resources
+- viewport_area: Optional rectangle defining the viewport area (default: nil means window size)
 */
 viewport :: struct {
-	viewport_area : Maybe(linalg.rect),
 	camera : ^camera,
 	projection : ^projection,
 	set:descriptor_set,
+	viewport_area : Maybe(linalg.rect),
 }
 
 viewport_descriptor_set_layout :: proc "contextless" () -> vk.DescriptorSetLayout {
