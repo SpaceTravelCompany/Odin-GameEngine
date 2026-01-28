@@ -5192,6 +5192,11 @@ gb_internal ExactValue get_constant_field_single(CheckerContext *c, ExactValue v
 						}
 					} else {
 						TypeAndValue index_tav = fv->field->tav;
+						if (index_tav.mode != Addressing_Constant) {
+							if (success_) *success_ = false;
+							if (finish_) *finish_ = true;
+							return empty_exact_value;
+						}
 						GB_ASSERT(index_tav.mode == Addressing_Constant);
 						ExactValue index_value = index_tav.value;
 						if (is_type_enumerated_array(node->tav.type)) {
@@ -11064,8 +11069,20 @@ gb_internal ExprKind check_type_assertion(CheckerContext *c, Operand *o, Ast *no
 end:;
 
 	if ((c->state_flags & StateFlag_no_type_assert) == 0) {
-		add_package_dependency(c, "runtime", "type_assertion_check");
-		add_package_dependency(c, "runtime", "type_assertion_check2");
+		bool has_context = true;
+		if (c->proc_name.len == 0 && c->curr_proc_sig == nullptr) {
+			has_context = false;
+		} else if ((c->scope->flags & ScopeFlag_ContextDefined) == 0) {
+			has_context = false;
+		}
+
+		if (has_context) {
+			add_package_dependency(c, "runtime", "type_assertion_check_with_context");
+			add_package_dependency(c, "runtime", "type_assertion_check2_with_context");
+		} else {
+			add_package_dependency(c, "runtime", "type_assertion_check_contextless");
+			add_package_dependency(c, "runtime", "type_assertion_check2_contextless");
+		}
 	}
 	return kind;
 }
