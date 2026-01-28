@@ -17,16 +17,16 @@ Extends iobject with tile texture array and tile index
 */
 tile_image :: struct {
     using _:engine.itransform_object,
-    tile_uniform:engine.iresource,
     src: ^tile_texture_array,
     tile_idx:u32,
+	tile_uniform:byte,
 }
 
 @private get_uniform_resources_tile_image :: #force_inline proc(self:^tile_image) -> []engine.union_resource {
     res := mem.make_non_zeroed([]engine.union_resource, 3, context.temp_allocator)
-    res[0].buf = engine.get_iresource_buffer(&self.mat_uniform, false)
-    res[1].buf = engine.get_iresource_buffer(&self.color_transform.mat_uniform, false)
-    res[2].buf = engine.get_iresource_buffer(&self.tile_uniform, false)
+    res[0] = engine.graphics_get_resource(self).(^engine.buffer_resource)
+    res[1] = engine.graphics_get_resource(self.color_transform).(^engine.buffer_resource)
+    res[2] = engine.graphics_get_resource(&self.tile_uniform).(^engine.buffer_resource)
     return res[:]
 }
 
@@ -50,6 +50,12 @@ colorTransform:^engine.color_transform = nil, vtable:^engine.iobject_vtable = ni
     if self.vtable.deinit == nil do self.vtable.deinit = auto_cast _super_tile_image_deinit
 
     if self.vtable.get_uniform_resources == nil do self.vtable.get_uniform_resources = auto_cast get_uniform_resources_tile_image
+
+	 engine.buffer_resource_create_buffer(&self.tile_uniform, {
+        size = size_of(u32),
+        type = .UNIFORM,
+        resource_usage = .CPU,
+    }, mem.ptr_to_bytes(&self.tile_idx), true)
 
     engine.itransform_object_init(self, colorTransform, self.vtable)
 	self.actual_type = typeid_of(tile_image)
@@ -213,7 +219,7 @@ inPixelFmt:img.color_fmt = .RGBA, allocator := context.allocator) {
         }
     }
   
-    engine.buffer_resource_create_texture(&self.texture, {
+    engine.buffer_resource_create_texture(self, {
         width = tile_width,
         height = tile_height,
         use_gcpu_mem = false,
@@ -224,9 +230,9 @@ inPixelFmt:img.color_fmt = .RGBA, allocator := context.allocator) {
         type = .TEX2D,
     }, self.sampler, allocPixels, false, allocator)
 
-	if self.set.__resources != nil do engine.__graphics_free_resources(self.set.__resources)
-    self.set.__resources = engine.__graphics_alloc_resources(1)
-    self.set.__resources[0].tex = engine.get_iresource_texture(&self.texture, false)
+	if self.set.__resources != nil do engine.__graphics_free_descriptor_resources(self.set.__resources)
+    self.set.__resources = engine.__graphics_alloc_descriptor_resources(1)
+    self.set.__resources[0] = engine.graphics_get_resource(self).(^engine.texture_resource)
     engine.update_descriptor_sets(mem.slice_ptr(&self.set, 1))
 }
 
@@ -240,9 +246,9 @@ Returns:
 - None
 */
 tile_texture_array_deinit :: #force_inline proc(self:^tile_texture_array) {
-    engine.buffer_resource_deinit(&self.texture)
+    engine.buffer_resource_deinit(self)
 	if self.set.__resources != nil {
-		engine.__graphics_free_resources(self.set.__resources)
+		engine.__graphics_free_descriptor_resources(self.set.__resources)
 		self.set.__resources = nil
 	}
 }
@@ -256,7 +262,9 @@ Returns:
 - Width of each tile in pixels
 */
 tile_texture_array_width :: #force_inline proc "contextless" (self:^tile_texture_array) -> u32 {
-    return engine.get_iresource_texture(&self.texture, false).option.width
+    res, ok := engine.graphics_get_resource(self).(^engine.texture_resource)
+    if !ok do return 0
+    return res.option.width
 }
 
 /*
@@ -269,7 +277,9 @@ Returns:
 - Height of each tile in pixels
 */
 tile_texture_array_height :: #force_inline proc "contextless" (self:^tile_texture_array) -> u32 {
-    return engine.get_iresource_texture(&self.texture, false).option.height
+    res, ok := engine.graphics_get_resource(self).(^engine.texture_resource)
+    if !ok do return 0
+    return res.option.height
 }
 
 /*
@@ -282,5 +292,7 @@ Returns:
 - Number of tiles in the array
 */
 tile_texture_array_count :: #force_inline proc "contextless" (self:^tile_texture_array) -> u32 {
-    return engine.get_iresource_texture(&self.texture, false).option.len
+    res, ok := engine.graphics_get_resource(self).(^engine.texture_resource)
+    if !ok do return 0
+    return res.option.len
 }

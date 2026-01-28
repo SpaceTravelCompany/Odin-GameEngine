@@ -249,8 +249,8 @@ texture_init :: proc(
 		single = false,
 	}, self.sampler, pixels, false, pixels_allocator)
 
-	if self.set.__resources != nil do __graphics_free_resources(self.set.__resources)
-	self.set.__resources = __graphics_alloc_resources(1)
+	if self.set.__resources != nil do __graphics_free_descriptor_resources(self.set.__resources)
+	self.set.__resources = __graphics_alloc_descriptor_resources(1)
 	self.set.__resources[0] = graphics_get_resource(self).(^texture_resource)
 	update_descriptor_sets(mem.slice_ptr(&self.set, 1))
 }
@@ -296,8 +296,8 @@ texture_init_grey :: proc(
 		single = false,
 	}, self.sampler, pixels, false, pixels_allocator)
 
-	if self.set.__resources != nil do __graphics_free_resources(self.set.__resources)
-	self.set.__resources = __graphics_alloc_resources(1)
+	if self.set.__resources != nil do __graphics_free_descriptor_resources(self.set.__resources)
+	self.set.__resources = __graphics_alloc_descriptor_resources(1)
 	self.set.__resources[0] = graphics_get_resource(self).(^texture_resource)
 	update_descriptor_sets(mem.slice_ptr(&self.set, 1))
 }
@@ -402,7 +402,7 @@ Returns:
 texture_deinit :: #force_inline proc(self:^texture) {
     buffer_resource_deinit(self)
 	if self.set.__resources != nil {
-		__graphics_free_resources(self.set.__resources)
+		__graphics_free_descriptor_resources(self.set.__resources)
 		self.set.__resources = nil
 	}
 }
@@ -521,8 +521,8 @@ texture_array_init :: proc(self:^texture_array, width:u32, height:u32, count:u32
         resource_usage = .GPU,
     }, self.sampler, allocPixels, false, context.allocator)
 
-	if self.set.__resources != nil do __graphics_free_resources(self.set.__resources)
-    self.set.__resources = __graphics_alloc_resources(1)
+	if self.set.__resources != nil do __graphics_free_descriptor_resources(self.set.__resources)
+    self.set.__resources = __graphics_alloc_descriptor_resources(1)
     self.set.__resources[0] = graphics_get_resource(self).(^texture_resource)
     update_descriptor_sets(mem.slice_ptr(&self.set, 1))
 }
@@ -539,7 +539,7 @@ Returns:
 texture_array_deinit :: #force_inline proc(self:^texture_array) {
     buffer_resource_deinit(self)
 	if self.set.__resources != nil {
-		__graphics_free_resources(self.set.__resources)
+		__graphics_free_descriptor_resources(self.set.__resources)
 		self.set.__resources = nil
 	}
 }

@@ -161,7 +161,7 @@ _super_itransform_object_deinit :: proc (self:^itransform_object) {
 		buffer_resource_deinit(self)
 	}
 	if self.set.__resources != nil {
-		__graphics_free_resources(self.set.__resources)
+		__graphics_free_descriptor_resources(self.set.__resources)
 		self.set.__resources = nil
 	}
 }
@@ -200,8 +200,8 @@ get_uniform_resources_transform_object :: proc(self:^itransform_object) -> []uni
 
 
 @private __itransform_object_update_uniform :: proc(self:^itransform_object, resources:[]union_resource) {
-   	if self.set.__resources != nil do __graphics_free_resources(self.set.__resources)
-    self.set.__resources = __graphics_alloc_resources(len(resources))
+   	if self.set.__resources != nil do __graphics_free_descriptor_resources(self.set.__resources)
+    self.set.__resources = __graphics_alloc_descriptor_resources(len(resources))
     mem.copy_non_overlapping(&self.set.__resources[0], &resources[0], len(resources) * size_of(union_resource))
     update_descriptor_sets(mem.slice_ptr(&self.set, 1))
 }
@@ -351,11 +351,11 @@ __index_buf_update :: #force_inline proc (self:^__index_buf, array:[]u32, alloca
 }
 
 __vertex_buf :: struct($NodeType:typeid) {
-	dummy:rawptr,
+	dummy:byte,
 }
 __index_buf :: distinct __vertex_buf(u32)
 __storage_buf :: struct($NodeType:typeid) {
-	dummy:rawptr,
+	dummy:byte,
 }
 
 /*

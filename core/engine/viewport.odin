@@ -41,8 +41,8 @@ viewport_init_update :: proc (self:^viewport) {
     	self.set.layout = viewport_descriptor_set_layout()
 	}
 	
-	if self.set.__resources != nil do __graphics_free_resources(self.set.__resources)
-	self.set.__resources = __graphics_alloc_resources(2)
+	if self.set.__resources != nil do __graphics_free_descriptor_resources(self.set.__resources)
+	self.set.__resources = __graphics_alloc_descriptor_resources(2)
 	self.set.__resources[0] = graphics_get_resource(self.camera)
 	self.set.__resources[1] = graphics_get_resource(self.projection)
 	update_descriptor_sets(mem.slice_ptr(&self.set, 1))
@@ -51,7 +51,7 @@ viewport_init_update :: proc (self:^viewport) {
 
 viewport_deinit :: proc(self:^viewport) {
 	if self.set.__resources != nil {
-		__graphics_free_resources(self.set.__resources)
+		__graphics_free_descriptor_resources(self.set.__resources)
 		self.set.__resources = nil
 	}
 }

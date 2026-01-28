@@ -12,8 +12,8 @@ Contains frame information and uniform buffer for frame data
 */
 ianimate_object :: struct {
     using _:engine.itransform_object,
-    frame_uniform:rawptr,
     frame:u32,
+	frame_uniform:byte,
 }
 
 /*
@@ -239,7 +239,7 @@ colorTransform:^engine.color_transform = nil, vtable:^ianimate_object_vtable = n
 
     if self.vtable.get_uniform_resources == nil do self.vtable.get_uniform_resources = auto_cast get_uniform_resources_animate_image
 
-    engine.buffer_resource_create_buffer(self.frame_uniform, {
+    engine.buffer_resource_create_buffer(&self.frame_uniform, {
         size = size_of(u32),
         type = .UNIFORM,
         resource_usage = .CPU,
@@ -250,7 +250,7 @@ colorTransform:^engine.color_transform = nil, vtable:^ianimate_object_vtable = n
 }
 
 _super_animate_image_deinit :: proc(self:^animate_image) {
-    engine.buffer_resource_deinit(self.frame_uniform)
+    engine.buffer_resource_deinit(&self.frame_uniform)
     engine._super_itransform_object_deinit(auto_cast self)
 }
 
@@ -349,6 +349,6 @@ _super_animate_image_draw :: proc (self:^animate_image, cmd:engine.command_buffe
     res := mem.make_non_zeroed([]engine.union_resource, 3, context.temp_allocator)
     res[0] = engine.graphics_get_resource(self)
     res[1] = engine.graphics_get_resource(self.color_transform)
-    res[2] = engine.graphics_get_resource(self.frame_uniform)
+    res[2] = engine.graphics_get_resource(&self.frame_uniform)
     return res[:]
 }

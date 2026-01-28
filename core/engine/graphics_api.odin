@@ -49,9 +49,6 @@ graphics_device :: #force_inline proc "contextless" () -> vk.Device {
 // Default Color Transform
 @private __def_color_transform: color_transform
 
-@private g_wait_rendering_sem: sync.Sema
-
-
 union_resource :: union {
 	^buffer_resource,
 	^texture_resource,
@@ -262,23 +259,19 @@ get_nearest_sampler :: #force_inline proc "contextless" () -> vk.Sampler {
 	vk_draw_frame()
 }
 
-graphics_wait_device_idle :: #force_inline proc "contextless" () {
+@private graphics_wait_device_idle :: #force_inline proc "contextless" () {
 	vk_wait_device_idle()
 }
 
-graphics_wait_graphics_idle :: #force_inline proc "contextless" () {
+@private graphics_wait_graphics_idle :: #force_inline proc "contextless" () {
 	vk_wait_graphics_idle()
 }
 
-graphics_wait_present_idle :: #force_inline proc "contextless" () {
+@private graphics_wait_present_idle :: #force_inline proc "contextless" () {
 	vk_wait_present_idle()
 }
 
-graphics_wait_rendering :: #force_inline proc () {
-    sync.sema_wait(&g_wait_rendering_sem)
-}
-
-graphics_execute_ops :: #force_inline proc() {
+@private graphics_execute_ops :: #force_inline proc() {
 	vk_op_execute()
 }
 
@@ -891,11 +884,11 @@ animate_img_descriptor_set_layout :: proc() -> vk.DescriptorSetLayout {
 	return __animate_img_descriptor_set_layout
 }
 
-__graphics_alloc_resources :: proc(len:int) -> []union_resource {
+__graphics_alloc_descriptor_resources :: proc(len:int) -> []union_resource {
 	return make([]union_resource, len, vk_def_allocator())
 }
 
-__graphics_free_resources :: proc(resources: []union_resource) {
+__graphics_free_descriptor_resources :: proc(resources: []union_resource) {
 	delete(resources, vk_def_allocator())
 }
 
@@ -987,3 +980,22 @@ graphics_get_resource_draw :: proc "contextless" (self: rawptr) -> union_resourc
 @private gMapResourceMtx: sync.Mutex
 @private gBufferPool: pool.Pool(buffer_resource)
 @private gTexturePool: pool.Pool(texture_resource)
+
+//!DO NOT CALL THIS FROM WITHIN ENGINE CALLBACKS
+render_lock :: proc "contextless" () {
+	sync.mutex_lock(&__g_layer_mtx)
+}
+//!DO NOT CALL THIS FROM WITHIN ENGINE CALLBACKS
+render_unlock :: proc "contextless" () {
+	sync.mutex_unlock(&__g_layer_mtx)
+}
+//!DO NOT CALL THIS FROM WITHIN ENGINE CALLBACKS
+@(deferred_in=render_unlock)
+render_guard :: proc "contextless" () -> bool {
+	sync.mutex_lock(&__g_layer_mtx)
+	return true
+}
+//!DO NOT CALL THIS FROM WITHIN ENGINE CALLBACKS
+render_try_lock :: proc "contextless" () -> bool {
+	return sync.mutex_try_lock(&__g_layer_mtx)
+}

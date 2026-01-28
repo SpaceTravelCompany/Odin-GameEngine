@@ -185,6 +185,8 @@ vk_clean_sync_object :: proc() {
 vk_frame: int = 0
 
 vk_draw_frame :: proc() {
+	sync.mutex_lock(&__g_layer_mtx)
+	defer sync.mutex_unlock(&__g_layer_mtx)
 	graphics_execute_ops()
 
 	if vk_swapchain == 0 do return
@@ -210,7 +212,7 @@ vk_draw_frame :: proc() {
 	} else if res != .SUCCESS { trace.panic_log("AcquireNextImageKHR : ", res) }
 
 	cmd_visible := false
-	sync.mutex_lock(&__g_layer_mtx)
+
 	visible_layers := make([dynamic]^layer, 0, len(__g_layer), context.temp_allocator)
 	defer delete(visible_layers)
 	if __g_layer != nil && len(__g_layer) > 0 {
@@ -299,8 +301,6 @@ vk_draw_frame :: proc() {
 		sync.mutex_lock(&vk_queue_mutex)
 		res = vk.QueueSubmit(vk_graphics_queue, 1, &submitInfo, vk_in_flight_fence[vk_frame])
 		if res != .SUCCESS do trace.panic_log("QueueSubmit : ", res)
-
-		sync.mutex_unlock(&__g_layer_mtx)
 	} else {
 		//?그릴 오브젝트가 없는 경우
 		waitStages := vk.PipelineStageFlags{.COLOR_ATTACHMENT_OUTPUT}
@@ -345,8 +345,6 @@ vk_draw_frame :: proc() {
 		sync.mutex_lock(&vk_queue_mutex)
 		res = vk.QueueSubmit(vk_graphics_queue, 1, &submitInfo, 	vk_in_flight_fence[vk_frame])
 		if res != .SUCCESS do trace.panic_log("QueueSubmit : ", res)
-
-		sync.mutex_unlock(&__g_layer_mtx)
 	}
 	presentInfo := vk.PresentInfoKHR {
 		sType = vk.StructureType.PRESENT_INFO_KHR,
@@ -379,5 +377,4 @@ vk_draw_frame :: proc() {
 	} else if res != .SUCCESS { trace.panic_log("QueuePresentKHR : ", res) }
 
 	vk_frame = (vk_frame + 1) % MAX_FRAMES_IN_FLIGHT
-	sync.sema_post(&g_wait_rendering_sem)
 }

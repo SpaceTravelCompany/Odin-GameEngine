@@ -39,7 +39,9 @@ device_callback :: proc "stdcall" (token: GameInput.CallbackToken, ctx: rawptr, 
 				sync.mutex_unlock(&devices_mtx)
 				
 				if general_input_change_callback != nil {
+					sync.mutex_lock(&__g_layer_mtx)
 					general_input_change_callback(rawptr(device), false)
+					sync.mutex_unlock(&__g_layer_mtx)
 				}
 				break
 			}
@@ -90,7 +92,9 @@ reading_callback :: proc "stdcall" (token: GameInput.CallbackToken, ctx: rawptr,
 		buttons = current_buttons,
 	}
 
+	sync.mutex_lock(&__g_layer_mtx)
 	general_input_callback(state)
+	sync.mutex_unlock(&__g_layer_mtx)
 }
 
 

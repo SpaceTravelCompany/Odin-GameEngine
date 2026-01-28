@@ -347,8 +347,6 @@ Returns:
 - None
 */
 layer_size_all :: proc () {
-	sync.mutex_lock(&__g_layer_mtx)
-	defer sync.mutex_unlock(&__g_layer_mtx)
 	for cmd in __g_viewports {
 		projection_size(cmd.projection)
 	}
