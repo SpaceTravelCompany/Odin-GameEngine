@@ -5,6 +5,7 @@ import "base:runtime"
 import "core:mem"
 import "core:debug/trace"
 import vk "vendor:vulkan"
+import "core:container/pool"
 
 
 // ============================================================================
@@ -120,6 +121,6 @@ executeReleaseUniform :: proc(
 
 		return
 	} else {
-		free(buf, vk_def_allocator())
+		pool.put(&gBufferPool, buf)
 	}
 }

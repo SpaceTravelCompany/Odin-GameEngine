@@ -3,6 +3,7 @@ package engine
 
 import "base:runtime"
 import "core:debug/trace"
+import "core:container/pool"
 import vk "vendor:vulkan"
 
 
@@ -23,13 +24,13 @@ buffer_resource_CreateBufferNoAsync :: #force_inline proc(
 
 buffer_resource_DestroyBufferNoAsync :: proc(self: ^buffer_resource) {
 	vk_mem_buffer_UnBindBufferNode(auto_cast self.mem_buffer, self.__resource, self.idx)
-	free(self, vk_def_allocator())
+	pool.put(&gBufferPool, self)
 }
 
 buffer_resource_DestroyTextureNoAsync :: proc(self: ^texture_resource) {
 	vk.DestroyImageView(vk_device, self.img_view, nil)
 	vk_mem_buffer_UnBindBufferNode(auto_cast self.mem_buffer, self.__resource, self.idx)
-	free(self, vk_def_allocator())
+	pool.put(&gTexturePool, self)
 }
 
 buffer_resource_MapCopy :: #force_inline proc(
@@ -95,7 +96,7 @@ executeCreateBuffer :: proc(
 		bufInfo.usage |= {.TRANSFER_DST}
 		if src.option.size > auto_cast len(data) do trace.panic_log("create_buffer _data not enough size. ", src.option.size, ", ", len(data))
 
-		last = new(buffer_resource, vk_def_allocator())
+		last = pool.get(&gBufferPool)
 		buffer_resource_CreateBufferNoAsync(outQueue, last, {
 			size           = src.option.size,
 			resource_usage = .CPU,
@@ -115,7 +116,7 @@ executeCreateBuffer :: proc(
 	if data != nil {
 		if src.option.resource_usage != .GPU {
 			append_op_save(OpMapCopy{
-					p_resource = src,
+					p_resource = (^base_resource)(src),
 					data       = data,
 				}, outQueue)
 		} else {
@@ -195,7 +196,7 @@ executeCreateTexture :: proc(
 	if data != nil && src.option.resource_usage == .GPU {
 		imgInfo.usage |= {.TRANSFER_DST}
 
-		last = new(buffer_resource, vk_def_allocator())
+		last = pool.get(&gBufferPool)
 		buffer_resource_CreateBufferNoAsync(outQueue, last, {
 			size           = auto_cast (imgInfo.extent.width * imgInfo.extent.height * imgInfo.extent.depth * imgInfo.arrayLayers * bit),
 			resource_usage = .CPU,
@@ -234,7 +235,7 @@ executeCreateTexture :: proc(
 	if data != nil {
 		if src.option.resource_usage != .GPU {
 			append_op_save(OpMapCopy{
-				p_resource = src,
+				p_resource = (^base_resource)(src),
 				data       = data,
 				allocator  = allocator,
 			}, outQueue)

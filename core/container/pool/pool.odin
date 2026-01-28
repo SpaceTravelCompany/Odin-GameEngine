@@ -113,28 +113,28 @@ _set_next :: proc(p: ^Pool($T), elem: ^T, next: ^T) {
 	(^^T)(uintptr(elem) + p.link_off)^ = next
 }
 
-@(disabled=.Address not_in ODIN_SANITIZER_FLAGS)
+//@(disabled=.Address not_in ODIN_SANITIZER_FLAGS)
 _poison_elem :: proc(p: ^Pool($T), elem: ^T) {
 	if p.link_off > 0 {
-		sanitizer.address_poison_rawptr(elem, int(p.link_off))
+		//sanitizer.address_poison_rawptr(elem, int(p.link_off))
 	}
 
 	len := size_of(T) - p.link_off - size_of(rawptr)
 	if len > 0 {
-		ptr := rawptr(uintptr(elem) + p.link_off + size_of(rawptr))
-		sanitizer.address_poison_rawptr(ptr, int(len))
+		//ptr := rawptr(uintptr(elem) + p.link_off + size_of(rawptr))
+		//sanitizer.address_poison_rawptr(ptr, int(len))
 	}
 }
 
-@(disabled=.Address not_in ODIN_SANITIZER_FLAGS)
+//@(disabled=.Address not_in ODIN_SANITIZER_FLAGS)
 _unpoison_elem :: proc(p: ^Pool($T), elem: ^T) {
 	if p.link_off > 0 {
-		sanitizer.address_unpoison_rawptr(elem, int(p.link_off))
+		//sanitizer.address_unpoison_rawptr(elem, int(p.link_off))
 	}
 
 	len := size_of(T) - p.link_off - size_of(rawptr)
 	if len > 0 {
-		ptr := rawptr(uintptr(elem) + p.link_off + size_of(rawptr))
-		sanitizer.address_unpoison_rawptr(ptr, int(len))
+		//ptr := rawptr(uintptr(elem) + p.link_off + size_of(rawptr))
+		//sanitizer.address_unpoison_rawptr(ptr, int(len))
 	}
 }
