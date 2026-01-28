@@ -14,7 +14,7 @@ import "core:engine"
 
 /*
 Shape source structure containing vertex and index buffers
-
+ 
 */
 shape_src :: struct {
     vertexBuf:engine.__vertex_buf(geometry.shape_vertex2d),
@@ -53,12 +53,6 @@ colorTransform:^engine.color_transform = nil, vtable:^engine.iobject_vtable = ni
 	self.actual_type = typeid_of(shape)
 }
 
-shape_update_src :: #force_inline proc "contextless" (self:^shape, src:^shape_src) {
-    self.src = src
-}
-shape_get_src :: #force_inline proc "contextless" (self:^shape) -> ^shape_src {
-    return self.src
-}
 shape_get_color_transform :: #force_inline proc "contextless" (self:^shape) -> ^engine.color_transform {
     return engine.itransform_object_get_color_transform(self)
 }
@@ -77,15 +71,23 @@ _super_shape_draw :: proc (self:^shape, cmd:engine.command_buffer, viewport:^eng
 }
 
 shape_src_bind_and_draw :: proc(self:^shape_src, set:^engine.descriptor_set, cmd:engine.command_buffer, viewport:^engine.viewport) {
+	buffer, ok : = engine.graphics_get_resource_draw(&self.vertexBuf).(^engine.buffer_resource)
+	if !ok do return
+	idx_buffer, ok2 : = engine.graphics_get_resource_draw(&self.indexBuf).(^engine.buffer_resource)
+	if !ok2 do return
+
     engine.graphics_cmd_bind_pipeline(cmd, .GRAPHICS, engine.get_shape_pipeline().__pipeline)
     engine.graphics_cmd_bind_descriptor_sets(cmd, .GRAPHICS, engine.get_shape_pipeline().__pipeline_layout, 0, 2,
         &([]vk.DescriptorSet{set.__set, viewport.set.__set})[0], 0, nil)
 
 	offsets: vk.DeviceSize = 0
-    engine.graphics_cmd_bind_vertex_buffers(cmd, 0, 1, []engine.iresource{self.vertexBuf.buf}, &offsets)
-    engine.graphics_cmd_bind_index_buffer(cmd, self.indexBuf.buf, 0, .UINT32)
+    engine.graphics_cmd_bind_vertex_buffers(cmd, 0, 1, []^engine.buffer_resource{
+		buffer
+	}, &offsets)
+    engine.graphics_cmd_bind_index_buffer(cmd, idx_buffer, 0, .UINT32)
 
-    engine.graphics_cmd_draw_indexed(cmd, auto_cast ((^engine.buffer_resource)(self.indexBuf.buf).option.len / size_of(u32)), 1, 0, 0, 0)
+    engine.graphics_cmd_draw_indexed(cmd,  u32(idx_buffer.option.size / size_of(u32)),
+	 1, 0, 0, 0)
 }
 
 shape_src_init_raw :: proc(self:^shape_src, raw:^geometry.raw_shape, flag:engine.resource_usage = .GPU, allocator :Maybe(runtime.Allocator) = nil) {
@@ -163,7 +165,8 @@ shape_src_deinit :: proc(self:^shape_src) {
 
 
 shape_src_is_inited :: proc "contextless" (self:^shape_src) -> bool {
-    return self.vertexBuf.buf != nil
+	buf, ok := engine.graphics_get_resource(&self.vertexBuf).(^engine.buffer_resource)
+    return ok
 }
 
 

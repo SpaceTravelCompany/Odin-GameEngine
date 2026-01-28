@@ -195,7 +195,7 @@ projection_update_matrix_raw :: proc(self:^projection, _mat:linalg.matrix44) {
         mat = _mat
     }
     self.mat = _mat
-    buffer_resource_copy_update(self.mat_uniform, &mat)
+    buffer_resource_copy_update(self, &mat)
 }
 
 @private __projection_update_ortho :: #force_inline proc(self:^projection, left:f32, right:f32, bottom:f32, top:f32, near:f32 = 0.1, far:f32 = 100, flip_z_axis_for_vulkan := true) {
@@ -256,8 +256,8 @@ projection_update_matrix_raw :: proc(self:^projection, _mat:linalg.matrix44) {
     } else {
         mat = self.mat
     }	
-    self.mat_uniform = buffer_resource_create_buffer({
-        len = size_of(linalg.matrix44),
+    buffer_resource_create_buffer(self, {
+        size = size_of(linalg.matrix44),
         type = .UNIFORM,
         resource_usage = .CPU,
         single = false,
@@ -275,8 +275,7 @@ Returns:
 - None
 */
 projection_deinit :: proc(self:^projection) {
-    buffer_resource_deinit(self.mat_uniform)
-	self.mat_uniform = nil
+    buffer_resource_deinit(self)
 }
 
 /*

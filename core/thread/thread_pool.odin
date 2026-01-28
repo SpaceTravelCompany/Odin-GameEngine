@@ -293,6 +293,15 @@ pool_shutdown :: proc(pool: ^Pool, exit_code: int = 1) {
 	}
 }
 
+pool_wait_all :: proc(pool: ^Pool) {
+	for 0 < pool_num_outstanding(pool) {
+		yield()
+	}
+	for {
+		pool_pop_done(pool) or_break
+	}
+}
+
 // Number of tasks waiting to be processed. Only informational, mostly for
 // debugging. Don't rely on this value being consistent with other num_*
 // values.

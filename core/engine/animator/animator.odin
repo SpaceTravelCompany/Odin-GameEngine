@@ -12,7 +12,7 @@ Contains frame information and uniform buffer for frame data
 */
 ianimate_object :: struct {
     using _:engine.itransform_object,
-    frame_uniform:engine.iresource,
+    frame_uniform:rawptr,
     frame:u32,
 }
 
@@ -198,7 +198,7 @@ Returns:
 - None
 */
 ianimate_object_update_frame :: #force_inline proc (self:^ianimate_object) {
-    engine.buffer_resource_copy_update(self.frame_uniform, &self.frame)
+    engine.buffer_resource_copy_update(&self.frame_uniform, &self.frame)
 }
 
 /*
@@ -239,8 +239,8 @@ colorTransform:^engine.color_transform = nil, vtable:^ianimate_object_vtable = n
 
     if self.vtable.get_uniform_resources == nil do self.vtable.get_uniform_resources = auto_cast get_uniform_resources_animate_image
 
-    self.frame_uniform = engine.buffer_resource_create_buffer({
-        len = size_of(u32),
+    engine.buffer_resource_create_buffer(self.frame_uniform, {
+        size = size_of(u32),
         type = .UNIFORM,
         resource_usage = .CPU,
     }, mem.ptr_to_bytes(&self.frame), true)
@@ -251,7 +251,6 @@ colorTransform:^engine.color_transform = nil, vtable:^ianimate_object_vtable = n
 
 _super_animate_image_deinit :: proc(self:^animate_image) {
     engine.buffer_resource_deinit(self.frame_uniform)
-    self.frame_uniform = nil
     engine._super_itransform_object_deinit(auto_cast self)
 }
 
@@ -267,7 +266,10 @@ Returns:
 - The total number of frames in the texture array
 */
 _super_animate_image_get_frame_cnt :: proc "contextless" (self:^animate_image) -> u32 {
-    return (^engine.texture_resource)(self.src.texture).option.len
+	res, ok := engine.graphics_get_resource(self.src).(^engine.texture_resource)
+	if !ok do return 0
+
+    return res.option.len
 }
 
 /*
@@ -343,10 +345,10 @@ _super_animate_image_draw :: proc (self:^animate_image, cmd:engine.command_buffe
     engine.graphics_cmd_draw(cmd, 6, 1, 0, 0)
 }
 
-@private get_uniform_resources_animate_image :: #force_inline proc(self:^animate_image) -> []engine.iresource {
-    res := mem.make_non_zeroed([]engine.iresource, 3, context.temp_allocator)
-    res[0] = self.mat_uniform
-    res[1] = self.color_transform.mat_uniform
-    res[2] = self.frame_uniform
+@private get_uniform_resources_animate_image :: #force_inline proc(self:^animate_image) -> []engine.union_resource {
+    res := mem.make_non_zeroed([]engine.union_resource, 3, context.temp_allocator)
+    res[0] = engine.graphics_get_resource(self)
+    res[1] = engine.graphics_get_resource(self.color_transform)
+    res[2] = engine.graphics_get_resource(self.frame_uniform)
     return res[:]
 }

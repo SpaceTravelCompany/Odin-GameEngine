@@ -80,12 +80,7 @@ init_pipelines :: proc() {
 				nil,
 				vk.PipelineDepthStencilStateCreateInfoInit())
 
-	for thread.pool_num_done(&g_thread_pool) < 2 {
-			thread.yield()
-	}
-	for {
-		thread.pool_pop_done(&g_thread_pool) or_break
-	}
+	thread.pool_wait_all(&g_thread_pool)
 }
 
  clean_pipelines :: proc() {

@@ -15,7 +15,6 @@ Manages a collection of objects to be rendered and their command buffers
 layer :: struct {
 	scene: ^[dynamic]^iobject,
     cmd:[MAX_FRAMES_IN_FLIGHT]command_buffer,
-    obj_lock:sync.Mutex,
 	cmd_pool: vk.CommandPool,
 	creation_allocator: runtime.Allocator,
 	visible: bool,
@@ -51,8 +50,6 @@ layer_init :: proc(_scene: ^[dynamic]^iobject, allocator := context.allocator) -
 	if res != .SUCCESS do trace.panic_log("vk.CreateCommandPool(&vk_cmd_pool) : ", res)
 
     allocate_command_buffers(&cmd.cmd[0], MAX_FRAMES_IN_FLIGHT, cmd.cmd_pool)
-
-    cmd.obj_lock = sync.Mutex{}
 
     sync.mutex_lock(&__g_layer_mtx)
     non_zero_append(&__g_layer, cmd)
@@ -135,9 +132,6 @@ layer_hide :: proc "contextless" (_cmd: ^layer) -> bool {
 Changes the scene of the render command
 */
 layer_change_scene :: proc "contextless" (cmd: ^layer, _scene: ^[dynamic]^iobject) {
-	sync.mutex_lock(&cmd.obj_lock)
-	defer sync.mutex_unlock(&cmd.obj_lock)
-	
 	if cmd.scene != _scene {
 		cmd.scene = _scene
 	}
@@ -157,9 +151,6 @@ layer_add_object :: proc(cmd: ^layer, obj: ^iobject) {
 	if cmd.scene == nil {
 		trace.panic_log("layer_add_object: cmd.scene is nil")
 	}
-
-    sync.mutex_lock(&cmd.obj_lock)
-    defer sync.mutex_unlock(&cmd.obj_lock)
 
     // for obj_t,i in cmd.scene^ {
     //     if obj_t == obj {
@@ -185,9 +176,6 @@ layer_add_objects :: proc(cmd: ^layer, objs: ..^iobject) {
 		trace.panic_log("layer_add_object: cmd.scene is nil")
 	}
 	
-    sync.mutex_lock(&cmd.obj_lock)
-    defer sync.mutex_unlock(&cmd.obj_lock)
-
     for obj_t,i in cmd.scene^ {
         for obj in objs {
             if obj_t == obj {
@@ -215,8 +203,6 @@ layer_remove_object :: proc(cmd: ^layer, obj: ^iobject) {
 		trace.panic_log("layer_add_object: cmd.scene is nil")
 	}
 	
-    sync.mutex_lock(&cmd.obj_lock)
-    defer sync.mutex_unlock(&cmd.obj_lock)
 
     for obj_t, i in cmd.scene^ {
         if obj_t == obj {
@@ -240,8 +226,6 @@ layer_remove_all :: proc(cmd: ^layer) {
 		trace.panic_log("layer_add_object: cmd.scene is nil")
 	}
 	
-    sync.mutex_lock(&cmd.obj_lock)
-    defer sync.mutex_unlock(&cmd.obj_lock)
     obj_len := len(cmd.scene)
     clear(cmd.scene)
 }
@@ -261,8 +245,6 @@ layer_has_object :: proc "contextless"(cmd: ^layer, obj: ^iobject) -> bool {
 		trace.panic_log("layer_add_object: cmd.scene is nil")
 	}
 	
-    sync.mutex_lock(&cmd.obj_lock)
-    defer sync.mutex_unlock(&cmd.obj_lock)
     
     for obj_t in cmd.scene^ {
         if obj_t == obj {
@@ -286,8 +268,6 @@ layer_get_object_len :: proc "contextless" (cmd: ^layer) -> int {
 		trace.panic_log("layer_add_object: cmd.scene is nil")
 	}
 	
-    sync.mutex_lock(&cmd.obj_lock)
-    defer sync.mutex_unlock(&cmd.obj_lock)
     return len(cmd.scene)
 }
 
@@ -305,9 +285,7 @@ layer_get_object :: proc "contextless" (cmd: ^layer, index: int) -> ^iobject {
 	if cmd.scene == nil {
 		trace.panic_log("layer_add_object: cmd.scene is nil")
 	}
-	
-    sync.mutex_lock(&cmd.obj_lock)
-    defer sync.mutex_unlock(&cmd.obj_lock)
+
     return cmd.scene^[index]
 }
 
@@ -340,6 +318,7 @@ layer_get_object_idx :: proc "contextless"(cmd: ^layer, obj: ^iobject) -> int {
 
 	camera_deinit(&__g_default_camera)
 	projection_deinit(&__g_default_projection)
+	viewport_deinit(&__g_default_viewport)
 }
 
 @(private) __layer_create :: proc() {

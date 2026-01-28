@@ -41,13 +41,20 @@ viewport_init_update :: proc (self:^viewport) {
     	self.set.layout = viewport_descriptor_set_layout()
 	}
 	
-	//__temp_arena_allocator update 하면 다 지우니 중복 할당해도 됨.
-	self.set.__resources = mem.make_non_zeroed_slice([]iresource, 2, temp_arena_allocator())
-	self.set.__resources[0] = self.camera.mat_uniform
-	self.set.__resources[1] = self.projection.mat_uniform
+	if self.set.__resources != nil do __graphics_free_resources(self.set.__resources)
+	self.set.__resources = __graphics_alloc_resources(2)
+	self.set.__resources[0] = graphics_get_resource(self.camera)
+	self.set.__resources[1] = graphics_get_resource(self.projection)
 	update_descriptor_sets(mem.slice_ptr(&self.set, 1))
 }
 
+
+viewport_deinit :: proc(self:^viewport) {
+	if self.set.__resources != nil {
+		__graphics_free_resources(self.set.__resources)
+		self.set.__resources = nil
+	}
+}
 
 def_viewport :: proc() -> ^viewport {
 	return &__g_default_viewport

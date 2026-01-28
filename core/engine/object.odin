@@ -15,7 +15,7 @@ import img "core:image"
 
 
 iobject_vtable :: struct {
-    get_uniform_resources: #type proc (self:^iobject) -> []iresource,
+    get_uniform_resources: #type proc (self:^iobject) -> []union_resource,
     draw: #type proc (self:^iobject, cmd:command_buffer, viewport:^viewport),
     deinit: #type proc (self:^iobject),
     update: #type proc (self:^iobject),
@@ -50,11 +50,8 @@ itransform_object :: struct {
     color_transform: ^color_transform,
 }
 
-iresource :: distinct rawptr
-
 @private __matrix_in :: struct {
     mat: linalg.matrix44,
-    mat_uniform:iresource,
 }
 
 @(require_results)
@@ -158,9 +155,15 @@ sr_2d_matrix2 :: proc "contextless" (s: linalg.point, r: f32, cp:linalg.point) -
     return nil
 }
 
-_super_itransform_object_deinit :: #force_inline proc (self:^itransform_object) {
-	buffer_resource_deinit(self.mat_uniform)
-	self.mat_uniform = nil
+_super_itransform_object_deinit :: proc (self:^itransform_object) {
+	resource := graphics_get_resource(self)
+	if resource != nil {
+		buffer_resource_deinit(self)
+	}
+	if self.set.__resources != nil {
+		__graphics_free_resources(self.set.__resources)
+		self.set.__resources = nil
+	}
 }
 
 iobject_init :: proc(self:^iobject) {
@@ -178,7 +181,7 @@ itransform_object_init :: proc(self:^itransform_object, _color_transform:^color_
 }
 
 //!alloc result array in temp_allocator
-@private get_uniform_resources :: proc(self:^iobject) -> []iresource {
+@private get_uniform_resources :: proc(self:^iobject) -> []union_resource {
     if self.vtable != nil && self.vtable.get_uniform_resources != nil {
         return self.vtable.get_uniform_resources(self)
     } else {
@@ -186,58 +189,34 @@ itransform_object_init :: proc(self:^itransform_object, _color_transform:^color_
     }
 }
 
-get_uniform_resources_transform_object :: #force_inline proc(self:^itransform_object) -> []iresource {
-    res := mem.make_non_zeroed([]iresource, 2, context.temp_allocator)
-    res[0] = self.mat_uniform
-    res[1] = self.color_transform.mat_uniform
+get_uniform_resources_transform_object :: proc(self:^itransform_object) -> []union_resource {
+    res := mem.make_non_zeroed([]union_resource, 2, context.temp_allocator)
+    
+    res[0] = graphics_get_resource(self)
+    res[1] = graphics_get_resource(self.color_transform)
 
     return res[:]
 }
 
 
-@private __itransform_object_update_uniform :: proc(self:^itransform_object, resources:[]iresource) {
-    //업데이트 하면 tempArenaAllocator를 다 지우니 중복 할당해도 됨.
-    self.set.__resources = mem.make_non_zeroed_slice([]iresource, len(resources), temp_arena_allocator())
-    mem.copy_non_overlapping(&self.set.__resources[0], &resources[0], len(resources) * size_of(iresource))
+@private __itransform_object_update_uniform :: proc(self:^itransform_object, resources:[]union_resource) {
+   	if self.set.__resources != nil do __graphics_free_resources(self.set.__resources)
+    self.set.__resources = __graphics_alloc_resources(len(resources))
+    mem.copy_non_overlapping(&self.set.__resources[0], &resources[0], len(resources) * size_of(union_resource))
     update_descriptor_sets(mem.slice_ptr(&self.set, 1))
 }
 
-/*
-Updates the object's transformation matrix
-
-Inputs:
-- self: Pointer to the object
-- pos: New position
-- rotation: New rotation angle in radians (default: 0.0)
-- scale: New scale factors (default: {1.0, 1.0})
-- pivot: Pivot point for transformations (default: {0.0, 0.0})
-
-Returns:
-- None
-*/
 itransform_object_update_transform :: proc(self:^itransform_object, pos:linalg.point3d, rotation:f32 = 0.0, scale:linalg.point = {1.0,1.0}, pivot:linalg.point = {0.0,0.0}) {
-    self.mat = srt_2d_matrix2(pos, scale, rotation, pivot)
-
-    if self.mat_uniform == nil {
-        self.mat_uniform = buffer_resource_create_buffer({
-            len = size_of(linalg.matrix44),
-            type = .UNIFORM,
-            resource_usage = .CPU,
-        }, mem.ptr_to_bytes(&self.mat), true)
-
-        resources := get_uniform_resources(self)
-        defer delete(resources, context.temp_allocator)
-        __itransform_object_update_uniform(self, resources)
-    } else {
-        buffer_resource_copy_update(auto_cast self.mat_uniform, &self.mat)
-    }
+    itransform_object_update_transform_matrix_raw(self, srt_2d_matrix2(pos, scale, rotation, pivot))
 }
 itransform_object_update_transform_matrix_raw :: proc(self:^itransform_object, _mat:linalg.matrix44) {
     self.mat = _mat
     
-    if self.mat_uniform == nil {
-        self.mat_uniform = buffer_resource_create_buffer({
-            len = size_of(linalg.matrix44),
+    // Check if resource exists in gMapResource
+    resource := graphics_get_resource(self)
+	if resource == nil {
+        buffer_resource_create_buffer(self, {
+            size = size_of(linalg.matrix44),
             type = .UNIFORM,
             resource_usage = .CPU,
         }, mem.ptr_to_bytes(&self.mat), true)
@@ -245,27 +224,10 @@ itransform_object_update_transform_matrix_raw :: proc(self:^itransform_object, _
         resources := get_uniform_resources(self)
         defer delete(resources, context.temp_allocator)
         __itransform_object_update_uniform(self, resources)
-    } else {
-        buffer_resource_copy_update(auto_cast self.mat_uniform, &self.mat)
-    }
+	} else {
+		buffer_resource_copy_update(self, &self.mat)
+	}
 }
-
-itransform_object_update_transform_matrix :: proc(self:^itransform_object) {
-    if self.mat_uniform == nil {
-        self.mat_uniform = buffer_resource_create_buffer({
-            len = size_of(linalg.matrix44),
-            type = .UNIFORM,
-            resource_usage = .CPU,
-        }, mem.ptr_to_bytes(&self.mat), true)
-
-        resources := get_uniform_resources(self)
-        defer delete(resources, context.temp_allocator)
-        __itransform_object_update_uniform(self, resources)
-    } else {
-        buffer_resource_copy_update(self.mat_uniform, &self.mat)
-    }
-}
-
 itransform_object_change_color_transform :: proc(self:^itransform_object, _color_transform:^color_transform) {
     self.color_transform = _color_transform
     __itransform_object_update_uniform(self, get_uniform_resources(self))
@@ -333,8 +295,8 @@ set_render_clear_color :: proc "contextless" (_color:linalg.point3dw) {
 
 __vertex_buf_init :: proc (self:^__vertex_buf($NodeType), array:[]NodeType, _flag:resource_usage, _useGPUMem := false, allocator :Maybe(runtime.Allocator) = nil) {
     if len(array) == 0 do trace.panic_log("vertex_buf_init: array is empty")
-    self.buf = buffer_resource_create_buffer({
-        len = vk.DeviceSize(len(array) * size_of(NodeType)),
+    buffer_resource_create_buffer(self, {
+        size = vk.DeviceSize(len(array) * size_of(NodeType)),
         type = .VERTEX,
         resource_usage = _flag,
         single = false,
@@ -343,18 +305,17 @@ __vertex_buf_init :: proc (self:^__vertex_buf($NodeType), array:[]NodeType, _fla
 }
 
 __vertex_buf_deinit :: proc (self:^__vertex_buf($NodeType)) {
-    buffer_resource_deinit(self.buf)
-	self.buf = nil
+    buffer_resource_deinit(self)
 }
 
 __vertex_buf_update :: proc (self:^__vertex_buf($NodeType), array:[]NodeType, allocator :Maybe(runtime.Allocator) = nil) {
-    buffer_resource_map_update_slice(self.buf, array, allocator)
+    buffer_resource_map_update_slice(self, array, allocator)
 }
 
 __storage_buf_init :: proc (self:^__storage_buf($NodeType), array:[]NodeType, _flag:resource_usage, _useGPUMem := false) {
     if len(array) == 0 do trace.panic_log("storage_buf_init: array is empty")
-    self.buf = buffer_resource_create_buffer({
-        len = vk.DeviceSize(len(array) * size_of(NodeType)),
+    buffer_resource_create_buffer(self, {
+        size = vk.DeviceSize(len(array) * size_of(NodeType)),
         type = .STORAGE,
         resource_usage = _flag,
         single = false,
@@ -363,18 +324,17 @@ __storage_buf_init :: proc (self:^__storage_buf($NodeType), array:[]NodeType, _f
 }
 
 __storage_buf_deinit :: proc (self:^__storage_buf($NodeType)) {
-    buffer_resource_deinit(self.buf)
-	self.buf = nil
+    buffer_resource_deinit(self)
 }
 
 __storage_buf_update :: proc (self:^__storage_buf($NodeType), array:[]NodeType) {
-    buffer_resource_map_update_slice(self.buf, array, engine_def_allocator)
+    buffer_resource_map_update_slice(self, array, engine_def_allocator)
 }
 
 __index_buf_init :: proc (self:^__index_buf, array:[]u32, _flag:resource_usage, _useGPUMem := false, allocator :Maybe(runtime.Allocator) = nil) {
     if len(array) == 0 do trace.panic_log("index_buf_init: array is empty")
-    self.buf = buffer_resource_create_buffer({
-        len = vk.DeviceSize(len(array) * size_of(u32)),
+    buffer_resource_create_buffer(self, {
+        size = vk.DeviceSize(len(array) * size_of(u32)),
         type = .INDEX,
         resource_usage = _flag,
         use_gcpu_mem = _useGPUMem,
@@ -383,21 +343,19 @@ __index_buf_init :: proc (self:^__index_buf, array:[]u32, _flag:resource_usage, 
 
 
 __index_buf_deinit :: proc (self:^__index_buf) {
-    buffer_resource_deinit(self.buf)
-	self.buf = nil
+    buffer_resource_deinit(self)
 }
 
 __index_buf_update :: #force_inline proc (self:^__index_buf, array:[]u32, allocator :Maybe(runtime.Allocator) = nil) {
-    buffer_resource_map_update_slice(self.buf, array, allocator)
+    buffer_resource_map_update_slice(self, array, allocator)
 }
 
 __vertex_buf :: struct($NodeType:typeid) {
-    buf:iresource,
+	dummy:rawptr,
 }
-
 __index_buf :: distinct __vertex_buf(u32)
 __storage_buf :: struct($NodeType:typeid) {
-    buf:iresource,
+	dummy:rawptr,
 }
 
 /*

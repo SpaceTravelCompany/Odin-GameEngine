@@ -320,3 +320,4 @@ sandbox/
 !glslc.exe
 
 *.apk
+ols.json

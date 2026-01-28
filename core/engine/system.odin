@@ -62,16 +62,8 @@ when library.is_android {
 }
 
 @private main_thread_id: int
-@(private = "file") __tempArena: virtual.Arena
-__temp_arena_allocator: mem.Allocator
-
-@private @thread_local track_allocator:mem.Tracking_Allocator
 
 @private __exiting := false
-
-temp_arena_allocator :: #force_inline proc "contextless" () -> mem.Allocator {
-	return __temp_arena_allocator
-}
 
 
 when library.is_android {
@@ -179,7 +171,6 @@ engine_main :: proc(
 			}
 
 			graphics_wait_device_idle()
-
 			destroy()
 
 			graphics_destroy()
@@ -205,7 +196,6 @@ engine_main :: proc(
 
 @private system_after_destroy :: #force_inline proc() {
 	delete(monitors)
-	virtual.arena_free_all(&__tempArena)
 	when !is_console {
 		thread.pool_join(&g_thread_pool)
 		thread.pool_destroy(&g_thread_pool)
@@ -357,12 +347,7 @@ close :: proc "contextless" () {
 			data.cmd = cmd
 			thread.pool_add_task(&g_thread_pool, context.allocator, update_task_proc, data)
 		}
-		for thread.pool_num_done(&g_thread_pool) < len(__g_layer) {
-			thread.yield()
-		}
-		for {
-			thread.pool_pop_done(&g_thread_pool) or_break
-		}
+		thread.pool_wait_all(&g_thread_pool)
 	}
 
 	if !paused_ {
