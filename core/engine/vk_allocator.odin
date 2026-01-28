@@ -43,7 +43,7 @@ vk_init_block_len :: proc() {
 		if .DEVICE_LOCAL in h.flags {
 			_ChangeSize(h.size)
 			change = true
-			log.infof("SYSLOG : Vulkan Graphic Card Dedicated Memory Block %d MB\nDedicated Memory : %d MB",
+			log.infof("SYSLOG : Vulkan Graphic Card Dedicated Memory Block %d MB\nDedicated Memory : %d MB\n",
 				vkMemBlockLen / mem.Megabyte,
 				h.size / mem.Megabyte,
 			)
@@ -53,8 +53,8 @@ vk_init_block_len :: proc() {
 	}
 	if !change {
 		_ChangeSize(vk_physical_mem_prop.memoryHeaps[0].size)
-		fmt.printfln(
-			"SYSLOG : Vulkan No Graphic Card System Memory Block %d MB\nSystem Memory : %d MB",
+		log.infof(
+			"SYSLOG : Vulkan No Graphic Card System Memory Block %d MB\nSystem Memory : %d MB\n",
 			vkMemBlockLen / mem.Megabyte,
 			vk_physical_mem_prop.memoryHeaps[0].size / mem.Megabyte,
 		)
@@ -67,10 +67,10 @@ vk_init_block_len :: proc() {
 	for t, i in vk_physical_mem_prop.memoryTypes[:vk_physical_mem_prop.memoryTypeCount] {
 		if t.propertyFlags >= {.DEVICE_LOCAL, .HOST_CACHED, .HOST_VISIBLE} {
 			vkSupportCacheLocal = true
-			log.infof("SYSLOG : Vulkan Device Supported Cache Local Memory")
+			log.info("SYSLOG : Vulkan Device Supported Cache Local Memory\n")
 		} else if t.propertyFlags >= {.DEVICE_LOCAL, .HOST_COHERENT, .HOST_VISIBLE} {
 			vkSupportNonCacheLocal = true
-			log.infof("SYSLOG : Vulkan Device Supported Non Cache Local Memory")
+			log.info("SYSLOG : Vulkan Device Supported Non Cache Local Memory\n")
 		} else {
 			continue
 		}

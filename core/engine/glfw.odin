@@ -193,7 +193,7 @@ glfw_system_init :: proc() {
 	
 		processor_core_len = auto_cast os._unix_get_nprocs()
 		if processor_core_len == 0 do log.panicf("processor_core_len can't zero\n")
-		log.infof("SYSLOG processor_core_len : ", processor_core_len)
+		log.infof("SYSLOG processor_core_len : %d\n", processor_core_len)
 	} else when ODIN_OS == .Windows {
 		system_info:windows.SYSTEM_INFO
 		windows.GetSystemInfo(&system_info)
@@ -242,8 +242,8 @@ glfw_system_init :: proc() {
 			log.warn("unknown windows version")
 		}
 
-		log.infof("SYSLOG processor_core_len : ", processor_core_len)
-		log.infof("SYSLOG windows_platform : ", windows_platform)
+		log.infof("SYSLOG processor_core_len : %d\n", processor_core_len)
+		log.infof("SYSLOG windows_platform : %v\n", windows_platform)
 	}
 
 	__glfw_logger = context.logger
