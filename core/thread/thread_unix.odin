@@ -2,6 +2,7 @@
 #+private
 package thread
 
+import "base:intrinsics"
 import "base:runtime"
 import "core:sync"
 import "core:sys/posix"
@@ -59,7 +60,7 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 
 		if .Self_Cleanup in sync.atomic_load(&t.flags) {
 			res := posix.pthread_detach(t.unix_thread)
-			if res != nil && res != .EINVAL do fmt.panicf("pthread_detach : %s", res) // edited (SpaceTravelCompany) Set this for now
+			if res != nil && res != .EINVAL do intrinsics.trap() // edited (SpaceTravelCompany) Set this for now
 			//assert_contextless(res == nil)
 
 			t.unix_thread = {}
