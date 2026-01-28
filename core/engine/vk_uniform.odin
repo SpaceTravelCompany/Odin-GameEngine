@@ -3,9 +3,9 @@ package engine
 
 import "base:runtime"
 import "core:mem"
-import "core:debug/trace"
 import vk "vendor:vulkan"
 import "core:container/pool"
+import "core:log"
 
 
 // ============================================================================
@@ -84,7 +84,7 @@ create_new_uniform_buffer :: proc(
 		usage = {.UNIFORM_BUFFER},
 	}
 	res := vk.CreateBuffer(vk_device, &bufInfo, nil, &g.buf)
-	if res != .SUCCESS do trace.panic_log("res := vk.CreateBuffer(vk_device, &bufInfo, nil, &g.buf) : ", res)
+	if res != .SUCCESS do log.panicf("res := vk.CreateBuffer(vk_device, &bufInfo, nil, &g.buf) : %s\n", res)
 
 	g.mem_buffer = vk_mem_buffer_CreateFromResource(g.buf, {.HOST_CACHED, .HOST_VISIBLE}, &g.idx, 0, .UNIFORM)
 

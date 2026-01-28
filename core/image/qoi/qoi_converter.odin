@@ -1,7 +1,6 @@
 package qoi
 
 import "core:mem"
-import "core:debug/trace"
 import "base:intrinsics"
 import "base:runtime"
 import "core:image"
@@ -93,7 +92,7 @@ qoi_converter_load :: proc (self:^qoi_converter, data:[]byte, out_fmt:image.colo
         case .RGBA, .RGBA16: self.img, err = load_from_bytes(data, Options{.alpha_add_if_missing}, allocator = allocator)
         case .RGB, .RGB16: self.img, err = load_from_bytes(data, Options{.alpha_drop_if_present}, allocator = allocator)
         case .Unknown: self.img, err = load_from_bytes(data, allocator = allocator)
-        case : trace.panic_log("unsupport option")
+        case : panic("unsupport option")
     }
     
     self.allocator = allocator
@@ -140,7 +139,7 @@ qoi_converter_load_file :: proc (self:^qoi_converter, file_path:string, out_fmt:
         imgFileReadErr : android.AssetFileError
         imgFileData, imgFileReadErr = android.asset_read_file(file_path, context.temp_allocator)
         if imgFileReadErr != .None {
-            trace.panic_log(imgFileReadErr)
+            return nil, imgFileReadErr
         }
     } else {
         imgFileReadErr:os2.Error
@@ -199,7 +198,7 @@ qoi_converter_encode :: proc (self:^qoi_converter, data:[]byte, in_fmt:image.col
         case .RGB16:
             if s.len % 6 != 0 do return nil, .Encode_Size_Mismatch
             self.img^, ok = image.pixels_to_image((cast([^][3]u16)s.data)[:s.len / 6], int(width), int(height))
-        case : trace.panic_log("unsupport option")
+        case : panic("unsupport option")
     }
 
    

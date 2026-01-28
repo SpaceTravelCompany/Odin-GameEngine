@@ -5,11 +5,11 @@ import "base:runtime"
 import "base:intrinsics"
 import "core:mem"
 import "core:mem/virtual"
-import "core:debug/trace"
 import "core:sync"
 import "core:thread"
 import "core:fmt"
 import vk "vendor:vulkan"
+import "core:log"
 
 
 // ============================================================================
@@ -43,26 +43,21 @@ vk_init_block_len :: proc() {
 		if .DEVICE_LOCAL in h.flags {
 			_ChangeSize(h.size)
 			change = true
-			when is_log {
-				fmt.printfln(
-					"XFIT SYSLOG : Vulkan Graphic Card Dedicated Memory Block %d MB\nDedicated Memory : %d MB",
-					vkMemBlockLen / mem.Megabyte,
-					h.size / mem.Megabyte,
-				)
-			}
+			log.infof("SYSLOG : Vulkan Graphic Card Dedicated Memory Block %d MB\nDedicated Memory : %d MB",
+				vkMemBlockLen / mem.Megabyte,
+				h.size / mem.Megabyte,
+			)
 			mainHeapIdx = auto_cast i
 			break
 		}
 	}
 	if !change {
 		_ChangeSize(vk_physical_mem_prop.memoryHeaps[0].size)
-		when is_log {
-			fmt.printfln(
-				"XFIT SYSLOG : Vulkan No Graphic Card System Memory Block %d MB\nSystem Memory : %d MB",
-				vkMemBlockLen / mem.Megabyte,
-				vk_physical_mem_prop.memoryHeaps[0].size / mem.Megabyte,
-			)
-		}
+		fmt.printfln(
+			"SYSLOG : Vulkan No Graphic Card System Memory Block %d MB\nSystem Memory : %d MB",
+			vkMemBlockLen / mem.Megabyte,
+			vk_physical_mem_prop.memoryHeaps[0].size / mem.Megabyte,
+		)
 		mainHeapIdx = 0
 	}
 
@@ -72,10 +67,10 @@ vk_init_block_len :: proc() {
 	for t, i in vk_physical_mem_prop.memoryTypes[:vk_physical_mem_prop.memoryTypeCount] {
 		if t.propertyFlags >= {.DEVICE_LOCAL, .HOST_CACHED, .HOST_VISIBLE} {
 			vkSupportCacheLocal = true
-			when is_log do fmt.printfln("XFIT SYSLOG : Vulkan Device Supported Cache Local Memory")
+			log.infof("SYSLOG : Vulkan Device Supported Cache Local Memory")
 		} else if t.propertyFlags >= {.DEVICE_LOCAL, .HOST_COHERENT, .HOST_VISIBLE} {
 			vkSupportNonCacheLocal = true
-			when is_log do fmt.printfln("XFIT SYSLOG : Vulkan Device Supported Non Cache Local Memory")
+			log.infof("SYSLOG : Vulkan Device Supported Non Cache Local Memory")
 		} else {
 			continue
 		}
@@ -113,7 +108,7 @@ vk_allocator_init :: proc() {
 			queueFamilyIndex = vk_graphics_family_index,
 		}
 		res := vk.CreateCommandPool(vk_device, &cmdPoolInfo, nil, &thread_cmdPool)
-		if res != .SUCCESS do trace.panic_log("vk.CreateCommandPool failed in thread init: ", res)
+		if res != .SUCCESS do log.panicf("vk.CreateCommandPool failed in thread init: %s\n", res)
 
 		vk.CreateFence(vk_device, &vk.FenceCreateInfo{
 				sType = vk.StructureType.FENCE_CREATE_INFO,
@@ -127,7 +122,7 @@ vk_allocator_init :: proc() {
 			commandPool        = thread_cmdPool,
 		}
 		res = vk.AllocateCommandBuffers(vk_device, &cmdAllocInfo, &thread_cmd)
-		if res != .SUCCESS do trace.panic_log("vk.AllocateCommandBuffers failed: ", res)
+		if res != .SUCCESS do log.panicf("vk.AllocateCommandBuffers failed: %s\n", res)
 	}
 
 	// Thread finalization: destroy command pool for each thread
@@ -439,9 +434,9 @@ vk_exec_gpu_commands_task :: proc(task: thread.Task) {
 			sType = vk.StructureType.COMMAND_BUFFER_BEGIN_INFO,
 		}
 		res := vk.ResetCommandPool(vk_device, thread_cmdPool, {})
-		if res != .SUCCESS do trace.panic_log("res := vk.ResetCommandPool(vk_device, thread_cmdPool, {}) : ", res)
+		if res != .SUCCESS do log.panicf("res := vk.ResetCommandPool(vk_device, thread_cmdPool, {}) : %s\n", res)
 		res = vk.BeginCommandBuffer(thread_cmd, &beginInfo)
-		if res != .SUCCESS do trace.panic_log("res := vk.BeginCommandBuffer(cmd, &beginInfo) : ", res)
+		if res != .SUCCESS do log.panicf("res := vk.BeginCommandBuffer(cmd, &beginInfo) : %s\n", res)
 
 		for node in opExecQueue {
 			#partial switch n in node {
@@ -453,7 +448,7 @@ vk_exec_gpu_commands_task :: proc(task: thread.Task) {
 		}
 
 		res = vk.EndCommandBuffer(thread_cmd)
-		if res != .SUCCESS do trace.panic_log("res := vk.EndCommandBuffer(cmd) : ", res)
+		if res != .SUCCESS do log.panicf("res := vk.EndCommandBuffer(cmd) : %s\n", res)
 
 		submitInfo := vk.SubmitInfo {
 			commandBufferCount = 1,
@@ -463,11 +458,11 @@ vk_exec_gpu_commands_task :: proc(task: thread.Task) {
 		vk.ResetFences(vk_device, 1, &vk_allocator_fence)
 		sync.mutex_lock(&vk_queue_mutex)
 		res = vk.QueueSubmit(vk_graphics_queue, 1, &submitInfo, vk_allocator_fence)
-		if res != .SUCCESS do trace.panic_log("res := vk.QueueSubmit(vk_graphics_queue, 1, &submitInfo, 0) : ", res)
+		if res != .SUCCESS do log.panicf("res := vk.QueueSubmit(vk_graphics_queue, 1, &submitInfo, 0) : %s\n", res)
 		sync.mutex_unlock(&vk_queue_mutex)
 
 		vk.WaitForFences(vk_device, 1, &vk_allocator_fence, true, max(u64))
-		if res != .SUCCESS do trace.panic_log("res := vk.WaitForFences(vk_device, 1, &vk_allocator_fence, true, max(u64)) : ", res)
+		if res != .SUCCESS do log.panicf("res := vk.WaitForFences(vk_device, 1, &vk_allocator_fence, true, max(u64)) : %s\n", res)
 	}
 
 	sync.mutex_lock(&gMapResourceMtx)

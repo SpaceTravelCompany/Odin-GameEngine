@@ -1,11 +1,11 @@
 #+private
 package engine
 
-import "core:debug/trace"
 import "core:math/linalg"
 import "core:mem"
 import "core:sync"
 import "core:thread"
+import "core:log"
 import vk "vendor:vulkan"
 
 
@@ -58,7 +58,7 @@ vk_transition_image_layout :: proc(cmd:vk.CommandBuffer, image:vk.Image, mip_lev
 		srcStage = {.TOP_OF_PIPE}
 		dstStage = {.FRAGMENT_SHADER}
 	} else {
-		trace.panic_log("unsupported layout transition!", old_layout, new_layout)
+		log.panicf("unsupported layout transition! %s, %s\n", old_layout, new_layout)
 	}
 
 	vk.CmdPipelineBarrier(cmd,
@@ -88,7 +88,7 @@ vk_record_command_buffer :: proc(cmd:^layer, _inheritanceInfo:vk.CommandBufferIn
 	}
 
 	res := vk.BeginCommandBuffer(c.__handle, &beginInfo)
-	if res != .SUCCESS do trace.panic_log("BeginCommandBuffer : ", res)
+	if res != .SUCCESS do log.panicf("BeginCommandBuffer : %s\n", res)
 
 	vp := vk.Viewport {
 		x = 0.0,
@@ -111,7 +111,7 @@ vk_record_command_buffer :: proc(cmd:^layer, _inheritanceInfo:vk.CommandBufferIn
 			scissor :vk.Rect2D
 			if viewport.viewport_area != nil {
 				if viewport.viewport_area.?.top <= viewport.viewport_area.?.bottom {
-					trace.panic_log("viewport.viewport_area.?.top <= viewport.viewport_area.?.bottom")
+					log.panic("viewport.viewport_area.?.top <= viewport.viewport_area.?.bottom\n")
 				}
 				scissor = {
 					offset = {x = i32(viewport.viewport_area.?.left), y = i32(viewport.viewport_area.?.top)},
@@ -133,7 +133,7 @@ vk_record_command_buffer :: proc(cmd:^layer, _inheritanceInfo:vk.CommandBufferIn
 		}
 	}
 	res = vk.EndCommandBuffer(c.__handle)
-	if res != .SUCCESS do trace.panic_log("EndCommandBuffer : ", res)
+	if res != .SUCCESS do log.panicf("EndCommandBuffer : %s\n", res)
 }
 
 
@@ -197,7 +197,7 @@ vk_draw_frame :: proc() {
 	}
 
 	res := vk.WaitForFences(vk_device, 1, &vk_in_flight_fence[vk_frame], true, max(u64))
-	if res != .SUCCESS do trace.panic_log("WaitForFences : ", res)
+	if res != .SUCCESS do log.panicf("WaitForFences : %s\n", res)
 	
 	vk_destroy_resources()
 
@@ -209,7 +209,7 @@ vk_draw_frame :: proc() {
 		return
 	} else if res == .SUBOPTIMAL_KHR {
 	} else if res == .ERROR_SURFACE_LOST_KHR {
-	} else if res != .SUCCESS { trace.panic_log("AcquireNextImageKHR : ", res) }
+	} else if res != .SUCCESS { log.panicf("AcquireNextImageKHR : %s\n", res) }
 
 	cmd_visible := false
 
@@ -279,10 +279,10 @@ vk_draw_frame :: proc() {
 		vk.CmdExecuteCommands(vk_cmd_buffer[vk_frame], auto_cast len(cmd_buffers), &cmd_buffers[0])
 		vk.CmdEndRenderPass(vk_cmd_buffer[vk_frame])
 		res = vk.EndCommandBuffer(vk_cmd_buffer[vk_frame])
-		if res != .SUCCESS do trace.panic_log("EndCommandBuffer : ", res)
+		if res != .SUCCESS do log.panicf("EndCommandBuffer : %s\n", res)
 
 		res = vk.ResetFences(vk_device, 1, &vk_in_flight_fence[vk_frame])
-		if res != .SUCCESS do trace.panic_log("ResetFences : ", res)
+		if res != .SUCCESS do log.panicf("ResetFences : %s", res)
 
 		waitStages := vk.PipelineStageFlags{.COLOR_ATTACHMENT_OUTPUT}
 		submitInfo := vk.SubmitInfo {
@@ -296,11 +296,11 @@ vk_draw_frame :: proc() {
 			pSignalSemaphores = &vk_render_finished_semaphore[vk_frame][imageIndex],
 		}
 		vk.WaitForFences(vk_device, 1, &vk_in_flight_fence[(vk_frame + 1) % MAX_FRAMES_IN_FLIGHT], true, max(u64))
-		if res != .SUCCESS do trace.panic_log("WaitForFences : ", res)
+		if res != .SUCCESS do log.panicf("WaitForFences : %s\n", res)
 
 		sync.mutex_lock(&vk_queue_mutex)
 		res = vk.QueueSubmit(vk_graphics_queue, 1, &submitInfo, vk_in_flight_fence[vk_frame])
-		if res != .SUCCESS do trace.panic_log("QueueSubmit : ", res)
+		if res != .SUCCESS do log.panicf("QueueSubmit : %s\n", res)
 	} else {
 		//?그릴 오브젝트가 없는 경우
 		waitStages := vk.PipelineStageFlags{.COLOR_ATTACHMENT_OUTPUT}
@@ -326,7 +326,7 @@ vk_draw_frame :: proc() {
 		vk.CmdBeginRenderPass(vk_cmd_buffer[vk_frame], &renderPassBeginInfo, vk.SubpassContents.INLINE)
 		vk.CmdEndRenderPass(vk_cmd_buffer[vk_frame])
 		res = vk.EndCommandBuffer(vk_cmd_buffer[vk_frame])
-		if res != .SUCCESS do trace.panic_log("EndCommandBuffer : ", res)
+		if res != .SUCCESS do log.panicf("EndCommandBuffer : %s\n", res)
 
 		submitInfo := vk.SubmitInfo {
 			sType = vk.StructureType.SUBMIT_INFO,
@@ -340,11 +340,11 @@ vk_draw_frame :: proc() {
 		}
 
 		res = vk.ResetFences(vk_device, 1, &vk_in_flight_fence[vk_frame])
-		if res != .SUCCESS do trace.panic_log("ResetFences : ", res)
+		if res != .SUCCESS do log.panicf("ResetFences : %s", res)
 
 		sync.mutex_lock(&vk_queue_mutex)
 		res = vk.QueueSubmit(vk_graphics_queue, 1, &submitInfo, 	vk_in_flight_fence[vk_frame])
-		if res != .SUCCESS do trace.panic_log("QueueSubmit : ", res)
+		if res != .SUCCESS do log.panicf("QueueSubmit : %s\n", res)
 	}
 	presentInfo := vk.PresentInfoKHR {
 		sType = vk.StructureType.PRESENT_INFO_KHR,
@@ -374,7 +374,7 @@ vk_draw_frame :: proc() {
 		vk_recreate_swap_chain()
 		vk_frame = 0
 		return
-	} else if res != .SUCCESS { trace.panic_log("QueuePresentKHR : ", res) }
+	} else if res != .SUCCESS { log.panicf("QueuePresentKHR : %s\n", res) }
 
 	vk_frame = (vk_frame + 1) % MAX_FRAMES_IN_FLIGHT
 }

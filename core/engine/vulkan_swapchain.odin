@@ -2,12 +2,12 @@
 package engine
 
 import "base:library"
-import "core:debug/trace"
 import "core:fmt"
 import "core:mem"
 import "core:sync"
 import "core:thread"
 import vk "vendor:vulkan"
+import "core:log"
 
 
 // ============================================================================
@@ -33,7 +33,7 @@ vk_set_full_screen_ex :: proc() {
 	when ODIN_OS == .Windows {
 		if VK_EXT_full_screen_exclusive_support() && __is_full_screen_ex {
 			res := vk.AcquireFullScreenExclusiveModeEXT(vk_device, vk_swapchain)
-			if res != .SUCCESS do trace.panic_log("AcquireFullScreenExclusiveModeEXT : ", res)
+			if res != .SUCCESS do log.panicf("AcquireFullScreenExclusiveModeEXT : %s\n", res)
 			is_released_full_screen_ex = false
 		}
 	}
@@ -43,7 +43,7 @@ vk_release_full_screen_ex :: proc() {
 	when ODIN_OS == .Windows {
 		if VK_EXT_full_screen_exclusive_support() && !is_released_full_screen_ex {
 			res := vk.ReleaseFullScreenExclusiveModeEXT(vk_device, vk_swapchain)
-			if res != .SUCCESS do trace.panic_log("ReleaseFullScreenExclusiveModeEXT : ", res)
+			if res != .SUCCESS do log.panicf("ReleaseFullScreenExclusiveModeEXT : %s\n", res)
 			is_released_full_screen_ex = true
 		}
 	}
@@ -67,14 +67,12 @@ init_swap_chain :: proc() {
 
 	for f in vk_fmts {
 		if f.format == .R8G8B8A8_UNORM || f.format == .B8G8R8A8_UNORM {
-			when is_log {
-				fmt.printfln("XFIT SYSLOG : vulkan swapchain format : %s, colorspace : %s", f.format, f.colorSpace)
-			}
+			log.infof("SYSLOG : vulkan swapchain format : %s, colorspace : %s\n", f.format, f.colorSpace)
 			vk_fmt = f
 			break;
 		}
 	}
-	if vk_fmt.format == .UNDEFINED do trace.panic_log("Xfit vulkan unsupported format")
+	if vk_fmt.format == .UNDEFINED do log.panic("Xfit vulkan unsupported format\n")
 
 	depthProp:vk.FormatProperties
 	vk.GetPhysicalDeviceFormatProperties(vk_physical_device, .D24_UNORM_S8_UINT, &depthProp)
@@ -104,18 +102,16 @@ init_swap_chain :: proc() {
 	vkColorHasTransferSrcOptimal =.TRANSFER_SRC in colorProp.optimalTilingFeatures
 	vkColorHasTransferDstOptimal = .TRANSFER_DST in colorProp.optimalTilingFeatures
 
-	when is_log {
-		fmt.printfln("XFIT SYSLOG : depth format : %s", depth_fmt)
-		fmt.println("XFIT SYSLOG : optimal format supports")
-		fmt.printfln("vkDepthHasOptimal : %t", vkDepthHasOptimal)
-		fmt.printfln("vkDepthHasTransferSrcOptimal : %t", vkDepthHasTransferSrcOptimal)
-		fmt.printfln("vkDepthHasTransferDstOptimal : %t", vkDepthHasTransferDstOptimal)
-		fmt.printfln("vkDepthHasSampleOptimal : %t", vkDepthHasSampleOptimal)
-		fmt.printfln("vkColorHasAttachOptimal : %t", vkColorHasAttachOptimal)
-		fmt.printfln("vkColorHasSampleOptimal : %t", vkColorHasSampleOptimal)
-		fmt.printfln("vkColorHasTransferSrcOptimal : %t", vkColorHasTransferSrcOptimal)
-		fmt.printfln("vkColorHasTransferDstOptimal : %t", vkColorHasTransferDstOptimal)
-	}
+	log.infof("SYSLOG : depth format : %s", depth_fmt)
+	log.infof("SYSLOG : optimal format supports")
+	log.infof("vkDepthHasOptimal : %t", vkDepthHasOptimal)
+	log.infof("vkDepthHasTransferSrcOptimal : %t", vkDepthHasTransferSrcOptimal)
+	log.infof("vkDepthHasTransferDstOptimal : %t", vkDepthHasTransferDstOptimal)
+	log.infof("vkDepthHasSampleOptimal : %t", vkDepthHasSampleOptimal)
+	log.infof("vkColorHasAttachOptimal : %t", vkColorHasAttachOptimal)
+	log.infof("vkColorHasSampleOptimal : %t", vkColorHasSampleOptimal)
+	log.infof("vkColorHasTransferSrcOptimal : %t", vkColorHasTransferSrcOptimal)
+	log.infof("vkColorHasTransferDstOptimal : %t", vkColorHasTransferDstOptimal)
 }
 
 
@@ -157,16 +153,12 @@ vk_create_swap_chain_and_image_views :: proc() -> bool {
 
 	vkPresentMode = .FIFO
 	if __v_sync == .Double {
-		when is_log {
-			if program_start do fmt.println("XFIT SYSLOG : vulkan present mode fifo_khr vsync double")
-		}
+		if program_start do log.infof("SYSLOG : vulkan present mode fifo_khr vsync double\n")
 	} else {
 		if __v_sync == .Triple {
 			for p in vkPresentModes {
 				if p == .MAILBOX {
-					when is_log {
-						if program_start do fmt.println("XFIT SYSLOG : vulkan present mode mailbox_khr vsync triple")
-					}
+					if program_start do log.infof("SYSLOG : vulkan present mode mailbox_khr vsync triple\n")
 					vkPresentMode = p
 					break;
 				}
@@ -174,12 +166,10 @@ vk_create_swap_chain_and_image_views :: proc() -> bool {
 		}
 		for p in vkPresentModes {
 			if p == .IMMEDIATE {
-				when is_log {
-					if program_start {
-						if __v_sync == .Triple do fmt.println("XFIT SYSLOG : vulkan present mode immediate_khr mailbox_khr instead(vsync triple -> none)")
-						else do fmt.println("XFIT SYSLOG : vulkan present mode immediate_khr vsync none")
-					} 
-				}
+				if program_start {
+					if __v_sync == .Triple do log.infof("SYSLOG : vulkan present mode immediate_khr mailbox_khr instead(vsync triple -> none)\n")
+					else do log.infof("SYSLOG : vulkan present mode immediate_khr vsync none\n")
+				} 
 				vkPresentMode = p
 				break;
 			}
@@ -202,7 +192,7 @@ vk_create_swap_chain_and_image_views :: proc() -> bool {
 	} else if .POST_MULTIPLIED in vk_surface_cap.supportedCompositeAlpha {
 		vk_surface_cap.supportedCompositeAlpha = {.POST_MULTIPLIED}
 	} else {
-		trace.panic_log("not supports supportedCompositeAlpha")
+		log.panic("not supports supportedCompositeAlpha\n")
 	}
 
 	swapChainCreateInfo := vk.SwapchainCreateInfoKHR{
@@ -291,11 +281,11 @@ vk_create_swap_chain_and_image_views :: proc() -> bool {
 			},
 		}
 		res = vk.CreateImageView(vk_device, &imageViewCreateInfo, nil, &vk_frame_buffer_image_views[i])
-		if res != .SUCCESS do trace.panic_log("res = vk.CreateImageView(vk_device, &imageViewCreateInfo, nil, &vk_frame_buffer_image_views[i]) : ", res)
+		if res != .SUCCESS do log.panicf("res = vk.CreateImageView(vk_device, &imageViewCreateInfo, nil, &vk_frame_buffer_image_views[i]) : %s\n", res)
 
 
 		vk_frame_depth_stencil_texture_res, ok := graphics_get_resource(&vk_frame_depth_stencil_texture).(^texture_resource)
-		if !ok do trace.panic_log("vk_frame_depth_stencil_texture not found")
+		if !ok do log.panic("vk_frame_depth_stencil_texture not found\n")
 		when msaa_count == 1 {
 			frameBufferCreateInfo := vk.FramebufferCreateInfo{
 				sType = vk.StructureType.FRAMEBUFFER_CREATE_INFO,
@@ -308,7 +298,7 @@ vk_create_swap_chain_and_image_views :: proc() -> bool {
 			}
 		} else {
 			vk_msaa_frame_texture_res, ok := graphics_get_resource(&vk_msaa_frame_texture).(^texture_resource)
-			if !ok do trace.panic_log("vk_msaa_frame_texture not found")
+			if !ok do log.panic("vk_msaa_frame_texture not found\n")
 			frameBufferCreateInfo := vk.FramebufferCreateInfo{
 				sType = vk.StructureType.FRAMEBUFFER_CREATE_INFO,
 				renderPass = vk_render_pass,
@@ -320,7 +310,7 @@ vk_create_swap_chain_and_image_views :: proc() -> bool {
 			}
 		}
 		res = vk.CreateFramebuffer(vk_device, &frameBufferCreateInfo, nil, &vk_frame_buffers[i])
-		if res != .SUCCESS do trace.panic_log("res = vk.CreateFramebuffer(vk_device, &frameBufferCreateInfo, nil, &vk_frame_buffers[i]) : ", res)
+		if res != .SUCCESS do log.panicf("res = vk.CreateFramebuffer(vk_device, &frameBufferCreateInfo, nil, &vk_frame_buffers[i]) : %s\n", res)
 	}
 
 	return true

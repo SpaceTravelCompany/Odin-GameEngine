@@ -7,7 +7,7 @@ import "core:c"
 import "core:math"
 import "core:sys/linux"
 import "core:sys/windows"
-import "core:debug/trace"
+import "core:fmt"
 import "base:library"
 import "core:sys/android"
 
@@ -501,12 +501,14 @@ luaL_loadbuffer :: #force_inline proc "c" (L:^ lua_State,s: cstring, sz: c.size_
 		mem.copy_non_overlapping(&tmp[0], ptr, auto_cast size)
 		tmp[size] = 0
 
-		return auto_cast android.__android_log_write(android.LogPriority.INFO, ODIN_BUILD_PROJECT_NAME, cstring(&tmp[0]))
+		res := android.__android_log_write(android.LogPriority.INFO, ODIN_BUILD_PROJECT_NAME, cstring(&tmp[0]))
+		if res < 0 do return max(c.size_t)
+		return auto_cast res
 	} else when ODIN_OS == .Linux {
 		res, err := linux.write(linux.STDOUT_FILENO, ([^]u8)(ptr)[0:size])
 
 		if err != .NONE {
-			trace.panic_log(err)
+			return max(c.size_t)
 		}
 		return auto_cast res
 	} else when ODIN_OS == .Windows {
@@ -516,7 +518,7 @@ luaL_loadbuffer :: #force_inline proc "c" (L:^ lua_State,s: cstring, sz: c.size_
 		res := windows.WriteFile(stdout, ptr, auto_cast size, &wr, nil)
 
 		if !res {
-			trace.panic_log(windows.GetLastError())
+			return max(c.size_t)
 		}
 		return auto_cast wr
 	} else {

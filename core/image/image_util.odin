@@ -1,8 +1,6 @@
 package image
 
 
-import "core:debug/trace"
-
 /*
 Returns the bit size of the given color format
 
@@ -23,7 +21,7 @@ color_fmt_bit :: proc "contextless" (fmt: color_fmt) -> u32 {
         case .RGB32, .BGR32, .RGB32F, .BGR32F : return 96
         case .RGBA32, .BGRA32, .ABGR32, .ARGB32, .RGBA32F, .BGRA32F, .ABGR32F, .ARGB32F : return 128
 		case .Unknown:
-            trace.panic_log("unknown")
+			return 0
     };
 	return 0
 }

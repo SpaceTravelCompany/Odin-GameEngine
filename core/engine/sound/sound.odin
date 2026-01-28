@@ -6,6 +6,7 @@ import "core:debug/trace"
 import "core:sync"
 import "core:thread"
 import "vendor:miniaudio"
+import "core:log"
 
 
 @(private = "file") sound_private :: struct #packed {
@@ -68,14 +69,14 @@ sound_src :: struct {
     miniaudio_resource_manager_config.pCustomDecodingBackendUserData = nil
 
     res := miniaudio.resource_manager_init(&miniaudio_resource_manager_config, &miniaudio_resource_manager)
-    if res != .SUCCESS do trace.panic_log("miniaudio.resource_manager_init : ", res)
+    if res != .SUCCESS do log.panicf("miniaudio.resource_manager_init : %s\n", res)
 
     miniaudio_engine_config = miniaudio.engine_config_init()
     miniaudio_engine_config.pResourceManager = &miniaudio_resource_manager
     
     
     res = miniaudio.engine_init(&miniaudio_engine_config, &miniaudio_engine)
-    if res != .SUCCESS do trace.panic_log("miniaudio.engine_init : ", res)
+    if res != .SUCCESS do log.panicf("miniaudio.engine_init : %s\n", res)
 
     started = true
     g_thread = thread.create(callback)
@@ -188,7 +189,7 @@ Returns:
 - An error if playback failed
 */
 sound_src_play_sound_memory :: proc(self:^sound_src, volume:f32, loop:bool) -> (snd: ^sound, err: sound_error) {
-    if !intrinsics.atomic_load_explicit(&started, .Acquire) do trace.panic_log("sound_src_play_sound_memory : sound not started.")
+    if !intrinsics.atomic_load_explicit(&started, .Acquire) do log.panicf("sound_src_play_sound_memory : sound not started.\n")
 
     err = .SUCCESS
     snd = new(sound)
@@ -231,54 +232,70 @@ set_pitch :: #force_inline proc "contextless" (self:^sound, pitch:f32) {
     miniaudio.sound_set_pitch(&self.__private.__miniaudio_sound, pitch)
 }
 
-pause :: #force_inline proc "contextless" (self:^sound) {
+pause :: #force_inline proc (self:^sound) {
     res := miniaudio.sound_stop(&self.__private.__miniaudio_sound)
-    if res != .SUCCESS do trace.panic_log(res)
+    if res != .SUCCESS {
+		log.panicf("sound_stop: %s\n", res)
+	}
 }
 
-resume :: #force_inline proc "contextless" (self:^sound) {
+resume :: #force_inline proc (self:^sound) {
    res := miniaudio.sound_start(&self.__private.__miniaudio_sound)
-   if res != .SUCCESS do trace.panic_log(res)
+   if res != .SUCCESS {
+		log.panicf("sound_start: %s\n", res)
+	}
 }
 
-@require_results get_len_sec :: #force_inline proc "contextless" (self:^sound) -> f32 {
+@require_results get_len_sec :: #force_inline proc (self:^sound) -> f32 {
     sec:f32
     res := miniaudio.sound_get_length_in_seconds(&self.__private.__miniaudio_sound, &sec)
-    if res != .SUCCESS do trace.panic_log(res)
+    if res != .SUCCESS {
+		log.panicf("sound_get_length_in_seconds: %s\n", res)
+	}
     return sec
 }
 
-@require_results get_len :: #force_inline proc "contextless" (self:^sound) -> u64 {
+@require_results get_len :: #force_inline proc (self:^sound) -> u64 {
     frames:u64
     res := miniaudio.sound_get_length_in_pcm_frames(&self.__private.__miniaudio_sound, &frames)
-    if res != .SUCCESS do trace.panic_log(res)
+    if res != .SUCCESS {
+		log.panicf("sound_get_length_in_pcm_frames: %s\n", res)
+	}
     return frames
 }
 
-@require_results get_pos_sec :: #force_inline proc "contextless" (self:^sound) -> f32 {
+@require_results get_pos_sec :: #force_inline proc (self:^sound) -> f32 {
     sec:f32
     res := miniaudio.sound_get_cursor_in_seconds(&self.__private.__miniaudio_sound, &sec)
-    if res != .SUCCESS do trace.panic_log(res)
+    if res != .SUCCESS {
+		log.panicf("sound_get_cursor_in_seconds: %s\n", res)
+	}
     return sec
 }
 
-@require_results get_pos :: #force_inline proc "contextless" (self:^sound) -> u64 {
+@require_results get_pos :: #force_inline proc (self:^sound) -> u64 {
     frames:u64
     res := miniaudio.sound_get_cursor_in_pcm_frames(&self.__private.__miniaudio_sound, &frames)
-    if res != .SUCCESS do trace.panic_log(res)
+    if res != .SUCCESS {
+		log.panicf("sound_get_cursor_in_pcm_frames: %s\n", res)
+	}
     return frames
 }
 
-set_pos :: #force_inline proc "contextless" (self:^sound, pos:u64) {
+set_pos :: #force_inline proc (self:^sound, pos:u64) {
     res := miniaudio.sound_seek_to_pcm_frame(&self.__private.__miniaudio_sound, pos)
-    if res != .SUCCESS do trace.panic_log(res)
+    if res != .SUCCESS {
+		log.panicf("sound_seek_to_pcm_frame: %s\n", res)
+	}
 }
 
-set_pos_sec :: #force_inline proc "contextless" (self:^sound, pos_sec:f32) -> bool {
+set_pos_sec :: #force_inline proc (self:^sound, pos_sec:f32) -> bool {
     pos:u64 = u64(f64(pos_sec) * f64(self.src.sample_rate))
     if pos >= get_len(self) do return false
     res := miniaudio.sound_seek_to_pcm_frame(&self.__private.__miniaudio_sound, pos)
-    if res != .SUCCESS do trace.panic_log(res)
+    if res != .SUCCESS {
+		log.panicf("sound_seek_to_pcm_frame: %s\n", res)
+	}
     return true
 }
 

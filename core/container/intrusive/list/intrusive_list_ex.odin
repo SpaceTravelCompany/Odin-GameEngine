@@ -15,7 +15,7 @@ insert_after :: proc "contextless" (list: ^List, current_node: ^Node, new_node: 
         }
         current_node.next = new_node
     } else {
-		trace.panic_log("insert_after: new_node or current_node is nil")
+		panic_contextless("insert_after")
 	}
 }
 
@@ -31,6 +31,6 @@ insert_before :: proc "contextless" (list: ^List, current_node: ^Node, new_node:
         }
         current_node.prev = new_node
     } else {
-		trace.panic_log("insert_before: new_node or current_node is nil")
+		panic_contextless("insert_before")
 	}
 }

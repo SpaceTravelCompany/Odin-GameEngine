@@ -7,7 +7,7 @@ import "core:math/linalg"
 import "core:mem"
 import "core:slice"
 import "core:sync"
-import "core:debug/trace"
+import "core:log"
 import vk "vendor:vulkan"
 
 /*
@@ -36,7 +36,7 @@ projection_size :: proc(self:^projection) {
     }
 	when ODIN_DEBUG {
 		if self.ortho_canvas_width < 0.0 || self.ortho_canvas_height < 0.0 {
-			trace.panic_log("projection_size: ortho_canvas_width and ortho_canvas_height (both must be greater than or equal to 0)")
+			log.panic("projection_size: ortho_canvas_width and ortho_canvas_height (both must be greater than or equal to 0)\n")
 		}
 	}
 }

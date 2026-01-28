@@ -7,6 +7,7 @@ import "core:mem"
 import "core:slice"
 import "core:sync"
 import "core:debug/trace"
+import "core:log"
 import vk "vendor:vulkan"
 
 
@@ -60,10 +61,10 @@ vk_mem_buffer_InitSingle :: proc(cellSize: vk.DeviceSize, typeFilter: u32) -> Ma
 		typeFilter,
 		vk.MemoryPropertyFlags{.DEVICE_LOCAL},
 	)
-	if !success do trace.panic_log("memBuf.allocateInfo.memoryTypeIndex, success = vk_find_mem_type(typeFilter, vk.MemoryPropertyFlags{.DEVICE_LOCAL})")
+	if !success do log.panic("memBuf.allocateInfo.memoryTypeIndex, success = vk_find_mem_type(typeFilter, vk.MemoryPropertyFlags{.DEVICE_LOCAL})\n")
 
 	res := vk.AllocateMemory(vk_device, &memBuf.allocateInfo, nil, &memBuf.deviceMem)
-	if res != .SUCCESS do trace.panic_log("res := vk.AllocateMemory(vk_device, &memBuf.allocateInfo, nil, &memBuf.deviceMem)")
+	if res != .SUCCESS do log.panicf("res := vk.AllocateMemory(vk_device, &memBuf.allocateInfo, nil, &memBuf.deviceMem) : %s\n", res)
 
 	return memBuf
 }
@@ -113,13 +114,13 @@ vk_mem_buffer_BindBufferNode :: proc(
 	vk_mem_buffer_BindBufferNodeInside :: proc(self: ^vk_mem_buffer, vkResource: $T, idx: vk.DeviceSize) where T == vk.Buffer || T == vk.Image {
 		when (T == vk.Buffer) {
 			res := vk.BindBufferMemory(vk_device, vkResource, self.deviceMem, self.cellSize * idx)
-			if res != .SUCCESS do trace.panic_log("vk_mem_buffer_BindBufferNodeInside BindBufferMemory : ", res)
+			if res != .SUCCESS do log.panicf("vk_mem_buffer_BindBufferNodeInside BindBufferMemory : %s\n", res)
 		} else when (T == vk.Image) {
 			res := vk.BindImageMemory(vk_device, vkResource, self.deviceMem, self.cellSize * idx)
-			if res != .SUCCESS do trace.panic_log("vk_mem_buffer_BindBufferNodeInside BindImageMemory : ", res)
+			if res != .SUCCESS do log.panicf("vk_mem_buffer_BindBufferNodeInside BindImageMemory : %s\n", res)
 		}
 	}
-	if cellCnt == 0 do trace.panic_log("if cellCnt == 0")
+	if cellCnt == 0 do log.panic("if cellCnt == 0\n")
 	if self.single {
 		vk_mem_buffer_BindBufferNodeInside(self, vkResource, 0)
 		return nil, .NONE
@@ -255,7 +256,7 @@ vk_mem_buffer_CreateFromResource :: proc(
 			return false
 		}
 		if outIdx_ == nil {
-			trace.panic_log("")
+			log.panic("vk_mem_buffer_BindBufferNode outIdx_ == nil\n")
 		}
 		outIdx^ = outIdx_
 		memBuf^ = b
@@ -301,7 +302,7 @@ vk_mem_buffer_CreateFromResource :: proc(
 		if !ok {
 			memProp_ = memProp
 			memType, ok = vk_find_mem_type(memRequire.memoryTypeBits, memProp_)
-			if !ok do trace.panic_log("vk_find_mem_type Failed")
+			if !ok do log.panic("vk_find_mem_type Failed\n")
 		}
 		if !_BindBufferNode(b, memType, vkResource, cellCnt, outIdx, &memBuf) do continue
 		break
@@ -322,21 +323,21 @@ vk_mem_buffer_CreateFromResource :: proc(
 			for b in gVkMemBufs {
 				if b.cellSize != memRequire.alignment do continue
 				memType, ok := vk_find_mem_type(memRequire.memoryTypeBits, memProp_)
-				if !ok do trace.panic_log("")
+				if !ok do log.panic("vk_find_mem_type\n")
 				if !_BindBufferNode(b, memType, vkResource, cellCnt, outIdx, &memBuf) do continue
 				break
 			}
 			if memBuf == nil {
 				BLKSize = vkMemBlockLen
 				memBufT = _Init(BLKSize, maxSize_, memRequire, memProp_)
-				if memBufT == nil do trace.panic_log("")
+				if memBufT == nil do log.panic("memBufT == nil\n")
 				memBuf^ = memBufT.?
 			}
 		} else {
 			memBuf^ = memBufT.?
 		}
 
-		if !_BindBufferNode(memBuf, memBuf.allocateInfo.memoryTypeIndex, vkResource, cellCnt, outIdx, &memBuf) do trace.panic_log("")
+		if !_BindBufferNode(memBuf, memBuf.allocateInfo.memoryTypeIndex, vkResource, cellCnt, outIdx, &memBuf) do log.panic("vk_mem_buffer_BindBufferNode\n")
 		non_zero_append(&gVkMemBufs, memBuf)
 		gVkMemIdxCnts[memBuf.allocateInfo.memoryTypeIndex] += 1
 	}
@@ -475,7 +476,7 @@ vk_mem_buffer_MapCopyexecute :: proc(self: ^vk_mem_buffer, nodes: []OpNode) {
 	} else {
 		if self.cache {
 			res := vk.InvalidateMappedMemoryRanges(vk_device, offIdx, raw_data(ranges))
-			if res != .SUCCESS do trace.panic_log("res := vk.InvalidateMappedMemoryRanges(vk_device, offIdx, raw_data(ranges)) : ", res)
+			if res != .SUCCESS do log.panicf("res := vk.InvalidateMappedMemoryRanges(vk_device, offIdx, raw_data(ranges)) : %s\n", res)
 		}
 	}
 
@@ -495,7 +496,7 @@ vk_mem_buffer_MapCopyexecute :: proc(self: ^vk_mem_buffer, nodes: []OpNode) {
 
 	if self.cache {
 		res := vk.FlushMappedMemoryRanges(vk_device, auto_cast len(ranges), raw_data(ranges))
-		if res != .SUCCESS do trace.panic_log("res := vk.FlushMappedMemoryRanges(vk_device, auto_cast len(ranges), raw_data(ranges)) : ", res)
+		if res != .SUCCESS do log.panicf("res := vk.FlushMappedMemoryRanges(vk_device, auto_cast len(ranges), raw_data(ranges)) : %s\n", res)
 
 		delete(ranges)
 	}

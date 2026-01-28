@@ -10,6 +10,7 @@ import "core:math/linalg"
 import "core:mem"
 import vk "vendor:vulkan"
 import "core:sync"
+import "core:log"
 
 
 image_center_pt_pos :: enum {
@@ -142,7 +143,11 @@ image_change_color_transform :: #force_inline proc(self:^image, colorTransform:^
 }
 
 _super_image_draw :: proc (self:^image, cmd:command_buffer, viewport:^viewport) {
-   image_binding_sets_and_draw(cmd, self.set, viewport.set, self.src.set)
+	//self의 uniform, texture 리소스가 준비가 안됨. 드로우 하면 안됨.
+	if graphics_get_resource_draw(self) == nil do return
+	if graphics_get_resource_draw(self.src) == nil do return
+
+   	image_binding_sets_and_draw(cmd, self.set, viewport.set, self.src.set)
 }
 
 /*
@@ -189,6 +194,7 @@ Example:
 	import "core:debug/trace"
 	import "base:runtime"
 	import "core:engine"
+	import "core:log"
 
 	panda_img : []u8 = #load("res/panda.qoi")
 
@@ -207,7 +213,7 @@ Example:
 		
 		imgData, errCode := image_converter_load(qoiD, panda_img, .RGBA)
 		if errCode != nil {
-			trace.panic_log(errCode)
+			log.panicf("image_converter_load : %s\n", errCode)
 		}
 		
 		texture_init(&texture,
@@ -599,7 +605,7 @@ Inputs:
 Returns:
 - None
 */
-color_fmt_convert_default :: proc "contextless" (pixels:[]byte, out:[]byte, inPixelFmt:img.color_fmt = .RGBA) {
+color_fmt_convert_default :: proc (pixels:[]byte, out:[]byte, inPixelFmt:img.color_fmt = .RGBA) {
     defcol := default_color_fmt()
     if defcol == inPixelFmt {
         mem.copy_non_overlapping(&out[0], &pixels[0], len(pixels))
@@ -611,7 +617,7 @@ color_fmt_convert_default :: proc "contextless" (pixels:[]byte, out:[]byte, inPi
             out[i * 4 + 3] = pixels[i * 4 + 3]
         }   
     } else {
-        trace.printlnLog("color_fmt_convert_default: Unsupported pixel format: ", inPixelFmt)
+        log.errorf("color_fmt_convert_default: Unsupported pixel format: %s\n", inPixelFmt)
     }
 }
 
@@ -626,7 +632,7 @@ Inputs:
 Returns:
 - None
 */
-color_fmt_convert_default_overlap :: proc "contextless" (pixels:[]byte, out:[]byte, inPixelFmt:img.color_fmt = .RGBA) {
+color_fmt_convert_default_overlap :: proc (pixels:[]byte, out:[]byte, inPixelFmt:img.color_fmt = .RGBA) {
     defcol := default_color_fmt()
     if defcol == inPixelFmt {
         if &pixels[0] != &out[0] do mem.copy(&out[0], &pixels[0], len(pixels))
@@ -644,7 +650,7 @@ color_fmt_convert_default_overlap :: proc "contextless" (pixels:[]byte, out:[]by
             out[i * 4 + 3] = temp[3]
         }   
     } else {
-        trace.printlnLog("color_fmt_convert_default: Unsupported pixel format: ", inPixelFmt)
+        log.errorf("color_fmt_convert_default: Unsupported pixel format: %s\n", inPixelFmt)
     }
 }
 
@@ -703,7 +709,7 @@ Returns the default color format based on the graphics origin format
 Returns:
 - The default color format for the current graphics system
 */
-default_color_fmt :: proc "contextless" () -> img.color_fmt {
+default_color_fmt :: proc () -> img.color_fmt {
     return texture_fmt_to_color_fmt(vk_fmt_to_texture_fmt(get_graphics_origin_format()))
 }
 
@@ -716,7 +722,7 @@ Inputs:
 Returns:
 - The corresponding color format, or `.Unknown` if unsupported
 */
-@(require_results) texture_fmt_to_color_fmt :: proc "contextless" (t:texture_fmt) -> img.color_fmt {
+@(require_results) texture_fmt_to_color_fmt :: proc (t:texture_fmt) -> img.color_fmt {
 	#partial switch t {
 		case .DefaultColor:
 			return texture_fmt_to_color_fmt(vk_fmt_to_texture_fmt(get_graphics_origin_format()))
@@ -725,7 +731,7 @@ Returns:
 		case .B8G8R8A8Unorm:
 			return .BGRA
 	}
-    trace.printlnLog("unsupport format texture_fmt_to_color_fmt : ", t)
+    log.errorf("unsupport format texture_fmt_to_color_fmt : %s\n", t)
     return .Unknown
 }
 
@@ -755,7 +761,7 @@ Inputs:
 Returns:
 - The number of bits per pixel for the given format
 */
-@(require_results) texture_fmt_bit_size :: proc  "contextless" (fmt:texture_fmt) -> u32 {
+@(require_results) texture_fmt_bit_size :: proc (fmt:texture_fmt) -> u32 {
     switch (fmt) {
         case .DefaultColor : return texture_fmt_bit_size(vk_fmt_to_texture_fmt(get_graphics_origin_format()))
         case .DefaultDepth : return texture_fmt_bit_size(depth_fmt)
@@ -773,7 +779,7 @@ Returns:
     return 4
 }
 
-@(require_results) @private vk_fmt_to_texture_fmt :: proc "contextless" (t:vk.Format) -> texture_fmt {
+@(require_results) @private vk_fmt_to_texture_fmt :: proc (t:vk.Format) -> texture_fmt {
 	#partial switch t {
 		case .R8G8B8A8_UNORM:
 			return .R8G8B8A8Unorm
@@ -788,7 +794,7 @@ Returns:
 		case .R8_UNORM:
 			return .R8Unorm
 	}
-	trace.panic_log("unsupport format vk_fmt_to_texture_fmt : ", t)
+	log.panicf("unsupport format vk_fmt_to_texture_fmt : %s\n", t)
 }
 
 /*

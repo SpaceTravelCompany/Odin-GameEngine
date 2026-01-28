@@ -17,7 +17,6 @@ import "core:engine/sound"
 import "core:engine/shape"
 import "core:engine/geometry"
 import "core:engine/gui"
-import "core:debug/trace"
 import "vendor:svg"
 
 is_android :: engine.is_android
@@ -77,7 +76,7 @@ svg_shape_src : shape.shape_src
 init_svg :: proc() {
     svg_parser, err := svg.init_parse(github_mark_svg, context.temp_allocator)
     if err != nil {
-        trace.panic_log(err)
+        fmt.panicf("svg.init_parse: %s", err)
     }
     defer svg.deinit(&svg_parser)
 
@@ -91,7 +90,7 @@ init_svg :: proc() {
     svg_shape := new(shape.shape)
     shape_err := shape.shape_src_init(&svg_shape_src, &svg_parser.shapes)
     if shape_err != nil {
-        trace.panic_log(shape_err)
+        fmt.panicf("shape.shape_src_init: %s", shape_err)
     }
 
     shape.shape_init(svg_shape, &svg_shape_src)
@@ -117,20 +116,20 @@ Init ::proc() {
         fontFileReadErr : android.AssetFileError
         fontFileData, fontFileReadErr = android.asset_read_file("omyu pretty.ttf", context.temp_allocator)
         if fontFileReadErr != .None {
-            trace.panic_log(fontFileReadErr)
+            fmt.panicf("android.asset_read_file: %s", fontFileReadErr)
         }
     } else {
         fontFileReadErr :os2.Error
         fontFileData, fontFileReadErr = os2.read_entire_file_from_path("res/omyu pretty.ttf", context.temp_allocator)
         if fontFileReadErr != nil {
-            trace.panic_log(fontFileReadErr)
+            fmt.panicf("os2.read_entire_file_from_path: %s", fontFileReadErr)
         }
     }
 
     freeTypeErr : font.freetype_err
     ft, freeTypeErr = font.font_init(fontFileData, 0)
     if freeTypeErr != .Ok {
-        trace.panic_log(freeTypeErr)
+        fmt.panicf("font.font_init: %s", freeTypeErr)
     }
 	
     renderOpt := font.font_render_opt{
@@ -141,7 +140,7 @@ Init ::proc() {
 
     rawText, shapeErr := font.font_render_string(ft, "안녕", renderOpt, context.allocator)
     if shapeErr != nil {
-        trace.panic_log(shapeErr)
+        fmt.panicf("font.font_render_string: %s", shapeErr)
     }
     defer free(rawText)
     //!DO NOT geometry.raw_shape_free, auto delete vertex and index data after shape_src_init_raw completed
@@ -158,13 +157,13 @@ Init ::proc() {
         sndFileReadErr : android.AssetFileError
         bgSndFileData, sndFileReadErr = android.asset_read_file("BG.opus", context.allocator)
         if sndFileReadErr != .None {
-            trace.panic_log(sndFileReadErr)
+            fmt.panicf("android.asset_read_file: %s", sndFileReadErr)
         }
     } else {
         sndFileReadErr :os2.Error
         bgSndFileData, sndFileReadErr = os2.read_entire_file_from_path("res/BG.opus", context.allocator)
         if sndFileReadErr != nil {
-            trace.panic_log(sndFileReadErr)
+            fmt.panicf("os2.read_entire_file_from_path: %s", sndFileReadErr)
         }
     }
 
@@ -176,7 +175,7 @@ Init ::proc() {
 
     imgData, errCode := qoi.qoi_converter_load(qoiD, panda_img, .RGBA)
     if errCode != nil {
-        trace.panic_log(errCode)
+        fmt.panicf("qoi.qoi_converter_load: %s", errCode)
     }
 
     engine.texture_init(&texture,

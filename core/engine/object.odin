@@ -2,7 +2,6 @@ package engine
 
 import "base:intrinsics"
 import "base:runtime"
-import "core:debug/trace"
 import "core:math"
 import "core:math/linalg"
 import "core:mem"
@@ -11,6 +10,7 @@ import "core:sync"
 import "core:thread"
 import vk "vendor:vulkan"
 import img "core:image"
+import "core:log"
 
 
 
@@ -185,7 +185,7 @@ itransform_object_init :: proc(self:^itransform_object, _color_transform:^color_
     if self.vtable != nil && self.vtable.get_uniform_resources != nil {
         return self.vtable.get_uniform_resources(self)
     } else {
-        trace.panic_log("get_uniform_resources is not implemented")
+        log.panic("get_uniform_resources is not implemented\n")
     }
 }
 
@@ -271,7 +271,7 @@ iobject_deinit :: proc(self:^iobject) {
     if self.vtable != nil && self.vtable.deinit != nil {
         self.vtable.deinit(self)
     } else {
-        trace.panic_log("iobjectType_Deinit: unknown object type")
+        log.panic("iobjectType_Deinit: unknown object type\n")
     }
 }
 
@@ -294,7 +294,7 @@ set_render_clear_color :: proc "contextless" (_color:linalg.point3dw) {
 }
 
 __vertex_buf_init :: proc (self:^__vertex_buf($NodeType), array:[]NodeType, _flag:resource_usage, _useGPUMem := false, allocator :Maybe(runtime.Allocator) = nil) {
-    if len(array) == 0 do trace.panic_log("vertex_buf_init: array is empty")
+    if len(array) == 0 do log.panic("vertex_buf_init: array is empty\n")
     buffer_resource_create_buffer(self, {
         size = vk.DeviceSize(len(array) * size_of(NodeType)),
         type = .VERTEX,
@@ -313,7 +313,7 @@ __vertex_buf_update :: proc (self:^__vertex_buf($NodeType), array:[]NodeType, al
 }
 
 __storage_buf_init :: proc (self:^__storage_buf($NodeType), array:[]NodeType, _flag:resource_usage, _useGPUMem := false) {
-    if len(array) == 0 do trace.panic_log("storage_buf_init: array is empty")
+    if len(array) == 0 do log.panic("storage_buf_init: array is empty\n")
     buffer_resource_create_buffer(self, {
         size = vk.DeviceSize(len(array) * size_of(NodeType)),
         type = .STORAGE,
@@ -332,7 +332,7 @@ __storage_buf_update :: proc (self:^__storage_buf($NodeType), array:[]NodeType) 
 }
 
 __index_buf_init :: proc (self:^__index_buf, array:[]u32, _flag:resource_usage, _useGPUMem := false, allocator :Maybe(runtime.Allocator) = nil) {
-    if len(array) == 0 do trace.panic_log("index_buf_init: array is empty")
+    if len(array) == 0 do log.panic("index_buf_init: array is empty\n")
     buffer_resource_create_buffer(self, {
         size = vk.DeviceSize(len(array) * size_of(u32)),
         type = .INDEX,

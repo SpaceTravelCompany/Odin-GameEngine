@@ -60,10 +60,6 @@ main :: proc() {
 	if "is-android" in setting {
 		is_android = setting["is-android"].(json.Boolean)
 	}
-	log :bool = false
-	if "log" in setting {
-		log = setting["log"].(json.Boolean)
-	}
 
 	// Sets the optimization mode for compilation.
 	// Available options:
@@ -187,7 +183,6 @@ main :: proc() {
 			strings.join({"-out:", outSos[i]}, "", context.temp_allocator), 
 			o, 
 			"-debug" if debug else ({}),
-			"-define:LOG=true" if log else "-define:LOG=false",
 			//"-show-system-calls" if debug else ({}),
 			//"-sanitize:address" if debug else ({}),
 			"-build-mode:shared",
@@ -271,7 +266,6 @@ main :: proc() {
 		"-debug" if debug else ({}),
 		//"-show-debug-messages",//!for debug
 		resource.? if resource != nil else ({}),
-		"-define:LOG=true" if log else "-define:LOG=false",
 		"-define:CONSOLE=true" if console else "-define:CONSOLE=false",
 		("-subsystem:console" if console else "-subsystem:windows") if ODIN_OS == .Windows else ({}),
 		//"-sanitize:address" if debug else ({}),

@@ -7,12 +7,12 @@ import "core:mem"
 import "core:mem/virtual"
 import "core:sync"
 import "core:time"
-import "core:debug/trace"
 import "core:fmt"
 import "core:math/linalg"
 import "core:os"
 import "base:intrinsics"
 import "core:thread"
+import "core:log"
 
 /*
 Gets the delta time in seconds
@@ -41,7 +41,6 @@ get_processor_core_len :: #force_inline proc "contextless" () -> int { return pr
 
 is_android :: ODIN_PLATFORM_SUBTARGET == .Android
 is_mobile :: is_android
-is_log :: #config(LOG, false)
 is_console :: #config(CONSOLE, false)
 
 init: #type proc()
@@ -132,7 +131,7 @@ engine_main :: proc(
 	__window_title = window_title
 	when is_android {
 		when is_console {
-			trace.panic_log("Console mode is not supported on Android.")
+			log.panic("Console mode is not supported on Android.\n")
 		}
 		__window_x = 0
 		__window_y = 0

@@ -6,6 +6,7 @@ import "core:mem"
 import "core:strings"
 import "vendor:x11/xlib"
 
+import "core:log"
 
 @(rodata) DefaultDynamicStates := [2]DynamicState{DynamicState.VIEWPORT, DynamicState.SCISSOR}
 DefaultPipelineDynamicStateCreateInfo : PipelineDynamicStateCreateInfo
@@ -192,16 +193,20 @@ DefaultPipelineDepthStencilStateCreateInfo := PipelineDepthStencilStateCreateInf
 }
 
 
-@(require_results) PipelineLayoutInit :: proc "contextless"(vkDevice: Device, sets: []DescriptorSetLayout) -> PipelineLayout {
+@(require_results) PipelineLayoutInit :: proc (vkDevice: Device, sets: []DescriptorSetLayout) -> (PipelineLayout, Result) {
 	pipelineLayoutInfo := PipelineLayoutCreateInfo {
 		setLayoutCount = auto_cast len(sets),
 		pSetLayouts    = raw_data(sets),
 		sType          = StructureType.PIPELINE_LAYOUT_CREATE_INFO,
 	}
 	pipelineLayout: PipelineLayout
-	CreatePipelineLayout(vkDevice, &pipelineLayoutInfo, nil, &pipelineLayout)
+	res := CreatePipelineLayout(vkDevice, &pipelineLayoutInfo, nil, &pipelineLayout)
+	if res != .SUCCESS {
+		log.errorf("PipelineLayoutInit: CreatePipelineLayout : %s", res)
+		return 0, res
+	}
 
-	return pipelineLayout
+	return pipelineLayout, .SUCCESS
 }
 
 @(require_results) StencilOpStateInit :: proc "contextless"(

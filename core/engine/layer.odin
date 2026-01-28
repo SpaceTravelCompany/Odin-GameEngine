@@ -1,10 +1,10 @@
 package engine
 
 import "core:mem"
-import "core:debug/trace"
 import "core:sync"
 import vk "vendor:vulkan"
 import "base:runtime"
+import "core:log"
 
 
 /*
@@ -47,7 +47,7 @@ layer_init :: proc(_scene: ^[dynamic]^iobject, allocator := context.allocator) -
 		flags = {vk.CommandPoolCreateFlag.RESET_COMMAND_BUFFER},
 		queueFamilyIndex = vk_graphics_family_index,
 	}, nil, &cmd.cmd_pool)
-	if res != .SUCCESS do trace.panic_log("vk.CreateCommandPool(&vk_cmd_pool) : ", res)
+	if res != .SUCCESS do log.panicf("vk.CreateCommandPool(&vk_cmd_pool) : %s\n", res)
 
     allocate_command_buffers(&cmd.cmd[0], MAX_FRAMES_IN_FLIGHT, cmd.cmd_pool)
 
@@ -94,7 +94,7 @@ Inputs:
 Returns:
 - `true` if successful, `false` if the command was not found
 */
-layer_show :: proc "contextless" (_cmd: ^layer) {
+layer_show :: proc (_cmd: ^layer) {
     sync.mutex_lock(&__g_layer_mtx)
     for cmd in __g_layer {
         if cmd == _cmd {
@@ -103,7 +103,7 @@ layer_show :: proc "contextless" (_cmd: ^layer) {
             return
         }
     }
-    trace.panic_log("layer_show: layer not found")
+    log.panicf("layer_show: layer not found\n")
 }
 
 /*
@@ -149,7 +149,7 @@ Returns:
 */
 layer_add_object :: proc(cmd: ^layer, obj: ^iobject) {
 	if cmd.scene == nil {
-		trace.panic_log("layer_add_object: cmd.scene is nil")
+		log.panic("layer_add_object: cmd.scene is nil\n")
 	}
 
     // for obj_t,i in cmd.scene^ {
@@ -173,7 +173,7 @@ Returns:
 */
 layer_add_objects :: proc(cmd: ^layer, objs: ..^iobject) {
 	if cmd.scene == nil {
-		trace.panic_log("layer_add_object: cmd.scene is nil")
+		log.panic("layer_add_object: cmd.scene is nil\n")
 	}
 	
     for obj_t,i in cmd.scene^ {
@@ -200,7 +200,7 @@ Returns:
 */
 layer_remove_object :: proc(cmd: ^layer, obj: ^iobject) {
 	if cmd.scene == nil {
-		trace.panic_log("layer_add_object: cmd.scene is nil")
+		log.panic("layer_add_object: cmd.scene is nil\n")
 	}
 	
 
@@ -223,7 +223,7 @@ Returns:
 */
 layer_remove_all :: proc(cmd: ^layer) {
 	if cmd.scene == nil {
-		trace.panic_log("layer_add_object: cmd.scene is nil")
+		log.panic("layer_add_object: cmd.scene is nil\n")
 	}
 	
     obj_len := len(cmd.scene)
@@ -240,9 +240,9 @@ Inputs:
 Returns:
 - `true` if the object is in the scene, `false` otherwise
 */
-layer_has_object :: proc "contextless"(cmd: ^layer, obj: ^iobject) -> bool {
+layer_has_object :: proc (cmd: ^layer, obj: ^iobject) -> bool {
 	if cmd.scene == nil {
-		trace.panic_log("layer_add_object: cmd.scene is nil")
+		log.panic("layer_add_object: cmd.scene is nil\n")
 	}
 	
     
@@ -263,9 +263,9 @@ Inputs:
 Returns:
 - The number of objects in the scene
 */
-layer_get_object_len :: proc "contextless" (cmd: ^layer) -> int {
+layer_get_object_len :: proc (cmd: ^layer) -> int {
 	if cmd.scene == nil {
-		trace.panic_log("layer_add_object: cmd.scene is nil")
+		log.panic("layer_add_object: cmd.scene is nil\n")
 	}
 	
     return len(cmd.scene)
@@ -281,9 +281,9 @@ Inputs:
 Returns:
 - Pointer to the object at the specified index
 */
-layer_get_object :: proc "contextless" (cmd: ^layer, index: int) -> ^iobject {
+layer_get_object :: proc (cmd: ^layer, index: int) -> ^iobject {
 	if cmd.scene == nil {
-		trace.panic_log("layer_add_object: cmd.scene is nil")
+		log.panic("layer_add_object: cmd.scene is nil\n")
 	}
 
     return cmd.scene^[index]
@@ -299,9 +299,9 @@ Inputs:
 Returns:
 - The index of the object, or -1 if not found
 */
-layer_get_object_idx :: proc "contextless"(cmd: ^layer, obj: ^iobject) -> int {
+layer_get_object_idx :: proc (cmd: ^layer, obj: ^iobject) -> int {
 	if cmd.scene == nil {
-		trace.panic_log("layer_add_object: cmd.scene is nil")
+		log.panic("layer_add_object: cmd.scene is nil\n")
 	}
     for obj_t, i in cmd.scene^ {
         if obj_t == obj {

@@ -32,11 +32,6 @@
 					"default": "minimal",
 					"description": "Build optimization type"
 				},
-				"log": {
-					"type": "boolean",
-					"default": false,
-					"description": "Enable logging"
-				},
 				"resource": {
 					"type": "string",
 					"description": "Windows resource file path"

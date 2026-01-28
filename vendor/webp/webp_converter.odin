@@ -1,7 +1,7 @@
 package webp
 
 import "core:mem"
-import "core:debug/trace"
+import "core:fmt"
 import "core:os/os2"
 import "core:sys/android"
 import "base:intrinsics"
@@ -166,7 +166,7 @@ webp_converter_load :: proc (self:^webp_converter, data:[]byte, out_fmt:image.co
             case .BGRA : animOp.color_mode = webp.CSP_MODE.BGRA
             case .RGB : animOp.color_mode = webp.CSP_MODE.RGB
             case .BGR : animOp.color_mode = webp.CSP_MODE.BGR
-            case : trace.panic_log("unsupports decode fmt : ", out_fmt)
+            case : fmt.panicf("unsupports decode fmt : %s", out_fmt)
         }
 
         self.anim_dec = webp.WebPAnimDecoderNew(&wData, &self.config.(webp.WebPAnimDecoderOptions))
@@ -276,7 +276,7 @@ webp_converter_load_file :: proc (self:^webp_converter, file_path:string, out_fm
         imgFileReadErr : android.AssetFileError
         imgFileData, imgFileReadErr = android.asset_read_file(file_path, context.temp_allocator)
         if imgFileReadErr != .None {
-            trace.panic_log(imgFileReadErr)
+            return nil, imgFileReadErr
         }
     } else {
         imgFileReadErr:os2.Error

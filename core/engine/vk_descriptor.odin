@@ -2,7 +2,7 @@
 package engine
 
 import "core:mem"
-import "core:debug/trace"
+import "core:log"
 import vk "vendor:vulkan"
 import "base:runtime"
 
@@ -35,7 +35,7 @@ __create_descriptor_pool :: proc(size: []descriptor_pool_size, out: ^descriptor_
 		maxSets       = vkPoolBlock,
 	}
 	res := vk.CreateDescriptorPool(vk_device, &poolInfo, nil, &out.pool)
-	if res != .SUCCESS do trace.panic_log("res := vk.CreateDescriptorPool(vk_device, &poolInfo, nil, &out.pool) : ", res)
+	if res != .SUCCESS do log.panicf("res := vk.CreateDescriptorPool(vk_device, &poolInfo, nil, &out.pool) : %s\n", res)
 }
 
 
@@ -68,7 +68,7 @@ execute_update_descriptor_sets :: proc(sets: []descriptor_set, update_list: ^[dy
 				pSetLayouts        = &s.layout,
 			}
 			res := vk.AllocateDescriptorSets(vk_device, &allocInfo, &s.__set)
-			if res != .SUCCESS do trace.panic_log("res := vk.AllocateDescriptorSets(vk_device, &allocInfo, &s.__set) : ", res)
+			if res != .SUCCESS do log.panicf("res := vk.AllocateDescriptorSets(vk_device, &allocInfo, &s.__set) : %s\n", res)
 		}
 
 		cnt: u32 = 0

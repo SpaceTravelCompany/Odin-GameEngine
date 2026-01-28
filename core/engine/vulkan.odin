@@ -1,10 +1,10 @@
 #+private
 package engine
 
-import "core:debug/trace"
 import "core:dynlib"
 import "core:sync"
 import vk "vendor:vulkan"
+import "core:log"
 
 
 // ============================================================================
@@ -100,19 +100,19 @@ vk_destroy :: proc() {
 // Public API - Wait Functions
 // ============================================================================
 
-vk_wait_device_idle :: proc "contextless" () {
+vk_wait_device_idle :: proc () {
 	res := vk.DeviceWaitIdle(vk_device)
-	if res != .SUCCESS do trace.panic_log("vk_wait_device_idle : ", res )
+	if res != .SUCCESS do log.panicf("vk_wait_device_idle : %s\n", res)
 }
 
-vk_wait_graphics_idle :: proc "contextless" () {
+vk_wait_graphics_idle :: proc () {
 	sync.mutex_lock(&vk_queue_mutex)
 	defer sync.mutex_unlock(&vk_queue_mutex)
 	res := vk.QueueWaitIdle(vk_graphics_queue)
-	if res != .SUCCESS do trace.panic_log("vk_wait_graphics_idle : ", res )
+	if res != .SUCCESS do log.panicf("vk_wait_graphics_idle : %s\n", res)
 }
 
-vk_wait_present_idle :: proc "contextless" () {
+vk_wait_present_idle :: proc () {
 	res := vk.QueueWaitIdle(vk_present_queue)
-	if res != .SUCCESS do trace.panic_log("vk_wait_present_idle : ", res )
+	if res != .SUCCESS do log.panicf("vk_wait_present_idle : %s\n", res)
 }

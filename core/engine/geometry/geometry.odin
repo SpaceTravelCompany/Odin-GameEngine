@@ -2,7 +2,6 @@ package geometry
 
 import "base:intrinsics"
 import "base:runtime"
-import "core:debug/trace"
 import "core:math"
 import "core:math/linalg"
 import "core:math/poly2tri"
@@ -401,7 +400,7 @@ LineSplitLine :: proc "contextless" (pts:[2][$N]$T, t:T) -> (outPts1:[2][N]T, ou
     _subdiv :f32 = 0.0,
     _repeat :int = -1) -> shape_error {
 
-    if _subdiv < 0 do trace.panic_log("_subdiv can't negative.")
+    assert(_subdiv >= 0)
 
     curveType := type
     err:shape_error = nil
@@ -562,7 +561,7 @@ LineSplitLine :: proc "contextless" (pts:[2][$N]$T, t:T) -> (outPts1:[2][N]T, ou
                 }
                 //reverse = true
             case .Unknown:
-                trace.panic_log("GetCubicCurveType: unknown curve type")
+                intrinsics.trap()
         }
     }
    

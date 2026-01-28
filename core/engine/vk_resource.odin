@@ -2,9 +2,9 @@
 package engine
 
 import "base:runtime"
-import "core:debug/trace"
 import "core:container/pool"
 import vk "vendor:vulkan"
+import "core:log"
 
 
 // ============================================================================
@@ -75,7 +75,7 @@ executeCreateBuffer :: proc(
 	case .INDEX:
 		bufUsage = {.INDEX_BUFFER}
 	case .UNIFORM: //bufUsage = {.UNIFORM_BUFFER} no create each obj
-		if src.option.resource_usage == .GPU do trace.panic_log("UNIFORM BUFFER can't resource_usage .GPU")
+		if src.option.resource_usage == .GPU do log.panic("UNIFORM BUFFER can't resource_usage .GPU\n")
 		bind_uniform_buffer(src, data, allocator)
 		return
 	case .STORAGE:
@@ -94,7 +94,7 @@ executeCreateBuffer :: proc(
 	last: ^buffer_resource
 	if data != nil && src.option.resource_usage == .GPU {
 		bufInfo.usage |= {.TRANSFER_DST}
-		if src.option.size > auto_cast len(data) do trace.panic_log("create_buffer _data not enough size. ", src.option.size, ", ", len(data))
+		if src.option.size > auto_cast len(data) do log.panicf("create_buffer _data not enough size. %d, %d\n", src.option.size, len(data))
 
 		last = pool.get(&gBufferPool)
 		buffer_resource_CreateBufferNoAsync(outQueue, last, {
@@ -104,11 +104,11 @@ executeCreateBuffer :: proc(
 			type           = .__STAGING,
 		}, data, allocator)
 	} else if src.option.type == .__STAGING {
-		if data == nil do trace.panic_log("staging buffer data can't nil")
+		if data == nil do log.panic("staging buffer data can't nil\n")
 	}
 
 	res := vk.CreateBuffer(vk_device, &bufInfo, nil, &src.__resource)
-	if res != .SUCCESS do trace.panic_log("res := vk.CreateBuffer(vk_device, &bufInfo, nil, &self.__resource) : ", res)
+	if res != .SUCCESS do log.panicf("res := vk.CreateBuffer(vk_device, &bufInfo, nil, &self.__resource) : %s\n", res)
 
 	src.mem_buffer = auto_cast vk_mem_buffer_CreateFromResourceSingle(src.__resource) if src.option.single else 
 	auto_cast vk_mem_buffer_CreateFromResource(src.__resource, memProp, &src.idx, 0, src.option.type)
@@ -206,7 +206,7 @@ executeCreateTexture :: proc(
 	}
 
 	res := vk.CreateImage(vk_device, &imgInfo, nil, &src.__resource)
-	if res != .SUCCESS do trace.panic_log("res := vk.CreateImage(vk_device, &imgInfo, nil, &src.__resource) : ", res)
+	if res != .SUCCESS do log.panicf("res := vk.CreateImage(vk_device, &imgInfo, nil, &src.__resource) : %s\n", res)
 
 	src.mem_buffer = auto_cast vk_mem_buffer_CreateFromResourceSingle(src.__resource) if src.option.single else
 	 auto_cast vk_mem_buffer_CreateFromResource(src.__resource, memProp, &src.idx, 0, src.option.type)
@@ -230,7 +230,7 @@ executeCreateTexture :: proc(
 	}
 
 	res = vk.CreateImageView(vk_device, &imgViewInfo, nil, &src.img_view)
-	if res != .SUCCESS do trace.panic_log("res = vk.CreateImageView(vk_device, &imgViewInfo, nil, &src.img_view) : ", res)
+	if res != .SUCCESS do log.panicf("res = vk.CreateImageView(vk_device, &imgViewInfo, nil, &src.img_view) : %s\n", res)
 
 	if data != nil {
 		if src.option.resource_usage != .GPU {

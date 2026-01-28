@@ -3,15 +3,13 @@ package engine
 
 import "base:library"
 import "base:runtime"
-import "core:debug/trace"
 import "core:dynlib"
 import "core:fmt"
 import "core:mem"
 import "core:strings"
 import vk "vendor:vulkan"
 import "vendor:glfw"
-
-import "core:c"
+import "core:log"
 
 
 // ============================================================================
@@ -46,17 +44,17 @@ vk_create_instance :: proc() {
 	ok: bool
 	when ODIN_OS == .Windows {
 		vk_library, ok = dynlib.load_library("vulkan-1.dll")
-		if !ok do trace.panic_log(" vk_library, ok = dynlib.load_library(\"vulkan-1.dll\")")
+		if !ok do log.panicf(" vk_library, ok = dynlib.load_library(\"vulkan-1.dll\")\n")
 	} else {
 		vk_library, ok = dynlib.load_library("libvulkan.so.1")
 		if !ok {
 			vk_library, ok = dynlib.load_library("libvulkan.so")
-			if !ok do trace.panic_log(" vk_library, ok = dynlib.load_library(\"libvulkan.so\")")
+			if !ok do log.panicf(" vk_library, ok = dynlib.load_library(\"libvulkan.so\")\n")
 		}
 	}
 	rawFunc: rawptr
 	rawFunc, ok = dynlib.symbol_address(vk_library, "vkGetInstanceProcAddr")
-	if !ok do trace.panic_log("rawFunc, ok = dynlib.symbol_address(vk_library, \"vkGetInstanceProcAddr\")")
+	if !ok do log.panicf("rawFunc, ok = dynlib.symbol_address(vk_library, \"vkGetInstanceProcAddr\")\n")
 	vk_get_instance_proc_addr = auto_cast rawFunc
 	vk.load_proc_addresses_global(rawFunc)
 
@@ -69,14 +67,14 @@ vk_create_instance :: proc() {
 	}
 	FN_vkEnumerateInstanceVersion := vk.ProcEnumerateInstanceVersion(vk.GetInstanceProcAddr(nil, "vkEnumerateInstanceVersion"))
 	if FN_vkEnumerateInstanceVersion == nil {
-		when is_log do fmt.println("XFIT SYSLOG : vulkan 1.0 device, set api version 1.0")
+		log.infof("SYSLOG : vulkan 1.0 device, set api version 1.0\n")
 		appInfo.apiVersion = vk.API_VERSION_1_0
 		vulkan_version = {1,0,0}
 	} else {
 		vk_ver:u32
 		FN_vkEnumerateInstanceVersion(&vk_ver)
 		vulkan_version = { vk.VK_VERSION_MAJOR(vk_ver), vk.VK_VERSION_MINOR(vk_ver), vk.VK_VERSION_PATCH(vk_ver) }
-		when is_log do fmt.println("XFIT SYSLOG : vulkan version : ", vulkan_version)
+		log.infof("SYSLOG : vulkan version : %d.%d.%d\n", vulkan_version.major, vulkan_version.minor, vulkan_version.patch)
 	}
 	glfwLen := 0
 	glfwExtensions : []cstring
@@ -108,10 +106,7 @@ vk_create_instance :: proc() {
 					}
 					non_zero_append(&layerNames, LAYERS[i])
 					LAYERS_CHECK[i] = true
-					when is_log do fmt.printfln(
-						"XFIT SYSLOG : vulkan %s instance layer support",
-						LAYERS[i],
-					)
+					log.infof("SYSLOG : vulkan %s instance layer support\n", LAYERS[i])
 				}
 			}
 		}
@@ -131,19 +126,16 @@ vk_create_instance :: proc() {
 			   mem.compare((transmute([^]byte)INSTANCE_EXTENSIONS[i])[:len(INSTANCE_EXTENSIONS[i])], e.extensionName[:len(INSTANCE_EXTENSIONS[i])]) == 0 {
 				non_zero_append(&instanceExtNames, INSTANCE_EXTENSIONS[i])
 				INSTANCE_EXTENSIONS_CHECK[i] = true
-				when is_log do fmt.printfln(
-					"XFIT SYSLOG : vulkan %s instance ext support",
-					INSTANCE_EXTENSIONS[i],
-				)
+				log.infof("SYSLOG : vulkan %s instance ext support\n", INSTANCE_EXTENSIONS[i])
 			}
 		}
 	}
 	if validation_layer_support() {
 		non_zero_append(&instanceExtNames, vk.EXT_DEBUG_UTILS_EXTENSION_NAME)
 
-		when is_log do fmt.println("XFIT SYSLOG : vulkan validation layer enable")
+		log.infof("SYSLOG : vulkan validation layer enable\n")
 	} else {
-		when is_log do fmt.println("XFIT SYSLOG : vulkan validation layer disable")
+		log.infof("SYSLOG : vulkan validation layer disable\n")
 	}
 
 	when library.is_android {
@@ -173,7 +165,7 @@ vk_create_instance :: proc() {
 	}
 
 	res := vk.CreateInstance(&instanceCreateInfo, nil, &vk_instance)
-	if (res != vk.Result.SUCCESS) do trace.panic_log("vk.CreateInstance(&instanceCreateInfo, nil, &vk_instance) : ", res)
+	if res != vk.Result.SUCCESS do log.panicf("vk.CreateInstance(&instanceCreateInfo, nil, &vk_instance) : %s\n", res)
 
 	vk.load_proc_addresses_instance(vk_instance)
 

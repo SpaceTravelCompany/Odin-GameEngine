@@ -1,11 +1,11 @@
 package engine
 
-import "core:debug/trace"
 import "core:math/linalg"
 import "core:sync"
 import "core:sys/windows"
 import "vendor:glfw"
 import "base:library"
+import "core:log"
 
 icon_image :: glfw.Image
 v_sync :: enum {Double, Triple, None}
@@ -113,27 +113,30 @@ set_window_mode :: proc "contextless" () {
 
 monitor_lock :: proc "contextless" () {
 	sync.mutex_lock(&monitors_mtx)
-	if monitor_locked do trace.panic_log("already monitor_locked locked")
-	monitor_locked = true
+}
+monitor_try_lock :: proc "contextless" () -> bool {
+	return sync.mutex_try_lock(&monitors_mtx)
 }
 monitor_unlock :: proc "contextless" () {
-	if !monitor_locked do trace.panic_log("already monitor_locked unlocked")
-	monitor_locked = false
 	sync.mutex_unlock(&monitors_mtx)
 }
-
 get_monitors :: proc "contextless" () -> []monitor_info {
-	if !monitor_locked do trace.panic_log("call inside monitor_lock")
+	b := monitor_try_lock()
+	defer if b {
+		monitor_unlock()
+	}
 	return monitors[:len(monitors)]
-}
+}	
 
 get_current_monitor :: proc "contextless" () -> ^monitor_info {
-	if !monitor_locked do trace.panic_log("call inside monitor_lock")
+	b := monitor_try_lock()
+	defer if b {
+		monitor_unlock()
+	}
 	return current_monitor
 }
 
 get_monitor_from_window :: proc "contextless" () -> ^monitor_info #no_bounds_check {
-	if !monitor_locked do trace.panic_log("call inside monitor_lock")
 	for &value in monitors {
 		if linalg.Rect_PointIn(value.rect, [2]i32{auto_cast __window_x.?, auto_cast __window_y.?}) do return &value
 	}

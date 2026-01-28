@@ -11,6 +11,7 @@ import "core:c"
 import "core:sync"
 import "vendor:glslang"
 import "core:container/pool"
+import "core:log"
 
 import vk "vendor:vulkan"
 
@@ -259,15 +260,15 @@ get_nearest_sampler :: #force_inline proc "contextless" () -> vk.Sampler {
 	vk_draw_frame()
 }
 
-@private graphics_wait_device_idle :: #force_inline proc "contextless" () {
+@private graphics_wait_device_idle :: #force_inline proc () {
 	vk_wait_device_idle()
 }
 
-@private graphics_wait_graphics_idle :: #force_inline proc "contextless" () {
+@private graphics_wait_graphics_idle :: #force_inline proc () {
 	vk_wait_graphics_idle()
 }
 
-@private graphics_wait_present_idle :: #force_inline proc "contextless" () {
+@private graphics_wait_present_idle :: #force_inline proc () {
 	vk_wait_present_idle()
 }
 
@@ -283,7 +284,7 @@ allocate_command_buffers :: proc(p_cmd_buffer: [^]command_buffer, count: u32, cm
 		commandBufferCount = count,
 	}
 	res := vk.AllocateCommandBuffers(graphics_device(), &alloc_info, auto_cast p_cmd_buffer)
-	if res != .SUCCESS do trace.panic_log("res = vk.AllocateCommandBuffers(graphics_device(), &alloc_info, &cmd.cmds[i][0]) : ", res)
+	if res != .SUCCESS do log.panicf("res = vk.AllocateCommandBuffers(graphics_device(), &alloc_info, &cmd.cmds[i][0]) : %s\n", res)
 }
 
 free_command_buffers :: proc(p_cmd_buffer: [^]command_buffer, count: u32, cmd_pool: vk.CommandPool) {
@@ -617,7 +618,7 @@ object_pipeline_deinit :: proc(self:^object_pipeline) {
 		sync.mutex_lock(&__shader_mtx)
 		defer sync.mutex_unlock(&__shader_mtx)
 		if glslang.initialize_process() == 0 {
-			trace.panic_log("__shader_init: glslang initialization failed")
+			panic_contextless("__shader_init: glslang initialization failed")
 		}
 		intrinsics.atomic_store_explicit(&__shader_inited, true, .Relaxed)
 	}
@@ -662,7 +663,7 @@ custom_object_pipeline_init :: proc(self:^object_pipeline,
     }
 
     if vertex_shader == nil || pixel_shader == nil {
-        trace.panic_log("custom_object_pipeline_init: vertex_shader and pixel_shader cannot be nil")
+        log.panic("custom_object_pipeline_init: vertex_shader and pixel_shader cannot be nil\n")
     }
 
     
@@ -719,7 +720,7 @@ custom_object_pipeline_init :: proc(self:^object_pipeline,
 					}
                     shader := glslang.shader_create(&input)
                     if shader == nil {
-                        trace.printlnLog("custom_object_pipeline_init: failed to create shader")
+                        log.error("custom_object_pipeline_init: failed to create shader\n")
                         return false
                     }
                     defer glslang.shader_delete(shader)
@@ -730,10 +731,10 @@ custom_object_pipeline_init :: proc(self:^object_pipeline,
 						info_log := glslang.shader_get_info_log(shader)
                         debug_log := glslang.shader_get_info_debug_log(shader)
                         if info_log != nil {
-                            trace.printlnLog(info_log)
+                            log.error(info_log, "\n")
                         }
                         if debug_log != nil {
-                            trace.printlnLog(debug_log)
+                            log.error(debug_log, "\n")
                         }
                         return false
 					}
@@ -742,17 +743,17 @@ custom_object_pipeline_init :: proc(self:^object_pipeline,
                         info_log := glslang.shader_get_info_log(shader)
                         debug_log := glslang.shader_get_info_debug_log(shader)
                         if info_log != nil {
-                            trace.printlnLog(info_log)
+                            log.error(info_log, "\n")
                         }
                         if debug_log != nil {
-                            trace.printlnLog(debug_log)
+                            log.error(debug_log, "\n")
                         }
                         return false
                     }
                     
                     program := glslang.program_create()
                     if program == nil {
-                        trace.printlnLog("custom_object_pipeline_init: failed to create program")
+                        log.error("custom_object_pipeline_init: failed to create program\n")
                         return false
                     }
                     glslang.program_add_shader(program, shader)
@@ -762,10 +763,10 @@ custom_object_pipeline_init :: proc(self:^object_pipeline,
                         info_log := glslang.program_get_info_log(program)
                         debug_log := glslang.program_get_info_debug_log(program)
                         if info_log != nil {
-                            trace.printlnLog(info_log)
+                            log.error(info_log, "\n")
                         }
                         if debug_log != nil {
-                            trace.printlnLog(debug_log)
+                            log.error(debug_log, "\n")
                         }
                         glslang.program_delete(program)
                         return false
@@ -796,14 +797,19 @@ custom_object_pipeline_init :: proc(self:^object_pipeline,
                     glslang.program_SPIRV_get(program, cast(^c.uint)&spirv_data[0])
                     
                     spirv_messages := glslang.program_SPIRV_get_messages(program)
-                    if spirv_messages != nil {trace.printlnLog(spirv_messages)}
+                    if spirv_messages != nil {log.error(spirv_messages, "\n")}
                     
                     shader_bytes = spirv_data
                     shader_programs[i] = program
                 case []byte:
                     shader_bytes = s
             }
-            shader_modules[i] = vk.CreateShaderModule2(graphics_device(), shader_bytes) or_else trace.panic_log("custom_object_pipeline_init: CreateShaderModule2")
+			res: vk.Result
+            shader_modules[i], res = vk.CreateShaderModule2(graphics_device(), shader_bytes)
+			if res != .SUCCESS {
+				log.errorf("custom_object_pipeline_init: CreateShaderModule2 : %s\n", res)
+				return false
+			} 
 			if spirv_data != nil do delete(spirv_data, context.temp_allocator)
 			spirv_data = nil
         }
@@ -822,9 +828,15 @@ custom_object_pipeline_init :: proc(self:^object_pipeline,
 
     viewportState := vk.PipelineViewportStateCreateInfoInit()
 
+	res: vk.Result
     self.__descriptor_set_layouts = mem.make_non_zeroed_slice([]vk.DescriptorSetLayout, len(descriptor_set_layouts), allocator)
 	mem.copy_non_overlapping(&self.__descriptor_set_layouts[0], &descriptor_set_layouts[0], len(descriptor_set_layouts) * size_of(vk.DescriptorSetLayout))
-    self.__pipeline_layout = vk.PipelineLayoutInit(graphics_device(), self.__descriptor_set_layouts)
+    self.__pipeline_layout, res = vk.PipelineLayoutInit(graphics_device(), self.__descriptor_set_layouts)
+	if res != .SUCCESS {
+		log.errorf("custom_object_pipeline_init: PipelineLayoutInit : %s\n", res)
+		delete(self.__descriptor_set_layouts, allocator)
+		return false
+	}
 
     vertexInputState:Maybe(vk.PipelineVertexInputStateCreateInfo)
     if vertex_input_binding != nil && vertex_input_attribute != nil {
@@ -839,6 +851,8 @@ custom_object_pipeline_init :: proc(self:^object_pipeline,
         viewportState,
         vertexInputState == nil ? nil : &vertexInputState.?,
 		color_blend_state == nil ? vk.DefaultPipelineColorBlendStateCreateInfo : color_blend_state.?) {
+		delete(self.__descriptor_set_layouts, allocator)
+		vk.DestroyPipelineLayout(graphics_device(), self.__pipeline_layout, nil)
         return false
     }
     return true
@@ -870,7 +884,7 @@ create_graphics_pipeline :: proc(
 
 	res := vk.CreateGraphicsPipelines(graphics_device(), 0, 1, &pipeline_create_info, nil, &self.__pipeline)
 	if res != .SUCCESS {
-		trace.printlnLog("create_graphics_pipeline: Failed to create graphics pipeline:", res)
+		log.errorf("create_graphics_pipeline: Failed to create graphics pipeline: %s\n", res)
 		return false
 	}
 	return true

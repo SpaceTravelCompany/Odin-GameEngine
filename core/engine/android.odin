@@ -16,6 +16,7 @@ import "core:sys/posix"
 import "core:thread"
 import vk "vendor:vulkan"
 import "vendor:android_cpu_features"
+import "core:log"
 
 when library.is_android {
     @(private="file") app : ^android.android_app
@@ -33,7 +34,7 @@ android_get_asset_manager :: proc "contextless" () -> ^android.AAssetManager {
 	when library.is_android {
 		return app.activity.assetManager
 	} else {
-		trace.panic_log("android_get_asset_manager is not available on this platform")
+		intrinsics.trap()
 	}
 }
 
@@ -47,7 +48,7 @@ android_get_device_width :: proc "contextless" () -> u32 {
 	when library.is_android {
 		return auto_cast max(0, android.ANativeWindow_getWidth(app.window))
 	} else {
-		trace.panic_log("android_get_device_width is not available on this platform")
+		intrinsics.trap()
 	}
 }
 
@@ -61,7 +62,7 @@ android_get_device_height :: proc "contextless" () -> u32 {
 	when library.is_android {
 		return auto_cast max(0, android.ANativeWindow_getHeight(app.window))
 	} else {
-		trace.panic_log("android_get_device_height is not available on this platform")
+		intrinsics.trap()
 	}
 }
 
@@ -79,7 +80,7 @@ android_get_internal_data_path :: proc "contextless" () -> string {
 	when library.is_android {
 		return string(app.activity.internalDataPath)
 	} else {
-		trace.panic_log("android_get_internal_data_path is not available on this platform")
+		intrinsics.trap()
 	}
 }
 
@@ -112,7 +113,7 @@ android_print_current_config :: proc () {
 			android.AConfiguration_getUiModeNight(app.config),
 		)
 	} else {
-		trace.panic_log("android_print_current_config is not available on this platform")
+		intrinsics.trap()
 	}
 }
 
@@ -131,7 +132,7 @@ when library.is_android {
 		app.destroyRequested = 1
 	}
 
-	@private vulkan_android_start :: proc "contextless" () {
+	@private vulkan_android_start :: proc () {
 		if vk_surface != 0 {
 			vk.DestroySurfaceKHR(vk_instance, vk_surface, nil)
 		}
@@ -141,7 +142,7 @@ when library.is_android {
 		}
 		res := vk.CreateAndroidSurfaceKHR(vk_instance, &android_surface_create_info, nil, &vk_surface)
 		if res != .SUCCESS {
-			trace.panic_log(res)
+			log.panicf("vk.CreateAndroidSurfaceKHR: %s\n", res)
 		}
 	}
 
@@ -412,7 +413,9 @@ when library.is_android {
 
 				prop : vk.SurfaceCapabilitiesKHR
 				res := vk.GetPhysicalDeviceSurfaceCapabilitiesKHR(vk_physical_device, vk_surface, &prop)
-				if res != .SUCCESS do trace.panic_log(res)
+				if res != .SUCCESS {
+					panic_contextless("vk.GetPhysicalDeviceSurfaceCapabilitiesKHR")
+				}
 				if prop.currentExtent.width != vk_extent.width || prop.currentExtent.height != vk_extent.height {
 					size_updated = true
 				}
@@ -423,7 +426,7 @@ when library.is_android {
 		// Set CPU core count for Android
 		core_count := android_cpu_features.android_getCpuCount()
 		processor_core_len = auto_cast core_count
-		if processor_core_len == 0 do trace.panic_log("processor_core_len can't zero")
+		if processor_core_len == 0 do log.panicf("processor_core_len can't zero\n")
 		
 		app = auto_cast android.get_android_app()
 		app.userData = nil

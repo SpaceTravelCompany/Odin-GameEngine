@@ -14,7 +14,7 @@ import "core:unicode/utf8"
 import "core:engine/geometry"
 import "vendor:freetype"
 import "../"
-
+import "core:log"
 
 @(private="file") char_data :: struct {
     raw_shape : ^geometry.raw_shape,
@@ -72,15 +72,15 @@ font_render_range :: struct {
 
 @(private) freetype_lib:freetype.Library = nil
 
-@(private) _init_freetype :: proc "contextless" () {
+@(private) _init_freetype :: proc () {
     err := freetype.init_free_type(&freetype_lib)
-    if err != .Ok do trace.panic_log(err)
+    if err != .Ok do log.panicf("init_freetype: %s\n", err)
 }
 
 @(private, fini) _deinit_freetype :: proc "contextless" () {
     if (freetype_lib != nil) {
         err := freetype.done_free_type(freetype_lib)
-        if err != .Ok do trace.panic_log(err)
+        if err != .Ok do panic_contextless("done_free_type\n")
         freetype_lib = nil
     }
 }
@@ -154,7 +154,7 @@ font_deinit :: proc(self:^font) -> (err : freetype_err = nil) {
     sync.mutex_lock(&self_.mutex)
 
     err = freetype.done_face(self_.face)
-    if err != nil do trace.panic_log(err)
+    if err != nil do log.panicf("done_face: %s\n", err)
 
     for key,value in self_.char_array {
         geometry.raw_shape_free(value.raw_shape, self_.allocator)
@@ -381,7 +381,7 @@ allocator : runtime.Allocator) -> (rect:linalg.rect, err:geometry.shape_error = 
         for {
             fIdx := freetype.get_char_index(self.face, auto_cast ch)
             if fIdx == 0 {
-                if ch == '□' do trace.panic_log("not found □")
+                if ch == '□' do log.panicf("not found □\n")
                 ok = FONT_KEY{'□', thickness2} in self.char_array
                 if ok {
                     charD = &self.char_array[FONT_KEY{'□', thickness2}]
@@ -392,7 +392,7 @@ allocator : runtime.Allocator) -> (rect:linalg.rect, err:geometry.shape_error = 
                 continue
             }
             err := freetype.load_glyph(self.face, fIdx, {.No_Bitmap})
-            if err != .Ok do trace.panic_log(err)
+            if err != .Ok do log.panicf("load_glyph: %s\n", err)
 
             if self.face.glyph.outline.n_points == 0 {
                 charData : char_data = {
@@ -431,7 +431,7 @@ allocator : runtime.Allocator) -> (rect:linalg.rect, err:geometry.shape_error = 
 			}
         
             err = freetype.outline_decompose(&self.face.glyph.outline, &funcs, &data)
-            if err != .Ok do trace.panic_log(err)
+            if err != .Ok do log.panicf("outline_decompose: %s\n", err)
 
             charData : char_data
             if data.lineCount == 0 {
@@ -556,7 +556,7 @@ Returns:
 - Allocator error if allocation failed
 */
 font_render_string :: proc(self:^font, _str:string, _renderOpt:font_render_opt, allocator := context.allocator) -> (res:^geometry.raw_shape, err:geometry.shape_error = nil) {
-	if self == nil do trace.panic_log("font_render_string: font is nil")
+	if self == nil do log.panicf("font_render_string: font is nil\n")
 
     vertList := make([dynamic]geometry.shape_vertex2d, context.temp_allocator)
     defer delete(vertList)

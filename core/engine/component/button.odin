@@ -143,9 +143,10 @@ _super_image_button_draw :: proc (self:^image_button, cmd:engine.command_buffer,
         case .OVER:texture = self.over_texture
         case .DOWN:texture = self.down_texture
     }
-    when ODIN_DEBUG {
-        if texture == nil do panic_contextless("texture: uninitialized")
-    }
+    if texture == nil do panic_contextless("texture: uninitialized")
+	//self의 uniform, texture 리소스가 준비가 안됨. 드로우 하면 안됨.
+	if engine.graphics_get_resource_draw(self) == nil do return
+	if engine.graphics_get_resource_draw(texture) == nil do return
 
     engine.image_binding_sets_and_draw(cmd, self.set, viewport.set, texture.set)
 }

@@ -2,10 +2,10 @@
 package engine
 
 
-import "core:debug/trace"
 import "core:fmt"
 import "core:mem"
 import vk "vendor:vulkan"
+import "core:log"
 
 
 // ============================================================================
@@ -80,10 +80,7 @@ vk_create_logical_device :: proc() {
 			   mem.compare((transmute([^]byte)DEVICE_EXTENSIONS[i])[:len(DEVICE_EXTENSIONS[i])],e.extensionName[:len(DEVICE_EXTENSIONS[i])]) == 0 {
 				non_zero_append(&deviceExtNames, DEVICE_EXTENSIONS[i])
 				DEVICE_EXTENSIONS_CHECK[i] = true
-				when is_log do fmt.printfln(
-					"XFIT SYSLOG : vulkan %s device ext support",
-					DEVICE_EXTENSIONS[i],
-				)
+				log.infof("SYSLOG : vulkan %s device ext support\n", DEVICE_EXTENSIONS[i])
 			}
 		}
 	}
@@ -124,7 +121,7 @@ vk_create_logical_device :: proc() {
 	}
 
 	res := vk.CreateDevice(vk_physical_device, &deviceCreateInfo, nil, &vk_device)
-	if (res != vk.Result.SUCCESS) do trace.panic_log("res = vk.CreateDevice(vk_physical_device, &deviceCreateInfo, nil, &vk_device) : ", res)
+	if (res != vk.Result.SUCCESS) do log.panicf("res = vk.CreateDevice(vk_physical_device, &deviceCreateInfo, nil, &vk_device) : %s\n", res)
 	vk.load_proc_addresses_device(vk_device)
 
 	vk.GetPhysicalDeviceMemoryProperties(vk_physical_device, &vk_physical_mem_prop)
@@ -143,7 +140,7 @@ vk_create_logical_device :: proc() {
 		flags = vk.CommandPoolCreateFlags{.RESET_COMMAND_BUFFER},
 		queueFamilyIndex = vk_graphics_family_index,
 	}, nil, &vk_cmd_pool)
-	if res != .SUCCESS do trace.panic_log("vk.CreateCommandPool(&vk_cmd_pool) : ", res)
+	if res != .SUCCESS do log.panicf("vk.CreateCommandPool(&vk_cmd_pool) : %s\n", res)
 
 	res = vk.AllocateCommandBuffers(vk_device, &vk.CommandBufferAllocateInfo{
 		sType = vk.StructureType.COMMAND_BUFFER_ALLOCATE_INFO,
@@ -151,5 +148,5 @@ vk_create_logical_device :: proc() {
 		level = vk.CommandBufferLevel.PRIMARY,
 		commandBufferCount = MAX_FRAMES_IN_FLIGHT,
 	}, &vk_cmd_buffer[0])
-	if res != .SUCCESS do trace.panic_log("vk.AllocateCommandBuffers(&vk_cmd_buffer) : ", res)
+	if res != .SUCCESS do log.panicf("vk.AllocateCommandBuffers(&vk_cmd_buffer) : %s\n", res)
 }
