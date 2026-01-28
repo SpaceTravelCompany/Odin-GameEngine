@@ -6,7 +6,6 @@ import "base:intrinsics"
 import "base:runtime"
 import "core:sync"
 import "core:sys/posix"
-import "core:fmt"
 
 _IS_SUPPORTED :: true
 
