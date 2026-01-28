@@ -43,7 +43,7 @@ vk_init_block_len :: proc() {
 		if .DEVICE_LOCAL in h.flags {
 			_ChangeSize(h.size)
 			change = true
-			log.infof("SYSLOG : Vulkan Graphic Card Dedicated Memory Block %d MB\nDedicated Memory : %d MB\n",
+			log.infof("SYSLOG : Vulkan Graphic Card Dedicated Memory Block %d MB Dedicated Memory : %d MB\n",
 				vkMemBlockLen / mem.Megabyte,
 				h.size / mem.Megabyte,
 			)
