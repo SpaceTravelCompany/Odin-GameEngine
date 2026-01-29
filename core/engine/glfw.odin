@@ -21,6 +21,7 @@ import vk "vendor:vulkan"
 import "vendor:glfw"
 import "core:log"
 
+when !library.is_android {
 
 @(private="file") wnd:glfw.WindowHandle = nil
 @(private="file") glfw_monitors:[dynamic]glfw.MonitorHandle
@@ -429,4 +430,6 @@ glfw_loop :: proc() {
 }
 glfw_get_window :: proc "contextless" () -> glfw.WindowHandle {
 	return wnd
+}
+
 }

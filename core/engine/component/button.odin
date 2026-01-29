@@ -6,7 +6,8 @@ import "core:mem"
 import "core:engine"
 import "core:engine/shape"
 import "core:log"
-
+import "base:runtime"
+import "core:sync"
 import vk "vendor:vulkan"
 
 
@@ -19,6 +20,46 @@ image_button :: struct {
     up_texture:^engine.texture,
     over_texture:^engine.texture,
     down_texture:^engine.texture,
+}
+
+@private g_buttons:[dynamic]^button
+@private g_buttons_mtx:sync.Mutex
+
+@(private) g_buttons_init :: proc (self:^button) {
+	sync.mutex_lock(&g_buttons_mtx)
+	defer sync.mutex_unlock(&g_buttons_mtx)
+	if g_buttons.allocator.procedure == nil {
+		g_buttons = mem.make_non_zeroed([dynamic]^button,runtime.default_allocator())
+	}
+}
+
+@(private, fini) g_buttons_fini :: proc "contextless" () {
+	sync.mutex_lock(&g_buttons_mtx)
+	defer sync.mutex_unlock(&g_buttons_mtx)
+	if g_buttons.allocator.procedure != nil {
+		context = runtime.default_context()
+		delete(g_buttons)
+	}
+}
+
+@private g_buttons_append :: proc (self:^button) {
+	sync.mutex_lock(&g_buttons_mtx)
+	defer sync.mutex_unlock(&g_buttons_mtx)
+	if g_buttons.allocator.procedure != nil {
+		non_zero_append_elem(&g_buttons, self)
+	}
+}
+@private g_buttons_remove :: proc (self:^button) {
+	sync.mutex_lock(&g_buttons_mtx)
+	defer sync.mutex_unlock(&g_buttons_mtx)
+	if g_buttons.allocator.procedure != nil {
+		for button, i  in g_buttons {
+			if button == self {
+				unordered_remove(&g_buttons, i)
+				break
+			}
+		}
+	}
 }
 
 button_up :: proc (self:^button, mousePos:linalg.point) {
@@ -210,6 +251,7 @@ button_vtable :: struct {
 	__over_exists = auto_cast image_button_over_exists,
 	__down_exists = auto_cast image_button_down_exists,
 	__up_exists = auto_cast image_button_up_exists,
+	deinit = auto_cast _super_button_deinit,
 }
 
 @private shape_button_vtable :button_vtable = button_vtable {
@@ -217,6 +259,55 @@ button_vtable :: struct {
 	__over_exists = auto_cast shape_button_over_exists,
 	__down_exists = auto_cast shape_button_down_exists,
 	__up_exists = auto_cast shape_button_up_exists,
+	deinit = auto_cast _super_button_deinit,
+}
+
+@private button_vtable_default :button_vtable = button_vtable {
+	deinit = auto_cast _super_button_deinit,
+}
+
+handle_button_down :: proc (mousePos:linalg.point) {
+	sync.mutex_lock(&g_buttons_mtx)
+	defer sync.mutex_unlock(&g_buttons_mtx)
+	for button in g_buttons {
+		button_down(button, mousePos)
+	}	
+}
+handle_button_up :: proc (mousePos:linalg.point) {
+	sync.mutex_lock(&g_buttons_mtx)
+	defer sync.mutex_unlock(&g_buttons_mtx)
+	for button in g_buttons {
+		button_up(button, mousePos)
+	}
+}
+handle_button_move :: proc (mousePos:linalg.point) {
+	sync.mutex_lock(&g_buttons_mtx)
+	defer sync.mutex_unlock(&g_buttons_mtx)
+	for button in g_buttons {
+		button_move(button, mousePos)
+	}
+}
+
+handle_pointer_down :: proc (pointerPos:linalg.point, pointerIdx:u8) {
+	sync.mutex_lock(&g_buttons_mtx)
+	defer sync.mutex_unlock(&g_buttons_mtx)
+	for button in g_buttons {
+		button_pointer_down(button, pointerPos, pointerIdx)
+	}
+}
+handle_pointer_up :: proc (pointerPos:linalg.point, pointerIdx:u8) {
+	sync.mutex_lock(&g_buttons_mtx)
+	defer sync.mutex_unlock(&g_buttons_mtx)
+	for button in g_buttons {
+		button_pointer_up(button, pointerPos, pointerIdx)
+	}
+}
+handle_pointer_move :: proc (pointerPos:linalg.point, pointerIdx:u8) {
+	sync.mutex_lock(&g_buttons_mtx)
+	defer sync.mutex_unlock(&g_buttons_mtx)
+	for button in g_buttons {
+		button_pointer_move(button, pointerPos, pointerIdx)
+	}
 }
 
 image_button_over_exists :: proc (self:^image_button) -> bool {
@@ -271,12 +362,8 @@ ref_viewport:^engine.viewport = nil) {
 
 	self.vtable = vtable == nil ? &image_button_vtable : vtable
     if self.vtable.draw == nil do self.vtable.draw = auto_cast _super_image_button_draw
-	btable :^button_vtable = auto_cast self.vtable
-	if btable.__over_exists == nil do btable.__over_exists = auto_cast image_button_over_exists
-	if btable.__down_exists == nil do btable.__down_exists = auto_cast image_button_down_exists
-	if btable.__up_exists == nil do btable.__up_exists = auto_cast image_button_up_exists
 
-	engine.itransform_object_init(self, colorTransform, self.vtable)
+	_super_button_init(self, colorTransform, auto_cast self.vtable)
 	self.actual_type = typeid_of(image_button)
 	self.ref_viewport = ref_viewport
 }
@@ -299,6 +386,28 @@ _super_shape_button_draw :: proc (self:^shape_button, cmd:engine.command_buffer,
 	shape.shape_src_bind_and_draw(shape_src, &self.set, cmd, viewport)
 }
 
+_super_button_deinit :: proc (self:^button) {
+	g_buttons_remove(self)
+	engine._super_itransform_object_deinit(self)
+}
+
+_super_button_init :: proc (self:^button, colorTransform:^engine.color_transform = nil, vtable:^button_vtable = nil,
+ref_viewport:^engine.viewport = nil) {
+	g_buttons_init(self)
+	g_buttons_append(self)
+
+	btable :^button_vtable = vtable == nil ? &button_vtable_default : vtable
+	if btable.__over_exists == nil do btable.__over_exists = auto_cast shape_button_over_exists
+	if btable.__down_exists == nil do btable.__down_exists = auto_cast shape_button_down_exists
+	if btable.__up_exists == nil do btable.__up_exists = auto_cast shape_button_up_exists
+	if btable.deinit == nil do btable.deinit = auto_cast _super_button_deinit
+	self.vtable = btable
+
+	engine.itransform_object_init(self, colorTransform, self.vtable)
+	self.actual_type = typeid_of(button)
+	self.ref_viewport = ref_viewport
+}
+
 shape_button_init :: proc(self:^shape_button,
 up:^shape.shape_src = nil, over:^shape.shape_src = nil, down:^shape.shape_src = nil, colorTransform:^engine.color_transform = nil, vtable:^button_vtable = nil,
 ref_viewport:^engine.viewport = nil) {
@@ -312,12 +421,7 @@ ref_viewport:^engine.viewport = nil) {
 
 	self.vtable = vtable == nil ? &shape_button_vtable : vtable
     if self.vtable.draw == nil do self.vtable.draw = auto_cast _super_shape_button_draw
-	btable :^button_vtable = auto_cast self.vtable
-	if btable.__over_exists == nil do btable.__over_exists = auto_cast shape_button_over_exists
-	if btable.__down_exists == nil do btable.__down_exists = auto_cast shape_button_down_exists
-	if btable.__up_exists == nil do btable.__up_exists = auto_cast shape_button_up_exists
 
-	engine.itransform_object_init(self, colorTransform, self.vtable)
+	_super_button_init(self, colorTransform, auto_cast self.vtable)
 	self.actual_type = typeid_of(shape_button)
-	self.ref_viewport = ref_viewport
 }

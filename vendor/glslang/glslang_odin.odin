@@ -8,50 +8,17 @@ import "base:library"
 
 when ODIN_OS == .Windows && !library.is_android{
     foreign import glslang {
-        library.LIBPATH  + "/libGenericCodeGen" + library.ARCH_end,
-        library.LIBPATH  + "/libglslang-default-resource-limits" + library.ARCH_end,
-        library.LIBPATH  + "/libglslang" + library.ARCH_end,
-        library.LIBPATH  + "/libMachineIndependent" + library.ARCH_end,
-        library.LIBPATH  + "/libOSDependent" + library.ARCH_end,
-        library.LIBPATH  + "/libSPIRV-Tools-opt" + library.ARCH_end,
-        library.LIBPATH  + "/libSPIRV-Tools-diff" + library.ARCH_end,
-        library.LIBPATH  + "/libSPIRV-Tools-link" + library.ARCH_end,
-        library.LIBPATH  + "/libSPIRV-Tools-lint" + library.ARCH_end,
-        library.LIBPATH  + "/libSPIRV-Tools-reduce" + library.ARCH_end,
-        library.LIBPATH  + "/libSPIRV-Tools" + library.ARCH_end,
-        library.LIBPATH  + "/libSPIRV" + library.ARCH_end,
+        library.LIBPATH  + "/libglslang_combined" + library.ARCH_end,
     }
 } else when library.is_android {
     @(extra_linker_flags = "-lc++_static -lc++abi -std=c++17")
     foreign import glslang {
-        library.LIBPATH  + "/libGenericCodeGen" + library.ARCH_end,
-        library.LIBPATH  + "/libglslang-default-resource-limits" + library.ARCH_end,
-        library.LIBPATH  + "/libglslang" + library.ARCH_end,
-        library.LIBPATH  + "/libMachineIndependent" + library.ARCH_end,
-        library.LIBPATH  + "/libOSDependent" + library.ARCH_end,
-        library.LIBPATH  + "/libSPIRV-Tools-opt" + library.ARCH_end,
-        library.LIBPATH  + "/libSPIRV-Tools-diff" + library.ARCH_end,
-        library.LIBPATH  + "/libSPIRV-Tools-link" + library.ARCH_end,
-        library.LIBPATH  + "/libSPIRV-Tools-lint" + library.ARCH_end,
-        library.LIBPATH  + "/libSPIRV-Tools-reduce" + library.ARCH_end,
-        library.LIBPATH  + "/libSPIRV-Tools" + library.ARCH_end,
-        library.LIBPATH  + "/libSPIRV" + library.ARCH_end,
+        library.LIBPATH  + "/libglslang_combined" + library.ARCH_end,
     }
 } else {
     @(extra_linker_flags = "-lstdc++ -std=c++17")
     foreign import glslang {
-        library.LIBPATH  + "/libGenericCodeGen" + library.ARCH_end,
-        library.LIBPATH  + "/libglslang-default-resource-limits" + library.ARCH_end,
-        library.LIBPATH  + "/libglslang" + library.ARCH_end,
-        library.LIBPATH  + "/libMachineIndependent" + library.ARCH_end,
-        library.LIBPATH  + "/libOSDependent" + library.ARCH_end,
-        library.LIBPATH  + "/libSPIRV-Tools-opt" + library.ARCH_end,
-        library.LIBPATH  + "/libSPIRV-Tools-diff" + library.ARCH_end,
-        library.LIBPATH  + "/libSPIRV-Tools-link" + library.ARCH_end,
-        library.LIBPATH  + "/libSPIRV-Tools-lint" + library.ARCH_end,
-        library.LIBPATH  + "/libSPIRV-Tools-reduce" + library.ARCH_end,
-        library.LIBPATH  + "/libSPIRV-Tools" + library.ARCH_end,
-        library.LIBPATH  + "/libSPIRV" + library.ARCH_end,
+        library.LIBPATH  + "/libglslang_combined" + library.ARCH_end,
     }
 }
 

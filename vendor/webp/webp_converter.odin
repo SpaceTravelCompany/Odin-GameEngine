@@ -275,9 +275,10 @@ webp_converter_load_file :: proc (self:^webp_converter, file_path:string, out_fm
     when library.is_android {
         imgFileReadErr : android.AssetFileError
         imgFileData, imgFileReadErr = android.asset_read_file(file_path, context.temp_allocator)
-        if imgFileReadErr != .None {
-            return nil, imgFileReadErr
-        }
+		os2Error :os2.Error = .Invalid_File
+		if imgFileReadErr != .None {
+			return nil, os2Error
+		}
     } else {
         imgFileReadErr:os2.Error
         imgFileData, imgFileReadErr = os2.read_entire_file_from_path(file_path, context.temp_allocator)

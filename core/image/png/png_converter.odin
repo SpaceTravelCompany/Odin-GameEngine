@@ -132,8 +132,9 @@ png_converter_load_file :: proc (self:^png_converter, file_path:string, out_fmt:
     when library.is_android {
         imgFileReadErr : android.AssetFileError
         imgFileData, imgFileReadErr = android.asset_read_file(file_path, context.temp_allocator)
+        os2Error :os2.Error = .Invalid_File
         if imgFileReadErr != .None {
-            return nil, imgFileReadErr
+            return nil, os2Error
         }
     } else {
         imgFileReadErr:os2.Error
