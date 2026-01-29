@@ -56,9 +56,13 @@ custom_object_init :: proc(self:^custom_object,
 		 self.sets[i].layout = p_pipeline.__descriptor_set_layouts[i]
 	}
 
-    self.vtable = vtable == nil ? &custom_object_vtable : vtable
-    if self.vtable.draw == nil do self.vtable.draw = auto_cast _super_custom_object_draw
-    if self.vtable.deinit == nil do self.vtable.deinit = auto_cast _super_custom_object_deinit
+    if vtable == nil {
+        self.vtable = &custom_object_vtable
+    } else {
+        self.vtable = vtable
+		if self.vtable.draw == nil do self.vtable.draw = auto_cast _super_custom_object_draw
+    	if self.vtable.deinit == nil do self.vtable.deinit = auto_cast _super_custom_object_deinit
+    }
 
     engine.iobject_init(self)
     self.actual_type = typeid_of(custom_object)

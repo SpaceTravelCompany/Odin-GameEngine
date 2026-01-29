@@ -45,11 +45,15 @@ colorTransform:^engine.color_transform = nil, vtable:^engine.iobject_vtable = ni
     self.set.size = engine.descriptor_pool_size__animate_img_uniform_pool[:]
     self.set.layout = engine.animate_img_descriptor_set_layout()
 
-    self.vtable = vtable == nil ? &tile_image_vtable : vtable
-    if self.vtable.draw == nil do self.vtable.draw = auto_cast _super_tile_image_draw
-    if self.vtable.deinit == nil do self.vtable.deinit = auto_cast _super_tile_image_deinit
+    if vtable == nil {
+        self.vtable = &tile_image_vtable
+    } else {
+        self.vtable = vtable
+		if self.vtable.draw == nil do self.vtable.draw = auto_cast _super_tile_image_draw
+    	if self.vtable.deinit == nil do self.vtable.deinit = auto_cast _super_tile_image_deinit
 
-    if self.vtable.get_uniform_resources == nil do self.vtable.get_uniform_resources = auto_cast get_uniform_resources_tile_image
+		if self.vtable.get_uniform_resources == nil do self.vtable.get_uniform_resources = auto_cast get_uniform_resources_tile_image
+    }
 
 	 engine.buffer_resource_create_buffer(&self.tile_uniform, {
         size = size_of(u32),

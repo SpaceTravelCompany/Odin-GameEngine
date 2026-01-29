@@ -232,12 +232,15 @@ colorTransform:^engine.color_transform = nil, vtable:^ianimate_object_vtable = n
     self.set.size = engine.descriptor_pool_size__animate_img_uniform_pool[:]
     self.set.layout = engine.animate_img_descriptor_set_layout()
 
-    self.vtable = auto_cast (vtable == nil ? &animate_image_vtable : vtable)
-    if self.vtable.draw == nil do self.vtable.draw = auto_cast _super_animate_image_draw
-    if self.vtable.deinit == nil do self.vtable.deinit = auto_cast _super_animate_image_deinit
-    if ((^ianimate_object_vtable)(self.vtable)).get_frame_cnt == nil do ((^ianimate_object_vtable)(self.vtable)).get_frame_cnt = auto_cast _super_animate_image_get_frame_cnt
-
-    if self.vtable.get_uniform_resources == nil do self.vtable.get_uniform_resources = auto_cast get_uniform_resources_animate_image
+    if vtable == nil {
+        self.vtable = &animate_image_vtable
+    } else {
+        self.vtable = vtable
+		 if self.vtable.draw == nil do self.vtable.draw = auto_cast _super_animate_image_draw
+   	 	if self.vtable.deinit == nil do self.vtable.deinit = auto_cast _super_animate_image_deinit
+    	if ((^ianimate_object_vtable)(self.vtable)).get_frame_cnt == nil do ((^ianimate_object_vtable)(self.vtable)).get_frame_cnt = auto_cast _super_animate_image_get_frame_cnt
+    	if self.vtable.get_uniform_resources == nil do self.vtable.get_uniform_resources = auto_cast get_uniform_resources_animate_image
+    }
 
     engine.buffer_resource_create_buffer(&self.frame_uniform, {
         size = size_of(u32),

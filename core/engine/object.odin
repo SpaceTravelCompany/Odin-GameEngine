@@ -168,9 +168,13 @@ iobject_init :: proc(self:^iobject) {
 itransform_object_init :: proc(self:^itransform_object, _color_transform:^color_transform = nil, vtable:^iobject_vtable = nil) {
     self.color_transform = _color_transform == nil ? def_color_transform() : _color_transform
 
-	self.vtable = vtable == nil ? &__itransform_object_vtable : vtable
-	if self.vtable.get_uniform_resources == nil do self.vtable.get_uniform_resources = auto_cast get_uniform_resources_transform_object
-	if self.vtable.deinit == nil do self.vtable.deinit = auto_cast _super_itransform_object_deinit
+	if vtable == nil {
+		self.vtable = &__itransform_object_vtable
+	} else {
+		self.vtable = vtable
+		if self.vtable.get_uniform_resources == nil do self.vtable.get_uniform_resources = auto_cast get_uniform_resources_transform_object
+		if self.vtable.deinit == nil do self.vtable.deinit = auto_cast _super_itransform_object_deinit
+	}
 
     self.actual_type = typeid_of(itransform_object)
 }

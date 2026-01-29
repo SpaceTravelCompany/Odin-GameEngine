@@ -56,8 +56,12 @@ colorTransform:^color_transform = nil, vtable:^iobject_vtable = nil) {
     self.set.size = descriptor_pool_size__base_uniform_pool[:]
     self.set.layout = base_descriptor_set_layout()
 
-    self.vtable = vtable == nil ? &image_vtable : vtable
-    if self.vtable.draw == nil do self.vtable.draw = auto_cast _super_image_draw
+    if vtable == nil {
+        self.vtable = &image_vtable
+    } else {
+        self.vtable = vtable
+        if self.vtable.draw == nil do self.vtable.draw = auto_cast _super_image_draw
+    }
 
     itransform_object_init(self, colorTransform, self.vtable)
 	self.actual_type = typeid_of(image)

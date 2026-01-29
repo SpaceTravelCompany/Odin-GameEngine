@@ -42,8 +42,12 @@ colorTransform:^engine.color_transform = nil, vtable:^engine.iobject_vtable = ni
     self.set.size = engine.descriptor_pool_size__base_uniform_pool[:]
     self.set.layout = engine.base_descriptor_set_layout()
 
-    self.vtable = vtable == nil ? &shape_vtable : vtable
-    if self.vtable.draw == nil do self.vtable.draw = auto_cast _super_shape_draw
+    if vtable == nil {
+        self.vtable = &shape_vtable
+    } else {
+        self.vtable = vtable
+		if self.vtable.draw == nil do self.vtable.draw = auto_cast _super_shape_draw
+    }
 
     engine.itransform_object_init(self, colorTransform, self.vtable)
 	self.actual_type = typeid_of(shape)
