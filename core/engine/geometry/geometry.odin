@@ -284,17 +284,6 @@ raw_shape_free :: proc (self:^raw_shape, allocator := context.allocator) {
     free(self, allocator)
 }
 
-/*
-Clones a raw shape
-
-Inputs:
-- self: Pointer to the raw shape to clone
-- allocator: Allocator to use for the clone (default: context.allocator)
-
-Returns:
-- Pointer to the cloned raw shape
-- Allocator error if allocation failed
-*/
 raw_shape_clone :: proc (self:^raw_shape, allocator := context.allocator) -> (res:^raw_shape = nil, err: mem.Allocator_Error) #optional_allocator_error {
     res = new(raw_shape, allocator) or_return
     defer if err != nil {
@@ -730,17 +719,6 @@ LineSplitLine :: proc "contextless" (pts:[2][$N]$T, t:T) -> (outPts1:[2][N]T, ou
     isCurve:bool,
 }
 
-/*
-Computes a polygon from shapes data
-
-Inputs:
-- poly: Pointer to the shapes data
-- allocator: Allocator to use
-
-Returns:
-- Pointer to the computed raw shape
-- An error if computation failed (includes allocator errors)
-*/
 shapes_compute_polygon :: proc(poly:^shapes, allocator := context.allocator) -> (res:^raw_shape = nil, err:shape_error = nil) {
 	__arena: mem.Dynamic_Arena = {}
 	mem.dynamic_arena_init(&__arena, context.temp_allocator,context.temp_allocator)

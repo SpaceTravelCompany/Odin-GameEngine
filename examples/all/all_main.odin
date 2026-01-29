@@ -159,7 +159,7 @@ package all
 @(require) import "core:unicode/utf16"
 
 @(require) import poly2tri "core:math/poly2tri"
-@(require) import collision "core:math/collision"
+//@(require) import collision "core:math/collision"
 
 //engine
 

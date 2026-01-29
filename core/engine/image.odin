@@ -27,10 +27,12 @@ image_center_pt_pos :: enum {
 
 texture_array :: struct {
     using _: texture,
+    count: u32,
 }
 
 tile_texture_array :: struct {
     using _: texture,
+    count: u32,
 }
 
 /*
@@ -259,6 +261,9 @@ texture_init :: proc(
 	self.set.__resources = __graphics_alloc_descriptor_resources(1)
 	self.set.__resources[0] = graphics_get_resource(self).(^texture_resource)
 	update_descriptor_sets(mem.slice_ptr(&self.set, 1))
+	self.pixel_data = pixels
+	self.width = width
+	self.height = height
 }
 
 /*
@@ -302,10 +307,14 @@ texture_init_grey :: proc(
 		single = false,
 	}, self.sampler, pixels, false, pixels_allocator)
 
+
 	if self.set.__resources != nil do __graphics_free_descriptor_resources(self.set.__resources)
 	self.set.__resources = __graphics_alloc_descriptor_resources(1)
 	self.set.__resources[0] = graphics_get_resource(self).(^texture_resource)
 	update_descriptor_sets(mem.slice_ptr(&self.set, 1))
+	self.pixel_data = pixels
+	self.width = width
+	self.height = height
 }
 
 
@@ -362,6 +371,8 @@ texture_init_depth_stencil :: proc(self:^texture, width:u32, height:u32) {
         single = true,
         resource_usage = .GPU
     }, self.sampler, nil)
+	self.width = width
+	self.height = height
 }
 
 /*
@@ -394,6 +405,8 @@ texture_init_msaa :: proc(self:^texture, width:u32, height:u32) {
         single = true,
         resource_usage = .GPU
     }, self.sampler, nil)
+	self.width = width
+	self.height = height
 }
 
 /*
@@ -413,34 +426,13 @@ texture_deinit :: #force_inline proc(self:^texture) {
 	}
 }
 
-/*
-Gets the width of the texture
 
-Inputs:
-- self: Pointer to the texture
-
-Returns:
-- Width of the texture in pixels
-*/
 texture_width :: #force_inline proc "contextless" (self:^texture) -> u32{
-	tex, ok := graphics_get_resource(self).(^texture_resource)
-	if !ok do return 0
-    return auto_cast tex.option.width
+    return self.width
 }
 
-/*
-Gets the height of the texture
-
-Inputs:
-- self: Pointer to the texture
-
-Returns:
-- Height of the texture in pixels
-*/
 texture_height :: #force_inline proc "contextless" (self:^texture) -> u32 {
-	tex, ok := graphics_get_resource(self).(^texture_resource)
-	if !ok do return 0
-    return auto_cast tex.option.height
+    return self.height
 }
 
 /*
@@ -463,32 +455,7 @@ get_default_nearest_sampler :: #force_inline proc "contextless" () -> vk.Sampler
     return nearest_sampler
 }
 
-/*
-Updates the sampler for the texture
 
-Inputs:
-- self: Pointer to the texture
-- sampler: The new sampler to use
-
-Returns:
-- None
-*/
-texture_update_sampler :: #force_inline proc "contextless" (self:^texture, sampler:vk.Sampler) {
-    self.sampler = sampler
-}
-
-/*
-Gets the sampler used by the texture
-
-Inputs:
-- self: Pointer to the texture
-
-Returns:
-- The sampler used by the texture
-*/
-texture_get_sampler :: #force_inline proc "contextless" (self:^texture) -> vk.Sampler {
-    return self.sampler
-}
 
 /*
 Initializes a texture array with multiple textures
@@ -531,17 +498,12 @@ texture_array_init :: proc(self:^texture_array, width:u32, height:u32, count:u32
     self.set.__resources = __graphics_alloc_descriptor_resources(1)
     self.set.__resources[0] = graphics_get_resource(self).(^texture_resource)
     update_descriptor_sets(mem.slice_ptr(&self.set, 1))
+	self.pixel_data = pixels
+	self.width = width
+	self.height = height
+	self.count = count
 }
 
-/*
-Deinitializes and cleans up texture array resources
-
-Inputs:
-- self: Pointer to the texture array to deinitialize
-
-Returns:
-- None
-*/
 texture_array_deinit :: #force_inline proc(self:^texture_array) {
     buffer_resource_deinit(self)
 	if self.set.__resources != nil {
@@ -549,49 +511,17 @@ texture_array_deinit :: #force_inline proc(self:^texture_array) {
 		self.set.__resources = nil
 	}
 }
-/*
-Gets the width of textures in the texture array
 
-Inputs:
-- self: Pointer to the texture array
-
-Returns:
-- Width of each texture in pixels
-*/
 texture_array_width :: #force_inline proc "contextless" (self:^texture_array) -> u32 {
-	tex, ok := graphics_get_resource(self).(^texture_resource)
-	if !ok do return 0
-    return auto_cast tex.option.width
+    return self.width
 }
 
-/*
-Gets the height of textures in the texture array
-
-Inputs:
-- self: Pointer to the texture array
-
-Returns:
-- Height of each texture in pixels
-*/
 texture_array_height :: #force_inline proc "contextless" (self:^texture_array) -> u32 {
-	tex, ok := graphics_get_resource(self).(^texture_resource)
-	if !ok do return 0
-    return auto_cast tex.option.height
+    return self.height
 }
 
-/*
-Gets the number of textures in the texture array
-
-Inputs:
-- self: Pointer to the texture array
-
-Returns:
-- Number of textures in the array
-*/
 texture_array_count :: #force_inline proc "contextless" (self:^texture_array) -> u32 {
-    tex, ok := graphics_get_resource(self).(^texture_resource)
-    if !ok do return 0
-    return auto_cast tex.option.len
+    return self.count
 }
 
 /*

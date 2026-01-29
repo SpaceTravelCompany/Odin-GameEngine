@@ -102,16 +102,16 @@ init_swap_chain :: proc() {
 	vkColorHasTransferSrcOptimal =.TRANSFER_SRC in colorProp.optimalTilingFeatures
 	vkColorHasTransferDstOptimal = .TRANSFER_DST in colorProp.optimalTilingFeatures
 
-	log.infof("SYSLOG : depth format : %s", depth_fmt)
-	log.infof("SYSLOG : optimal format supports")
-	log.infof("vkDepthHasOptimal : %t", vkDepthHasOptimal)
-	log.infof("vkDepthHasTransferSrcOptimal : %t", vkDepthHasTransferSrcOptimal)
-	log.infof("vkDepthHasTransferDstOptimal : %t", vkDepthHasTransferDstOptimal)
-	log.infof("vkDepthHasSampleOptimal : %t", vkDepthHasSampleOptimal)
-	log.infof("vkColorHasAttachOptimal : %t", vkColorHasAttachOptimal)
-	log.infof("vkColorHasSampleOptimal : %t", vkColorHasSampleOptimal)
-	log.infof("vkColorHasTransferSrcOptimal : %t", vkColorHasTransferSrcOptimal)
-	log.infof("vkColorHasTransferDstOptimal : %t", vkColorHasTransferDstOptimal)
+	log.infof("SYSLOG : depth format : %s\n", depth_fmt)
+	log.infof("SYSLOG : optimal format supports\n")
+	log.infof("vkDepthHasOptimal : %t\n", vkDepthHasOptimal)
+	log.infof("vkDepthHasTransferSrcOptimal : %t\n", vkDepthHasTransferSrcOptimal)
+	log.infof("vkDepthHasTransferDstOptimal : %t\n", vkDepthHasTransferDstOptimal)
+	log.infof("vkDepthHasSampleOptimal : %t\n", vkDepthHasSampleOptimal)
+	log.infof("vkColorHasAttachOptimal : %t\n", vkColorHasAttachOptimal)
+	log.infof("vkColorHasSampleOptimal : %t\n", vkColorHasSampleOptimal)
+	log.infof("vkColorHasTransferSrcOptimal : %t\n", vkColorHasTransferSrcOptimal)
+	log.infof("vkColorHasTransferDstOptimal : %t\n", vkColorHasTransferDstOptimal)
 }
 
 

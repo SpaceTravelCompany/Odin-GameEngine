@@ -171,6 +171,9 @@ color_transform :: struct {
 texture :: struct {
 	set: descriptor_set,
 	sampler: vk.Sampler,
+	pixel_data: []byte,
+	width: u32,
+	height: u32,
 }
 
 resource_usage :: enum {

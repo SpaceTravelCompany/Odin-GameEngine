@@ -399,6 +399,8 @@ itransform_object_cvt_area_window_coord :: proc(self:^itransform_object, area:li
 			n[i].x += f32(window_width()) / 2.0
 			n[i].y += f32(window_height()) / 2.0
 		}
+	case linalg.ImageArea:
+		panic_contextless("ImageArea: Available only for ImageButton\n")
 	}
 	return area_
 }

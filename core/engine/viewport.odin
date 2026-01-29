@@ -56,6 +56,6 @@ viewport_deinit :: proc(self:^viewport) {
 	}
 }
 
-def_viewport :: proc() -> ^viewport {
+def_viewport :: proc "contextless" () -> ^viewport {
 	return &__g_default_viewport
 }

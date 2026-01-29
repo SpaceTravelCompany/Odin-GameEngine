@@ -145,6 +145,8 @@ Area_MulMatrix :: proc (_a: AreaF, _mat: matrix44, allocator := context.allocato
 		return res2
 	case [][2]f32:
 		return __Poly_MulMatrix(n, _mat, allocator)
+	case ImageArea:
+		panic_contextless("ImageArea: Available only for ImageButton\n")
 	}
 	return {}
 }
@@ -534,9 +536,12 @@ MirrorPoint :: #force_inline proc "contextless" (pivot : [2]$T, target : [2]T) -
 	return [2]T{2,2} * pivot - target
 }
 
+ImageArea :: struct {}
+
 Area :: union($T: typeid) where intrinsics.type_is_numeric(T)  {
 	Rect_(T),
 	[][2]T,
+	ImageArea,//Available only for ImageButton
 }
 
 AreaF :: Area(f32)
@@ -547,6 +552,7 @@ Area_PointIn :: #force_inline proc "contextless" (area:Area($T), pt:[2]T) -> boo
 	switch a in area {
 		case Rect_(T):return Rect_PointIn(a, pt)
 		case [][2]T:return PointInPolygon(pt, a)
+		case ImageArea:panic_contextless("ImageArea: Available only for ImageButton\n")
 	}
 	return false
 }
