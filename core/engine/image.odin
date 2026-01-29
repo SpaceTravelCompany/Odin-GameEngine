@@ -3,13 +3,10 @@ package engine
 import "core:math/rand"
 import "base:intrinsics"
 import "base:runtime"
-import "core:debug/trace"
-import "core:math"
 import img "core:image"
 import "core:math/linalg"
 import "core:mem"
 import vk "vendor:vulkan"
-import "core:sync"
 import "core:log"
 
 
@@ -45,13 +42,6 @@ image :: struct {
     src: ^texture,
 }
 
-is_any_image_type :: #force_inline proc "contextless" ($any_image:typeid) -> bool {
-    return intrinsics.type_is_subtype_of(any_image, iobject) && intrinsics.type_has_field(any_image, "src") && 
-    (intrinsics.type_field_type(any_image, "src") == ^texture ||
-    intrinsics.type_field_type(any_image, "src") == texture_array ||
-    intrinsics.type_field_type(any_image, "src") == tile_texture_array)
-}
-
 @private image_vtable :iobject_vtable = iobject_vtable {
     draw = auto_cast _super_image_draw,
 }
@@ -71,58 +61,6 @@ colorTransform:^color_transform = nil, vtable:^iobject_vtable = nil) {
 
     itransform_object_init(self, colorTransform, self.vtable)
 	self.actual_type = typeid_of(image)
-}
-
-/*
-Gets the texture source of the image
-
-Inputs:
-- self: Pointer to the image
-
-Returns:
-- Pointer to the texture source
-*/
-image_get_texture :: #force_inline proc "contextless" (self:^image) -> ^texture {
-    return self.src
-}
-
-// /*
-// Gets the camera of the image
-
-// Inputs:
-// - self: Pointer to the image
-
-// Returns:
-// - Pointer to the camera
-// */
-// image_get_camera :: proc "contextless" (self:^image) -> ^camera {
-//     return iobject_get_camera(self)
-// }
-
-// /*
-// Gets the projection of the image
-
-// Inputs:
-// - self: Pointer to the image
-
-// Returns:
-// - Pointer to the projection
-// */
-// image_get_projection :: proc "contextless" (self:^image) -> ^projection {
-//     return iobject_get_projection(self)
-// }
-
-/*
-Gets the color transform of the image
-
-Inputs:
-- self: Pointer to the image
-
-Returns:
-- Pointer to the color transform
-*/
-image_get_color_transform :: proc "contextless" (self:^image) -> ^color_transform {
-    return itransform_object_get_color_transform(self)
 }
 
 image_update_transform :: #force_inline proc(self:^image, pos:linalg.point3d, rotation:f32 = 0.0, scale:linalg.point = {1,1}, pivot:linalg.point = {0.0,0.0}) {
@@ -426,13 +364,64 @@ texture_deinit :: #force_inline proc(self:^texture) {
 	}
 }
 
+/*
+Checks if a window-space point hits the textured quad (with optional alpha test).
+Uses same transform as image shader: proj * view * model * scale(tex_width, tex_height, 1).
 
-texture_width :: #force_inline proc "contextless" (self:^texture) -> u32{
-    return self.width
-}
+Inputs:
+- texture: Texture to test (used for size and pixel_data alpha).
+- point: Window coordinates (0,0 top-left to window_size bottom-right).
+- mat: Model matrix of the quad.
+- ref_viewport: Viewport for proj/camera; if nil, def_viewport() is used.
+- alpha_threshold: Pixels with alpha >= this are considered hit; use 0 to skip alpha test when pixel_data is set.
 
-texture_height :: #force_inline proc "contextless" (self:^texture) -> u32 {
-    return self.height
+Returns:
+- true if point is inside the quad and (if pixel_data present) alpha >= alpha_threshold.
+*/
+texture_point_in :: proc(texture: ^texture, point: linalg.point, mat: linalg.matrix44, ref_viewport: ^viewport = nil) -> bool {
+	if texture == nil do return false
+
+	tex_width := texture.width
+	tex_height := texture.height
+
+	if tex_width == 0 || tex_height == 0 do return false
+
+	viewport_ := ref_viewport
+	if viewport_ == nil {
+		viewport_ = def_viewport()
+	}
+
+	// Window to NDC: (0,0) top-left to (w,h) -> (-1,-1) bottom-left to (1,1) top-right
+	w := f32(window_width())
+	h := f32(window_height())
+	ndc_x := 2.0 * point.x / w - 1.0
+	ndc_y := 2.0 * point.y / h - 1.0
+
+	// NDC to local: inverse(proj * view * model * scale(tex_size))
+	tmp_mat := viewport_.projection.mat * viewport_.camera.mat * mat * linalg.matrix4_scale(linalg.Vector3f32{f32(tex_width), f32(tex_height), 1.0})
+	pt_ := linalg.point3dw{ndc_x, ndc_y, 0.0, 1.0}
+	pt_ = linalg.mul(linalg.inverse(tmp_mat), pt_)
+	local_pos := linalg.point{(pt_.x / pt_.w), (pt_.y * -1.0 / pt_.w)}
+
+	if local_pos.x < -0.5 || local_pos.x > 0.5 do return false
+	if local_pos.y < -0.5 || local_pos.y > 0.5 do return false
+	// If no pixel data, treat as rect hit only
+	if texture.pixel_data == nil || len(texture.pixel_data) == 0 do return true
+
+	uv_x := local_pos.x + 0.5
+	uv_y := local_pos.y + 0.5
+	tex_x := i32(uv_x * f32(tex_width))
+	tex_y := i32(uv_y * f32(tex_height))
+
+	if tex_x < 0 || tex_x >= i32(tex_width) do return false
+	if tex_y < 0 || tex_y >= i32(tex_height) do return false
+
+	bytes_per_pixel: u32 = 4
+	pixel_idx := (u32(tex_y) * tex_width + u32(tex_x)) * bytes_per_pixel
+	if pixel_idx + 3 >= u32(len(texture.pixel_data)) do return false
+
+	alpha := texture.pixel_data[pixel_idx + 3]
+	return alpha > 0
 }
 
 /*
@@ -512,18 +501,6 @@ texture_array_deinit :: #force_inline proc(self:^texture_array) {
 	}
 }
 
-texture_array_width :: #force_inline proc "contextless" (self:^texture_array) -> u32 {
-    return self.width
-}
-
-texture_array_height :: #force_inline proc "contextless" (self:^texture_array) -> u32 {
-    return self.height
-}
-
-texture_array_count :: #force_inline proc "contextless" (self:^texture_array) -> u32 {
-    return self.count
-}
-
 /*
 Converts pixel format to the default graphics format
 
@@ -585,10 +562,10 @@ color_fmt_convert_default_overlap :: proc (pixels:[]byte, out:[]byte, inPixelFmt
 }
 
 /*
-Calculates pixel-perfect point position for an image
+Calculates pixel-perfect point position for a texture
 
 Inputs:
-- img: Pointer to any image type
+- tex: Pointer to texture
 - p: Point to adjust
 - canvasW: Canvas width
 - canvasH: Canvas height
@@ -597,38 +574,36 @@ Inputs:
 Returns:
 - Adjusted point for pixel-perfect rendering
 */
-image_pixel_perfect_point :: proc "contextless" (img:^$ANY_IMAGE, p:linalg.point, canvasW:f32, canvasH:f32, pivot:image_center_pt_pos) -> linalg.point 
-where is_any_image_type(ANY_IMAGE) {
-    width := __windowWidth
-    height := __windowHeight
+texture_pixel_perfect_point :: proc "contextless" (tex:^texture, p:linalg.point, canvasW:f32, canvasH:f32, pivot:image_center_pt_pos) -> linalg.point {
+    width := window_width()
+    height := window_height()
     widthF := f32(width)
     heightF := f32(height)
     if widthF / heightF > canvasW / canvasH {
         if canvasH != heightF do return p
     } else {
-        if canvasW != width do return p
+        if canvasW != widthF do return p
     }
-    p = linalg.floor(p)
-    if width % 2 == 0 do p.x -= 0.5
-    if height % 2 == 0 do p.y += 0.5
+    p_ := linalg.floor(p)
+    if width % 2 == 0 do p_.x -= 0.5
+    if height % 2 == 0 do p_.y += 0.5
 
-
-	if img.src == nil {
-		return p
+	if tex == nil {
+		return p_
 	}
-	img_width := img.src.ptr.tex.option.width
-	img_height := img.src.ptr.tex.option.height
+	img_width := tex.width
+	img_height := tex.height
 
     #partial switch pivot {
         case .Center:
-            if img_width % 2 != 0 do p.x += 0.5
-            if img_height % 2 != 0 do p.y -= 0.5
+            if img_width % 2 != 0 do p_.x += 0.5
+            if img_height % 2 != 0 do p_.y -= 0.5
         case .Left, .Right:
-            if img_height % 2 != 0 do p.y -= 0.5
+            if img_height % 2 != 0 do p_.y -= 0.5
         case .Top, .Bottom:
-            if img_width % 2 != 0 do p.x += 0.5
+            if img_width % 2 != 0 do p_.x += 0.5
     }
-    return p
+    return p_
 }
 
 

@@ -272,58 +272,6 @@ _super_animate_image_get_frame_cnt :: proc "contextless" (self:^animate_image) -
     return res.option.len
 }
 
-/*
-Gets the texture array source of the animated image
-
-Inputs:
-- self: Pointer to the animated image
-
-Returns:
-- Pointer to the texture array source
-*/
-animate_image_get_texture_array :: #force_inline proc "contextless" (self:^animate_image) -> ^engine.texture_array {
-    return self.src
-}
-
-// /*
-// Gets the camera of the animated image
-
-// Inputs:
-// - self: Pointer to the animated image
-
-// Returns:
-// - Pointer to the camera
-// */
-// animate_image_get_camera :: proc "contextless" (self:^animate_image) -> ^engine.camera {
-//     return self.camera
-// }
-
-// /*
-// Gets the projection of the animated image
-
-// Inputs:
-// - self: Pointer to the animated image
-
-// Returns:
-// - Pointer to the projection
-// */
-// animate_image_get_projection :: proc "contextless" (self:^animate_image) -> ^engine.projection {
-//     return self.projection
-// }
-
-/*
-Gets the color transform of the animated image
-
-Inputs:
-- self: Pointer to the animated image
-
-Returns:
-- Pointer to the color transform
-*/
-animate_image_get_color_transform :: proc "contextless" (self:^animate_image) -> ^engine.color_transform {
-    return self.color_transform
-}
-
 animate_image_update_transform :: #force_inline proc(self:^animate_image, pos:linalg.point3d, rotation:f32, scale:linalg.point = {1,1}, pivot:linalg.point = {0.0,0.0}) {
     engine.itransform_object_update_transform(self, pos, rotation, scale, pivot)
 }
@@ -332,9 +280,6 @@ animate_image_update_transform_matrix_raw :: #force_inline proc(self:^animate_im
 }
 animate_image_change_color_transform :: #force_inline proc(self:^animate_image, colorTransform:^engine.color_transform) {
     engine.itransform_object_change_color_transform(self, colorTransform)
-}
-animate_image_update_texture_array :: #force_inline proc "contextless" (self:^animate_image, src:^engine.texture_array) {
-    self.src = src
 }
 
 _super_animate_image_draw :: proc (self:^animate_image, cmd:engine.command_buffer, viewport:^engine.viewport) {

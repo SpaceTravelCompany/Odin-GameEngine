@@ -1,13 +1,8 @@
 package engine
 
 import "base:intrinsics"
-import "base:runtime"
 import "core:mem"
-import "core:math"
 import "core:math/linalg"
-import "core:slice"
-import "core:sync"
-import vk "vendor:vulkan"
 
 /*
 Camera structure for view matrix management

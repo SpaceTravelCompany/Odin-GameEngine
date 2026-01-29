@@ -1,10 +1,6 @@
 package shape
 
-import "core:math"
 import "core:engine/geometry"
-import "core:mem"
-import "core:slice"
-import "core:sync"
 import "core:math/linalg"
 import "base:intrinsics"
 import "base:runtime"
@@ -53,9 +49,6 @@ colorTransform:^engine.color_transform = nil, vtable:^engine.iobject_vtable = ni
 	self.actual_type = typeid_of(shape)
 }
 
-shape_get_color_transform :: #force_inline proc "contextless" (self:^shape) -> ^engine.color_transform {
-    return engine.itransform_object_get_color_transform(self)
-}
 shape_update_transform :: #force_inline proc(self:^shape, pos:linalg.point3d, rotation:f32, scale:linalg.point = {1,1}, pivot:linalg.point = {0.0,0.0}) {
     engine.itransform_object_update_transform(self, pos, rotation, scale, pivot)
 }

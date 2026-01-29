@@ -1,7 +1,6 @@
 package linalg
 
 import "core:math"
-import "base:builtin"
 import "base:intrinsics"
 @require import "base:runtime"
 

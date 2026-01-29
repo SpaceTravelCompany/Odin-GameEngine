@@ -2,14 +2,9 @@ package engine
 
 import "base:intrinsics"
 import "base:runtime"
-import "core:math"
 import "core:math/linalg"
 import "core:mem"
-import "core:slice"
-import "core:sync"
-import "core:thread"
 import vk "vendor:vulkan"
-import img "core:image"
 import "core:log"
 
 
@@ -232,13 +227,6 @@ itransform_object_change_color_transform :: proc(self:^itransform_object, _color
     self.color_transform = _color_transform
     __itransform_object_update_uniform(self, get_uniform_resources(self))
 }
-itransform_object_get_color_transform :: #force_inline proc "contextless" (self:^itransform_object) -> ^color_transform {
-    return self.color_transform
-}
-
-itransform_object_get_actual_type :: #force_inline proc "contextless" (self:^itransform_object) -> typeid {
-    return self.actual_type
-}
 
 /*
 Draws the object using its vtable draw function
@@ -302,6 +290,7 @@ __vertex_buf_init :: proc (self:^__vertex_buf($NodeType), array:[]NodeType, _fla
         single = false,
         use_gcpu_mem = _useGPUMem,
     }, mem.slice_to_bytes(array), false, allocator)
+	self.data = array
 }
 
 __vertex_buf_deinit :: proc (self:^__vertex_buf($NodeType)) {
@@ -321,6 +310,7 @@ __storage_buf_init :: proc (self:^__storage_buf($NodeType), array:[]NodeType, _f
         single = false,
         use_gcpu_mem = _useGPUMem,
     }, mem.slice_to_bytes(array), false, engine_def_allocator)
+	self.data = array
 }
 
 __storage_buf_deinit :: proc (self:^__storage_buf($NodeType)) {
@@ -339,6 +329,7 @@ __index_buf_init :: proc (self:^__index_buf, array:[]u32, _flag:resource_usage, 
         resource_usage = _flag,
         use_gcpu_mem = _useGPUMem,
     }, mem.slice_to_bytes(array), false, allocator)
+	self.data = array
 }
 
 
@@ -351,11 +342,11 @@ __index_buf_update :: #force_inline proc (self:^__index_buf, array:[]u32, alloca
 }
 
 __vertex_buf :: struct($NodeType:typeid) {
-	dummy:byte,
+	data:[]NodeType,
 }
 __index_buf :: distinct __vertex_buf(u32)
 __storage_buf :: struct($NodeType:typeid) {
-	dummy:byte,
+	data:[]NodeType,
 }
 
 /*

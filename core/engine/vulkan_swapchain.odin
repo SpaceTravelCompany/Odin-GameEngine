@@ -2,7 +2,6 @@
 package engine
 
 import "base:library"
-import "core:fmt"
 import "core:mem"
 import "core:sync"
 import "core:thread"

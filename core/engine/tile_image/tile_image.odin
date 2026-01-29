@@ -68,80 +68,8 @@ _super_tile_image_deinit :: proc(self:^tile_image) {
 }
 
 
-/*
-Gets the tile texture array source of the tile image
-
-Inputs:
-- self: Pointer to the tile image
-
-Returns:
-- Pointer to the tile texture array source
-*/
-tile_image_get_tile_texture_array :: #force_inline proc "contextless" (self:^tile_image) -> ^tile_texture_array {
-    return self.src
-}
-
-/*
-Updates the tile texture array source of the tile image
-
-Inputs:
-- self: Pointer to the tile image
-- src: Pointer to the new tile texture array source
-
-Returns:
-- None
-*/
-tile_image_update_tile_texture_array :: #force_inline proc "contextless" (self:^tile_image, src:^tile_texture_array) {
-    self.src = src
-}
-
 tile_image_change_color_transform :: #force_inline proc(self:^tile_image, colorTransform:^engine.color_transform) {
     engine.itransform_object_change_color_transform(self, colorTransform)
-}
-// tile_image_update_camera :: #force_inline proc(self:^tile_image, camera:^engine.camera) {
-//     engine.iobject_update_camera(self, camera)
-// }
-// tile_image_update_projection :: #force_inline proc(self:^tile_image, projection:^engine.projection) {
-//     engine.iobject_update_projection(self, projection)
-// }
-
-// /*
-// Gets the camera of the tile image
-
-// Inputs:
-// - self: Pointer to the tile image
-
-// Returns:
-// - Pointer to the camera
-// */
-// tile_image_get_camera :: proc "contextless" (self:^tile_image) -> ^engine.camera {
-//     return engine.iobject_get_camera(self)
-// }
-
-// /*
-// Gets the projection of the tile image
-
-// Inputs:
-// - self: Pointer to the tile image
-
-// Returns:
-// - Pointer to the projection
-// */
-// tile_image_get_projection :: proc "contextless" (self:^tile_image) -> ^engine.projection {
-//     return engine.iobject_get_projection(self)
-// }
-
-/*
-Gets the color transform of the tile image
-
-Inputs:
-- self: Pointer to the tile image
-
-Returns:
-- Pointer to the color transform
-*/
-tile_image_get_color_transform :: proc "contextless" (self:^tile_image) -> ^engine.color_transform {
-    return engine.itransform_object_get_color_transform(self)
 }
 
 tile_image_update_transform :: #force_inline proc(self:^tile_image, pos:linalg.point3d, rotation:f32, scale:linalg.point = {1,1}, pivot:linalg.point = {0.0, 0.0}) {
@@ -251,48 +179,4 @@ tile_texture_array_deinit :: #force_inline proc(self:^tile_texture_array) {
 		engine.__graphics_free_descriptor_resources(self.set.__resources)
 		self.set.__resources = nil
 	}
-}
-/*
-Gets the width of tiles in the tile texture array
-
-Inputs:
-- self: Pointer to the tile texture array
-
-Returns:
-- Width of each tile in pixels
-*/
-tile_texture_array_width :: #force_inline proc "contextless" (self:^tile_texture_array) -> u32 {
-    res, ok := engine.graphics_get_resource(self).(^engine.texture_resource)
-    if !ok do return 0
-    return res.option.width
-}
-
-/*
-Gets the height of tiles in the tile texture array
-
-Inputs:
-- self: Pointer to the tile texture array
-
-Returns:
-- Height of each tile in pixels
-*/
-tile_texture_array_height :: #force_inline proc "contextless" (self:^tile_texture_array) -> u32 {
-    res, ok := engine.graphics_get_resource(self).(^engine.texture_resource)
-    if !ok do return 0
-    return res.option.height
-}
-
-/*
-Gets the number of tiles in the tile texture array
-
-Inputs:
-- self: Pointer to the tile texture array
-
-Returns:
-- Number of tiles in the array
-*/
-tile_texture_array_count :: #force_inline proc "contextless" (self:^tile_texture_array) -> u32 {
-    res, ok := engine.graphics_get_resource(self).(^engine.texture_resource)
-    if !ok do return 0
-    return res.option.len
 }

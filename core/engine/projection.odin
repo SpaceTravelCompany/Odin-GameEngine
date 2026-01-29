@@ -1,14 +1,10 @@
 package engine
 
 import "base:intrinsics"
-import "base:runtime"
 import "core:math"
 import "core:math/linalg"
 import "core:mem"
-import "core:slice"
-import "core:sync"
 import "core:log"
-import vk "vendor:vulkan"
 
 /*
 Projection structure for projection matrix management
