@@ -167,6 +167,7 @@ button_pointer_down :: proc (self:^button, pointerPos:linalg.point, pointerIdx:u
 	// Check if normalized local position is within the quad bounds (-0.5 to 0.5)
 	if local_pos.x < -0.5 || local_pos.x > 0.5 do return false
 	if local_pos.y < -0.5 || local_pos.y > 0.5 do return false
+	if texture.pixel_data == nil do return true // if texture pixel data is not set, check only rect area
 	
 	// Convert to texture UV coordinates
 	// uv_x = normalized_local_x + 0.5  (0 to 1)
