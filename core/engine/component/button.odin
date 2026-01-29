@@ -153,17 +153,16 @@ button_pointer_down :: proc (self:^button, pointerPos:linalg.point, pointerIdx:u
 	w := f32(engine.window_width())
 	h := f32(engine.window_height())
 	ndc_x := 2.0 * point.x / w - 1.0
-	ndc_y := 1.0 - 2.0 * point.y / h  // Y-axis flip
+	ndc_y := 2.0 * point.y / h - 1.0
 	
 
-	//! can't apply rotation now
 	// Transform from NDC to local coordinates: shader uses proj * view * model * (quad * textureSize)
 	// So inverse(proj * view * model) * ndc gives point in (quad*textureSize) space
 	tmp_mat := viewport_.projection.mat * viewport_.camera.mat * self.mat * linalg.matrix4_scale(linalg.Vector3f32{f32(tex_width), f32(tex_height), 1.0})
 	pt_ := linalg.point3dw{ndc_x, ndc_y, 0.0, 1.0}
 	pt_ = linalg.mul(linalg.inverse(tmp_mat), pt_)
 	// Point is in quad*textureSize space; normalize to -0.5..0.5 for UV
-	local_pos := linalg.point{(pt_.x / pt_.w), (pt_.y / pt_.w)}
+	local_pos := linalg.point{(pt_.x / pt_.w), (pt_.y * -1.0 / pt_.w)}
 	
 	// Check if normalized local position is within the quad bounds (-0.5 to 0.5)
 	if local_pos.x < -0.5 || local_pos.x > 0.5 do return false
