@@ -24,9 +24,8 @@ Extends iobject with custom pipeline and descriptor sets
 */
 custom_object :: struct {
     using _:engine.iobject,
-	sets:[]engine.descriptor_set,
+	sets:[]^engine.i_descriptor_set,
     p_pipeline:^engine.object_pipeline,
-    pipeline_p_sets:[]^engine.descriptor_set,
 	allocator:runtime.Allocator,
 }
 
@@ -38,22 +37,33 @@ custom_object :: struct {
 
 custom_object_init :: proc(self:^custom_object,
     p_pipeline:^engine.object_pipeline,
-    pipeline_p_sets:[]^engine.descriptor_set,
 	pool_binding:[][]u32,
 	pool_sizes:[][]engine.descriptor_pool_size,
    vtable:^engine.iobject_vtable = nil, allocator := context.allocator) {
 
-    self.pipeline_p_sets = mem.make_non_zeroed_slice([]^engine.descriptor_set, len(pipeline_p_sets))
-    mem.copy_non_overlapping(&self.pipeline_p_sets[0], &pipeline_p_sets[0], len(pipeline_p_sets) * size_of(^engine.descriptor_set))
-
     self.p_pipeline = p_pipeline
 	self.allocator = allocator
+	assert(len(pool_sizes) == len(pool_binding))
     
-	self.sets = make([]engine.descriptor_set, len(pipeline_p_sets), allocator)
-	for i in 0..<len(pipeline_p_sets) {
-		 self.sets[i].bindings = pool_binding[i]
-		 self.sets[i].size = pool_sizes[i]
-		 self.sets[i].layout = p_pipeline.__descriptor_set_layouts[i]
+	self.sets = make([]^engine.i_descriptor_set, len(pool_sizes), allocator)
+	for i in 0..<len(pool_sizes) {
+		//TODO pool_sizes의 cnt를 모두 더해서 descriptor_set의 num_resources를 설정
+		num_resources :u32= 0
+		for j in 0..<len(pool_sizes[i]) {
+			num_resources += pool_sizes[i][j].cnt
+		}
+		pool_binding_copy := mem.make_non_zeroed_slice([]u32, len(pool_binding[i]), allocator)
+		mem.copy_non_overlapping(&pool_binding_copy[0], &pool_binding[i][0], len(pool_binding[i]))
+		pool_sizes_copy := mem.make_non_zeroed_slice([]engine.descriptor_pool_size, len(pool_sizes[i]), allocator)
+		mem.copy_non_overlapping(&pool_sizes_copy[0], &pool_sizes[i][0], len(pool_sizes[i]))
+		
+		ptr, _ := mem.alloc(size_of(engine.p_descriptor_set) + ((int(num_resources)-1) * size_of(engine.union_resource)), 
+		mem.DEFAULT_ALIGNMENT, allocator)
+		self.sets[i] = auto_cast ptr
+		self.sets[i].bindings = pool_binding_copy
+		self.sets[i].size = pool_sizes_copy
+		self.sets[i].layout = p_pipeline.__descriptor_set_layouts[i]
+		self.sets[i].num_resources = num_resources
 	}
 
     if vtable == nil {
@@ -70,20 +80,25 @@ custom_object_init :: proc(self:^custom_object,
 
 
 _super_custom_object_deinit :: proc(self:^custom_object) {
-    delete(self.pipeline_p_sets, self.allocator)
+	for i in 0..<len(self.sets) {
+		mem.free(self.sets[i], self.allocator)
+		delete(self.sets[i].bindings, self.allocator)
+		delete(self.sets[i].size, self.allocator)
+	}
+    delete(self.sets, self.allocator)
 }
 
 
 _super_custom_object_draw :: proc(self:^custom_object, cmd:engine.command_buffer) {
-    sets := mem.make_non_zeroed_slice([]vk.DescriptorSet, len(self.pipeline_p_sets), context.temp_allocator)
+    sets := mem.make_non_zeroed_slice([]vk.DescriptorSet, len(self.sets), context.temp_allocator)
     defer delete(sets, context.temp_allocator)
 
-    for i in 0..<len(self.pipeline_p_sets) {
-        sets[i] = self.pipeline_p_sets[i].__set
+    for i in 0..<len(self.sets) {
+        sets[i] = self.sets[i].__set
     }
 
     engine.graphics_cmd_bind_pipeline(cmd, .GRAPHICS, self.p_pipeline.__pipeline)
-    engine.graphics_cmd_bind_descriptor_sets(cmd, .GRAPHICS, self.p_pipeline.__pipeline_layout, 0, auto_cast len(self.pipeline_p_sets),
+    engine.graphics_cmd_bind_descriptor_sets(cmd, .GRAPHICS, self.p_pipeline.__pipeline_layout, 0, auto_cast len(self.sets),
         &sets[0], 0, nil)
 
     if self.p_pipeline.draw_method.type == .Draw {

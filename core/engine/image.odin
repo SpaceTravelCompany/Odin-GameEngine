@@ -91,7 +91,7 @@ _super_image_draw :: proc (self:^image, cmd:command_buffer, viewport:^viewport) 
 	if graphics_get_resource_draw(self) == nil do return
 	if graphics_get_resource_draw(self.src) == nil do return
 
-   	image_binding_sets_and_draw(cmd, self.set, viewport.set, self.src.set)
+   	image_binding_sets_and_draw(cmd, &self.set, &viewport.set, &self.src.set)
 }
 
 /*
@@ -105,7 +105,7 @@ Inputs:
 Returns:
 - None
 */
-image_binding_sets_and_draw :: proc "contextless" (cmd:command_buffer, imageSet:descriptor_set, viewSet:descriptor_set, textureSet:descriptor_set) {
+image_binding_sets_and_draw :: proc "contextless" (cmd:command_buffer, imageSet:^i_descriptor_set, viewSet:^i_descriptor_set, textureSet:^i_descriptor_set) {
     graphics_cmd_bind_pipeline(cmd, .GRAPHICS, get_img_pipeline().__pipeline)
     graphics_cmd_bind_descriptor_sets(cmd, .GRAPHICS, get_img_pipeline().__pipeline_layout, 0, 3,
         &([]vk.DescriptorSet{imageSet.__set, viewSet.__set, textureSet.__set})[0], 0, nil)
@@ -199,28 +199,13 @@ texture_init :: proc(
 		single = false,
 	}, self.sampler, pixels, false, pixels_allocator)
 
-	if self.set.__resources != nil do __graphics_free_descriptor_resources(self.set.__resources)
-	self.set.__resources = __graphics_alloc_descriptor_resources(1)
 	self.set.__resources[0] = graphics_get_resource(self).(^texture_resource)
-	update_descriptor_sets(mem.slice_ptr(&self.set, 1))
+	update_descriptor_set(&self.set)
 	self.pixel_data = pixels
 	self.width = width
 	self.height = height
 }
 
-/*
-Initializes a grey texture with the given width, height, pixels, and sampler
-
-Inputs:
-- self: Pointer to the texture to initialize
-- width: Width of the texture
-- height: Height of the texture
-- pixels: Pixels of the texture
-- pixels_allocator: The allocator to use for the pixels
-
-Returns:
-- None
-*/
 texture_init_grey :: proc(
 	self: ^texture,
 	width: u32,
@@ -250,10 +235,8 @@ texture_init_grey :: proc(
 	}, self.sampler, pixels, false, pixels_allocator)
 
 
-	if self.set.__resources != nil do __graphics_free_descriptor_resources(self.set.__resources)
-	self.set.__resources = __graphics_alloc_descriptor_resources(1)
 	self.set.__resources[0] = graphics_get_resource(self).(^texture_resource)
-	update_descriptor_sets(mem.slice_ptr(&self.set, 1))
+	update_descriptor_set(&self.set)
 	self.pixel_data = pixels
 	self.width = width
 	self.height = height
@@ -283,17 +266,6 @@ texture_init_grey :: proc(
 // }
 
 
-/*
-Initializes a depth-stencil texture
-
-Inputs:
-- self: Pointer to the texture to initialize
-- width: Width of the texture
-- height: Height of the texture
-
-Returns:
-- None
-*/
 texture_init_depth_stencil :: proc(self:^texture, width:u32, height:u32) {
     self.sampler = 0
     self.set.bindings = nil
@@ -317,17 +289,7 @@ texture_init_depth_stencil :: proc(self:^texture, width:u32, height:u32) {
 	self.height = height
 }
 
-/*
-Initializes an MSAA texture
 
-Inputs:
-- self: Pointer to the texture to initialize
-- width: Width of the texture
-- height: Height of the texture
-
-Returns:
-- None
-*/
 texture_init_msaa :: proc(self:^texture, width:u32, height:u32) {
     self.sampler = 0
     self.set.bindings = nil
@@ -351,21 +313,8 @@ texture_init_msaa :: proc(self:^texture, width:u32, height:u32) {
 	self.height = height
 }
 
-/*
-Deinitializes and cleans up texture resources
-
-Inputs:
-- self: Pointer to the texture to deinitialize
-
-Returns:
-- None
-*/
 texture_deinit :: #force_inline proc(self:^texture) {
     buffer_resource_deinit(self)
-	if self.set.__resources != nil {
-		__graphics_free_descriptor_resources(self.set.__resources)
-		self.set.__resources = nil
-	}
 }
 
 /*
@@ -487,10 +436,8 @@ texture_array_init :: proc(self:^texture_array, width:u32, height:u32, count:u32
         resource_usage = .GPU,
     }, self.sampler, allocPixels, false, context.allocator)
 
-	if self.set.__resources != nil do __graphics_free_descriptor_resources(self.set.__resources)
-    self.set.__resources = __graphics_alloc_descriptor_resources(1)
     self.set.__resources[0] = graphics_get_resource(self).(^texture_resource)
-    update_descriptor_sets(mem.slice_ptr(&self.set, 1))
+    update_descriptor_set(&self.set)
 	self.pixel_data = pixels
 	self.width = width
 	self.height = height
@@ -499,10 +446,6 @@ texture_array_init :: proc(self:^texture_array, width:u32, height:u32, count:u32
 
 texture_array_deinit :: #force_inline proc(self:^texture_array) {
     buffer_resource_deinit(self)
-	if self.set.__resources != nil {
-		__graphics_free_descriptor_resources(self.set.__resources)
-		self.set.__resources = nil
-	}
 }
 
 /*

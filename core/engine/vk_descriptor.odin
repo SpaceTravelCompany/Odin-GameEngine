@@ -11,8 +11,8 @@ import "base:runtime"
 // Descriptor - Public API
 // ============================================================================
 
-vk_update_descriptor_sets :: proc(sets: []descriptor_set) {
-	append_op(Op__Updatedescriptor_sets{sets = sets})
+vk_update_descriptor_set :: proc(sets: ^i_descriptor_set) {
+	append_op(Op__UpdateDescriptorSet{set = sets})
 }
 
 
@@ -43,109 +43,109 @@ __create_descriptor_pool :: proc(size: []descriptor_pool_size, out: ^descriptor_
 // Descriptor - Execute Update Descriptor Sets
 // ============================================================================
 
-execute_update_descriptor_sets :: proc(sets: []descriptor_set, update_list: ^[dynamic]vk.WriteDescriptorSet, arena: runtime.Allocator) {
-	for &s in sets {
-		if s.__set == 0 {
-			if raw_data(s.size) in gDesciptorPools {
-			} else {
-				gDesciptorPools[raw_data(s.size)] = mem.make_non_zeroed([dynamic]descriptor_pool_mem, vk_def_allocator())
-				non_zero_append(&gDesciptorPools[raw_data(s.size)], descriptor_pool_mem{cnt = 0})
-				__create_descriptor_pool(s.size, &gDesciptorPools[raw_data(s.size)][0])
-			}
-
-			last := &gDesciptorPools[raw_data(s.size)][len(gDesciptorPools[raw_data(s.size)]) - 1]
-			if last.cnt >= vkPoolBlock {
-				non_zero_append(&gDesciptorPools[raw_data(s.size)], descriptor_pool_mem{cnt = 0})
-				last = &gDesciptorPools[raw_data(s.size)][len(gDesciptorPools[raw_data(s.size)]) - 1]
-				__create_descriptor_pool(s.size, last)
-			}
-
-			last.cnt += 1
-			allocInfo := vk.DescriptorSetAllocateInfo {
-				sType              = .DESCRIPTOR_SET_ALLOCATE_INFO,
-				descriptorPool     = last.pool,
-				descriptorSetCount = 1,
-				pSetLayouts        = &s.layout,
-			}
-			res := vk.AllocateDescriptorSets(vk_device, &allocInfo, &s.__set)
-			if res != .SUCCESS do log.panicf("res := vk.AllocateDescriptorSets(vk_device, &allocInfo, &s.__set) : %s\n", res)
+execute_update_descriptor_set :: proc(set: ^i_descriptor_set, update_list: ^[dynamic]vk.WriteDescriptorSet, arena: runtime.Allocator) {
+	if set.__set == 0 {
+		if raw_data(set.size) in gDesciptorPools {
+		} else {
+			gDesciptorPools[raw_data(set.size)] = mem.make_non_zeroed([dynamic]descriptor_pool_mem, vk_def_allocator())
+			non_zero_append(&gDesciptorPools[raw_data(set.size)], descriptor_pool_mem{cnt = 0})
+			__create_descriptor_pool(set.size, &gDesciptorPools[raw_data(set.size)][0])
 		}
 
-		cnt: u32 = 0
-		bufCnt: u32 = 0
-		texCnt: u32 = 0
-
-		//sets[i].__resources array must match v.size configuration.
-		for s in s.size {
-			cnt += s.cnt
+		last := &gDesciptorPools[raw_data(set.size)][len(gDesciptorPools[raw_data(set.size)]) - 1]
+		if last.cnt >= vkPoolBlock {
+			non_zero_append(&gDesciptorPools[raw_data(set.size)], descriptor_pool_mem{cnt = 0})
+			last = &gDesciptorPools[raw_data(set.size)][len(gDesciptorPools[raw_data(set.size)]) - 1]
+			__create_descriptor_pool(set.size, last)
 		}
 
-		for r in s.__resources[0:cnt] {
-			switch rr in r {
-			case ^buffer_resource:
-				bufCnt += 1
-			case ^texture_resource:
-				texCnt += 1
-			}
+		last.cnt += 1
+		allocInfo := vk.DescriptorSetAllocateInfo {
+			sType              = .DESCRIPTOR_SET_ALLOCATE_INFO,
+			descriptorPool     = last.pool,
+			descriptorSetCount = 1,
+			pSetLayouts        = &set.layout,
 		}
+		res := vk.AllocateDescriptorSets(vk_device, &allocInfo, &set.__set)
+		if res != .SUCCESS do log.panicf("res := vk.AllocateDescriptorSets(vk_device, &allocInfo, &set.__set) : %set\n", res)
+	}
 
-		bufs := mem.make_non_zeroed([]vk.DescriptorBufferInfo, bufCnt, arena)
-		texs := mem.make_non_zeroed([]vk.DescriptorImageInfo, texCnt, arena)
-		bufCnt = 0
-		texCnt = 0
+	cnt: u32 = 0
+	bufCnt: u32 = 0
+	texCnt: u32 = 0
 
-		for r in s.__resources[0:cnt] {
-			switch rr in r {
-			case ^buffer_resource:
-				bufs[bufCnt] = vk.DescriptorBufferInfo {
-					buffer = rr.__resource,
-					offset = rr.g_uniform_indices[2],
-					range  = rr.option.size,
-				}
-				bufCnt += 1
-			case ^texture_resource:
-				texs[texCnt] = vk.DescriptorImageInfo {
-					imageLayout = .SHADER_READ_ONLY_OPTIMAL,
-					imageView   = rr.img_view,
-					sampler     = rr.sampler,
-				}
-				texCnt += 1
-			}
+	//sets[i].__resources array must match v.size configuration.
+	for set in set.size {
+		cnt += set.cnt
+	}
+
+	resources :[^]union_resource = &((^p_descriptor_set)(set)).__resources[0]
+
+	for r in resources[0:cnt] {
+		switch rr in r {
+		case ^buffer_resource:
+			bufCnt += 1
+		case ^texture_resource:
+			texCnt += 1
 		}
+	}
 
-		bufCnt = 0
-		texCnt = 0
-		for n, i in s.size {
-			switch n.type {
-			case .SAMPLER, .STORAGE_IMAGE:
-				non_zero_append(update_list, vk.WriteDescriptorSet {
-					dstSet          = s.__set,
-					dstBinding      = s.bindings[i],
-					dstArrayElement = 0,
-					descriptorCount = n.cnt,
-					descriptorType  = descriptor_type_to_vk_descriptor_type(n.type),
-					pBufferInfo     = nil,
-					pImageInfo      = &texs[texCnt],
-					pTexelBufferView = nil,
-					sType           = .WRITE_DESCRIPTOR_SET,
-					pNext           = nil,
-				})
-				texCnt += n.cnt
-			case .UNIFORM, .STORAGE, .UNIFORM_DYNAMIC:
-				non_zero_append(update_list, vk.WriteDescriptorSet {
-					dstSet          = s.__set,
-					dstBinding      = s.bindings[i],
-					dstArrayElement = 0,
-					descriptorCount = n.cnt,
-					descriptorType  = descriptor_type_to_vk_descriptor_type(n.type),
-					pBufferInfo     = &bufs[bufCnt],
-					pImageInfo      = nil,
-					pTexelBufferView = nil,
-					sType           = .WRITE_DESCRIPTOR_SET,
-					pNext           = nil,
-				})
-				bufCnt += n.cnt
+	bufs := mem.make_non_zeroed([]vk.DescriptorBufferInfo, bufCnt, arena)
+	texs := mem.make_non_zeroed([]vk.DescriptorImageInfo, texCnt, arena)
+	bufCnt = 0
+	texCnt = 0
+
+	for r in resources[0:cnt] {
+		switch rr in r {
+		case ^buffer_resource:
+			bufs[bufCnt] = vk.DescriptorBufferInfo {
+				buffer = rr.__resource,
+				offset = rr.g_uniform_indices[2],
+				range  = rr.option.size,
 			}
+			bufCnt += 1
+		case ^texture_resource:
+			texs[texCnt] = vk.DescriptorImageInfo {
+				imageLayout = .SHADER_READ_ONLY_OPTIMAL,
+				imageView   = rr.img_view,
+				sampler     = rr.sampler,
+			}
+			texCnt += 1
+		}
+	}
+
+	bufCnt = 0
+	texCnt = 0
+	for n, i in set.size {
+		switch n.type {
+		case .SAMPLER, .STORAGE_IMAGE:
+			non_zero_append(update_list, vk.WriteDescriptorSet {
+				dstSet          = set.__set,
+				dstBinding      = set.bindings[i],
+				dstArrayElement = 0,
+				descriptorCount = n.cnt,
+				descriptorType  = descriptor_type_to_vk_descriptor_type(n.type),
+				pBufferInfo     = nil,
+				pImageInfo      = &texs[texCnt],
+				pTexelBufferView = nil,
+				sType           = .WRITE_DESCRIPTOR_SET,
+				pNext           = nil,
+			})
+			texCnt += n.cnt
+		case .UNIFORM, .STORAGE, .UNIFORM_DYNAMIC:
+			non_zero_append(update_list, vk.WriteDescriptorSet {
+				dstSet          = set.__set,
+				dstBinding      = set.bindings[i],
+				dstArrayElement = 0,
+				descriptorCount = n.cnt,
+				descriptorType  = descriptor_type_to_vk_descriptor_type(n.type),
+				pBufferInfo     = &bufs[bufCnt],
+				pImageInfo      = nil,
+				pTexelBufferView = nil,
+				sType           = .WRITE_DESCRIPTOR_SET,
+				pNext           = nil,
+			})
+			bufCnt += n.cnt
 		}
 	}
 }

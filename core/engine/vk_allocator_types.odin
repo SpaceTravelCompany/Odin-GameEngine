@@ -129,8 +129,8 @@ OpDestroyTexture :: struct {
 	src: ^texture_resource,
 }
 
-Op__Updatedescriptor_sets :: struct {
-	sets: []descriptor_set,
+Op__UpdateDescriptorSet :: struct {
+	set: ^i_descriptor_set,
 }
 
 Op__AddResToObj :: struct {
@@ -199,7 +199,7 @@ OpNode :: union {
 	OpDestroyBuffer,
 	OpReleaseUniform,
 	OpDestroyTexture,
-	Op__Updatedescriptor_sets,
+	Op__UpdateDescriptorSet,
 }
 
 

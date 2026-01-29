@@ -243,7 +243,7 @@ shape_button_up_exists :: proc (self:^shape_button) -> bool {
 	return self.up_shape_src != nil
 }
 
-_super_image_button_draw :: proc (self:^image_button, cmd:engine.command_buffer, viewport:engine.viewport) {
+_super_image_button_draw :: proc (self:^image_button, cmd:engine.command_buffer, viewport:^engine.viewport) {
     texture :^engine.texture
 
     switch self.state {
@@ -258,7 +258,7 @@ _super_image_button_draw :: proc (self:^image_button, cmd:engine.command_buffer,
 	if engine.graphics_get_resource_draw(self) == nil do return
 	if engine.graphics_get_resource_draw(texture) == nil do return
 
-    engine.image_binding_sets_and_draw(cmd, self.set, viewport.set, texture.set)
+    engine.image_binding_sets_and_draw(cmd, &self.set, &viewport.set, &texture.set)
 }
 
 

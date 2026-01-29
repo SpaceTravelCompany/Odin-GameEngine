@@ -22,19 +22,16 @@ tile_image :: struct {
 	tile_uniform:byte,
 }
 
-@private get_uniform_resources_tile_image :: #force_inline proc(self:^tile_image) -> []engine.union_resource {
-    res := mem.make_non_zeroed([]engine.union_resource, 3, context.temp_allocator)
-    res[0] = engine.graphics_get_resource(self).(^engine.buffer_resource)
-    res[1] = engine.graphics_get_resource(self.color_transform).(^engine.buffer_resource)
-    res[2] = engine.graphics_get_resource(&self.tile_uniform).(^engine.buffer_resource)
-    return res[:]
+set_uniform_resources_tile_image :: proc(self:^tile_image, resources:[]engine.union_resource) {
+    resources[0] = engine.graphics_get_resource(self).(^engine.buffer_resource)
+    resources[1] = engine.graphics_get_resource(self.color_transform).(^engine.buffer_resource)
+    resources[2] = engine.graphics_get_resource(&self.tile_uniform).(^engine.buffer_resource)
 }
 
 
 @private tile_image_vtable :engine.iobject_vtable = engine.iobject_vtable {
     draw = auto_cast _super_tile_image_draw,
     deinit = auto_cast _super_tile_image_deinit,
-    get_uniform_resources = auto_cast get_uniform_resources_tile_image,
 }
 
 tile_image_init :: proc(self:^tile_image, src:^tile_texture_array,
@@ -52,7 +49,6 @@ colorTransform:^engine.color_transform = nil, vtable:^engine.iobject_vtable = ni
 		if self.vtable.draw == nil do self.vtable.draw = auto_cast _super_tile_image_draw
     	if self.vtable.deinit == nil do self.vtable.deinit = auto_cast _super_tile_image_deinit
 
-		if self.vtable.get_uniform_resources == nil do self.vtable.get_uniform_resources = auto_cast get_uniform_resources_tile_image
     }
 
 	 engine.buffer_resource_create_buffer(&self.tile_uniform, {
@@ -162,10 +158,8 @@ inPixelFmt:img.color_fmt = .RGBA, allocator := context.allocator) {
         type = .TEX2D,
     }, self.sampler, allocPixels, false, allocator)
 
-	if self.set.__resources != nil do engine.__graphics_free_descriptor_resources(self.set.__resources)
-    self.set.__resources = engine.__graphics_alloc_descriptor_resources(1)
     self.set.__resources[0] = engine.graphics_get_resource(self).(^engine.texture_resource)
-    engine.update_descriptor_sets(mem.slice_ptr(&self.set, 1))
+    engine.update_descriptor_set(&self.set)
 }
 
 /*
@@ -179,8 +173,4 @@ Returns:
 */
 tile_texture_array_deinit :: #force_inline proc(self:^tile_texture_array) {
     engine.buffer_resource_deinit(self)
-	if self.set.__resources != nil {
-		engine.__graphics_free_descriptor_resources(self.set.__resources)
-		self.set.__resources = nil
-	}
 }

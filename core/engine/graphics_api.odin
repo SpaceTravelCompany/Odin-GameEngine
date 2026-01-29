@@ -151,13 +151,24 @@ get_vulkan_version :: proc "contextless" () -> VULKAN_VERSION {
 	return vulkan_version
 }
 
-descriptor_set :: struct {
+
+i_descriptor_set :: struct {
 	layout: vk.DescriptorSetLayout,
-	/// created inside update_descriptor_sets call
+	/// created inside update_descriptor_set call
 	__set: vk.DescriptorSet,
 	size: []descriptor_pool_size,
 	bindings: []u32,
-	__resources: []union_resource,
+	num_resources: u32,
+}
+
+descriptor_set :: struct($N:int) {
+	using _: i_descriptor_set,
+	__resources: [N]union_resource,
+}
+
+p_descriptor_set :: struct {
+	using _: i_descriptor_set,
+	__resources: [1]union_resource,
 }
 
 command_buffer :: struct #packed {
@@ -169,7 +180,7 @@ color_transform :: struct {
 }
 
 texture :: struct {
-	set: descriptor_set,
+	set: descriptor_set(1),
 	sampler: vk.Sampler,
 	pixel_data: []byte,
 	width: u32,
@@ -483,8 +494,8 @@ buffer_resource_create_texture :: proc(
 	}
 }
 
-update_descriptor_sets :: #force_inline proc(descriptor_sets: []descriptor_set) {
-	vk_update_descriptor_sets(descriptor_sets)
+update_descriptor_set :: proc(descriptor_sets: ^i_descriptor_set) {
+	vk_update_descriptor_set(descriptor_sets)
 }
 
 color_transform_init_matrix_raw :: proc(self: ^color_transform, mat: linalg.matrix44 = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1}) {
@@ -899,14 +910,6 @@ graphics_destriptor_set_layout_init :: proc(bindings: []vk.DescriptorSetLayoutBi
 
 animate_img_descriptor_set_layout :: proc() -> vk.DescriptorSetLayout {
 	return __animate_img_descriptor_set_layout
-}
-
-__graphics_alloc_descriptor_resources :: proc(len:int) -> []union_resource {
-	return make([]union_resource, len, vk_def_allocator())
-}
-
-__graphics_free_descriptor_resources :: proc(resources: []union_resource) {
-	delete(resources, vk_def_allocator())
 }
 
 // Add resource to gMapResource stack (push_back)

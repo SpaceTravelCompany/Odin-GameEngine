@@ -239,7 +239,6 @@ colorTransform:^engine.color_transform = nil, vtable:^ianimate_object_vtable = n
 		 if self.vtable.draw == nil do self.vtable.draw = auto_cast _super_animate_image_draw
    	 	if self.vtable.deinit == nil do self.vtable.deinit = auto_cast _super_animate_image_deinit
     	if ((^ianimate_object_vtable)(self.vtable)).get_frame_cnt == nil do ((^ianimate_object_vtable)(self.vtable)).get_frame_cnt = auto_cast _super_animate_image_get_frame_cnt
-    	if self.vtable.get_uniform_resources == nil do self.vtable.get_uniform_resources = auto_cast get_uniform_resources_animate_image
     }
 
     engine.buffer_resource_create_buffer(&self.frame_uniform, {
@@ -293,7 +292,7 @@ _super_animate_image_draw :: proc (self:^animate_image, cmd:engine.command_buffe
     engine.graphics_cmd_draw(cmd, 6, 1, 0, 0)
 }
 
-@private get_uniform_resources_animate_image :: #force_inline proc(self:^animate_image) -> []engine.union_resource {
+@private set_uniform_resources_animate_image :: #force_inline proc(self:^animate_image) -> []engine.union_resource {
     res := mem.make_non_zeroed([]engine.union_resource, 3, context.temp_allocator)
     res[0] = engine.graphics_get_resource(self)
     res[1] = engine.graphics_get_resource(self.color_transform)

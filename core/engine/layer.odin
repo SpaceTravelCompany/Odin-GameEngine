@@ -318,7 +318,6 @@ layer_get_object_idx :: proc (cmd: ^layer, obj: ^iobject) -> int {
 
 	camera_deinit(&__g_default_camera)
 	projection_deinit(&__g_default_projection)
-	viewport_deinit(&__g_default_viewport)
 }
 
 @(private) __layer_create :: proc() {

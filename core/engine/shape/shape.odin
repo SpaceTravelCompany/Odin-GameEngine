@@ -67,7 +67,7 @@ _super_shape_draw :: proc (self:^shape, cmd:engine.command_buffer, viewport:^eng
     shape_src_bind_and_draw(self.src, &self.set, cmd, viewport)
 }
 
-shape_src_bind_and_draw :: proc(self:^shape_src, set:^engine.descriptor_set, cmd:engine.command_buffer, viewport:^engine.viewport) {
+shape_src_bind_and_draw :: proc(self:^shape_src, set:^engine.i_descriptor_set, cmd:engine.command_buffer, viewport:^engine.viewport) {
 	buffer, ok : = engine.graphics_get_resource_draw(&self.vertexBuf).(^engine.buffer_resource)
 	if !ok do return
 	idx_buffer, ok2 : = engine.graphics_get_resource_draw(&self.indexBuf).(^engine.buffer_resource)

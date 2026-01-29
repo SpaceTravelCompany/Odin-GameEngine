@@ -409,8 +409,8 @@ vk_exec_gpu_commands_task :: proc(task: thread.Task) {
 	gVkUpdateDesciptorSetList := mem.make_non_zeroed([dynamic]vk.WriteDescriptorSet, arena_allocator)
 	for node in opExecQueue {
 		#partial switch n in node {
-		case Op__Updatedescriptor_sets:
-			execute_update_descriptor_sets(n.sets, &gVkUpdateDesciptorSetList, arena_allocator)
+		case Op__UpdateDescriptorSet:
+			execute_update_descriptor_set(n.set, &gVkUpdateDesciptorSetList, arena_allocator)
 		case OpCopyBuffer:
 			haveCmds = true
 		case OpCopyBufferToTexture:
@@ -561,64 +561,6 @@ append_op :: proc(node: OpNode) {
 	sync.atomic_mutex_lock(&gQueueMtx)
 	defer sync.atomic_mutex_unlock(&gQueueMtx)
 
-	// #partial switch &n in node {
-	// case OpMapCopy:
-	// 	for &op in opQueue {
-	// 		#partial switch &o in op {
-	// 		case OpMapCopy:
-	// 			if o.p_resource == n.p_resource {
-	// 				if o.allocator != nil && o.data != nil {
-	// 					delete(o.data, o.allocator.?)
-	// 				}
-	// 				o.allocator = n.allocator
-	// 				o.data = n.data
-	// 				return
-	// 			}
-	// 		}
-	// 	}
-	// case OpDestroyBuffer:
-	// 	for &op, i in opQueue {
-	// 		#partial switch &o in op {
-	// 		case OpCreateBuffer:
-	// 			if o.src.prepare_ptr.buf == n.src {
-	// 				if o.allocator != nil && o.data != nil {
-	// 					delete(o.data, o.allocator.?)
-	// 				}
-	// 				free(o.src.prepare_ptr.buf, vk_def_allocator())
-	// 				ordered_remove(&opQueue, i)
-	// 				return
-	// 			}
-	// 		}
-	// 	}
-	// case OpDestroyTexture:
-	// 	for &op, i in opQueue {
-	// 		#partial switch &o in op {
-	// 		case OpCreateTexture:
-	// 			if o.src.prepare_ptr.tex == n.src {
-	// 				if o.allocator != nil && o.data != nil {
-	// 					delete(o.data, o.allocator.?)
-	// 				}
-	// 				free(o.src.prepare_ptr.tex, vk_def_allocator())
-	// 				ordered_remove(&opQueue, i)
-	// 				return
-	// 			}
-	// 		}
-	// 	}
-	// case OpReleaseUniform:
-	// 	for &op, i in opQueue {
-	// 		#partial switch &o in op {
-	// 		case OpCreateBuffer:
-	// 			if o.src.prepare_ptr.buf == n.src {
-	// 				if o.data != nil && o.data != nil {
-	// 					delete(o.data, o.allocator.?)
-	// 				}
-	// 				free(o.src.prepare_ptr.buf, vk_def_allocator())
-	// 				ordered_remove(&opQueue, i)
-	// 				return
-	// 			}
-	// 		}
-	// 	}
-	// }
 	non_zero_append(&opQueue, node)
 }
 

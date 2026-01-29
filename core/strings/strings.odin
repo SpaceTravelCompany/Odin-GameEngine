@@ -366,7 +366,7 @@ Output:
 	5
 
 */
-rune_count :: proc "contextless" (s: string) -> (res: int) {
+rune_count :: proc (s: string) -> (res: int) {
 	return utf8.rune_count_in_string(s)
 }
 
@@ -1932,7 +1932,7 @@ Output:
 	0
 
 */
-count :: proc "contextless" (s, substr: string) -> (res: int) {
+count :: proc (s, substr: string) -> (res: int) {
 	if len(substr) == 0 { // special case
 		return rune_count(s) + 1
 	}

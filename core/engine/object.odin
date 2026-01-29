@@ -10,7 +10,6 @@ import "core:log"
 
 
 iobject_vtable :: struct {
-    get_uniform_resources: #type proc (self:^iobject) -> []union_resource,
     draw: #type proc (self:^iobject, cmd:command_buffer, viewport:^viewport),
     deinit: #type proc (self:^iobject),
     update: #type proc (self:^iobject),
@@ -29,7 +28,6 @@ iobject :: struct {
     vtable: ^iobject_vtable,
 }
 @private __itransform_object_vtable :iobject_vtable = iobject_vtable {
-    get_uniform_resources = auto_cast get_uniform_resources_transform_object,
     deinit = auto_cast _super_itransform_object_deinit,
 }
 
@@ -41,7 +39,7 @@ Contains transformation matrix, descriptor set for polymorphic behavior
 itransform_object :: struct {
 	using _: iobject,
     using _: __matrix_in,
-    set:descriptor_set,
+    set:descriptor_set(2),
     color_transform: ^color_transform,
 }
 
@@ -155,10 +153,6 @@ _super_itransform_object_deinit :: proc (self:^itransform_object) {
 	if resource != nil {
 		buffer_resource_deinit(self)
 	}
-	if self.set.__resources != nil {
-		__graphics_free_descriptor_resources(self.set.__resources)
-		self.set.__resources = nil
-	}
 }
 
 iobject_init :: proc(self:^iobject) {
@@ -172,38 +166,17 @@ itransform_object_init :: proc(self:^itransform_object, _color_transform:^color_
 		self.vtable = &__itransform_object_vtable
 	} else {
 		self.vtable = vtable
-		if self.vtable.get_uniform_resources == nil do self.vtable.get_uniform_resources = auto_cast get_uniform_resources_transform_object
 		if self.vtable.deinit == nil do self.vtable.deinit = auto_cast _super_itransform_object_deinit
 	}
 
     self.actual_type = typeid_of(itransform_object)
 }
 
-//!alloc result array in temp_allocator
-@private get_uniform_resources :: proc(self:^iobject) -> []union_resource {
-    if self.vtable != nil && self.vtable.get_uniform_resources != nil {
-        return self.vtable.get_uniform_resources(self)
-    } else {
-        log.panic("get_uniform_resources is not implemented\n")
-    }
+set_uniform_resources_transform_object :: proc(self:^itransform_object, resources:[]union_resource)  {
+    resources[0] = graphics_get_resource(self)
+    resources[1] = graphics_get_resource(self.color_transform)
 }
 
-get_uniform_resources_transform_object :: proc(self:^itransform_object) -> []union_resource {
-    res := mem.make_non_zeroed([]union_resource, 2, context.temp_allocator)
-    
-    res[0] = graphics_get_resource(self)
-    res[1] = graphics_get_resource(self.color_transform)
-
-    return res[:]
-}
-
-
-@private __itransform_object_update_uniform :: proc(self:^itransform_object, resources:[]union_resource) {
-   	if self.set.__resources != nil do __graphics_free_descriptor_resources(self.set.__resources)
-    self.set.__resources = __graphics_alloc_descriptor_resources(len(resources))
-    mem.copy_non_overlapping(&self.set.__resources[0], &resources[0], len(resources) * size_of(union_resource))
-    update_descriptor_sets(mem.slice_ptr(&self.set, 1))
-}
 
 itransform_object_update_transform :: proc(self:^itransform_object, pos:linalg.point3d, rotation:f32 = 0.0, scale:linalg.point = {1.0,1.0}, pivot:linalg.point = {0.0,0.0}) {
     itransform_object_update_transform_matrix_raw(self, srt_2d_matrix2(pos, scale, rotation, pivot))
@@ -220,16 +193,16 @@ itransform_object_update_transform_matrix_raw :: proc(self:^itransform_object, _
             resource_usage = .CPU,
         }, mem.ptr_to_bytes(&self.mat), true)
 
-        resources := get_uniform_resources(self)
-        defer delete(resources, context.temp_allocator)
-        __itransform_object_update_uniform(self, resources)
+        set_uniform_resources_transform_object(self, self.set.__resources[:])
+		update_descriptor_set(&self.set)
 	} else {
 		buffer_resource_copy_update(self, &self.mat)
 	}
 }
 itransform_object_change_color_transform :: proc(self:^itransform_object, _color_transform:^color_transform) {
     self.color_transform = _color_transform
-    __itransform_object_update_uniform(self, get_uniform_resources(self))
+    set_uniform_resources_transform_object(self, self.set.__resources[:])
+	update_descriptor_set(&self.set)
 }
 
 /*
