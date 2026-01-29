@@ -3,7 +3,6 @@ package build_tool
 import "core:fmt"
 import "core:encoding/json"
 import "core:mem"
-import "core:slice"
 import "core:os"
 import "core:os/os2"
 import "core:strings"
@@ -35,18 +34,7 @@ i686-linux-gnu
 x86_64-linux-gnu
 riscv64-linux-gnu
 */
-
-
 main :: proc() {
-	//shader compile only
-	// if len(os2.args) >= 2 {
-	// 	if os2.args[1] == "-s" || os2.args[1] == "--shader" {
-	// 		findGLSLFileAndRunCmd()
-	// 		return
-	// 	}
-	// }
-
-	//fmt.println(os.args)
 	json_data:json.Value
 	ok :bool
 
@@ -61,6 +49,21 @@ main :: proc() {
 		is_android = setting["is-android"].(json.Boolean)
 	}
 
+	is_web :bool = false
+	if "is-web" in setting {
+		is_web = setting["is-web"].(json.Boolean)
+	}
+	if is_web && is_android do fmt.panicf("is-web and is-android cannot be true at the same time")
+
+	non_web_graphics_api :string = "vulkan"
+	if "non-web-graphics-api" in setting {
+		non_web_graphics_api = setting["non-web-graphics-api"].(json.String)
+	}
+	web_graphics_api :string = "webgl"
+	if "web-graphics-api" in setting {
+		web_graphics_api = setting["web-graphics-api"].(json.String)
+	}
+
 	// Sets the optimization mode for compilation.
 	// Available options:
 	// 		-o:none
@@ -69,8 +72,6 @@ main :: proc() {
 	// 		-o:speed
 	// 		-o:aggressive (use this with caution)
 	// The default is -o:minimal.
-
-
 	os.make_directory("bin")
 	o:string
 	debug:bool = false
@@ -111,6 +112,11 @@ main :: proc() {
 			if sdkPath == "" {
 				fmt.panicf("ODIN_ANDROID_SDK is not set")
 			}
+		}
+
+		ODIN_ROOT := os2.get_env_alloc("ODIN_ROOT", context.temp_allocator)
+		if ODIN_ROOT == "" {
+			fmt.panicf("ODIN_ROOT is not set")
 		}
 
 		export_vulkan_validation_layer := false
@@ -172,9 +178,7 @@ main :: proc() {
 		}
 
 
-		builded := false
-
-		
+		builded := false	
 		
 		for target, i in targets {
 			if !runCmd({"odin", "build", 
@@ -189,6 +193,7 @@ main :: proc() {
 			target,
 			"-subtarget:android",
 			//"-show-debug-messages",//!for debug
+			strings.join({"-define:NON_WEB_GRAPHICS_API=", non_web_graphics_api}, "", context.temp_allocator),
 			}) {
 				return
 			}
@@ -216,7 +221,34 @@ main :: proc() {
 			os2.remove("test.apk")
 			os2.remove("test.apk-build")
 			os2.remove("test.apk.idsig")
-		}	
+		}
+	} else if is_web {
+		out_path := strings.join({"-out:", setting["out-path"].(json.String)}, "", context.temp_allocator)
+
+		PAGE_SIZE::65536
+		INITIAL_MEMORY_PAGES::2000
+		MAX_MEMORY_PAGES::65536
+		INITIAL_MEMORY_BYTES::INITIAL_MEMORY_PAGES * PAGE_SIZE
+		MAX_MEMORY_BYTES::MAX_MEMORY_PAGES * PAGE_SIZE
+
+		os2.copy_file(filepath.dir(setting["out-path"].(json.String), context.temp_allocator),
+				filepath.join({ODIN_ROOT, "/core/sys/wasm/js/odin.js"}, context.temp_allocator))
+
+		if !runCmd({"odin", "build", 
+		setting["main-package"].(json.String), 
+		"-no-bounds-check" if !debug else ({}),
+		out_path, 
+		o,
+		"-target:js_wasm32",
+		"-debug" if debug else ({}),
+		//"-show-debug-messages",//!for debug
+		strings.join({"-define:WEB_GRAPHICS_API=", web_graphics_api}, "", context.temp_allocator),
+		fmt.tprintf("-extra-linker-flags:\"--export-table --import-memory --initial-memory=%d --max-memory=%d\"", 
+		INITIAL_MEMORY_BYTES, MAX_MEMORY_BYTES),
+		//"-sanitize:address" if debug else ({}),
+		}) {
+			return
+		}
 	} else {
 		target_arch :string = ""
 		if "target-arch" in setting && ODIN_OS == .Linux {
@@ -268,11 +300,14 @@ main :: proc() {
 		resource.? if resource != nil else ({}),
 		"-define:CONSOLE=true" if console else "-define:CONSOLE=false",
 		("-subsystem:console" if console else "-subsystem:windows") if ODIN_OS == .Windows else ({}),
+		strings.join({"-define:NON_WEB_GRAPHICS_API=", non_web_graphics_api}, "", context.temp_allocator),
 		//"-sanitize:address" if debug else ({}),
 		}) {
 			return
 		}
 	}
+
+	free_all(context.temp_allocator)
 }
 
 // findGLSLFileAndRunCmd :: proc() -> bool {

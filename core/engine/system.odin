@@ -14,34 +14,21 @@ import "base:intrinsics"
 import "core:thread"
 import "core:log"
 
-/*
-Gets the delta time in seconds
 
-Returns:
-- Delta time in seconds
-*/
 dt :: #force_inline proc "contextless" () -> f64 { return f64(delta_time) / 1000000000.0 }
 
-/*
-Gets the delta time in nanoseconds as u64
-
-Returns:
-- Delta time in nanoseconds
-*/
 dt_u64 :: #force_inline proc "contextless" () -> u64 { return delta_time }
 
-/*
-Gets the number of processor cores
-
-Returns:
-- The number of processor cores
-*/
 get_processor_core_len :: #force_inline proc "contextless" () -> int { return processor_core_len }
 
 
 is_android :: ODIN_PLATFORM_SUBTARGET == .Android
 is_mobile :: is_android
 is_console :: #config(CONSOLE, false)
+
+NON_WEB_GRAPHICS_API :: #config(NON_WEB_GRAPHICS_API, "vulkan")//Vulkan or OpenGL
+WEB_GRAPHICS_API :: #config(WEB_GRAPHICS_API, "webgl")//WebGL or WebGPU
+IS_WEB :: ODIN_OS == .JS
 
 init: #type proc()
 update: #type proc()
@@ -224,13 +211,6 @@ engine_main :: proc(
 	}
 }
 
-
-/*
-Gets the maximum frame rate limit
-
-Returns:
-- Maximum frame rate in frames per second, or 0 if unlimited
-*/
 get_max_frame :: #force_inline proc "contextless" () -> f64 {
 	return intrinsics.atomic_load_explicit(&max_frame,.Relaxed)
 }
@@ -247,15 +227,6 @@ get_fps :: #force_inline proc "contextless" () -> f64 {
 	return 1.0 / dt()
 }
 
-/*
-Sets the maximum frame rate limit
-
-Inputs:
-- _maxframe: Maximum frame rate in frames per second (0 for unlimited)
-
-Returns:
-- None
-*/
 set_max_frame :: #force_inline proc "contextless" (_maxframe: f64) {
 	intrinsics.atomic_store_explicit(&max_frame, _maxframe, .Relaxed)
 }
@@ -417,37 +388,7 @@ linux_platform_version :: struct {
 	machine:string,
 }
 
-
-/*
-Checks if the engine is exiting
-
-Returns:
-- `true` if the engine is exiting, `false` otherwise
-*/
 exiting :: #force_inline proc  "contextless"() -> bool {return __exiting}
-
-
-
-// @(private) CreateRenderFuncThread :: proc() {
-// 	render_th = thread.create_and_start(RenderFunc)
-// }
-
-// @(private) RenderFunc :: proc() {
-// 	vkStart()
-
-// 	Init()
-
-// 	for !__exiting {
-// 		RenderLoop()
-// 	}
-
-// 	vkWaitDeviceIdle()
-
-// 	Destroy()
-
-// 	vkDestory()
-// }
-
 
 start_console :: proc() {
 	when ODIN_OS == .Windows {
@@ -459,12 +400,6 @@ start_console :: proc() {
 	}
 }
 
-/*
-Checks if the current thread is the main thread
-
-Returns:
-- `true` if the current thread is the main thread, `false` otherwise
-*/
 is_main_thread :: #force_inline proc "contextless" () -> bool {
 	return sync.current_thread_id() == main_thread_id
 }

@@ -261,9 +261,27 @@ get_nearest_sampler :: #force_inline proc "contextless" () -> vk.Sampler {
 
 
 @private graphics_init :: #force_inline proc() {
-	_ = pool.init(&gBufferPool, "self", ) 
-	_ = pool.init(&gTexturePool, "self", )
-	vk_start()
+	when IS_WEB {
+		when WEB_GRAPHICS_API == "webgl" {
+			webgl_start()
+		} else when WEB_GRAPHICS_API == "webgpu" {
+			#panic("Unsupported graphics API: " + WEB_GRAPHICS_API)
+		} else {
+			#panic("Unsupported graphics API: " + WEB_GRAPHICS_API)
+		}
+	} else {
+		when NON_WEB_GRAPHICS_API == "vulkan" {
+			_ = pool.init(&gBufferPool, "self", ) 
+			_ = pool.init(&gTexturePool, "self", )
+			vk_start()
+		} else when NON_WEB_GRAPHICS_API == "opengl" {
+			//opengl_start()
+			#panic("Unsupported graphics API: " + NON_WEB_GRAPHICS_API)
+		} else {
+			#panic("Unsupported graphics API: " + NON_WEB_GRAPHICS_API)
+		}
+	}
+
 }
 
 @private graphics_destroy :: #force_inline proc() {

@@ -14,6 +14,29 @@
 					"default": false,
 					"description": "Enable console"
 				},
+				"is-web": {
+					"type": "boolean",
+					"default": false,
+					"description": "Enable build Target Web"
+				},
+				"web-graphics-api": {
+					"type": "string",
+					"enum": [
+						"webgl",
+						"webgpu"
+					],
+					"default": "webgl",
+					"description": "Web graphics API"
+				},
+				"non-web-graphics-api": {
+					"type": "string",
+					"enum": [
+						"vulkan",
+						"opengl"
+					],
+					"default": "vulkan",
+					"description": "Non-web graphics API"
+				},
 				"main-package": {
 					"type": "string"
 				},
