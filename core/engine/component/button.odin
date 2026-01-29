@@ -157,17 +157,16 @@ button_pointer_down :: proc (self:^button, pointerPos:linalg.point, pointerIdx:u
 	
 
 	//! can't apply rotation now
-	// Transform from NDC to local coordinates using inverse matrices
-	tmp_mat := self.mat * linalg.matrix4_scale(linalg.Vector3f32{f32(tex_width), f32(tex_height), 1.0})
-	tmp_mat = viewport_.camera.mat * tmp_mat
-	tmp_mat = viewport_.projection.mat * tmp_mat
-	
+	// Transform from NDC to local coordinates: shader uses proj * view * model * (quad * textureSize)
+	// So inverse(proj * view * model) * ndc gives point in (quad*textureSize) space
+	tmp_mat := viewport_.projection.mat * viewport_.camera.mat * self.mat * linalg.matrix4_scale(linalg.Vector3f32{f32(tex_width), f32(tex_height), 1.0})
 	pt_ := linalg.point3dw{ndc_x, ndc_y, 0.0, 1.0}
 	pt_ = linalg.mul(linalg.inverse(tmp_mat), pt_)
-	local_pos := linalg.point{pt_.x / pt_.w, pt_.y / pt_.w}
+	// Point is in quad*textureSize space; normalize to -0.5..0.5 for UV
+	local_pos := linalg.point{(pt_.x / pt_.w), (pt_.y / pt_.w)}
 	
 	// Check if normalized local position is within the quad bounds (-0.5 to 0.5)
-	if local_pos.x < -0.5 || local_pos.y > 0.5 do return false
+	if local_pos.x < -0.5 || local_pos.x > 0.5 do return false
 	if local_pos.y < -0.5 || local_pos.y > 0.5 do return false
 	
 	// Convert to texture UV coordinates
@@ -192,7 +191,7 @@ button_pointer_down :: proc (self:^button, pointerPos:linalg.point, pointerIdx:u
 	if pixel_idx + 3 >= u32(len(texture.pixel_data)) do return false
 	
 	alpha := texture.pixel_data[pixel_idx + 3]  // Alpha channel is the 4th byte
-	alpha_threshold: u8 = 1  // Consider pixels with alpha > 0 as visible
+	alpha_threshold: u8 :  1  // Consider pixels with alpha > 0 as visible
 	
 	return alpha >= alpha_threshold
 }
