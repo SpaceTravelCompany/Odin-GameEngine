@@ -15,8 +15,13 @@ when ODIN_ARCH == .amd64 {
     __ARCH_end :: "_arm32"
 }
 
-ARCH_end :: __ARCH_end + ".a"
-ARCH_end_so :: __ARCH_end + ".so"
+when ODIN_OS == .Windows && !is_mobile {
+	ARCH_end :: __ARCH_end + ".lib"
+	ARCH_end_so :: __ARCH_end + ".dll"
+} else {
+	ARCH_end :: __ARCH_end + ".a"
+	ARCH_end_so :: __ARCH_end + ".so"
+}
 
 when !is_mobile {
 	when ODIN_OS == .Windows {
