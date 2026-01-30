@@ -49,10 +49,10 @@ package all
 @(require) import "vendor:darwin/MetalKit"
 @(require) import "vendor:darwin/QuartzCore"
 
-@(require) import "vendor:directx/dxc"
-@(require) import "vendor:directx/d3d11"
-@(require) import "vendor:directx/d3d12"
-@(require) import "vendor:directx/dxgi"
+// @(require) import "vendor:directx/dxc"
+// @(require) import "vendor:directx/d3d11"
+// @(require) import "vendor:directx/d3d12"
+// @(require) import "vendor:directx/dxgi"
 @(require) import "vendor:commonmark"
 
 // @(require) import "vendor:stb/easy_font"
