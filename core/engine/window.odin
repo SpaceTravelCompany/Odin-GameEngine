@@ -44,7 +44,6 @@ monitor_info :: struct {
 @private monitors_mtx:sync.Mutex
 @private monitors: [dynamic]monitor_info
 @private primary_monitor: ^monitor_info
-@private current_monitor: ^monitor_info = nil
 
 @private __is_full_screen_ex := false
 @private __v_sync:v_sync
@@ -105,10 +104,19 @@ set_window_mode :: proc "contextless" () {
 	when !library.is_mobile {
 		sync.mutex_lock(&full_screen_mtx)
 		defer sync.mutex_unlock(&full_screen_mtx)
-		save_prev_window()
 		glfw_set_window_mode()
 		__screen_mode = .Window
 	}
+}
+
+
+get_screen_mode :: proc "contextless" () -> screen_mode {
+	when !library.is_mobile {
+		sync.mutex_lock(&full_screen_mtx)
+		defer sync.mutex_unlock(&full_screen_mtx)
+		return __screen_mode
+	}
+	return .Window
 }
 
 monitor_lock :: proc "contextless" () {
@@ -128,18 +136,14 @@ get_monitors :: proc "contextless" () -> []monitor_info {
 	return monitors[:len(monitors)]
 }	
 
-get_current_monitor :: proc "contextless" () -> ^monitor_info {
-	b := monitor_try_lock()
-	defer if b {
-		monitor_unlock()
-	}
-	return current_monitor
-}
-
-get_monitor_from_window :: proc "contextless" () -> ^monitor_info #no_bounds_check {
+get_monitor_from_window :: proc "contextless" () -> ^monitor_info {
 	for &value in monitors {
 		if linalg.Rect_PointIn(value.rect, [2]i32{auto_cast __window_x.?, auto_cast __window_y.?}) do return &value
 	}
+	return primary_monitor
+}
+
+get_primary_monitor :: proc "contextless" () -> ^monitor_info {
 	return primary_monitor
 }
 

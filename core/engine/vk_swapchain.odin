@@ -23,32 +23,6 @@ vk_recreate_surface :: proc() {
 	}
 }
 
-
-// ============================================================================
-// Surface - Full Screen Exclusive
-// ============================================================================
-
-vk_set_full_screen_ex :: proc() {
-	when ODIN_OS == .Windows {
-		if VK_EXT_full_screen_exclusive_support() && __is_full_screen_ex {
-			res := vk.AcquireFullScreenExclusiveModeEXT(vk_device, vk_swapchain)
-			if res != .SUCCESS do log.panicf("AcquireFullScreenExclusiveModeEXT : %s\n", res)
-			is_released_full_screen_ex = false
-		}
-	}
-}
-
-vk_release_full_screen_ex :: proc() {
-	when ODIN_OS == .Windows {
-		if VK_EXT_full_screen_exclusive_support() && !is_released_full_screen_ex {
-			res := vk.ReleaseFullScreenExclusiveModeEXT(vk_device, vk_swapchain)
-			if res != .SUCCESS do log.panicf("ReleaseFullScreenExclusiveModeEXT : %s\n", res)
-			is_released_full_screen_ex = true
-		}
-	}
-}
-
-
 // ============================================================================
 // Swapchain - Initialize Swapchain Properties
 // ============================================================================
@@ -212,25 +186,6 @@ vk_create_swap_chain_and_image_views :: proc() -> bool {
 		queueFamilyIndexCount = 0,
 		surface = vk_surface
 	}
-	when ODIN_OS == .Windows {
-		if __is_full_screen_ex && VK_EXT_full_screen_exclusive_support() {
-			fullScreenWinInfo : vk.SurfaceFullScreenExclusiveWin32InfoEXT
-			fullScreenInfo := vk.SurfaceFullScreenExclusiveInfoEXT{
-				sType = vk.StructureType.SURFACE_FULL_SCREEN_EXCLUSIVE_INFO_EXT,
-				pNext = nil,
-				fullScreenExclusive = .APPLICATION_CONTROLLED,
-			}
-			if current_monitor != nil {
-				fullScreenWinInfo = vk.SurfaceFullScreenExclusiveWin32InfoEXT{
-					sType = vk.StructureType.SURFACE_FULL_SCREEN_EXCLUSIVE_WIN32_INFO_EXT,
-					pNext = nil,
-					hmonitor = glfw_get_current_hmonitor(),
-				}
-				fullScreenInfo.pNext = &fullScreenWinInfo
-			}
-			swapChainCreateInfo.pNext = &fullScreenInfo
-		}
-	}
 	queueFamiliesIndices := [2]u32{vk_graphics_family_index, vk_present_family_index}
 	if vk_graphics_family_index != vk_present_family_index {
 		swapChainCreateInfo.imageSharingMode = .CONCURRENT
@@ -329,8 +284,6 @@ vk_recreate_swap_chain :: proc() {
 	}
 	sync.mutex_lock(&full_screen_mtx)
 
-	vk_release_full_screen_ex()
-
 	vk_wait_device_idle()
 	vk_op_execute_no_async()
 	vk_destroy_resources(true)
@@ -346,8 +299,6 @@ vk_recreate_swap_chain :: proc() {
 		sync.mutex_unlock(&full_screen_mtx)
 		return
 	}
-
-	vk_set_full_screen_ex()
 
 	size_updated = false
 

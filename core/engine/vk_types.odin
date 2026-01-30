@@ -12,7 +12,7 @@ import vk "vendor:vulkan"
 // ============================================================================
 
 @(rodata)
-DEVICE_EXTENSIONS: [3]cstring = {vk.KHR_SWAPCHAIN_EXTENSION_NAME, vk.EXT_FULL_SCREEN_EXCLUSIVE_EXTENSION_NAME, vk.KHR_SHADER_CLOCK_EXTENSION_NAME}
+DEVICE_EXTENSIONS: [2]cstring = {vk.KHR_SWAPCHAIN_EXTENSION_NAME, vk.KHR_SHADER_CLOCK_EXTENSION_NAME}
 
 @(rodata)
 INSTANCE_EXTENSIONS: [2]cstring = {
@@ -189,4 +189,3 @@ vkCopyBlending := vk.PipelineColorBlendStateCreateInfoInit(__vkNoBlendingState[:
 
 validation_layer_support :: #force_inline proc "contextless" () -> bool {return LAYERS_CHECK[0]}
 vk_khr_portability_enumeration_support :: #force_inline proc "contextless" () -> bool {return INSTANCE_EXTENSIONS_CHECK[1]}
-VK_EXT_full_screen_exclusive_support :: #force_inline proc "contextless" () -> bool {return DEVICE_EXTENSIONS_CHECK[1]}

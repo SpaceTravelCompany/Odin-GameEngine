@@ -382,15 +382,6 @@ graphics_cmd_draw_indexed :: #force_inline proc "contextless" (
 	vk.CmdDrawIndexed(cmd.__handle, index_count, instance_count, first_index, vertex_offset, first_instance)
 }
 
-
-graphics_set_fullscreen_exclusive :: #force_inline proc() {
-	vk_set_full_screen_ex()
-}
-
-graphics_release_fullscreen_exclusive :: #force_inline proc() {
-	vk_release_full_screen_ex()
-}
-
 buffer_resource_create_buffer :: proc(
 	self: rawptr,
 	option: buffer_create_option,
