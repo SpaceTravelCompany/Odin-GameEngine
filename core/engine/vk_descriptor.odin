@@ -5,6 +5,7 @@ import "core:mem"
 import "core:log"
 import vk "vendor:vulkan"
 import "base:runtime"
+import "core:sync"
 
 
 // ============================================================================
@@ -44,10 +45,12 @@ __create_descriptor_pool :: proc(size: []descriptor_pool_size, out: ^descriptor_
 // ============================================================================
 
 execute_update_descriptor_set :: proc(set: ^i_descriptor_set, update_list: ^[dynamic]vk.WriteDescriptorSet, arena: runtime.Allocator) {
+	@static mtx: sync.Mutex
 	if set.__set == 0 {
+		sync.mutex_lock(&mtx)
 		if raw_data(set.size) in gDesciptorPools {
 		} else {
-			gDesciptorPools[raw_data(set.size)] = mem.make_non_zeroed([dynamic]descriptor_pool_mem, vk_def_allocator())
+			gDesciptorPools[raw_data(set.size)] = mem.make_non_zeroed([dynamic]descriptor_pool_mem, gVkMemTlsfAllocator)
 			non_zero_append(&gDesciptorPools[raw_data(set.size)], descriptor_pool_mem{cnt = 0})
 			__create_descriptor_pool(set.size, &gDesciptorPools[raw_data(set.size)][0])
 		}
@@ -58,6 +61,7 @@ execute_update_descriptor_set :: proc(set: ^i_descriptor_set, update_list: ^[dyn
 			last = &gDesciptorPools[raw_data(set.size)][len(gDesciptorPools[raw_data(set.size)]) - 1]
 			__create_descriptor_pool(set.size, last)
 		}
+		sync.mutex_unlock(&mtx)
 
 		last.cnt += 1
 		allocInfo := vk.DescriptorSetAllocateInfo {

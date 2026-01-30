@@ -65,8 +65,8 @@ descriptor_type_to_vk_descriptor_type :: proc "contextless" (t: descriptor_type)
 // Constants
 // ============================================================================
 
-vkPoolBlock :: 256
-vkUniformSizeBlock :: mem.Megabyte
+vkPoolBlock :: 1024
+vkUniformSizeBlock :: 2 * mem.Megabyte
 VkMaxMemIdxCnt : int : 4
 
 
