@@ -5,13 +5,19 @@ import "core:dynlib"
 import "core:sync"
 import vk "vendor:vulkan"
 import "core:log"
+import "core:container/pool"
 
 
 // ============================================================================
 // Public API - Start & Destroy
 // ============================================================================
 
-vk_start :: proc() {
+vk_start :: proc() -> bool {
+	if !load_and_check_vulkan_support() do return false
+
+	_ = pool.init(&gBufferPool, "self") 
+	_ = pool.init(&gTexturePool, "self")
+	
 	vk_create_instance()
 	vk_create_surface()
 	vk_select_physical_device()
@@ -57,6 +63,8 @@ vk_start :: proc() {
 	//graphics_wait_all_ops()//reset wait
 
 	__layer_create()
+
+	return true
 }
 
 vk_destroy :: proc() {

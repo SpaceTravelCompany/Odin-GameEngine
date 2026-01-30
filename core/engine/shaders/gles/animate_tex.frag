@@ -1,0 +1,12 @@
+#version 300 es
+
+uniform mat4 u_colormat;
+uniform uint u_frame;
+uniform sampler2DArray texSampler;
+
+layout(location = 0) in vec2 fragTexCoord;
+layout(location = 0) out vec4 outColor;
+
+void main() {
+    outColor = u_colormat * texture(texSampler, vec3(fragTexCoord, float(u_frame)));
+}

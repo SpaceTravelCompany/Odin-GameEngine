@@ -27,53 +27,51 @@ when !library.is_android {
 @(private="file") glfw_monitors:[dynamic]glfw.MonitorHandle
 
 glfw_start :: proc(_screen_idx: int) {
-	when !is_console {
-		//?default screen idx 0
-		if __window_width == nil do __window_width = int((monitors[0].rect.right - monitors[0].rect.left) / 2)
-		if __window_height == nil do __window_height = int(abs(monitors[0].rect.bottom - monitors[0].rect.top) / 2)
-		if __window_x == nil do __window_x = int(monitors[0].rect.left + (monitors[0].rect.right - monitors[0].rect.left) / 4)
-		if __window_y == nil do __window_y = int(monitors[0].rect.top + abs(monitors[0].rect.bottom - monitors[0].rect.top) / 4)
+	//?default screen idx 0
+	if __window_width == nil do __window_width = int((monitors[0].rect.right - monitors[0].rect.left) / 2)
+	if __window_height == nil do __window_height = int(abs(monitors[0].rect.bottom - monitors[0].rect.top) / 2)
+	if __window_x == nil do __window_x = int(monitors[0].rect.left + (monitors[0].rect.right - monitors[0].rect.left) / 4)
+	if __window_y == nil do __window_y = int(monitors[0].rect.top + abs(monitors[0].rect.bottom - monitors[0].rect.top) / 4)
 
-		save_prev_window()
-		__screen_idx := _screen_idx
-		if len(monitors) - 1 < __screen_idx {
-			__screen_idx = 0
-		}
+	save_prev_window()
+	__screen_idx := _screen_idx
+	if len(monitors) - 1 < __screen_idx {
+		__screen_idx = 0
+	}
 
-		//? change use glfw.SetWindowAttrib()
-		if __screen_mode == .Fullscreen {
-			when ODIN_OS == .Windows {
-				glfw.WindowHint(glfw.DECORATED, glfw.FALSE)
-				glfw.WindowHint(glfw.FLOATING, glfw.TRUE)//미리 속성 지정한 뒤 생성
+	//? change use glfw.SetWindowAttrib()
+	if __screen_mode == .Fullscreen {
+		when ODIN_OS == .Windows {
+			glfw.WindowHint(glfw.DECORATED, glfw.FALSE)
+			glfw.WindowHint(glfw.FLOATING, glfw.TRUE)//미리 속성 지정한 뒤 생성
 
-				wnd = glfw.CreateWindow(monitors[__screen_idx].rect.right - monitors[__screen_idx].rect.left,
-					abs(monitors[__screen_idx].rect.bottom - monitors[__screen_idx].rect.top),
-					__window_title,
-					nil,
-					nil)
-			} else {
-				wnd = glfw.CreateWindow(monitors[__screen_idx].rect.right - monitors[__screen_idx].rect.left,
-					abs(monitors[__screen_idx].rect.bottom - monitors[__screen_idx].rect.top),
-					__window_title,
-					glfw_monitors[__screen_idx],
-					nil)
-			}	
-
-			__window_x = int(monitors[__screen_idx].rect.left)
-			__window_y = int(monitors[__screen_idx].rect.top)
-			__window_width = int(monitors[__screen_idx].rect.right - monitors[__screen_idx].rect.left)
-			__window_height = int(abs(monitors[__screen_idx].rect.bottom - monitors[__screen_idx].rect.top))
-		} else {
-			wnd = glfw.CreateWindow(auto_cast __window_width.?,
-				auto_cast __window_height.?,
+			wnd = glfw.CreateWindow(monitors[__screen_idx].rect.right - monitors[__screen_idx].rect.left,
+				abs(monitors[__screen_idx].rect.bottom - monitors[__screen_idx].rect.top),
 				__window_title,
 				nil,
 				nil)
-		}
-		glfw.SetWindowPos(wnd, auto_cast __window_x.?, auto_cast __window_y.?)
+		} else {
+			wnd = glfw.CreateWindow(monitors[__screen_idx].rect.right - monitors[__screen_idx].rect.left,
+				abs(monitors[__screen_idx].rect.bottom - monitors[__screen_idx].rect.top),
+				__window_title,
+				glfw_monitors[__screen_idx],
+				nil)
+		}	
 
-		//CreateRenderFuncThread()
+		__window_x = int(monitors[__screen_idx].rect.left)
+		__window_y = int(monitors[__screen_idx].rect.top)
+		__window_width = int(monitors[__screen_idx].rect.right - monitors[__screen_idx].rect.left)
+		__window_height = int(abs(monitors[__screen_idx].rect.bottom - monitors[__screen_idx].rect.top))
+	} else {
+		wnd = glfw.CreateWindow(auto_cast __window_width.?,
+			auto_cast __window_height.?,
+			__window_title,
+			nil,
+			nil)
 	}
+	glfw.SetWindowPos(wnd, auto_cast __window_x.?, auto_cast __window_y.?)
+
+	//CreateRenderFuncThread()
 }
 
 when ODIN_OS == .Windows {
@@ -268,18 +266,17 @@ glfw_system_start :: proc() {
 		} else if event == glfw.DISCONNECTED {
 			for m, i in glfw_monitors {
 				if m == monitor {
-					when !is_console {
-						log.infof(
-							"SYSLOG : DEL %s monitor name: %s, x:%d, y:%d, size.x:%d, size.y:%d, refleshrate%d\n",
-							"primary" if monitors[i].is_primary else "",
-							monitors[i].name,
-							monitors[i].rect.left,
-							monitors[i].rect.top,
-							monitors[i].rect.right - monitors[i].rect.left,
-							abs(monitors[i].rect.top - monitors[i].rect.bottom),
-							monitors[i].refresh_rate,
-						)
-					}
+					log.infof(
+						"SYSLOG : DEL %s monitor name: %s, x:%d, y:%d, size.x:%d, size.y:%d, refleshrate%d\n",
+						"primary" if monitors[i].is_primary else "",
+						monitors[i].name,
+						monitors[i].rect.left,
+						monitors[i].rect.top,
+						monitors[i].rect.right - monitors[i].rect.left,
+						abs(monitors[i].rect.top - monitors[i].rect.bottom),
+						monitors[i].refresh_rate,
+					)
+
 					ordered_remove(&glfw_monitors, i)
 					ordered_remove(&monitors, i)
 					break
@@ -299,10 +296,8 @@ glfw_system_start :: proc() {
 }
 
 glfw_destroy :: proc "contextless" () {
-	when !is_console {
-		if wnd != nil do glfw.SetWindowShouldClose(wnd, true)
-		//!glfw.DestroyWindow(wnd) 를 쓰지 않는다 왜냐하면 윈도우만 종료되고 윈도우 루프를 빠져나가지 않는다.
-	}
+	if wnd != nil do glfw.SetWindowShouldClose(wnd, true)
+	//!glfw.DestroyWindow(wnd) 를 쓰지 않는다 왜냐하면 윈도우만 종료되고 윈도우 루프를 빠져나가지 않는다.
 }
 
 glfw_system_destroy :: proc() {

@@ -35,6 +35,8 @@ x86_64-linux-gnu
 riscv64-linux-gnu
 */
 main :: proc() {
+	defer free_all(context.temp_allocator)
+
 	json_data:json.Value
 	ok :bool
 
@@ -55,15 +57,6 @@ main :: proc() {
 	}
 	if is_web && is_android do fmt.panicf("is-web and is-android cannot be true at the same time")
 
-	non_web_graphics_api :string = "vulkan"
-	if "non-web-graphics-api" in setting {
-		non_web_graphics_api = setting["non-web-graphics-api"].(json.String)
-	}
-	web_graphics_api :string = "webgl"
-	if "web-graphics-api" in setting {
-		web_graphics_api = setting["web-graphics-api"].(json.String)
-	}
-
 	// Sets the optimization mode for compilation.
 	// Available options:
 	// 		-o:none
@@ -81,8 +74,6 @@ main :: proc() {
 	} else {
 		o = strings.join({"-o:", setting["build-type"].(json.String)}, "", context.temp_allocator)
 	}
-	defer free_all(	context.temp_allocator)
-
 	//if !findGLSLFileAndRunCmd() do return
 
 	if is_android {
@@ -193,7 +184,6 @@ main :: proc() {
 			target,
 			"-subtarget:android",
 			//"-show-debug-messages",//!for debug
-			strings.join({"-define:NON_WEB_GRAPHICS_API=", non_web_graphics_api}, "", context.temp_allocator),
 			}) {
 				return
 			}
@@ -242,7 +232,6 @@ main :: proc() {
 		"-target:js_wasm32",
 		"-debug" if debug else ({}),
 		//"-show-debug-messages",//!for debug
-		strings.join({"-define:WEB_GRAPHICS_API=", web_graphics_api}, "", context.temp_allocator),
 		fmt.tprintf("-extra-linker-flags:\"--export-table --import-memory --initial-memory=%d --max-memory=%d\"", 
 		INITIAL_MEMORY_BYTES, MAX_MEMORY_BYTES),
 		//"-sanitize:address" if debug else ({}),
@@ -271,17 +260,12 @@ main :: proc() {
 		}
 
 		when ODIN_OS == .Windows {
-			out_path := strings.join({"-out:", setting["out-path"].(json.String), ".exe"}, "")
+			out_path := strings.join({"-out:", setting["out-path"].(json.String), ".exe"}, "", context.temp_allocator)
 		} else {
-			out_path := strings.join({"-out:", setting["out-path"].(json.String)}, "")
+			out_path := strings.join({"-out:", setting["out-path"].(json.String)}, "", context.temp_allocator)
 		}
-		defer delete(out_path)
 		
 		resource :Maybe(string) = nil
-		console := false
-		if "is-console" in setting {
-			console = setting["is-console"].(json.Boolean)
-		}
 		when ODIN_OS == .Windows {
 			if "resource" in setting {
 				resource = strings.join({"-resource:",setting["resource"].(json.String)}, "", context.temp_allocator)
@@ -298,16 +282,12 @@ main :: proc() {
 		"-debug" if debug else ({}),
 		//"-show-debug-messages",//!for debug
 		resource.? if resource != nil else ({}),
-		"-define:CONSOLE=true" if console else "-define:CONSOLE=false",
-		("-subsystem:console" if console else "-subsystem:windows") if ODIN_OS == .Windows else ({}),
-		strings.join({"-define:NON_WEB_GRAPHICS_API=", non_web_graphics_api}, "", context.temp_allocator),
+		"-subsystem:windows" if ODIN_OS == .Windows else ({}),
 		//"-sanitize:address" if debug else ({}),
 		}) {
 			return
 		}
 	}
-
-	free_all(context.temp_allocator)
 }
 
 // findGLSLFileAndRunCmd :: proc() -> bool {

@@ -262,30 +262,26 @@ get_nearest_sampler :: #force_inline proc "contextless" () -> vk.Sampler {
 
 @private graphics_init :: #force_inline proc() {
 	when IS_WEB {
-		when WEB_GRAPHICS_API == "webgl" {
-			webgl_start()
-		} else when WEB_GRAPHICS_API == "webgpu" {
-			#panic("Unsupported graphics API: " + WEB_GRAPHICS_API)
-		} else {
-			#panic("Unsupported graphics API: " + WEB_GRAPHICS_API)
-		}
+		webgl_start()
 	} else {
-		when NON_WEB_GRAPHICS_API == "vulkan" {
-			_ = pool.init(&gBufferPool, "self", ) 
-			_ = pool.init(&gTexturePool, "self", )
-			vk_start()
-		} else when NON_WEB_GRAPHICS_API == "opengl" {
-			//opengl_start()
-			#panic("Unsupported graphics API: " + NON_WEB_GRAPHICS_API)
-		} else {
-			#panic("Unsupported graphics API: " + NON_WEB_GRAPHICS_API)
+		if !vk_start() {
+			//TODO start OpenGL
+			log.panic("Failed to initialize Vulkan\n")
 		}
 	}
 
 }
 
 @private graphics_destroy :: #force_inline proc() {
-	vk_destroy()
+	when IS_WEB {
+		webgl_destroy()
+	} else {
+		if vulkan_version.major > 0 {
+			vk_destroy()
+		} else {
+			//TODO Destroy OpenGL
+		}
+	}
 }
 
 @private graphics_draw_frame :: #force_inline proc() {

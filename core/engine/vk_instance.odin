@@ -40,16 +40,20 @@ vk_debug_callback :: proc "system" (
 // Instance Creation
 // ============================================================================
 
-vk_create_instance :: proc() {
+load_and_check_vulkan_support :: proc() -> bool {
+	when IS_WEB {
+		return false
+	}
+
 	ok: bool
 	when ODIN_OS == .Windows {
 		vk_library, ok = dynlib.load_library("vulkan-1.dll")
-		if !ok do log.panicf(" vk_library, ok = dynlib.load_library(\"vulkan-1.dll\")\n")
+		if !ok do return false
 	} else {
 		vk_library, ok = dynlib.load_library("libvulkan.so.1")
 		if !ok {
 			vk_library, ok = dynlib.load_library("libvulkan.so")
-			if !ok do log.panicf(" vk_library, ok = dynlib.load_library(\"libvulkan.so\")\n")
+			if !ok do return false
 		}
 	}
 	rawFunc: rawptr
@@ -58,6 +62,10 @@ vk_create_instance :: proc() {
 	vk_get_instance_proc_addr = auto_cast rawFunc
 	vk.load_proc_addresses_global(rawFunc)
 
+	return vk.CreateInstance != nil
+}
+
+vk_create_instance :: proc() {
 	appInfo := vk.ApplicationInfo {
 		apiVersion         = vk.API_VERSION_1_4,
 		engineVersion      = vk.MAKE_VERSION(1, 0, 0),

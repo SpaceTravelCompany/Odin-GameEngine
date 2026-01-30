@@ -461,7 +461,7 @@ when library.is_android {
 				ident = android.ALooper_pollAll(!__paused ? 0 : -1, nil, &events, cast(^rawptr)&source)
 			}
 
-			if (!__paused && app_inited) {
+			if (app_inited) {
 				render_loop()
 			}
 		}

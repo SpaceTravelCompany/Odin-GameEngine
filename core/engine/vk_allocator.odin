@@ -100,8 +100,7 @@ vk_allocator_init :: proc() {
 	gVkMemIdxCnts = mem.make_non_zeroed([]int, vk_physical_mem_prop.memoryTypeCount, vk_def_allocator())
 	mem.zero_slice(gVkMemIdxCnts)
 
-	// Thread initialization: create command pool for each thread
-	vk_thread_init_proc :: proc(thread: ^thread.Thread, user_data: rawptr) {
+	__init :: proc() {
 		cmdPoolInfo := vk.CommandPoolCreateInfo {
 			sType            = vk.StructureType.COMMAND_POOL_CREATE_INFO,
 			flags = {},
@@ -122,8 +121,14 @@ vk_allocator_init :: proc() {
 			commandPool        = thread_cmdPool,
 		}
 		res = vk.AllocateCommandBuffers(vk_device, &cmdAllocInfo, &thread_cmd)
-		if res != .SUCCESS do log.panicf("vk.AllocateCommandBuffers failed: %s\n", res)
+		if res != .SUCCESS do log.panicf("vk.AllocateCommandBuffers failed: %s\n", res)	
 	}
+
+	// Thread initialization: create command pool for each thread
+	vk_thread_init_proc :: proc(thread: ^thread.Thread, user_data: rawptr) {
+		__init()
+	}
+	__init()
 
 	// Thread finalization: destroy command pool for each thread
 	vk_thread_fini_proc :: proc(thread: ^thread.Thread, user_data: rawptr) {
@@ -150,6 +155,9 @@ vk_allocator_destroy :: proc() {
 	thread.pool_wait_all(&vk_allocator_thread_pool)
 	thread.pool_join(&vk_allocator_thread_pool)
 	thread.pool_destroy(&vk_allocator_thread_pool)
+
+	vk.DestroyCommandPool(vk_device, thread_cmdPool, nil)
+	vk.DestroyFence(vk_device, vk_allocator_fence, nil)
 
 	for b in gVkMemBufs {
 		vk_mem_buffer_Deinit2(b)
@@ -209,7 +217,14 @@ vk_op_execute :: proc() {
 	thread.pool_add_task(&vk_allocator_thread_pool, vk_def_allocator(), vk_exec_gpu_commands_task, opExecQueue)
 }
 
+test_mtx:sync.Mutex
+
 __vk_op_execute_in :: proc() -> ^[dynamic]OpNode {
+	if !sync.mutex_try_lock(&test_mtx) {
+		runtime.debug_trap()
+	}
+	defer sync.mutex_unlock(&test_mtx)
+
 	sync.atomic_mutex_lock(&gQueueMtx)
 	if len(opQueue) == 0 {
 		sync.atomic_mutex_unlock(&gQueueMtx)

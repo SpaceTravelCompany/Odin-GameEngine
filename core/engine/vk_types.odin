@@ -1,10 +1,8 @@
 #+private
 package engine
 
-import "base:library"
-import "base:runtime"
+
 import "core:dynlib"
-import "core:mem"
 import "core:sync"
 import vk "vendor:vulkan"
 

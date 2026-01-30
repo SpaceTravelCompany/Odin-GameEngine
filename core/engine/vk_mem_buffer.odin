@@ -30,7 +30,9 @@ vk_mem_buffer_Init :: proc(
 	}
 	success: bool
 	memBuf.allocateInfo.memoryTypeIndex, success = vk_find_mem_type(typeFilter, memProp)
-	if !success do return nil
+	if !success {
+		return nil
+	} 
 
 	if memBuf.cache {
 		memBuf.allocateInfo.allocationSize = math.ceil_up(len * cellSize, vk_non_coherent_atom_size)
@@ -38,7 +40,9 @@ vk_mem_buffer_Init :: proc(
 	}
 
 	res := vk.AllocateMemory(vk_device, &memBuf.allocateInfo, nil, &memBuf.deviceMem)
-	if res != .SUCCESS do return nil
+	if res != .SUCCESS {
+		return nil
+	}
 
 	list.push_back(&memBuf.list, auto_cast new(vk_mem_buffer_node, vk_def_allocator()))
 	((^vk_mem_buffer_node)(memBuf.list.head)).free = true
@@ -331,6 +335,7 @@ vk_mem_buffer_CreateFromResource :: proc(
 				BLKSize = vkMemBlockLen
 				memBufT = _Init(BLKSize, maxSize_, memRequire, memProp_)
 				if memBufT == nil do log.panic("memBufT == nil\n")
+				memBuf = new(vk_mem_buffer, vk_def_allocator())
 				memBuf^ = memBufT.?
 			}
 		} else {

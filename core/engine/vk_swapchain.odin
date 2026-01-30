@@ -240,7 +240,7 @@ vk_create_swap_chain_and_image_views :: proc() -> bool {
 
 	res := vk.CreateSwapchainKHR(vk_device, &swapChainCreateInfo, nil, &vk_swapchain)
 	if res != .SUCCESS {
-		return false
+		log.panicf("res = vk.CreateSwapchainKHR(vk_device, &swapChainCreateInfo, nil, &vk_swapchain) : %s\n", res)
 	}
 
 	vk.GetSwapchainImagesKHR(vk_device, vk_swapchain, &swap_img_cnt, nil)
@@ -321,14 +321,20 @@ vk_create_swap_chain_and_image_views :: proc() -> bool {
 // ============================================================================
 
 vk_recreate_swap_chain :: proc() {
-	if vk_device == nil || vk_swapchain == 0 {
+	if vk_device == nil {
 		return
+	}
+	for 0 < thread.pool_num_outstanding(&vk_allocator_thread_pool) {
+		thread.yield()
 	}
 	sync.mutex_lock(&full_screen_mtx)
 
 	vk_release_full_screen_ex()
 
 	vk_wait_device_idle()
+	vk_op_execute_no_async()
+	vk_destroy_resources(true)
+	
 
 	when library.is_android {//? ANDROID ONLY
 		vulkan_android_start()

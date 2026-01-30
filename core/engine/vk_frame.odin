@@ -187,14 +187,15 @@ vk_frame: int = 0
 vk_draw_frame :: proc() {
 	sync.mutex_lock(&__g_layer_mtx)
 	defer sync.mutex_unlock(&__g_layer_mtx)
-	graphics_execute_ops()
 
-	if vk_swapchain == 0 do return
 	if vk_extent.width <= 0 || vk_extent.height <= 0 {
 		vk_recreate_swap_chain()
 		vk_frame = 0
 		return
 	}
+
+	graphics_execute_ops()
+	
 
 	res := vk.WaitForFences(vk_device, 1, &vk_in_flight_fence[vk_frame], true, max(u64))
 	if res != .SUCCESS do log.panicf("WaitForFences : %s\n", res)

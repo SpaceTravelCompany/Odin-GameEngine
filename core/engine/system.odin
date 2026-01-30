@@ -24,10 +24,7 @@ get_processor_core_len :: #force_inline proc "contextless" () -> int { return pr
 
 is_android :: ODIN_PLATFORM_SUBTARGET == .Android
 is_mobile :: is_android
-is_console :: #config(CONSOLE, false)
 
-NON_WEB_GRAPHICS_API :: #config(NON_WEB_GRAPHICS_API, "vulkan")//Vulkan or OpenGL
-WEB_GRAPHICS_API :: #config(WEB_GRAPHICS_API, "webgl")//WebGL or WebGPU
 IS_WEB :: ODIN_OS == .JS
 
 init: #type proc()
@@ -117,18 +114,13 @@ engine_main :: proc(
 
 	__window_title = window_title
 	when is_android {
-		when is_console {
-			log.panic("Console mode is not supported on Android.\n")
-		}
 		__window_x = 0
 		__window_y = 0
 	} else {
-		when !is_console {
-			__window_x = window_x
-			__window_y = window_y
-			__window_width = window_width
-			__window_height = window_height
-		}
+		__window_x = window_x
+		__window_y = window_y
+		__window_width = window_width
+		__window_height = window_height
 	}
 	__v_sync = v_sync
 	__screen_mode = screen_mode
@@ -138,36 +130,32 @@ engine_main :: proc(
 		thread.pool_start(&g_thread_pool)
 		android_start()
 	} else {
-		when is_console {
-			init()
-			destroy()
-			system_destroy()
-			system_after_destroy()
-		} else {
-			thread.pool_init(&g_thread_pool, context.allocator, get_processor_core_len())
-			thread.pool_start(&g_thread_pool)
-			window_start(screen_idx)
+		thread.pool_init(&g_thread_pool, context.allocator, get_processor_core_len())
+		thread.pool_start(&g_thread_pool)
+		window_start(screen_idx)
 
-			graphics_init()
+		graphics_init()
 
-			init()
+		init()
 
+		//if is web, main loop and destroy are handled by 'step' and '_end'
+		when !IS_WEB {
 			for !__exiting {
 				system_loop()
 			}
-
-			graphics_wait_device_idle()
-			destroy()
-
-			graphics_destroy()
-
-			system_destroy()
-
-			system_after_destroy()
+			__destroy()
 		}
 	}
 }
 
+
+@private __destroy :: proc() {
+	graphics_wait_device_idle()
+	destroy()
+	graphics_destroy()
+	system_destroy()
+	system_after_destroy()
+}
 
 @private system_start :: #force_inline proc() {
 	main_thread_id = sync.current_thread_id()
@@ -182,10 +170,8 @@ engine_main :: proc(
 
 @private system_after_destroy :: #force_inline proc() {
 	delete(monitors)
-	when !is_console {
-		thread.pool_join(&g_thread_pool)
-		thread.pool_destroy(&g_thread_pool)
-	}
+	thread.pool_join(&g_thread_pool)
+	thread.pool_destroy(&g_thread_pool)
 }
 
 
@@ -264,31 +250,34 @@ close :: proc "contextless" () {
 }
 
 @private calc_frame_time :: proc(paused_: bool) {
-	@static start: time.Time
-	@static now: time.Time
+	//delta time calc in web is handled by step(odin.js)
+	when !IS_WEB {
+		@static start: time.Time
+		@static now: time.Time
 
-	if !loop_start {
-		loop_start = true
-		start = time.now()
-		now = start
-	} else {
-		max_frame_ := get_max_frame()
-		if paused_ && max_frame_ == 0 {
-			max_frame_ = 60
-		}
-		n := time.now()
-		delta := n._nsec - now._nsec
-
-		if max_frame_ > 0 {
-			max_f := u64(1 * (1 / max_frame_)) * 1000000000
-			if max_f > auto_cast delta {
-				time.sleep(auto_cast (i64(max_f) - delta))
-				n = time.now()
-				delta = n._nsec - now._nsec
+		if !loop_start {
+			loop_start = true
+			start = time.now()
+			now = start
+		} else {
+			max_frame_ := get_max_frame()
+			if paused_ && max_frame_ == 0 {
+				max_frame_ = 60
 			}
+			n := time.now()
+			delta := n._nsec - now._nsec
+
+			if max_frame_ > 0 {
+				max_f := u64(1 * (1 / max_frame_)) * 1000000000
+				if max_f > auto_cast delta {
+					time.sleep(auto_cast (i64(max_f) - delta))
+					n = time.now()
+					delta = n._nsec - now._nsec
+				}
+			}
+			now = n
+			delta_time = auto_cast delta
 		}
-		now = n
-		delta_time = auto_cast delta
 	}
 }
 
@@ -319,10 +308,7 @@ close :: proc "contextless" () {
 		}
 		thread.pool_wait_all(&g_thread_pool)
 	}
-
-	if !paused_ {
-		graphics_draw_frame()
-	}
+	graphics_draw_frame()
 }
 
 /*
@@ -404,3 +390,13 @@ is_main_thread :: #force_inline proc "contextless" () -> bool {
 	return sync.current_thread_id() == main_thread_id
 }
 
+when IS_WEB {
+	@(export) step :: proc(dt: f64) -> bool {
+		delta_time = u64(dt * 1000000000.0)
+		render_loop()
+		return !__exiting
+	}
+	@(export) _end :: proc() {
+		__destroy()
+	}
+}
