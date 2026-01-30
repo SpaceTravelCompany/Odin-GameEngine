@@ -1022,7 +1022,7 @@ shapes_compute_polygon :: proc(poly:^shapes, allocator := context.allocator) -> 
 				// Convert CurveStruct points back to shape_lines (closed polygon)
 				points_to_shape_lines :: proc(points: []CurveStruct, out_lines: ^[dynamic]shape_line) {
 					points_len := len(points)
-					if points_len < 2 do return
+					if points_len < 3 do return
 					
 					// Helper to get point with wrap-around for closed polygon
 					get_point :: proc(pts: []CurveStruct, idx: int) -> CurveStruct {

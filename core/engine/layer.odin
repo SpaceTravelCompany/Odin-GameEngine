@@ -74,8 +74,8 @@ layer_deinit :: proc(cmd: ^layer) {
     free_command_buffers(&cmd.cmd[0], MAX_FRAMES_IN_FLIGHT, cmd.cmd_pool)
 
     sync.mutex_lock(&__g_layer_mtx)
-    for cmd, i in __g_layer {
-        if cmd == cmd {
+    for layer_cmd, i in __g_layer {
+        if layer_cmd == cmd {
             ordered_remove(&__g_layer, i)
             break
         }
