@@ -8,6 +8,7 @@ import "core:mem/virtual"
 import "core:sync"
 import "core:thread"
 import vk "vendor:vulkan"
+import "core:mem/tlsf"
 
 
 // ============================================================================
@@ -250,3 +251,6 @@ gNonInsertedUniforms: [dynamic]vk_temp_uniform_struct
 
 gVkMemBufs: [dynamic]^vk_mem_buffer
 gVkMemIdxCnts: []int
+
+gVkMemTlsfAllocator: runtime.Allocator
+gVkMemTlsf: tlsf.Allocator

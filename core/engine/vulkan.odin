@@ -6,7 +6,8 @@ import "core:sync"
 import vk "vendor:vulkan"
 import "core:log"
 import "core:container/pool"
-
+import "core:mem/tlsf"
+import "core:mem"
 
 // ============================================================================
 // Public API - Start & Destroy
@@ -15,9 +16,13 @@ import "core:container/pool"
 vk_start :: proc() -> bool {
 	if !load_and_check_vulkan_support() do return false
 
-	_ = pool.init(&gBufferPool, "self") 
-	_ = pool.init(&gTexturePool, "self")
-	
+	_ = pool.init(&gBufferPool, "self", mem.Megabyte * 4) 
+	_ = pool.init(&gTexturePool, "self", mem.Megabyte * 4)
+	_ = tlsf.init_from_allocator(&__graphics_tlsf, context.allocator, mem.Megabyte * 8, mem.Megabyte * 8)
+	__graphics_tlsf_allocator = tlsf.allocator(&__graphics_tlsf)
+
+	gMapResource = make_map(map[rawptr][dynamic]union_resource, __graphics_tlsf_allocator)
+
 	vk_create_instance()
 	vk_create_surface()
 	vk_select_physical_device()
@@ -101,6 +106,10 @@ vk_destroy :: proc() {
 	vk.DestroyInstance(vk_instance, nil)
 
 	dynlib.unload_library(vk_library)
+
+	tlsf.destroy(&__graphics_tlsf)
+	pool.destroy(&gBufferPool)
+	pool.destroy(&gTexturePool)
 }
 
 

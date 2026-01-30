@@ -75,7 +75,7 @@ create_new_uniform_buffer :: proc(
 	g^ = {
 		max_size = max(vkUniformSizeBlock, all_size),
 		size     = all_size,
-		uniforms = mem.make_non_zeroed_dynamic_array([dynamic]^buffer_resource, vk_def_allocator()),
+		uniforms = mem.make_non_zeroed_dynamic_array([dynamic]^buffer_resource, gVkMemTlsfAllocator),
 	}
 
 	bufInfo: vk.BufferCreateInfo = {

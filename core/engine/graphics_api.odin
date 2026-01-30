@@ -12,6 +12,7 @@ import "core:sync"
 import "vendor:glslang"
 import "core:container/pool"
 import "core:log"
+import "core:mem/tlsf"
 
 import vk "vendor:vulkan"
 
@@ -926,7 +927,7 @@ animate_img_descriptor_set_layout :: proc() -> vk.DescriptorSetLayout {
 	res = pool.get(&gBufferPool)
 	
 	if self not_in gMapResource {
-		map_insert(&gMapResource, self, make([dynamic]union_resource, vk_def_allocator()))
+		map_insert(&gMapResource, self, make([dynamic]union_resource, __graphics_tlsf_allocator))
 	}
 	append(&gMapResource[self], res)
 	return res
@@ -940,7 +941,7 @@ animate_img_descriptor_set_layout :: proc() -> vk.DescriptorSetLayout {
 	res = pool.get(&gTexturePool)
 	
 	if self not_in gMapResource {
-		map_insert(&gMapResource, self, make([dynamic]union_resource, vk_def_allocator()))
+		map_insert(&gMapResource, self, make([dynamic]union_resource, __graphics_tlsf_allocator))
 	}
 	append(&gMapResource[self], res)
 	return res
@@ -1005,6 +1006,9 @@ graphics_get_resource_draw :: proc "contextless" (self: rawptr) -> union_resourc
 @private gMapResourceMtx: sync.Mutex
 @private gBufferPool: pool.Pool(buffer_resource)
 @private gTexturePool: pool.Pool(texture_resource)
+
+@private __graphics_tlsf : tlsf.Allocator
+@private __graphics_tlsf_allocator : runtime.Allocator
 
 //!DO NOT CALL THIS FROM WITHIN ENGINE CALLBACKS
 render_lock :: proc "contextless" () {

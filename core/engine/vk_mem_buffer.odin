@@ -44,7 +44,7 @@ vk_mem_buffer_Init :: proc(
 		return nil
 	}
 
-	list.push_back(&memBuf.list, auto_cast new(vk_mem_buffer_node, vk_def_allocator()))
+	list.push_back(&memBuf.list, auto_cast new(vk_mem_buffer_node, gVkMemTlsfAllocator))
 	((^vk_mem_buffer_node)(memBuf.list.head)).free = true
 	((^vk_mem_buffer_node)(memBuf.list.head)).size = memBuf.len
 	((^vk_mem_buffer_node)(memBuf.list.head)).idx = 0
@@ -85,9 +85,9 @@ vk_mem_buffer_Deinit2 :: proc(self: ^vk_mem_buffer) {
 		for n = self.list.head; n.next != nil; {
 			tmp := n
 			n = n.next
-			free(tmp, vk_def_allocator())
+			free(tmp, gVkMemTlsfAllocator)
 		}
-		free(n, vk_def_allocator())
+		free(n, gVkMemTlsfAllocator)
 		self.list.head = nil
 		self.list.tail = nil
 	}
@@ -102,7 +102,7 @@ vk_mem_buffer_Deinit :: proc(self: ^vk_mem_buffer) {
 	}
 	if !self.single do gVkMemIdxCnts[self.allocateInfo.memoryTypeIndex] -= 1
 	vk_mem_buffer_Deinit2(self)
-	free(self, vk_def_allocator())
+	free(self, gVkMemTlsfAllocator)
 }
 
 
@@ -146,7 +146,7 @@ vk_mem_buffer_BindBufferNode :: proc(
 	curNext: ^vk_mem_buffer_node = auto_cast (cur.node.next if cur.node.next != nil else self.list.head)
 	if cur == curNext { // only one item on list
 		if remain > 0 {
-			list.push_back(&self.list, auto_cast new(vk_mem_buffer_node, vk_def_allocator()))
+			list.push_back(&self.list, auto_cast new(vk_mem_buffer_node, gVkMemTlsfAllocator))
 			tail: ^vk_mem_buffer_node = auto_cast self.list.tail
 			tail.free = true
 			tail.size = remain
@@ -155,7 +155,7 @@ vk_mem_buffer_BindBufferNode :: proc(
 	} else {
 		if remain > 0 {
 			if !curNext.free || curNext.idx < cur.idx {
-				list.insert_after(&self.list, auto_cast cur, auto_cast new(vk_mem_buffer_node, vk_def_allocator()))
+				list.insert_after(&self.list, auto_cast cur, auto_cast new(vk_mem_buffer_node, gVkMemTlsfAllocator))
 				next: ^vk_mem_buffer_node = auto_cast cur.node.next
 				next.free = true
 				next.idx = cur.idx + cellCnt
@@ -195,7 +195,7 @@ vk_mem_buffer_UnBindBufferNode :: proc(
 			range_.size += next.size
 			next_ = next.node.next
 			list.remove(&self.list, auto_cast next)
-			free(next, vk_def_allocator())
+			free(next, gVkMemTlsfAllocator)
 		} else {
 			break
 		}
@@ -209,7 +209,7 @@ vk_mem_buffer_UnBindBufferNode :: proc(
 			range_.idx -= prev.size
 			prev_ = prev.node.prev
 			list.remove(&self.list, auto_cast prev)
-			free(prev, vk_def_allocator())
+			free(prev, gVkMemTlsfAllocator)
 		} else {
 			break
 		}
@@ -228,7 +228,7 @@ vk_mem_buffer_UnBindBufferNode :: proc(
 		}
 	}
 	if self.list.head == nil { //?always self.list.head not nil
-		list.push_back(&self.list, auto_cast new(vk_mem_buffer_node, vk_def_allocator()))
+		list.push_back(&self.list, auto_cast new(vk_mem_buffer_node, gVkMemTlsfAllocator))
 		((^vk_mem_buffer_node)(self.list.head)).free = true
 		((^vk_mem_buffer_node)(self.list.head)).size = self.len
 		((^vk_mem_buffer_node)(self.list.head)).idx = 0
@@ -313,29 +313,35 @@ vk_mem_buffer_CreateFromResource :: proc(
 	}
 
 	if memBuf == nil {
-		memBuf = new(vk_mem_buffer, vk_def_allocator())
+		memBuf = new(vk_mem_buffer, gVkMemTlsfAllocator)
 
-		memFlag := vk.MemoryPropertyFlags{.HOST_VISIBLE, .DEVICE_LOCAL}
-		BLKSize := vkMemSpcialBlockLen if memProp_ >= memFlag else vkMemBlockLen
+		BLKSize := vkMemSpcialBlockLen if memProp_ >= vk.MemoryPropertyFlags{.HOST_VISIBLE, .DEVICE_LOCAL} else vkMemBlockLen
 		memBufT := _Init(BLKSize, maxSize_, memRequire, memProp_)
 
 		if memBufT == nil {
-			free(memBuf, vk_def_allocator())
+			free(memBuf, gVkMemTlsfAllocator)
 			memBuf = nil
 
-			memProp_ = {.HOST_VISIBLE, .HOST_CACHED}
 			for b in gVkMemBufs {
 				if b.cellSize != memRequire.alignment do continue
-				memType, ok := vk_find_mem_type(memRequire.memoryTypeBits, memProp_)
+				memType, ok := vk_find_mem_type(memRequire.memoryTypeBits,  {.HOST_VISIBLE, .HOST_CACHED})
 				if !ok do log.panic("vk_find_mem_type\n")
 				if !_BindBufferNode(b, memType, vkResource, cellCnt, outIdx, &memBuf) do continue
 				break
 			}
 			if memBuf == nil {
 				BLKSize = vkMemBlockLen
-				memBufT = _Init(BLKSize, maxSize_, memRequire, memProp_)
-				if memBufT == nil do log.panic("memBufT == nil\n")
-				memBuf = new(vk_mem_buffer, vk_def_allocator())
+				memBufT = _Init(BLKSize, maxSize_, memRequire,  {.HOST_VISIBLE, .HOST_CACHED})
+				if memBufT == nil {
+					memBufT = _Init(maxSize_, maxSize_, memRequire, memProp_)//원본 사이즈로 할당 재 시도
+					if memBufT == nil {
+						memBufT = _Init(maxSize_, maxSize_, memRequire, {.HOST_VISIBLE, .HOST_CACHED})//원본 사이즈로 할당 재 시도
+						if memBufT == nil {
+							log.panic("memBufT == nil\n")
+						}
+					}
+				}
+				memBuf = new(vk_mem_buffer, gVkMemTlsfAllocator)
 				memBuf^ = memBufT.?
 			}
 		} else {
@@ -359,7 +365,7 @@ vk_mem_buffer_CreateFromResourceSingle :: proc(vkResource: $T) -> (memBuf: ^vk_m
 		vk.GetImageMemoryRequirements(vk_device, vkResource, &memRequire)
 	}
 
-	memBuf = new(vk_mem_buffer, vk_def_allocator())
+	memBuf = new(vk_mem_buffer, gVkMemTlsfAllocator)
 	outMemBuf := vk_mem_buffer_InitSingle(memRequire.size, memRequire.memoryTypeBits)
 	memBuf^ = outMemBuf.?
 

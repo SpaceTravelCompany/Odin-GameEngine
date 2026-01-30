@@ -10,6 +10,7 @@ import "core:thread"
 import "core:fmt"
 import vk "vendor:vulkan"
 import "core:log"
+import "core:mem/tlsf"
 
 
 // ============================================================================
@@ -90,12 +91,15 @@ vk_init_block_len :: proc() {
 	gVkMinUniformBufferOffsetAlignment = vk_physical_prop.limits.minUniformBufferOffsetAlignment
 }
 
+
 vk_allocator_init :: proc() {
 	__vk_def_allocator = context.allocator
+	_ = tlsf.init_from_allocator(&gVkMemTlsf, context.allocator, mem.Megabyte * 8, mem.Megabyte * 8)
+	gVkMemTlsfAllocator = tlsf.allocator(&gVkMemTlsf)
 
-	gVkMemBufs = mem.make_non_zeroed([dynamic]^vk_mem_buffer, vk_def_allocator())
+	gVkMemBufs = mem.make_non_zeroed([dynamic]^vk_mem_buffer, gVkMemTlsfAllocator)
 
-	gVkMemIdxCnts = mem.make_non_zeroed([]int, vk_physical_mem_prop.memoryTypeCount, vk_def_allocator())
+	gVkMemIdxCnts = mem.make_non_zeroed([]int, vk_physical_mem_prop.memoryTypeCount, gVkMemTlsfAllocator)
 	mem.zero_slice(gVkMemIdxCnts)
 
 	__init :: proc() {
@@ -140,11 +144,9 @@ vk_allocator_init :: proc() {
 	opQueue = mem.make_non_zeroed([dynamic]OpNode, vk_def_allocator())
 	opDestroyQueues = mem.make_non_zeroed([dynamic]destroy_node, vk_def_allocator())
 
-	gUniforms = mem.make_non_zeroed([dynamic]vk_uniform_alloc, vk_def_allocator())
-	gTempUniforms = mem.make_non_zeroed([dynamic]vk_temp_uniform_struct, vk_def_allocator())
-	gNonInsertedUniforms = mem.make_non_zeroed([dynamic]vk_temp_uniform_struct, vk_def_allocator())
-
-	gMapResource = make_map(map[rawptr][dynamic]union_resource, vk_def_allocator())
+	gUniforms = mem.make_non_zeroed([dynamic]vk_uniform_alloc, gVkMemTlsfAllocator)
+	gTempUniforms = mem.make_non_zeroed([dynamic]vk_temp_uniform_struct, gVkMemTlsfAllocator)
+	gNonInsertedUniforms = mem.make_non_zeroed([dynamic]vk_temp_uniform_struct, gVkMemTlsfAllocator)
 }
 
 
@@ -159,7 +161,7 @@ vk_allocator_destroy :: proc() {
 
 	for b in gVkMemBufs {
 		vk_mem_buffer_Deinit2(b)
-		free(b, vk_def_allocator())
+		free(b, gVkMemTlsfAllocator)
 	}
 	delete(gVkMemBufs)
 
@@ -180,7 +182,9 @@ vk_allocator_destroy :: proc() {
 	delete(opQueue)
 	delete(opDestroyQueues)
 	delete(gMapResource)
-	delete(gVkMemIdxCnts, vk_def_allocator())
+	delete(gVkMemIdxCnts, gVkMemTlsfAllocator)
+
+	tlsf.destroy(&gVkMemTlsf)
 }
 
 vk_find_mem_type :: proc "contextless" (
