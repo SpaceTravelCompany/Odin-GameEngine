@@ -90,8 +90,6 @@ vk_init_block_len :: proc() {
 	gVkMinUniformBufferOffsetAlignment = vk_physical_prop.limits.minUniformBufferOffsetAlignment
 }
 
-@(private = "file") VK_ALLOCATOR_THREAD_POOL_SIZE :: 2
-
 vk_allocator_init :: proc() {
 	__vk_def_allocator = context.allocator
 
@@ -136,7 +134,7 @@ vk_allocator_init :: proc() {
 		vk.DestroyFence(vk_device, vk_allocator_fence, nil)
 	}
 
-	thread.pool_init(&vk_allocator_thread_pool, __vk_def_allocator, VK_ALLOCATOR_THREAD_POOL_SIZE, vk_thread_init_proc, nil, vk_thread_fini_proc, nil)
+	thread.pool_init(&vk_allocator_thread_pool, __vk_def_allocator, get_processor_core_len(), vk_thread_init_proc, nil, vk_thread_fini_proc, nil)
 	thread.pool_start(&vk_allocator_thread_pool)
 
 	opQueue = mem.make_non_zeroed([dynamic]OpNode, vk_def_allocator())

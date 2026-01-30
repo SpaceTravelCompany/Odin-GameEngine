@@ -55,35 +55,17 @@ monitor_info :: struct {
 
 @private full_screen_mtx : sync.Mutex
 
-/*
-Checks if the engine is paused
 
-Returns:
-- `true` if paused, `false` otherwise
-*/
 paused :: proc "contextless" () -> bool {
 	return __paused
 }
 
-/*
-Checks if the window is activated
 
-Returns:
-- `true` if activated, `false` otherwise
-*/
 activated :: proc "contextless" () -> bool {
 	return __activated
 }
 
-/*
-Sets the window to fullscreen mode on the specified monitor
 
-Inputs:
-- monitor: Pointer to the monitor to use for fullscreen
-
-Returns:
-- None
-*/
 set_full_screen_mode :: proc "contextless" (monitor:^monitor_info) {
 	when !library.is_mobile {
 		sync.mutex_lock(&full_screen_mtx)
@@ -94,12 +76,6 @@ set_full_screen_mode :: proc "contextless" (monitor:^monitor_info) {
 	}
 }
 
-/*
-Sets the window to windowed mode
-
-Returns:
-- None
-*/
 set_window_mode :: proc "contextless" () {
 	when !library.is_mobile {
 		sync.mutex_lock(&full_screen_mtx)
@@ -147,65 +123,27 @@ get_primary_monitor :: proc "contextless" () -> ^monitor_info {
 	return primary_monitor
 }
 
-/*
-Gets the window width
-
-Returns:
-- Window width in pixels
-*/
 window_width :: proc "contextless" () -> int {
 	return __window_width.?
 }
 
-/*
-Gets the window height
-
-Returns:
-- Window height in pixels
-*/
 window_height :: proc "contextless" () -> int {
 	return __window_height.?
 }
 
-/*
-Gets the window X position
-
-Returns:
-- Window X position in pixels
-*/
 window_x :: proc "contextless" () -> int {
 	return __window_x.?
 }
 
-/*
-Gets the window Y position
-
-Returns:
-- Window Y position in pixels
-*/
 window_y :: proc "contextless" () -> int {
 	return __window_y.?
 }
-/*
-Sets the vertical sync mode
 
-Inputs:
-- v_sync: The vertical sync mode to set
-
-Returns:
-- None
-*/
 set_v_sync :: proc "contextless" (v_sync:v_sync) {
 	__v_sync = v_sync
 	size_updated = true
 }
 
-/*
-Gets the current vertical sync mode
-
-Returns:
-- The current vertical sync mode
-*/
 get_v_sync :: proc "contextless" () -> v_sync {
 	return __v_sync
 }
