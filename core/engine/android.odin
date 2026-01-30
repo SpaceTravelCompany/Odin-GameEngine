@@ -447,11 +447,7 @@ when library.is_android {
 					if !closing() {
 						app.destroyRequested = 0
 					} else {
-						graphics_wait_device_idle()
-						destroy()
-						graphics_destroy()
-						system_destroy()
-						system_after_destroy()
+						__destroy()
 
 						libc.exit(0)
 						//return
