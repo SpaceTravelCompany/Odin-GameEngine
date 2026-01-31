@@ -1266,11 +1266,7 @@ Output:
 	["a", "b", "c\nd\ne"]
 
 */
-<<<<<<< HEAD
-split_lines_n :: proc (s: string, n: int, allocator := context.allocator) -> (res: []string, err: mem.Allocator_Error) #optional_allocator_error {
-=======
 split_lines_n :: proc(s: string, n: int, allocator := context.allocator, loc := #caller_location) -> (res: []string, err: mem.Allocator_Error) #optional_allocator_error {
->>>>>>> 8f138532438026383a0ddb5ae2b9e790a1eaa1db
 	sep :: "\n"
 	lines := _split(s, sep, 0, n, allocator, loc) or_return
 	for &line in lines {
