@@ -394,70 +394,18 @@ LineSplitLine :: proc "contextless" (pts:[2][$N]$T, t:T) -> (outPts1:[2][N]T, ou
     curveType := type
     err:shape_error = nil
 
-    pts2 : [4][2]f32
-    pts_:[4][2]f32
-    intrinsics.mem_copy_non_overlapping(&pts_[0], &pts[0], len(pts) * size_of(linalg.point))
-
     reverse := false
     outD:[3]f32 = {0, 0, 0}
     if curveType != .Line && curveType != .Quadratic {
         curveType, err, outD = GetCubicCurveType(pts[0], pts[1], pts[2], pts[3])
         if err != nil do return err
-    } else if curveType == .Quadratic {
-        if _subdiv == 0.0 {
-            vlen :u32 = u32(len(vertList))
-            if linalg.GetPolygonOrientation(pts) == .CounterClockwise {
-                non_zero_append(vertList, shape_vertex2d{
-                    uvw = {0,0,0},
-                    pos = pts[0],
-                    color = color,
-                })
-                non_zero_append(vertList, shape_vertex2d{
-                    uvw = {-0.5,0,0.5},
-                    pos = pts[1],
-                    color = color,
-                })
-                non_zero_append(vertList, shape_vertex2d{
-                    uvw = {-1,-1,1},
-                    pos = pts[2],
-                    color = color,
-                })
-            } else {
-                non_zero_append(vertList, shape_vertex2d{
-                    uvw = {0,0,0},
-                    pos = pts[0],
-                    color = color,
-                })
-                non_zero_append(vertList, shape_vertex2d{
-                    uvw = {0.5,0,0.5},
-                    pos = pts[1],
-                    color = color,
-                })
-                non_zero_append(vertList, shape_vertex2d{
-                    uvw = {1,1,1},
-                    pos = pts[2],
-                    color = color,
-                })
-            }
-    
-            non_zero_append(indList, vlen, vlen + 1, vlen + 2)
-    
-            non_zero_append(outPoly, CurveStruct{pts[0], false}, CurveStruct{pts[1], true})
-        } else {
-            x01 := (pts[1].x - pts[0].x) * _subdiv + pts[0].x
-            y01 := (pts[1].y - pts[0].y) * _subdiv + pts[0].y
-            x12 := (pts[2].x - pts[1].x) * _subdiv + pts[1].x
-            y12 := (pts[2].y - pts[1].y) * _subdiv + pts[1].y
-
-            x012 := (x12 - x01) * _subdiv + x01
-            y012 := (y12 - y01) * _subdiv + y01
-
-            err := _Shapes_ComputeLine(vertList, indList, outPoly, color,{pts[0], { x01, y01 }, { x012, y012 }}, .Quadratic, 0.0, 0)
-            if err != nil do return err
-            err = _Shapes_ComputeLine(vertList, indList, outPoly, color,{{ x012, y012 }, { x12, y12 }, pts[2]}, .Quadratic,0.0, 0)
-            if err != nil do return err
-        }
-        return nil
+    } else if curveType == .Quadratic && len(pts) == 3 {
+		pts_:[4][2]f32
+		pts_[0] = pts[0]
+		pts_[1] = CvtQuadraticToCubic0(pts[0], pts[1])
+		pts_[2] = CvtQuadraticToCubic1(pts[2], pts[1])
+		pts_[3] = pts[2]
+        return _Shapes_ComputeLine(vertList, indList, outPoly, color,pts_[:], .Quadratic, _subdiv, 0)
     }
 
     F :matrix[4,4]f32
@@ -703,7 +651,7 @@ LineSplitLine :: proc "contextless" (pts:[2][$N]$T, t:T) -> (outPts1:[2][N]T, ou
             non_zero_append(indList, start, start + 2, start + 3, start + 3, start + 2, start + 1)
         }
     }
-    appendLine(vertList, indList, color,pts_[:len(pts)], F)
+    appendLine(vertList, indList, color,pts[:len(pts)], F)
 
     if len(pts) == 3 {
         non_zero_append(outPoly, CurveStruct{pts[0], false}, CurveStruct{pts[1], true})
@@ -781,7 +729,6 @@ shapes_compute_polygon :: proc(poly:^shapes, allocator := context.allocator) -> 
             np :u32 = 0
 
             pT := mem.make_non_zeroed_dynamic_array([dynamic]linalg.point, arena )
-            defer delete(pT)
             for p in ps {
                 if !p.isCurve {
                     non_zero_append(&pT, p.p)
@@ -827,7 +774,7 @@ shapes_compute_polygon :: proc(poly:^shapes, allocator := context.allocator) -> 
 						uvw = {1,0,0},
 						color = node.color,
 					})
-				}
+				}			
             }
 			start_idx += outPoly2N[poly_idx]
 			poly_idx += 1
@@ -983,7 +930,7 @@ shapes_compute_polygon :: proc(poly:^shapes, allocator := context.allocator) -> 
 								if intersects {
 									tmp_points := make([]CurveStruct, len(new_points) - next_j, allocator)
 									mem.copy_non_overlapping(&tmp_points[0], &new_points[next_j], len(tmp_points) * size_of(CurveStruct))
-									resize(&new_points, i + (len(new_points) - next_j) + 1)
+									resize(&new_points, i + len(tmp_points) + 2)
 									mem.copy_non_overlapping(&new_points[i + 2], &tmp_points[0], len(tmp_points) * size_of(CurveStruct))
 									new_points[i + 1] = CurveStruct{intersection, false}
 
