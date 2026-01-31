@@ -828,8 +828,8 @@ shapes_compute_polygon :: proc(poly:^shapes, allocator := context.allocator) -> 
 						color = node.color,
 					})
 				}
-				start_idx += outPoly2N[poly_idx]
             }
+			start_idx += outPoly2N[poly_idx]
 			poly_idx += 1
         }
         //???! if len(indList) > 0 {
@@ -955,66 +955,56 @@ shapes_compute_polygon :: proc(poly:^shapes, allocator := context.allocator) -> 
 					}
 				}
 				
-				// Merge intersecting points (remove self-intersections)
-				// When segment i-(i+1) intersects with segment j-(j+1), remove points between i+1 and j
-				// Example: A->B->C->D, if A-B intersects C-D, result is A->intersection->D
 				merge_intersecting_points :: proc (in_points: []CurveStruct, out_points: ^[dynamic]CurveStruct, allocator: runtime.Allocator) {
-					n := len(in_points)
-					if n < 4 {
+					if len(in_points) < 4 {
 						for p in in_points {
 							non_zero_append(out_points, p)
 						}
 						return
 					}
+					new_points := make([dynamic]CurveStruct, allocator)
+					mem.copy_non_overlapping(&new_points[0], &in_points[0], n * size_of(CurveStruct))
 					
-					// Check all segment pairs for intersection
-					for i := 0; i < n; i += 1 {
-						next_i := (i + 1) % n
-						a1 := in_points[i].p
-						a2 := in_points[next_i].p
+					for i := 0; i < len(new_points); i += 1 {
+						next_i := (i + 1) % len(new_points)
+						a1 := new_points[i].p
+						a2 := new_points[next_i].p
 						
-						// Check against segments that are at least 2 away
-						for j := i + 2; j < n; j += 1 {
-							next_j := (j + 1) % n
+						for j := (i + 2) % len(new_points);; j = (j + 1) % len(new_points) {
+							next_j := (j + 1) % len(new_points)
+							if i == j || i == next_j || next_i == next_j || next_i == j do break
 							
-							// Skip if segments share a point (adjacent in circular sense)
-							if next_j == i do continue
+							b1 := new_points[j].p
+							b2 := new_points[next_j].p
 							
-							b1 := in_points[j].p
-							b2 := in_points[next_j].p
-							
-							// Check line intersection
 							_, intersects, intersection := linalg.LinesIntersect2(a1, a2, b1, b2)
 							
 							if intersects {
-								// Found intersection!
-								// Keep: points 0 to i, intersection point, points j+1 to end
-								// Remove: points i+1 to j (inclusive)
-								
-								new_points := make([dynamic]CurveStruct, allocator)
-								
-								// Add points from 0 to i (inclusive)
-								for k := 0; k <= i; k += 1 {
-									append(&new_points, in_points[k])
+								if i < next_j {
+									tmp_points := make([]CurveStruct, len(new_points) - next_j, allocator)
+									mem.copy_non_overlapping(&tmp_points[0], &new_points[next_j], len(tmp_points) * size_of(CurveStruct))
+									resize(&new_points, i + (len(new_points) - next_j))
+									mem.copy_non_overlapping(&new_points[i + 1], &tmp_points[0], len(tmp_points) * size_of(CurveStruct))
+								} else {
+									if next_j == 0 {
+										tmp :=  new_points[j]
+										resize(&new_points, i + 1)
+										//append(&new_points, CurveStruct{intersection, false})
+										append(&new_points, tmp)
+									} else {
+										tmp_points := make([]CurveStruct, i + 1 - next_j, allocator)
+										mem.copy_non_overlapping(&tmp_points[0], &new_points[next_j], len(tmp_points) * size_of(CurveStruct))
+										resize(&new_points, len(tmp_points))
+										mem.copy_non_overlapping(&new_points[0], &tmp_points[0], len(tmp_points) * size_of(CurveStruct))
+										//append(&new_points, CurveStruct{intersection, false})
+									}
 								}
-								
-								// Add intersection point
-								append(&new_points, CurveStruct{intersection, false})
-								
-								// Add points from j+1 to end
-								for k := j + 1; k < n; k += 1 {
-									append(&new_points, in_points[k])
-								}
-								
-								// Recursively process (there might be more intersections)
-								merge_intersecting_points(new_points[:], out_points, allocator)
-								return
+								break
 							}
 						}
+						non_zero_append(out_points, in_points[i])
 					}
-					
-					// No intersections found, copy all points
-					for p in in_points {
+					for p in new_points {
 						non_zero_append(out_points, p)
 					}
 				}
