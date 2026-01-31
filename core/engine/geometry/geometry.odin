@@ -919,8 +919,11 @@ shapes_compute_polygon :: proc(poly:^shapes, allocator := context.allocator) -> 
 							a1 := new_points[i].p
 							a2 := new_points[next_i].p
 							
-							for j := i + 2; j < len(new_points) - 1;j += 1{
-								next_j := j + 1
+							for j := (i + 2) % len(new_points);;j = (j + 1) % len(new_points){
+								next_j :=  (j + 1) % len(new_points)
+								if next_j == i {
+									break
+								}
 								
 								b1 := new_points[j].p
 								b2 := new_points[next_j].p
@@ -928,18 +931,20 @@ shapes_compute_polygon :: proc(poly:^shapes, allocator := context.allocator) -> 
 								_, intersects, intersection := linalg.LinesIntersect2(a1, a2, b1, b2)
 								
 								if intersects {
-									tmp_points := make([]CurveStruct, len(new_points) - next_j, allocator)
-									mem.copy_non_overlapping(&tmp_points[0], &new_points[next_j], len(tmp_points) * size_of(CurveStruct))
-									resize(&new_points, i + len(tmp_points) + 2)
-									mem.copy_non_overlapping(&new_points[i + 2], &tmp_points[0], len(tmp_points) * size_of(CurveStruct))
-									new_points[i + 1] = CurveStruct{intersection, false}
-
+									if next_i < j {
+										remove_range(&new_points, next_i, j + 1)
+									} else {
+										remove_range(&new_points, next_j, i + 1)
+									}
 									found = true
 									break BREAK
 								}
 							}
 						}
 						if !found do break
+						if len(new_points) < 3 {
+							return
+						}
 					}
 					for p in new_points {
 						non_zero_append(out_points, p)
@@ -1008,17 +1013,20 @@ shapes_compute_polygon :: proc(poly:^shapes, allocator := context.allocator) -> 
 				
 				out_points2 := mem.make_non_zeroed([dynamic]CurveStruct, arena)
 				merge_intersecting_points(out_points[:], &out_points2, arena)
-				
-				outer_lines2 := mem.make_non_zeroed([dynamic]shape_line, arena)
-				points_to_shape_lines(out_points2[:], &outer_lines2)
-				
-				stroke_nodes[node_idx] = shape_node{
-					lines = outer_lines2[:],
-					color = node.stroke_color,
-					stroke_color = {},
-					thickness = 0,
+
+				if len(out_points2) < 3 {
+				} else {			
+					outer_lines2 := mem.make_non_zeroed([dynamic]shape_line, arena)
+					points_to_shape_lines(out_points2[:], &outer_lines2)
+					
+					stroke_nodes[node_idx] = shape_node{
+						lines = outer_lines2[:],
+						color = node.stroke_color,
+						stroke_color = {},
+						thickness = 0,
+					}
+					node_idx += 1
 				}
-				node_idx += 1
 				
 				// 내부 스트로크
 				inner_lines := mem.make_aligned([]shape_line, node_len, 64, arena)	
@@ -1057,16 +1065,19 @@ shapes_compute_polygon :: proc(poly:^shapes, allocator := context.allocator) -> 
 				in_points2 := mem.make_non_zeroed([dynamic]CurveStruct, arena)
 				merge_intersecting_points(in_points[:], &in_points2, arena)
 				
-				inner_lines3 := mem.make_non_zeroed([dynamic]shape_line, arena)
-				points_to_shape_lines(in_points2[:], &inner_lines3)
-				
-				stroke_nodes[node_idx] = shape_node{
-					lines = inner_lines3[:],
-					color = node.stroke_color,
-					stroke_color = {},
-					thickness = 0,
+				if len(in_points2) < 3 {
+				} else {			
+					inner_lines3 := mem.make_non_zeroed([dynamic]shape_line, arena)
+					points_to_shape_lines(in_points2[:], &inner_lines3)
+					
+					stroke_nodes[node_idx] = shape_node{
+						lines = inner_lines3[:],
+						color = node.stroke_color,
+						stroke_color = {},
+						thickness = 0,
+					}
+					node_idx += 1
 				}
-				node_idx += 1
 			}
         }
         
