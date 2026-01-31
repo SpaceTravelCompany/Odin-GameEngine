@@ -120,9 +120,7 @@ android_print_current_config :: proc () {
 when library.is_android {
 	@private print_android :: proc "contextless" (args: ..any, sep := " ", flush := true) -> i32 {
 		_ = flush
-		context = runtime.Context {
-			allocator = runtime.heap_allocator(),
-		}
+		context = default_context
 		cstr := fmt.caprint(..args, sep=sep)
 		defer delete(cstr)
 		
@@ -197,7 +195,7 @@ when library.is_android {
 	}
 
 	@(private="file") handle_input :: proc "c" (app:^android.android_app, evt : ^android.AInputEvent) -> c.int {
-		context = runtime.default_context()
+		context = default_context
 
 		MAX_POINTERS :: 20
 		@static pointer_poses:[MAX_POINTERS]linalg.point
@@ -385,7 +383,7 @@ when library.is_android {
 			case .INIT_WINDOW:
 				if app.window != nil {
 					if !app_inited {
-						context = app.default_context
+						context = default_context
 						graphics_init()
 
 						__window_width = int(vk_extent.width)
@@ -433,7 +431,6 @@ when library.is_android {
 		app.userData = nil
 		app.onAppCmd = handle_cmd
 		app.onInputEvent = handle_input
-		app.default_context = context
 
 		for {
 			events: i32

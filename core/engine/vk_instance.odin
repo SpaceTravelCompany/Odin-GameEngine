@@ -22,7 +22,7 @@ vk_debug_callback :: proc "system" (
 	pCallbackData: ^vk.DebugUtilsMessengerCallbackDataEXT,
 	pUserData: rawptr,
 ) -> b32 {
-	context = runtime.default_context()
+	context = default_context
 
 	//#VUID-VkSwapchainCreateInfoKHR-pNext-07781 1284057537
 	//#VUID-vkDestroySemaphore-semaphore-05149 -1813885519
@@ -30,7 +30,7 @@ vk_debug_callback :: proc "system" (
 	case 1284057537, -1813885519:
 		return false
 	}
-	fmt.println(pCallbackData.pMessage)
+	log.infof("%s\n", pCallbackData.pMessage)
 
 	return false
 }

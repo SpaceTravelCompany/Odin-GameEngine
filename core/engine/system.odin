@@ -71,6 +71,7 @@ when library.is_android {
 @private delta_time: u64
 @private processor_core_len: int
 
+@private default_context: runtime.Context
 @private g_thread_pool: thread.Pool
 
 
@@ -157,8 +158,9 @@ engine_main :: proc(
 	system_after_destroy()
 }
 
-@private system_start :: #force_inline proc() {
+@private system_start :: proc() {
 	main_thread_id = sync.current_thread_id()
+	default_context = context
 
     monitors = mem.make_non_zeroed([dynamic]monitor_info)
 	when library.is_android {
@@ -168,7 +170,7 @@ engine_main :: proc(
 	}
 }
 
-@private system_after_destroy :: #force_inline proc() {
+@private system_after_destroy :: proc() {
 	delete(monitors)
 	thread.pool_join(&g_thread_pool)
 	thread.pool_destroy(&g_thread_pool)
