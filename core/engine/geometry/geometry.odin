@@ -962,47 +962,37 @@ shapes_compute_polygon :: proc(poly:^shapes, allocator := context.allocator) -> 
 						}
 						return
 					}
-					new_points := make([dynamic]CurveStruct, allocator)
-					mem.copy_non_overlapping(&new_points[0], &in_points[0], n * size_of(CurveStruct))
+					new_points := make([dynamic]CurveStruct, len(in_points), allocator)
+					mem.copy_non_overlapping(&new_points[0], &in_points[0], len(in_points) * size_of(CurveStruct))
 					
-					for i := 0; i < len(new_points); i += 1 {
-						next_i := (i + 1) % len(new_points)
-						a1 := new_points[i].p
-						a2 := new_points[next_i].p
-						
-						for j := (i + 2) % len(new_points);; j = (j + 1) % len(new_points) {
-							next_j := (j + 1) % len(new_points)
-							if i == j || i == next_j || next_i == next_j || next_i == j do break
+					for {
+						found := false
+						BREAK: for i := 0; i < len(new_points); i += 1 {
+							next_i := (i + 1) % len(new_points)
+							a1 := new_points[i].p
+							a2 := new_points[next_i].p
 							
-							b1 := new_points[j].p
-							b2 := new_points[next_j].p
-							
-							_, intersects, intersection := linalg.LinesIntersect2(a1, a2, b1, b2)
-							
-							if intersects {
-								if i < next_j {
+							for j := i + 2; j < len(new_points) - 1;j += 1{
+								next_j := j + 1
+								
+								b1 := new_points[j].p
+								b2 := new_points[next_j].p
+								
+								_, intersects, intersection := linalg.LinesIntersect2(a1, a2, b1, b2)
+								
+								if intersects {
 									tmp_points := make([]CurveStruct, len(new_points) - next_j, allocator)
 									mem.copy_non_overlapping(&tmp_points[0], &new_points[next_j], len(tmp_points) * size_of(CurveStruct))
-									resize(&new_points, i + (len(new_points) - next_j))
-									mem.copy_non_overlapping(&new_points[i + 1], &tmp_points[0], len(tmp_points) * size_of(CurveStruct))
-								} else {
-									if next_j == 0 {
-										tmp :=  new_points[j]
-										resize(&new_points, i + 1)
-										//append(&new_points, CurveStruct{intersection, false})
-										append(&new_points, tmp)
-									} else {
-										tmp_points := make([]CurveStruct, i + 1 - next_j, allocator)
-										mem.copy_non_overlapping(&tmp_points[0], &new_points[next_j], len(tmp_points) * size_of(CurveStruct))
-										resize(&new_points, len(tmp_points))
-										mem.copy_non_overlapping(&new_points[0], &tmp_points[0], len(tmp_points) * size_of(CurveStruct))
-										//append(&new_points, CurveStruct{intersection, false})
-									}
+									resize(&new_points, i + (len(new_points) - next_j) + 1)
+									mem.copy_non_overlapping(&new_points[i + 2], &tmp_points[0], len(tmp_points) * size_of(CurveStruct))
+									new_points[i + 1] = CurveStruct{intersection, false}
+
+									found = true
+									break BREAK
 								}
-								break
 							}
 						}
-						non_zero_append(out_points, in_points[i])
+						if !found do break
 					}
 					for p in new_points {
 						non_zero_append(out_points, p)
