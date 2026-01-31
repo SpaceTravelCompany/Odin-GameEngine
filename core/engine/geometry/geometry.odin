@@ -32,6 +32,7 @@ shape_vertex2d :: struct #align(1) {
     pos: linalg.point,
     uvw: linalg.point3d,
     color: linalg.point3dw,
+    edge_boundary: [4]u8, // [0]=edge0, [1]=edge1, [2]=edge2 (1=AA/boundary), [3]=check_curve_or_not (0=curve, 1=line)
 };
 
 raw_shape :: struct {
@@ -687,6 +688,7 @@ shapes_compute_polygon :: proc(poly:^shapes, allocator := context.allocator) -> 
     shapes_compute_polygon_in :: proc(vertList:^[dynamic]shape_vertex2d, indList:^[dynamic]u32, poly:^shapes, allocator : runtime.Allocator, arena : mem.Allocator) -> (err:shape_error = nil) {	
         outPoly:[][dynamic]CurveStruct = mem.make_non_zeroed([][dynamic]CurveStruct, len(poly.nodes), 64, arena)
         outPoly2:[dynamic]linalg.point = mem.make_non_zeroed([dynamic]linalg.point, arena)
+        outPoly2IsCurve:[dynamic]bool = mem.make_non_zeroed([dynamic]bool, arena)
         outPoly2N:[]u32 = mem.make_non_zeroed([]u32, len(poly.nodes), 64, arena)
         for &o in outPoly {
             o = make([dynamic]CurveStruct, arena)
@@ -735,18 +737,24 @@ shapes_compute_polygon :: proc(poly:^shapes, allocator := context.allocator) -> 
                 }
             }
 
-            // Check each curve control point individually
-            // Add curve points only if they are inside the polygon (regardless of polygon orientation)
-            for p in ps {
+            // Add points to outPoly2; outPoly2IsCurve[i] = true iff that point came from a curve (keeps arrays in sync).
+            for p, i in ps {
                 if p.isCurve {
-                    // Curve control point: add only if inside the polygon
                     if linalg.PointInPolygon(p.p, pT[:]) {
                         non_zero_append(&outPoly2, p.p)
+                        non_zero_append(&outPoly2IsCurve, true)
                         np += 1
                     }
                 } else {
                     // Regular vertex: always add
                     non_zero_append(&outPoly2, p.p)
+						if ps[i == 0 ? len(ps) - 1 : i - 1].isCurve {
+						non_zero_append(&outPoly2IsCurve, true)
+					} else if ps[(i + 1) % len(ps)].isCurve {
+						non_zero_append(&outPoly2IsCurve, true)
+					} else {
+						non_zero_append(&outPoly2IsCurve, false)
+					}
                     np += 1
                 }
             }
@@ -763,28 +771,52 @@ shapes_compute_polygon :: proc(poly:^shapes, allocator := context.allocator) -> 
             return
         }
     
-        start_idx :u32 = 0
-        vLen :u32 = auto_cast len(vertList)//Existing Curve Vertices Length
-        poly_idx = 0
-        for node in poly.nodes {
-            if node.color.a > 0 {
-				for idx in start_idx..<start_idx+outPoly2N[poly_idx] {
-					non_zero_append(vertList, shape_vertex2d{
-						pos = outPoly2[idx],
-						uvw = {1,0,0},
-						color = node.color,
-					})
-				}			
+        // 꼭짓점 하나가 어느 폴리곤에 속하는지 폴리곤 인덱스를 돌려줍니다.
+        point_to_poly_idx :: proc(point_idx: u32, n_per_poly: []u32) -> u32 {
+            acc: u32 = 0
+            for p in 0..<len(n_per_poly) {
+                if point_idx < acc + n_per_poly[p] do return auto_cast p
+                acc += n_per_poly[p]
             }
-			start_idx += outPoly2N[poly_idx]
-			poly_idx += 1
+            return 0
         }
-        //???! if len(indList) > 0 {
-            for _, i in indicesT {
-                indicesT[i] += vLen
+        // Boundary edge: consecutive on outline. Exclude only when both endpoints are from curve (curve has its own AA).
+        is_boundary_edge :: proc(a, b: u32, poly_idx: u32, n_per_poly: []u32, is_curve: []bool) -> bool {
+            start: u32 = 0
+            for p in 0..<poly_idx do start += n_per_poly[p]
+            count := n_per_poly[poly_idx]
+            for o in 0..<count {
+                p0 := start + o
+                p1 := start + (o + 1) % count
+                if (a == p0 && b == p1) || (a == p1 && b == p0) {
+                    if a < u32(len(is_curve)) && b < u32(len(is_curve)) && is_curve[a] && is_curve[b] {
+                        return false
+                    }
+                    return true
+                }
             }
-            non_zero_append(indList, ..indicesT)
-        //!}
+            return false
+        }
+        num_tri := len(indicesT) / 3
+        for t in 0..<num_tri {
+            i := indicesT[3 * t + 0]
+            j := indicesT[3 * t + 1]
+            k := indicesT[3 * t + 2]
+            pidx := point_to_poly_idx(i, outPoly2N[:])
+            node_color := poly.nodes[pidx].color
+			if node_color.a == 0.0 {
+				continue
+			}
+            e0: u8 = is_boundary_edge(j, k, pidx, outPoly2N[:], outPoly2IsCurve[:]) ? 1 : 0
+            e1: u8 = is_boundary_edge(k, i, pidx, outPoly2N[:], outPoly2IsCurve[:]) ? 1 : 0
+            e2: u8 = is_boundary_edge(i, j, pidx, outPoly2N[:], outPoly2IsCurve[:]) ? 1 : 0
+            eb := [4]u8{e0, e1, e2, 1}
+            base := u32(len(vertList))
+            non_zero_append(vertList, shape_vertex2d{ pos = outPoly2[i], uvw = {1, 0, 0}, color = node_color, edge_boundary = eb })
+            non_zero_append(vertList, shape_vertex2d{ pos = outPoly2[j], uvw = {0, 1, 0}, color = node_color, edge_boundary = eb })
+            non_zero_append(vertList, shape_vertex2d{ pos = outPoly2[k], uvw = {0, 0, 1}, color = node_color, edge_boundary = eb })
+            non_zero_append(indList, base, base + 1, base + 2)
+        }
         return
     }
 

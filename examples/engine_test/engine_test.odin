@@ -114,13 +114,13 @@ Init ::proc() {
 
     when is_android {
         fontFileReadErr : android.AssetFileError
-        fontFileData, fontFileReadErr = android.asset_read_file("omyu pretty.ttf", context.temp_allocator)
+        fontFileData, fontFileReadErr = android.asset_read_file("동그라미재단B.ttf", context.temp_allocator)
         if fontFileReadErr != .None {
             fmt.panicf("android.asset_read_file: %s", fontFileReadErr)
         }
     } else {
         fontFileReadErr :os2.Error
-        fontFileData, fontFileReadErr = os2.read_entire_file_from_path("res/omyu pretty.ttf", context.temp_allocator)
+        fontFileData, fontFileReadErr = os2.read_entire_file_from_path("res/동그라미재단B.ttf", context.temp_allocator)
         if fontFileReadErr != nil {
             fmt.panicf("os2.read_entire_file_from_path: %s", fontFileReadErr)
         }

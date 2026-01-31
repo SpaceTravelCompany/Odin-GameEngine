@@ -1034,9 +1034,12 @@ TrianguateSinglePolygon :: proc(poly:[]linalg.point, baseIdx:[]u32, holes:[][]li
             if tt != nil && !tt.interior {
                 tt.interior = true
 
-                non_zero_append(&ctx.indices, tt.pts[0].id)
-                non_zero_append(&ctx.indices, tt.pts[1].id)
-                non_zero_append(&ctx.indices, tt.pts[2].id)
+                // Skip triangles that use super-triangle sentinels (head/tail have id = max(u32))
+                if tt.pts[0].id != max(u32) && tt.pts[1].id != max(u32) && tt.pts[2].id != max(u32) {
+                    non_zero_append(&ctx.indices, tt.pts[0].id)
+                    non_zero_append(&ctx.indices, tt.pts[1].id)
+                    non_zero_append(&ctx.indices, tt.pts[2].id)
+                }
 
                 for i in 0..<3 {
                     if !tt.constrainedEdge[i] {

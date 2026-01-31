@@ -1,6 +1,7 @@
 #+private
 package engine
 
+import "base:intrinsics"
 import vk "vendor:vulkan"
 import "core:debug/trace"
 import "core:thread"
@@ -60,7 +61,7 @@ init_pipelines :: proc() {
 		stride = size_of(geometry.shape_vertex2d),
 		inputRate = .VERTEX,
 	}}
-	shapeVertexInputAttributeDescription := [3]vk.VertexInputAttributeDescription{{
+	shapeVertexInputAttributeDescription := [4]vk.VertexInputAttributeDescription{{
 		location = 0,
 		binding = 0,
 		format = vk.Format.R32G32_SFLOAT,
@@ -77,38 +78,50 @@ init_pipelines :: proc() {
 		binding = 0,
 		format = vk.Format.R32G32B32A32_SFLOAT,
 		offset = size_of(f32) * (2 + 3),
+	},
+	{
+		location = 3,
+		binding = 0,
+		format = vk.Format.R8G8B8A8_UINT,
+		offset = size_of(f32) * (2 + 3 + 4),
 	}}
 
 	thread.pool_add_task(&g_thread_pool, context.allocator, proc(task: thread.Task) {
-		custom_object_pipeline_init(&img_pipeline,
+		if !custom_object_pipeline_init(&img_pipeline,
 				[]vk.DescriptorSetLayout{base_descriptor_set_layout(), viewport_descriptor_set_layout(), img_descriptor_set_layout()},
 				nil, nil,
 				object_draw_method{type = .Draw,}, 
 				VULKAN_SHADER_VERT,
 				VULKAN_SHADER_FRAG,
 				nil,
-				vk.PipelineDepthStencilStateCreateInfoInit())
+				vk.PipelineDepthStencilStateCreateInfoInit()) {
+					intrinsics.trap()
+				}
 	}, nil)
 
 	thread.pool_add_task(&g_thread_pool, context.allocator, proc(task: thread.Task) {
-		custom_object_pipeline_init(&animate_img_pipeline,
+		if !custom_object_pipeline_init(&animate_img_pipeline,
 				[]vk.DescriptorSetLayout{animate_img_descriptor_set_layout(), viewport_descriptor_set_layout(), img_descriptor_set_layout()},
 				nil, nil,
 				object_draw_method{type = .Draw,}, 
 				VULKAN_SHADER_ANIMATE_VERT,
 				VULKAN_SHADER_ANIMATE_FRAG,
 				nil,
-				vk.PipelineDepthStencilStateCreateInfoInit())
+				vk.PipelineDepthStencilStateCreateInfoInit()){
+					intrinsics.trap()
+				}
 	}, nil)
 
-	custom_object_pipeline_init(&shape_pipeline,
+	if !custom_object_pipeline_init(&shape_pipeline,
 				[]vk.DescriptorSetLayout{base_descriptor_set_layout(), viewport_descriptor_set_layout()},
 				shapeVertexInputBindingDescription[:], shapeVertexInputAttributeDescription[:],
 				object_draw_method{type = .DrawIndexed,}, 
 				VULKAN_SHADER_SHAPE_VERT,
 				VULKAN_SHADER_SHAPE_FRAG,
 				nil,
-				vk.PipelineDepthStencilStateCreateInfoInit())
+				vk.PipelineDepthStencilStateCreateInfoInit()){
+					intrinsics.trap()
+				}
 
 	thread.pool_wait_all(&g_thread_pool)
 }
