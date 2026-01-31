@@ -32,7 +32,7 @@ shape_vertex2d :: struct #align(1) {
     pos: linalg.point,
     uvw: linalg.point3d,
     color: linalg.point3dw,
-    edge_boundary: [4]u8, // [0]=edge0, [1]=edge1, [2]=edge2 (1=AA/boundary), [3]=check_curve_or_not (0=curve, 1=line)
+    edge_boundary: [4]u8, // [0]=edge0, [1]=edge1, [2]=edge2 (1=AA/boundary), [3]=check_curve_or_not (0=curve, 1=line, 2=quadratic)
 };
 
 raw_shape :: struct {
@@ -401,12 +401,64 @@ LineSplitLine :: proc "contextless" (pts:[2][$N]$T, t:T) -> (outPts1:[2][N]T, ou
         curveType, err, outD = GetCubicCurveType(pts[0], pts[1], pts[2], pts[3])
         if err != nil do return err
     } else if curveType == .Quadratic && len(pts) == 3 {
-		pts_:[4][2]f32
-		pts_[0] = pts[0]
-		pts_[1] = CvtQuadraticToCubic0(pts[0], pts[1])
-		pts_[2] = CvtQuadraticToCubic1(pts[2], pts[1])
-		pts_[3] = pts[2]
-        return _Shapes_ComputeLine(vertList, indList, outPoly, color,pts_[:], .Quadratic, _subdiv, 0)
+		if _subdiv == 0.0 {
+            vlen :u32 = u32(len(vertList))
+            if linalg.GetPolygonOrientation(pts) == .CounterClockwise {
+                non_zero_append(vertList, shape_vertex2d{
+                    uvw = {0,0,0},
+                    pos = pts[0],
+                    color = color,
+					edge_boundary = {0,0,0,2},
+                })
+                non_zero_append(vertList, shape_vertex2d{
+                    uvw = {-0.5,0,0.5},
+                    pos = pts[1],
+                    color = color,
+					edge_boundary = {0,0,0,2},
+                })
+                non_zero_append(vertList, shape_vertex2d{
+                    uvw = {-1,-1,1},
+                    pos = pts[2],
+                    color = color,
+					edge_boundary = {0,0,0,2},
+                })
+            } else {
+                non_zero_append(vertList, shape_vertex2d{
+                    uvw = {0,0,0},
+                    pos = pts[0],
+                    color = color,
+					edge_boundary = {0,0,0,2},
+                })
+                non_zero_append(vertList, shape_vertex2d{
+                    uvw = {0.5,0,0.5},
+                    pos = pts[1],
+                    color = color,
+					edge_boundary = {0,0,0,2},
+                })
+                non_zero_append(vertList, shape_vertex2d{
+                    uvw = {1,1,1},
+                    pos = pts[2],
+                    color = color,
+					edge_boundary = {0,0,0,2},
+                })
+            }
+            non_zero_append(indList, vlen, vlen + 1, vlen + 2)
+            non_zero_append(outPoly, CurveStruct{pts[0], false}, CurveStruct{pts[1], true})
+		} else {
+            x01 := (pts[1].x - pts[0].x) * _subdiv + pts[0].x
+            y01 := (pts[1].y - pts[0].y) * _subdiv + pts[0].y
+            x12 := (pts[2].x - pts[1].x) * _subdiv + pts[1].x
+            y12 := (pts[2].y - pts[1].y) * _subdiv + pts[1].y
+
+            x012 := (x12 - x01) * _subdiv + x01
+            y012 := (y12 - y01) * _subdiv + y01
+
+            err := _Shapes_ComputeLine(vertList, indList, outPoly, color,{pts[0], { x01, y01 }, { x012, y012 }}, .Quadratic, 0.0, 0)
+            if err != nil do return err
+            err = _Shapes_ComputeLine(vertList, indList, outPoly, color,{{ x012, y012 }, { x12, y12 }, pts[2]}, .Quadratic,0.0, 0)
+            if err != nil do return err
+        }
+        return nil
     }
 
     F :matrix[4,4]f32
