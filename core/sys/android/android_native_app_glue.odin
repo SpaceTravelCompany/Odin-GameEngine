@@ -212,6 +212,8 @@ android_app :: struct {
     pendingInputQueue: ^AInputQueue,
     pendingWindow: ^ANativeWindow,
     pendingContentRect: ARect,
+
+	default_context : runtime.Context,
 }
 
 @(default_calling_convention="c")

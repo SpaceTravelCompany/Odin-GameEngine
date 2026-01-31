@@ -85,7 +85,7 @@ vk_create_logical_device :: proc() {
 		}
 	}
 
-	
+	//TODO: Check Vulkan Compatibility
 	REQUIRED_VK_13_FEATURES := vk.PhysicalDeviceVulkan13Features {
 		sType            = .PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
 		//dynamicRendering = true,
@@ -94,18 +94,36 @@ vk_create_logical_device :: proc() {
 	}
 	REQUIRED_VK_12_FEATURES := vk.PhysicalDeviceVulkan12Features {
 		sType = .PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
+		timelineSemaphore = true,
+		vulkanMemoryModel = true,
+		vulkanMemoryModelDeviceScope = true,
+		bufferDeviceAddress = true,
+		storageBuffer8BitAccess = true,
+		scalarBlockLayout = true,
 	}
-	if get_vulkan_version().major > 1 || get_vulkan_version().minor >= 3 do REQUIRED_VK_12_FEATURES.pNext = &REQUIRED_VK_13_FEATURES
+	REQUIRED_VK_RAY_QUERY_FEATURES := vk.PhysicalDeviceRayQueryFeaturesKHR  {
+		sType = .PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR,
+		rayQuery = true,
+	}
+	if get_vulkan_version().major > 1 || get_vulkan_version().minor >= 3 {
+		REQUIRED_VK_RAY_QUERY_FEATURES.pNext = &REQUIRED_VK_13_FEATURES
+	}
 	REQUIRED_VK_11_FEATURES := vk.PhysicalDeviceVulkan11Features {
 		sType                         = .PHYSICAL_DEVICE_VULKAN_1_1_FEATURES,
 		//variablePointers              = true,
 		//variablePointersStorageBuffer = true,
 	}
-	if get_vulkan_version().major > 1 || get_vulkan_version().minor >= 2 do REQUIRED_VK_11_FEATURES.pNext = &REQUIRED_VK_12_FEATURES
+	if get_vulkan_version().major > 1 || get_vulkan_version().minor >= 2 {
+		REQUIRED_VK_11_FEATURES.pNext = &REQUIRED_VK_12_FEATURES
+		REQUIRED_VK_12_FEATURES.pNext = &REQUIRED_VK_RAY_QUERY_FEATURES
+	}
 	REQUIRED_FEATURES := vk.PhysicalDeviceFeatures2 {
 		sType    = .PHYSICAL_DEVICE_FEATURES_2,
 		features = {
-			samplerAnisotropy = true
+			samplerAnisotropy = true,
+			vertexPipelineStoresAndAtomics = true,
+			shaderInt64 = true,
+			fragmentStoresAndAtomics = true,
 		},
 	}
 	if get_vulkan_version().major > 1 || get_vulkan_version().minor >= 1 do REQUIRED_FEATURES.pNext = &REQUIRED_VK_11_FEATURES

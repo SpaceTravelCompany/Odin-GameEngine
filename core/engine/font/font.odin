@@ -2,8 +2,6 @@ package font
 
 import "base:runtime"
 import "core:c"
-import "core:debug/trace"
-import "core:fmt"
 import "core:math"
 import "core:math/linalg"
 import "core:mem"

@@ -183,6 +183,7 @@ main :: proc() {
 			"-build-mode:shared",
 			target,
 			"-subtarget:android",
+			"-extra-linker-flags:-Landroid/lib/lib/arm64-v8a,-lVkLayer_khronos_validation" if export_vulkan_validation_layer else ({}),
 			//"-show-debug-messages",//!for debug
 			}) {
 				return

@@ -385,7 +385,7 @@ when library.is_android {
 			case .INIT_WINDOW:
 				if app.window != nil {
 					if !app_inited {
-						context = runtime.default_context()
+						context = app.default_context
 						graphics_init()
 
 						__window_width = int(vk_extent.width)
@@ -427,11 +427,13 @@ when library.is_android {
 		core_count := android_cpu_features.android_getCpuCount()
 		processor_core_len = auto_cast core_count
 		if processor_core_len == 0 do log.panicf("processor_core_len can't zero\n")
+		log.infof("processor_core_len: %d\n", processor_core_len)
 		
 		app = auto_cast android.get_android_app()
 		app.userData = nil
 		app.onAppCmd = handle_cmd
 		app.onInputEvent = handle_input
+		app.default_context = context
 
 		for {
 			events: i32
