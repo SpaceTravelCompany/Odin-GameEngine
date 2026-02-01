@@ -296,8 +296,6 @@ vk_draw_frame :: proc() {
 			signalSemaphoreCount = 1,
 			pSignalSemaphores = &vk_render_finished_semaphore[vk_frame][imageIndex],
 		}
-		vk.WaitForFences(vk_device, 1, &vk_in_flight_fence[(vk_frame + 1) % MAX_FRAMES_IN_FLIGHT], true, max(u64))
-		if res != .SUCCESS do log.panicf("WaitForFences : %s\n", res)
 
 		sync.mutex_lock(&vk_queue_mutex)
 		res = vk.QueueSubmit(vk_graphics_queue, 1, &submitInfo, vk_in_flight_fence[vk_frame])

@@ -588,7 +588,7 @@ vk_destroy_resources :: proc(destroy_all := false) {
 
 	for i := 0; i < len(opDestroyQueues); {
 		nodes := &opDestroyQueues[i]
-		if nodes.stack_count >= MAX_FRAMES_IN_FLIGHT || destroy_all {
+		if nodes.stack_count > MAX_FRAMES_IN_FLIGHT || destroy_all {
 			for &node in nodes.op {
 				#partial switch n in node {
 				case OpDestroyBuffer:
