@@ -41,7 +41,7 @@ vk_debug_callback :: proc "system" (
 // ============================================================================
 
 load_and_check_vulkan_support :: proc() -> bool {
-	when IS_WEB {
+	when is_web {
 		return false
 	}
 

@@ -166,7 +166,7 @@ vk_uniform_alloc :: struct {
 	max_size:   vk.DeviceSize,
 	size:       vk.DeviceSize,
 	uniforms:   [dynamic]^buffer_resource,
-	buf:        vk.Buffer,
+	buf:        __graphics_api_buffer,
 	idx:        resource_range,
 	mem_buffer: ^vk_mem_buffer,
 }
@@ -493,7 +493,7 @@ __vk_op_execute_in :: proc() -> ^[dynamic]OpNode {
 			for &t, i in gTempUniforms {
 				inserted := false
 				out: for &g, i2 in gUniforms {
-					if g.buf == 0 do continue
+					if g.buf.vk_buffer == 0 do continue
 					outN: for i3 := 0; i3 < len(g.uniforms); i3 += 1 {
 						if g.uniforms[i3] == nil {
 							if i3 == 0 {

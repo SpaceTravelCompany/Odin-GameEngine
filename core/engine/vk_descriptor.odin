@@ -103,7 +103,7 @@ execute_update_descriptor_set :: proc(set: ^i_descriptor_set, update_list: ^[dyn
 		switch rr in r {
 		case ^buffer_resource:
 			bufs[bufCnt] = vk.DescriptorBufferInfo {
-				buffer = rr.__resource,
+				buffer = rr.__resource.vk_buffer,
 				offset = rr.g_uniform_indices[2],
 				range  = rr.option.size,
 			}

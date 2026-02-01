@@ -23,13 +23,13 @@ buffer_resource_CreateBufferNoAsync :: #force_inline proc(
 }
 
 buffer_resource_DestroyBufferNoAsync :: proc(self: ^buffer_resource) {
-	vk_mem_buffer_UnBindBufferNode(auto_cast self.mem_buffer, self.__resource, self.idx)
+	vk_mem_buffer_UnBindBufferNode(auto_cast self.mem_buffer, self.__resource.vk_buffer, self.idx)
 	pool.put(&gBufferPool, self)
 }
 
 buffer_resource_DestroyTextureNoAsync :: proc(self: ^texture_resource) {
 	vk.DestroyImageView(vk_device, self.img_view, nil)
-	vk_mem_buffer_UnBindBufferNode(auto_cast self.mem_buffer, self.__resource, self.idx)
+	vk_mem_buffer_UnBindBufferNode(auto_cast self.mem_buffer, self.__resource.vk_image, self.idx)
 	pool.put(&gTexturePool, self)
 }
 
@@ -107,11 +107,11 @@ executeCreateBuffer :: proc(
 		if data == nil do log.panic("staging buffer data can't nil\n")
 	}
 
-	res := vk.CreateBuffer(vk_device, &bufInfo, nil, &src.__resource)
+	res := vk.CreateBuffer(vk_device, &bufInfo, nil, &src.__resource.vk_buffer)
 	if res != .SUCCESS do log.panicf("res := vk.CreateBuffer(vk_device, &bufInfo, nil, &self.__resource) : %s\n", res)
 
-	src.mem_buffer = auto_cast vk_mem_buffer_CreateFromResourceSingle(src.__resource) if src.option.single else 
-	auto_cast vk_mem_buffer_CreateFromResource(src.__resource, memProp, &src.idx, 0, src.option.type)
+	src.mem_buffer = auto_cast vk_mem_buffer_CreateFromResourceSingle(src.__resource.vk_buffer) if src.option.single else 
+	auto_cast vk_mem_buffer_CreateFromResource(src.__resource.vk_buffer, memProp, &src.idx, 0, src.option.type)
 
 	if data != nil {
 		if src.option.resource_usage != .GPU {
@@ -205,17 +205,17 @@ executeCreateTexture :: proc(
 		}, data, allocator)
 	}
 
-	res := vk.CreateImage(vk_device, &imgInfo, nil, &src.__resource)
+	res := vk.CreateImage(vk_device, &imgInfo, nil, &src.__resource.vk_image)
 	if res != .SUCCESS do log.panicf("res := vk.CreateImage(vk_device, &imgInfo, nil, &src.__resource) : %s\n", res)
 
-	src.mem_buffer = auto_cast vk_mem_buffer_CreateFromResourceSingle(src.__resource) if src.option.single else
-	 auto_cast vk_mem_buffer_CreateFromResource(src.__resource, memProp, &src.idx, 0, src.option.type)
+	src.mem_buffer = auto_cast vk_mem_buffer_CreateFromResourceSingle(src.__resource.vk_image) if src.option.single else
+	 auto_cast vk_mem_buffer_CreateFromResource(src.__resource.vk_image, memProp, &src.idx, 0, src.option.type)
 
 	imgViewInfo := vk.ImageViewCreateInfo {
 		sType      = .IMAGE_VIEW_CREATE_INFO,
 		format     = imgInfo.format,
 		components = {r = .IDENTITY, g = .IDENTITY, b = .IDENTITY, a = .IDENTITY},
-		image      = src.__resource,
+		image      = src.__resource.vk_image,
 		subresourceRange = {
 			aspectMask     = isDepth ? {.DEPTH, .STENCIL} : {.COLOR},
 			baseMipLevel   = 0,
@@ -271,11 +271,11 @@ execute_copy_buffer :: proc(cmd: vk.CommandBuffer, src: ^buffer_resource, target
 		srcOffset = 0,
 		dstOffset = 0,
 	}
-	vk.CmdCopyBuffer(cmd, src.__resource, target.__resource, 1, &copyRegion)
+	vk.CmdCopyBuffer(cmd, src.__resource.vk_buffer, target.__resource.vk_buffer, 1, &copyRegion)
 }
 
 execute_copy_buffer_to_texture :: proc(cmd: vk.CommandBuffer, src: ^buffer_resource, target: ^texture_resource) {
-	vk_transition_image_layout(cmd, target.__resource, 1, 0, target.option.len, .UNDEFINED, .TRANSFER_DST_OPTIMAL)
+	vk_transition_image_layout(cmd, target.__resource.vk_image, 1, 0, target.option.len, .UNDEFINED, .TRANSFER_DST_OPTIMAL)
 	region := vk.BufferImageCopy {
 		bufferOffset      = 0,
 		bufferRowLength   = 0,
@@ -289,6 +289,6 @@ execute_copy_buffer_to_texture :: proc(cmd: vk.CommandBuffer, src: ^buffer_resou
 			layerCount     = target.option.len,
 		},
 	}
-	vk.CmdCopyBufferToImage(cmd, src.__resource, target.__resource, .TRANSFER_DST_OPTIMAL, 1, &region)
-	vk_transition_image_layout(cmd, target.__resource, 1, 0, target.option.len, .TRANSFER_DST_OPTIMAL, .SHADER_READ_ONLY_OPTIMAL)
+	vk.CmdCopyBufferToImage(cmd, src.__resource.vk_buffer, target.__resource.vk_image, .TRANSFER_DST_OPTIMAL, 1, &region)
+	vk_transition_image_layout(cmd, target.__resource.vk_image, 1, 0, target.option.len, .TRANSFER_DST_OPTIMAL, .SHADER_READ_ONLY_OPTIMAL)
 }

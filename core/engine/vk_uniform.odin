@@ -83,10 +83,10 @@ create_new_uniform_buffer :: proc(
 		size  = g.max_size,
 		usage = {.UNIFORM_BUFFER},
 	}
-	res := vk.CreateBuffer(vk_device, &bufInfo, nil, &g.buf)
+	res := vk.CreateBuffer(vk_device, &bufInfo, nil, &g.buf.vk_buffer)
 	if res != .SUCCESS do log.panicf("res := vk.CreateBuffer(vk_device, &bufInfo, nil, &g.buf) : %s\n", res)
 
-	g.mem_buffer = vk_mem_buffer_CreateFromResource(g.buf, {.HOST_CACHED, .HOST_VISIBLE}, &g.idx, 0, .UNIFORM)
+	g.mem_buffer = vk_mem_buffer_CreateFromResource(g.buf.vk_buffer, {.HOST_CACHED, .HOST_VISIBLE}, &g.idx, 0, .UNIFORM)
 
 	off: vk.DeviceSize = 0
 	for &t, i in uniforms {

@@ -137,14 +137,17 @@ vk_create_swap_chain_and_image_views :: proc() -> bool {
 				}
 			}
 		}
-		for p in vkPresentModes {
-			if p == .IMMEDIATE {
-				if program_start {
-					if __v_sync == .Triple do log.infof("SYSLOG : vulkan present mode immediate_khr mailbox_khr instead(vsync triple -> none)\n")
-					else do log.infof("SYSLOG : vulkan present mode immediate_khr vsync none\n")
-				} 
-				vkPresentMode = p
-				break;
+		//if mailbox is not supported or not set, use immediate
+		if vkPresentMode != .MAILBOX {
+			for p in vkPresentModes {
+				if p == .IMMEDIATE {
+					if program_start {
+						if __v_sync == .Triple do log.infof("SYSLOG : vulkan present mode immediate_khr mailbox_khr instead(vsync triple -> none)\n")
+						else do log.infof("SYSLOG : vulkan present mode immediate_khr vsync none\n")
+					} 
+					vkPresentMode = p
+					break;
+				}
 			}
 		}
 	}

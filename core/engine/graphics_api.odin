@@ -28,6 +28,7 @@ graphics_device :: #force_inline proc "contextless" () -> vk.Device {
 	return vk_device
 }
 
+
 // Graphics State
 @private g_clear_color: [4]f32 = {0.0, 0.0, 0.0, 1.0}
 @private rotation_matrix: linalg.matrix44
@@ -67,11 +68,24 @@ base_resource :: struct {
 
 MEM_BUFFER :: distinct rawptr
 
+__graphics_api_buffer :: struct #raw_union {
+	vk_buffer: vk.Buffer,
+	opengl_buffer: u32,
+	webgl_buffer: WebGL.Buffer,
+}
+
+__graphics_api_image :: struct #raw_union {
+	vk_image: vk.Image,
+	opengl_image: u32,
+	webgl_image: WebGL.Texture,
+}
+
+
 buffer_resource :: struct {
 	using _: base_resource,
 	self:^buffer_resource,
 	option: buffer_create_option,
-	__resource: vk.Buffer,
+	__resource: __graphics_api_buffer,
 }
 
 texture_resource :: struct {
@@ -80,7 +94,7 @@ texture_resource :: struct {
 	img_view: vk.ImageView,
 	sampler: vk.Sampler,
 	option: texture_create_option,
-	__resource: vk.Image,
+	__resource: __graphics_api_image,
 }
 
 buffer_create_option :: struct {
@@ -264,7 +278,7 @@ get_nearest_sampler :: proc "contextless" () -> vk.Sampler {
 
 
 @private graphics_init :: proc() {
-	when IS_WEB {
+	when is_web {
 		webgl_start()
 	} else {
 		if !vk_start() {
@@ -276,7 +290,7 @@ get_nearest_sampler :: proc "contextless" () -> vk.Sampler {
 }
 
 @private graphics_destroy :: proc() {
-	when IS_WEB {
+	when is_web {
 		webgl_destroy()
 	} else {
 		if vulkan_version.major > 0 {
@@ -288,7 +302,7 @@ get_nearest_sampler :: proc "contextless" () -> vk.Sampler {
 }
 
 @private graphics_draw_frame :: proc() {
-	when IS_WEB {
+	when is_web {
 		webgl_draw_frame()
 	} else {
 		if vulkan_version.major > 0 {
@@ -299,7 +313,7 @@ get_nearest_sampler :: proc "contextless" () -> vk.Sampler {
 }
 
 @private graphics_wait_device_idle :: proc () {
-	when IS_WEB {
+	when is_web {
 		WebGL.Finish()
 	} else {
 		if vulkan_version.major > 0 {
@@ -311,7 +325,7 @@ get_nearest_sampler :: proc "contextless" () -> vk.Sampler {
 }
 
 @private graphics_wait_graphics_idle :: proc () {
-	when IS_WEB {
+	when is_web {
 		WebGL.Finish()
 	} else {
 		if vulkan_version.major > 0 {
@@ -327,7 +341,7 @@ get_nearest_sampler :: proc "contextless" () -> vk.Sampler {
 }
 
 @private graphics_execute_ops :: proc() {
-	when IS_WEB {
+	when is_web {
 	} else {
 		if vulkan_version.major > 0 {
 			vk_op_execute()
@@ -336,7 +350,7 @@ get_nearest_sampler :: proc "contextless" () -> vk.Sampler {
 }
 
 allocate_command_buffers :: proc(p_cmd_buffer: [^]command_buffer, count: u32, cmd_pool: vk.CommandPool) {
-	when IS_WEB {
+	when is_web {
 	} else {
 		if vulkan_version.major > 0 {
 			alloc_info := vk.CommandBufferAllocateInfo{
@@ -345,7 +359,7 @@ allocate_command_buffers :: proc(p_cmd_buffer: [^]command_buffer, count: u32, cm
 				level = vk.CommandBufferLevel.SECONDARY,
 				commandBufferCount = count,
 			}
-			res := vk.AllocateCommandBuffers(graphics_device(), &alloc_info, p_cmd_buffer)
+			res := vk.AllocateCommandBuffers(graphics_device(), &alloc_info, ([^]vk.CommandBuffer)(p_cmd_buffer))
 			if res != .SUCCESS do log.panicf("res = vk.AllocateCommandBuffers(graphics_device(), &alloc_info, &cmd.cmds[i][0]) : %s\n", res)
 		} else {
 		}
@@ -353,7 +367,7 @@ allocate_command_buffers :: proc(p_cmd_buffer: [^]command_buffer, count: u32, cm
 }
 
 free_command_buffers :: proc(p_cmd_buffer: [^]command_buffer, count: u32, cmd_pool: vk.CommandPool) {
-	when IS_WEB {
+	when is_web {
 	} else {
 		if vulkan_version.major > 0 {
 			vk.FreeCommandBuffers(graphics_device(), cmd_pool, count, auto_cast p_cmd_buffer)
@@ -363,7 +377,7 @@ free_command_buffers :: proc(p_cmd_buffer: [^]command_buffer, count: u32, cmd_po
 }
 
 graphics_cmd_bind_pipeline :: #force_inline proc "contextless" (cmd: command_buffer, pipeline_bind_point: vk.PipelineBindPoint, pipeline: vk.Pipeline) {
-	when IS_WEB {
+	when is_web {
 	} else {
 		if vulkan_version.major > 0 {
 			vk.CmdBindPipeline(cmd.__handle, pipeline_bind_point, pipeline)
@@ -382,7 +396,7 @@ graphics_cmd_bind_descriptor_sets :: #force_inline proc "contextless" (
 	dynamic_offset_count: u32,
 	p_dynamic_offsets: ^u32,
 ) {
-	when IS_WEB {
+	when is_web {
 	} else {
 		if vulkan_version.major > 0 {
 			vk.CmdBindDescriptorSets(cmd.__handle, pipeline_bind_point, layout, first_set, descriptor_set_count, p_descriptor_sets, dynamic_offset_count, p_dynamic_offsets)
@@ -397,19 +411,20 @@ graphics_cmd_bind_vertex_buffers :: proc (
 	binding_count: u32,
 	p_buffers: []^buffer_resource,
 	p_offsets: ^vk.DeviceSize,
+	gl_vertex_array: GL_VertexArrayObject = 0,
 ) {
-	when IS_WEB {
-		
+	when is_web {
+		WebGL.BindVertexArray((WebGL.VertexArrayObject)(gl_vertex_array))
 	} else {
 		if vulkan_version.major > 0 {
 			buffers: []vk.Buffer = mem.make_non_zeroed([]vk.Buffer, len(p_buffers), context.temp_allocator)
 			defer delete(buffers, context.temp_allocator)
 			for b, i in p_buffers {
-				buffers[i] = b.__resource
+				buffers[i] = b.__resource.vk_buffer
 			}
 			vk.CmdBindVertexBuffers(cmd.__handle, first_binding, binding_count, &buffers[0], p_offsets)
 		} else {
-
+			OpenGL.BindVertexArray(gl_vertex_array)
 		}
 	}
 
@@ -422,12 +437,13 @@ graphics_cmd_bind_index_buffer :: proc "contextless" (
 	offset: vk.DeviceSize,
 	index_type: vk.IndexType,
 ) {
-	when IS_WEB {
+	when is_web {
+		//HANDLES BY VERTEX ARRAY OBJECT
 	} else {
 		if vulkan_version.major > 0 {
-			vk.CmdBindIndexBuffer(cmd.__handle, buffer.__resource, offset, index_type)
+			vk.CmdBindIndexBuffer(cmd.__handle, buffer.__resource.vk_buffer, offset, index_type)
 		} else {
-
+			//HANDLES BY VERTEX ARRAY OBJECT
 		}
 	}
 }
@@ -439,12 +455,13 @@ graphics_cmd_draw :: proc "contextless" (
 	first_vertex: u32,
 	first_instance: u32,
 ) {
-	when IS_WEB {
+	when is_web {
+		WebGL.DrawArrays(WebGL.TRIANGLES, auto_cast first_vertex, auto_cast vertex_count)
 	} else {
 		if vulkan_version.major > 0 {
 			vk.CmdDraw(cmd.__handle, vertex_count, instance_count, first_vertex, first_instance)
 		} else {
-
+			OpenGL.DrawArrays(OpenGL.TRIANGLES, auto_cast first_vertex, auto_cast vertex_count)
 		}
 	}
 }
@@ -457,12 +474,13 @@ graphics_cmd_draw_indexed :: proc "contextless" (
 	vertex_offset: i32,
 	first_instance: u32,
 ) {
-	when IS_WEB {
+	when is_web {
+		WebGL.DrawElements(WebGL.TRIANGLES, auto_cast index_count, WebGL.UNSIGNED_INT, nil)
 	} else {
 		if vulkan_version.major > 0 {
 			vk.CmdDrawIndexed(cmd.__handle, index_count, instance_count, first_index, vertex_offset, first_instance)
 		} else {
-
+			OpenGL.DrawElements(OpenGL.TRIANGLES, auto_cast index_count, OpenGL.UNSIGNED_INT, nil)
 		}
 	}
 }

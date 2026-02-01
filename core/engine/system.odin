@@ -15,9 +15,9 @@ import "core:thread"
 import "core:log"
 
 
-dt :: #force_inline proc "contextless" () -> f64 { return f64(delta_time) / 1000000000.0 }
-
-dt_u64 :: #force_inline proc "contextless" () -> u64 { return delta_time }
+dt :: #force_inline proc "contextless" () -> f64 {
+	 return delta_time
+}
 
 get_processor_core_len :: #force_inline proc "contextless" () -> int { return processor_core_len }
 
@@ -25,7 +25,7 @@ get_processor_core_len :: #force_inline proc "contextless" () -> int { return pr
 is_android :: ODIN_PLATFORM_SUBTARGET == .Android
 is_mobile :: is_android
 
-IS_WEB :: ODIN_OS == .JS
+is_web :: ODIN_OS == .JS
 
 init: #type proc()
 update: #type proc()
@@ -47,6 +47,7 @@ when library.is_android {
 @private main_thread_id: int
 
 @private __exiting := false
+@private now: time.Tick
 
 
 when library.is_android {
@@ -67,8 +68,8 @@ when library.is_android {
 @private windows_h_instance:windows.HINSTANCE
 @private program_start := true
 @private loop_start := false
-@private max_frame: f64
-@private delta_time: u64
+@private max_frame_: f64
+@private delta_time: f64
 @private processor_core_len: int
 
 @private default_context: runtime.Context
@@ -102,6 +103,7 @@ engine_main :: proc(
 	v_sync:v_sync = .Double,
 	screen_mode:screen_mode = .Window,
 	screen_idx:int = 0,
+	max_frame:f64 = 0.0,
 ) {
 	when ODIN_OS == .Windows {
 		windows_h_instance = auto_cast windows.GetModuleHandleA(nil)
@@ -112,6 +114,8 @@ engine_main :: proc(
 	assert(!(window_height != nil && window_height.? <= 0))
 
 	inited = true
+
+	max_frame_ = max_frame
 
 	__window_title = window_title
 	when is_android {
@@ -140,7 +144,7 @@ engine_main :: proc(
 		init()
 
 		//if is web, main loop and destroy are handled by 'step' and '_end'
-		when !IS_WEB {
+		when !is_web {
 			for !__exiting {
 				system_loop()
 			}
@@ -200,7 +204,7 @@ engine_main :: proc(
 }
 
 get_max_frame :: #force_inline proc "contextless" () -> f64 {
-	return intrinsics.atomic_load_explicit(&max_frame,.Relaxed)
+	return intrinsics.atomic_load_explicit(&max_frame_,.Relaxed)
 }
 
 
@@ -210,13 +214,18 @@ Gets the current frames per second
 Returns:
 - Current FPS, or 0 if delta time is 0
 */
-get_fps :: #force_inline proc "contextless" () -> f64 {
-	if delta_time == 0 do return 0
-	return 1.0 / dt()
+get_fps :: proc "contextless" () -> f64 {
+	ddt := dt()
+	if ddt == 0 do return 0
+	return 1.0 / ddt
+}
+
+get_now :: #force_inline proc "contextless" () -> f64 {
+	return f64(now._nsec) / 1000000000.0
 }
 
 set_max_frame :: #force_inline proc "contextless" (_maxframe: f64) {
-	intrinsics.atomic_store_explicit(&max_frame, _maxframe, .Relaxed)
+	intrinsics.atomic_store_explicit(&max_frame_, _maxframe, .Relaxed)
 }
 
 //_int * 1000000000 + _dec
@@ -251,34 +260,39 @@ close :: proc "contextless" () {
 	}
 }
 
-@private calc_frame_time :: proc(paused_: bool) {
+@private calc_frame_time :: proc() {
 	//delta time calc in web is handled by step(odin.js)
-	when !IS_WEB {
-		@static start: time.Time
-		@static now: time.Time
-
+	when !is_web {
 		if !loop_start {
 			loop_start = true
-			start = time.now()
-			now = start
+			now = time.tick_now()
 		} else {
 			max_frame_ := get_max_frame()
-			if paused_ && max_frame_ == 0 {
-				max_frame_ = 60
-			}
-			n := time.now()
+			n := time.tick_now()
 			delta := n._nsec - now._nsec
 
-			if max_frame_ > 0 {
-				max_f := u64(1 * (1 / max_frame_)) * 1000000000
-				if max_f > auto_cast delta {
-					time.sleep(auto_cast (i64(max_f) - delta))
-					n = time.now()
-					delta = n._nsec - now._nsec
-				}
-			}
 			now = n
-			delta_time = auto_cast delta
+			delta_time = f64(delta) / 1000000000.0
+		}
+	}
+}
+
+@private wait_max_frame :: proc(paused_: bool) {
+	_max_frame := get_max_frame()
+	if _max_frame > 0 {
+		max_f := u64((1.0 / _max_frame) * 1000000000.0)
+		tick := time.tick_now()
+		if tick._nsec < now._nsec {
+			tick = now
+		}
+		diff :u64 = u64(tick._nsec - now._nsec)
+		for diff < max_f {
+			thread.yield()
+			tick = time.tick_now()
+			if tick._nsec < now._nsec {
+				tick = now
+			}
+			diff = u64(tick._nsec - now._nsec)
 		}
 	}
 }
@@ -286,7 +300,7 @@ close :: proc "contextless" () {
 @private render_loop :: proc() {
 	paused_ := paused()
 
-	calc_frame_time(paused_)
+	calc_frame_time()
 
 	update()
 	if len(__g_layer) > 0 {
@@ -311,6 +325,8 @@ close :: proc "contextless" () {
 		thread.pool_wait_all(&g_thread_pool)
 	}
 	graphics_draw_frame()
+
+	wait_max_frame(paused_)
 }
 
 /*
@@ -392,7 +408,7 @@ is_main_thread :: #force_inline proc "contextless" () -> bool {
 	return sync.current_thread_id() == main_thread_id
 }
 
-when IS_WEB {
+when is_web {
 	@(export) step :: proc(dt: f64) -> bool {
 		delta_time = u64(dt * 1000000000.0)
 		render_loop()

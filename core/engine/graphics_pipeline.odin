@@ -7,7 +7,7 @@ import "core:debug/trace"
 import "core:thread"
 import "core:engine/geometry"
 
-when IS_WEB {
+when is_web {
 } else {
 	VULKAN_SHADER_VERT :: #load("shaders/vulkan/tex.vert", string)
 	VULKAN_SHADER_FRAG :: #load("shaders/vulkan/tex.frag", string)
@@ -26,7 +26,7 @@ when IS_WEB {
 	}
 }
 
-when is_android || IS_WEB {
+when is_android || is_web {
 	GLES_SHADER_VERT :: #load("shaders/gles/tex.vert", string)
 	GLES_SHADER_FRAG :: #load("shaders/gles/tex.frag", string)
 	GLES_SHADER_ANIMATE_VERT :: #load("shaders/gles/animate_tex.vert", string)
@@ -37,7 +37,7 @@ when is_android || IS_WEB {
 
 
 init_pipelines :: proc() {
-	when !IS_WEB {
+	when !is_web {
 		__base_descriptor_set_layout = graphics_destriptor_set_layout_init(
 			[]vk.DescriptorSetLayoutBinding {
 				vk.DescriptorSetLayoutBindingInit(0, 1),
@@ -131,7 +131,7 @@ init_pipelines :: proc() {
 	object_pipeline_deinit(&img_pipeline)
 	object_pipeline_deinit(&animate_img_pipeline)
 
-	when !IS_WEB {
+	when !is_web {
 		if vulkan_version.major > 0 {
 			vk.DestroyDescriptorSetLayout(graphics_device(), __base_descriptor_set_layout, nil)
 			vk.DestroyDescriptorSetLayout(graphics_device(), __img_descriptor_set_layout, nil)
