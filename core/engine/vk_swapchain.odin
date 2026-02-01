@@ -254,8 +254,8 @@ vk_create_swap_chain_and_image_views :: proc() -> bool {
 				layers = 1,
 			}
 		} else {
-			vk_msaa_frame_texture_res, ok := graphics_get_resource(&vk_msaa_frame_texture).(^texture_resource)
-			if !ok do log.panic("vk_msaa_frame_texture not found\n")
+			vk_msaa_frame_texture_res, ok2 := graphics_get_resource(&vk_msaa_frame_texture).(^texture_resource)
+			if !ok2 do log.panic("vk_msaa_frame_texture not found\n")
 			frameBufferCreateInfo := vk.FramebufferCreateInfo{
 				sType = vk.StructureType.FRAMEBUFFER_CREATE_INFO,
 				renderPass = vk_render_pass,
