@@ -132,8 +132,10 @@ init_pipelines :: proc() {
 	object_pipeline_deinit(&animate_img_pipeline)
 
 	when !IS_WEB {
-		vk.DestroyDescriptorSetLayout(graphics_device(), __base_descriptor_set_layout, nil)
-		vk.DestroyDescriptorSetLayout(graphics_device(), __img_descriptor_set_layout, nil)
-		vk.DestroyDescriptorSetLayout(graphics_device(), __animate_img_descriptor_set_layout, nil)
+		if vulkan_version.major > 0 {
+			vk.DestroyDescriptorSetLayout(graphics_device(), __base_descriptor_set_layout, nil)
+			vk.DestroyDescriptorSetLayout(graphics_device(), __img_descriptor_set_layout, nil)
+			vk.DestroyDescriptorSetLayout(graphics_device(), __animate_img_descriptor_set_layout, nil)
+		}
 	}
 }

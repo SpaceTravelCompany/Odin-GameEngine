@@ -10,10 +10,12 @@ import gl "vendor:wasm/WebGL"
 
 
 webgl_start :: proc() {
+
 }
 
 webgl_destroy :: proc() {
 }
 
-webgl_create_context :: proc() {
+
+webgl_draw_frame :: proc() {
 }

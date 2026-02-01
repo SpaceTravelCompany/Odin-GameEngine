@@ -93,7 +93,7 @@ when ODIN_OS == .Windows {
 }
 
 glfw_set_full_screen_mode :: proc "contextless" (monitor:^monitor_info) {
-	glfw.SetWindowAttrib(wnd, glfw.DECORATED, glfw.FALSE)
+	glfw.SetWindowAttrib(wnd, glfw.DECORATED, i32(glfw.FALSE))
 	when ODIN_OS == .Windows {
 		glfw.SetWindowMonitor(wnd, nil, monitor.rect.left,
 			monitor.rect.top,
@@ -119,7 +119,7 @@ glfw_set_window_icon :: #force_inline  proc "contextless" (icons:[]glfw.Image) {
 }
 
 glfw_set_window_mode :: proc "contextless" () {
-	glfw.SetWindowAttrib(wnd, glfw.DECORATED, glfw.TRUE)
+	glfw.SetWindowAttrib(wnd, glfw.DECORATED, i32(glfw.TRUE))
 
 	glfw.SetWindowMonitor(wnd, nil, auto_cast prev_window_x,
 		auto_cast prev_window_y,
