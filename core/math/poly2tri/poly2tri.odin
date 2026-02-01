@@ -32,6 +32,7 @@ Trianguate_Error :: enum {
     FlipEdgeEvent_nil_Neighbor_Across,
 
     nil_node,
+    Allocator_Failed,
 }
 
 
@@ -1297,7 +1298,12 @@ TrianguatePolygons :: proc(poly:[]linalg.point,  nPoly:[]u32, allocator := conte
         idx += nPoly[n]
     }
 
-    indices = mem.make_non_zeroed_aligned_slice([]u32, len(indices_), 64, allocator)
+	alloc_err: runtime.Allocator_Error
+    indices, alloc_err = mem.make_non_zeroed_aligned_slice([]u32, len(indices_), 64, allocator)
+    if alloc_err != nil {
+        err = .Allocator_Failed
+        return
+    }
     intrinsics.mem_copy_non_overlapping(raw_data(indices), raw_data(indices_), len(indices_) * size_of(u32))
-	return
+    return
 }
