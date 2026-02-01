@@ -1,6 +1,6 @@
 package svg
 
-//! incomplete supports basic features not tested yet
+//! incomplete supports (gradients, dasharrays, etc.)
 
 import "core:encoding/xml"
 import "core:math"

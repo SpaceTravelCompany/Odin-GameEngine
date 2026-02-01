@@ -314,24 +314,34 @@ GetCubicCurveType :: proc "contextless" (_start:[2]$T, _control0:[2]T, _control1
         return
     }
 
-    cross_1 := [3]T{_end.y - _control1.y,       _control1.x - _end.x,       _end.x * _control1.y - _end.y * _control1.x}
-    cross_2 := [3]T{_start.y - _end.y,          _end.x - _start.x,          _start.x * _end.y - _start.y * _end.x}
-    cross_3 := [3]T{_control0.y - _start.y,     _start.x - _control0.x,     _control0.x * _start.y - _control0.y * _start.x}
+    // Assign params to temps, then internal calculation in f64
+    start := [2]f64{f64(_start[0]), f64(_start[1])}
+    c0    := [2]f64{f64(_control0[0]), f64(_control0[1])}
+    c1    := [2]f64{f64(_control1[0]), f64(_control1[1])}
+    end   := [2]f64{f64(_end[0]), f64(_end[1])}
 
-    a1 := _start.x * cross_1.x      + _start.y * cross_1.y      + cross_1.z
-    a2 := _control0.x * cross_2.x   + _control0.y * cross_2.y   + cross_2.z
-    a3 := _control1.x * cross_3.x   + _control1.y * cross_3.y   + cross_3.z
+    cross_1 := [3]f64{end[1] - c1[1],     c1[0] - end[0],     end[0] * c1[1] - end[1] * c1[0]}
+    cross_2 := [3]f64{start[1] - end[1],  end[0] - start[0],  start[0] * end[1] - start[1] * end[0]}
+    cross_3 := [3]f64{c0[1] - start[1],    start[0] - c0[0],   c0[0] * start[1] - c0[1] * start[0]}
 
-    outD[0] = a1 - 2 * a2 + 3 * a3
-    outD[1] = -a2 + 3 * a3
-    outD[2] = 3 * a3
+    a1 := start[0] * cross_1[0]  + start[1] * cross_1[1]  + cross_1[2]
+    a2 := c0[0] * cross_2[0]      + c0[1] * cross_2[1]     + cross_2[2]
+    a3 := c1[0] * cross_3[0]      + c1[1] * cross_3[1]     + cross_3[2]
 
-    D := 3 * outD[1] * outD[1] - 4 * outD[2] * outD[0]
-    discr := outD[0] * outD[0] * D
+    d0 := a1 - 2 * a2 + 3 * a3
+    d1 := -a2 + 3 * a3
+    d2 := 3 * a3
 
-    if discr >= 0 - math.epsilon(T) && discr <= 0 + math.epsilon(T) {
-        if outD[0] == 0.0 && outD[1] == 0.0 {
-            if outD[2] == 0.0 {
+    outD[0] = T(d0)
+    outD[1] = T(d1)
+    outD[2] = T(d2)
+
+    D     := 3 * d1 * d1 - 4 * d2 * d0
+    discr := d0 * d0 * D
+
+    if discr >= -math.epsilon(f64) && discr <= math.epsilon(f64) {
+        if d0 == 0.0 && d1 == 0.0 {
+            if d2 == 0.0 {
                 type = .Line
                 return
             }
