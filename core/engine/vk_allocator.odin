@@ -209,7 +209,7 @@ gQueueMtx: sync.Atomic_Mutex
 
 @thread_local thread_cmdPool: vk.CommandPool
 @thread_local thread_cmd: vk.CommandBuffer
-//@thread_local vk_allocator_fence : vk.Fence
+@thread_local vk_allocator_fence : vk.Fence
 
 opQueue: [dynamic]OpNode
 destroy_node :: struct {
@@ -327,10 +327,10 @@ vk_allocator_init :: proc() {
 		res := vk.CreateCommandPool(vk_device, &cmdPoolInfo, nil, &thread_cmdPool)
 		if res != .SUCCESS do log.panicf("vk.CreateCommandPool failed in thread init: %s\n", res)
 
-		// vk.CreateFence(vk_device, &vk.FenceCreateInfo{
-		// 		sType = vk.StructureType.FENCE_CREATE_INFO,
-		// 		flags = {vk.FenceCreateFlag.SIGNALED},
-		// 	}, nil, &vk_allocator_fence)
+		vk.CreateFence(vk_device, &vk.FenceCreateInfo{
+				sType = vk.StructureType.FENCE_CREATE_INFO,
+				flags = {vk.FenceCreateFlag.SIGNALED},
+			}, nil, &vk_allocator_fence)
 
 		cmdAllocInfo := vk.CommandBufferAllocateInfo {
 			sType              = vk.StructureType.COMMAND_BUFFER_ALLOCATE_INFO,
@@ -351,7 +351,7 @@ vk_allocator_init :: proc() {
 	// Thread finalization: destroy command pool for each thread
 	vk_thread_fini_proc :: proc(thread: ^thread.Thread, user_data: rawptr) {
 		vk.DestroyCommandPool(vk_device, thread_cmdPool, nil)
-		//vk.DestroyFence(vk_device, vk_allocator_fence, nil)
+		vk.DestroyFence(vk_device, vk_allocator_fence, nil)
 	}
 
 	thread.pool_init(&vk_allocator_thread_pool, __vk_def_allocator, get_processor_core_len(), vk_thread_init_proc, nil, vk_thread_fini_proc, nil)
@@ -373,7 +373,7 @@ vk_allocator_destroy :: proc() {
 	thread.pool_destroy(&vk_allocator_thread_pool)
 
 	vk.DestroyCommandPool(vk_device, thread_cmdPool, nil)
-	//vk.DestroyFence(vk_device, vk_allocator_fence, nil)
+	vk.DestroyFence(vk_device, vk_allocator_fence, nil)
 
 	for b in gVkMemBufs {
 		vk_mem_buffer_Deinit2(b)
@@ -688,13 +688,13 @@ vk_exec_gpu_commands_task :: proc(task: thread.Task) {
 			pCommandBuffers    = &thread_cmd,
 			sType              = .SUBMIT_INFO,
 		}
-		//vk.ResetFences(vk_device, 1, &vk_allocator_fence)
+		vk.ResetFences(vk_device, 1, &vk_allocator_fence)
 		sync.mutex_lock(&vk_queue_mutex)
-		res = vk.QueueSubmit(vk_graphics_queue, 1, &submitInfo, 0)
+		res = vk.QueueSubmit(vk_graphics_queue, 1, &submitInfo, vk_allocator_fence)
 		if res != .SUCCESS do log.panicf("res := vk.QueueSubmit(vk_graphics_queue, 1, &submitInfo, 0) : %s\n", res)
 		sync.mutex_unlock(&vk_queue_mutex)
 
-		//vk.WaitForFences(vk_device, 1, &vk_allocator_fence, true, max(u64))
+		vk.WaitForFences(vk_device, 1, &vk_allocator_fence, true, max(u64))
 		if res != .SUCCESS do log.panicf("res := vk.WaitForFences(vk_device, 1, &vk_allocator_fence, true, max(u64)) : %s\n", res)
 	}
 
