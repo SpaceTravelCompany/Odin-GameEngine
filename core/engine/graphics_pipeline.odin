@@ -61,7 +61,7 @@ init_pipelines :: proc() {
 		stride = size_of(geometry.shape_vertex2d),
 		inputRate = .VERTEX,
 	}}
-	shapeVertexInputAttributeDescription := [4]vk.VertexInputAttributeDescription{{
+	shapeVertexInputAttributeDescription := [3]vk.VertexInputAttributeDescription{{
 		location = 0,
 		binding = 0,
 		format = vk.Format.R32G32_SFLOAT,
@@ -78,12 +78,6 @@ init_pipelines :: proc() {
 		binding = 0,
 		format = vk.Format.R32G32B32A32_SFLOAT,
 		offset = size_of(f32) * (2 + 3),
-	},
-	{
-		location = 3,
-		binding = 0,
-		format = vk.Format.R8G8B8A8_UINT,
-		offset = size_of(f32) * (2 + 3 + 4),
 	}}
 
 	thread.pool_add_task(&g_thread_pool, context.allocator, proc(task: thread.Task) {

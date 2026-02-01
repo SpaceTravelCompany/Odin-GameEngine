@@ -32,7 +32,6 @@ shape_vertex2d :: struct #align(1) {
     pos: linalg.point,
     uvw: linalg.point3d,
     color: linalg.point3dw,
-    edge_boundary: [4]u8, // [0]=edge0, [1]=edge1, [2]=edge2 (1=AA/boundary), [3]=check_curve_or_not (0=curve, 1=line, 2=quadratic)
 };
 
 raw_shape :: struct {
@@ -418,38 +417,32 @@ LineSplitLine :: proc "contextless" (pts:[2][$N]$T, t:T) -> (outPts1:[2][N]T, ou
                     uvw = {0,0,0},
                     pos = pts[0],
                     color = color,
-					edge_boundary = {0,0,0,2},
                 })
                 non_zero_append(vertList, shape_vertex2d{
                     uvw = {-0.5,0,0.5},
                     pos = pts[1],
                     color = color,
-					edge_boundary = {0,0,0,2},
                 })
                 non_zero_append(vertList, shape_vertex2d{
                     uvw = {-1,-1,1},
                     pos = pts[2],
                     color = color,
-					edge_boundary = {0,0,0,2},
                 })
             } else {
                 non_zero_append(vertList, shape_vertex2d{
                     uvw = {0,0,0},
                     pos = pts[0],
                     color = color,
-					edge_boundary = {0,0,0,2},
                 })
                 non_zero_append(vertList, shape_vertex2d{
                     uvw = {0.5,0,0.5},
                     pos = pts[1],
                     color = color,
-					edge_boundary = {0,0,0,2},
                 })
                 non_zero_append(vertList, shape_vertex2d{
                     uvw = {1,1,1},
                     pos = pts[2],
                     color = color,
-					edge_boundary = {0,0,0,2},
                 })
             }
             non_zero_append(indList, vlen, vlen + 1, vlen + 2)
@@ -828,7 +821,7 @@ shapes_compute_polygon :: proc(poly:^shapes, allocator := context.allocator) -> 
 			endIdx := startIdx + outPoly2N[psi]
 			for t in startIdx..<endIdx {
 				non_zero_append(vertList, shape_vertex2d{ pos = outPoly2[t], 
-					color = poly.nodes[psi].color, edge_boundary = {0, 0, 0, 1} })
+					color = poly.nodes[psi].color, uvw = {1,0,0} })
 			}
 			startIdx = endIdx
 		}
