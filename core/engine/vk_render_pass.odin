@@ -53,13 +53,6 @@ vk_create_render_pass :: proc() {
 		storeOp = .STORE,
 		finalLayout = .PRESENT_SRC_KHR,
 	)
-	shapeBackAttachment := vk.AttachmentDescriptionInit(
-		format = .R8_UNORM,
-		loadOp = .CLEAR,
-		storeOp = .DONT_CARE,
-		finalLayout = .GENERAL,
-		initialLayout = .GENERAL,
-	)
 
 	colorAttachmentRef := vk.AttachmentReference {
 		attachment = 0,
@@ -72,10 +65,6 @@ vk_create_render_pass :: proc() {
 	depthAttachmentRef := vk.AttachmentReference {
 		attachment = 1,
 		layout     = .DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-	}
-	inputAttachmentRef := vk.AttachmentReference {
-		attachment = 1,
-		layout     = .SHADER_READ_ONLY_OPTIMAL,
 	}
 
 
@@ -92,29 +81,14 @@ vk_create_render_pass :: proc() {
 		pDepthStencilAttachment = &depthAttachmentRef,
 		pResolveAttachments = &colorResolveAttachmentRef,
 	}
-	subpassCopyDesc := vk.SubpassDescription {
-		pipelineBindPoint    = .GRAPHICS,
-		colorAttachmentCount = 1,
-		inputAttachmentCount = 1,
-		pColorAttachments    = &colorAttachmentRef,
-		pInputAttachments    = &inputAttachmentRef,
-	}
 
 	subpassDependency := vk.SubpassDependency {
 		srcSubpass    = vk.SUBPASS_EXTERNAL,
 		dstSubpass    = 0,
-		srcStageMask  = {.COLOR_ATTACHMENT_OUTPUT, .EARLY_FRAGMENT_TESTS},
-		srcAccessMask = {},
+		srcStageMask  = {.COLOR_ATTACHMENT_OUTPUT, .LATE_FRAGMENT_TESTS},
+		srcAccessMask = {.DEPTH_STENCIL_ATTACHMENT_WRITE},
 		dstStageMask  = {.COLOR_ATTACHMENT_OUTPUT, .EARLY_FRAGMENT_TESTS},
 		dstAccessMask = {.COLOR_ATTACHMENT_WRITE, .DEPTH_STENCIL_ATTACHMENT_WRITE},
-	}
-	subpassDependencyCopy := vk.SubpassDependency {
-		srcSubpass    = vk.SUBPASS_EXTERNAL,
-		dstSubpass    = 0,
-		srcStageMask  = {.COLOR_ATTACHMENT_OUTPUT},
-		srcAccessMask = {},
-		dstStageMask  = {.COLOR_ATTACHMENT_OUTPUT},
-		dstAccessMask = {.COLOR_ATTACHMENT_WRITE},
 	}
 
 	when msaa_count == 1 {
