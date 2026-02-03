@@ -13,7 +13,7 @@ Contains frame information and uniform buffer for frame data
 ianimate_object :: struct {
     using _:engine.itransform_object,
     frame:u32,
-	frame_uniform:byte,
+	frame_set:engine.descriptor_set(1),
 }
 
 /*
@@ -198,7 +198,20 @@ Returns:
 - None
 */
 ianimate_object_update_frame :: #force_inline proc (self:^ianimate_object) {
-    engine.buffer_resource_copy_update(&self.frame_uniform, &self.frame)
+    engine.buffer_resource_copy_update(&self.frame, &self.frame)
+}
+
+ianimate_object_init :: proc(self:^ianimate_object, colorTransform:^engine.color_transform = nil, vtable:^ianimate_object_vtable = nil) {
+    engine.buffer_resource_create_buffer(&self.frame, {
+        size = size_of(u32),
+        type = .UNIFORM,
+        resource_usage = .CPU,
+    }, mem.ptr_to_bytes(&self.frame), true)
+	self.frame_set.__resources[0] = engine.graphics_get_resource(&self.frame)
+	engine.update_descriptor_set(&self.frame_set)
+	
+    engine.itransform_object_init(self, colorTransform, vtable)
+    self.actual_type = typeid_of(ianimate_object)
 }
 
 /*
@@ -241,18 +254,12 @@ colorTransform:^engine.color_transform = nil, vtable:^ianimate_object_vtable = n
     	if ((^ianimate_object_vtable)(self.vtable)).get_frame_cnt == nil do ((^ianimate_object_vtable)(self.vtable)).get_frame_cnt = auto_cast _super_animate_image_get_frame_cnt
     }
 
-    engine.buffer_resource_create_buffer(&self.frame_uniform, {
-        size = size_of(u32),
-        type = .UNIFORM,
-        resource_usage = .CPU,
-    }, mem.ptr_to_bytes(&self.frame), true)
-
-    engine.itransform_object_init(self, colorTransform, self.vtable)
+    ianimate_object_init(self, colorTransform, auto_cast self.vtable)
     self.actual_type = typeid_of(animate_image)
 }
 
 _super_animate_image_deinit :: proc(self:^animate_image) {
-    engine.buffer_resource_deinit(&self.frame_uniform)
+    engine.buffer_resource_deinit(&self.frame)
     engine._super_itransform_object_deinit(auto_cast self)
 }
 
@@ -286,16 +293,10 @@ animate_image_change_color_transform :: #force_inline proc(self:^animate_image, 
 
 _super_animate_image_draw :: proc (self:^animate_image, cmd:engine.command_buffer, viewport:^engine.viewport) {
     engine.graphics_cmd_bind_pipeline(cmd, .GRAPHICS, engine.get_animate_img_pipeline().__pipeline)
-    engine.graphics_cmd_bind_descriptor_sets(cmd, .GRAPHICS, engine.get_animate_img_pipeline().__pipeline_layout, 0, 3,
-        &([]vk.DescriptorSet{self.set.__set, viewport.set.__set, self.src.set.__set})[0], 0, nil)
+    engine.graphics_cmd_bind_descriptor_sets(cmd, .GRAPHICS, engine.get_animate_img_pipeline().__pipeline_layout,
+	 0, 4,
+        &([]vk.DescriptorSet{self.set.__set, viewport.set.__set, self.src.set.__set, self.frame_set.__set})[0],
+		 0, nil)
 
     engine.graphics_cmd_draw(cmd, 6, 1, 0, 0)
-}
-
-@private set_uniform_resources_animate_image :: #force_inline proc(self:^animate_image) -> []engine.union_resource {
-    res := mem.make_non_zeroed([]engine.union_resource, 3, context.temp_allocator)
-    res[0] = engine.graphics_get_resource(self)
-    res[1] = engine.graphics_get_resource(self.color_transform)
-    res[2] = engine.graphics_get_resource(&self.frame_uniform)
-    return res[:]
 }

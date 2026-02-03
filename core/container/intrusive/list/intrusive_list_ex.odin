@@ -1,8 +1,5 @@
 package container_intrusive_list
 
-import "base:intrinsics"
-import "core:debug/trace"
-
 insert_after :: proc "contextless" (list: ^List, current_node: ^Node, new_node: ^Node) {
     if new_node != nil && current_node != nil {
         new_node.prev = current_node
@@ -14,9 +11,7 @@ insert_after :: proc "contextless" (list: ^List, current_node: ^Node, new_node: 
             list.tail = new_node
         }
         current_node.next = new_node
-    } else {
-		panic_contextless("insert_after")
-	}
+    }
 }
 
 insert_before :: proc "contextless" (list: ^List, current_node: ^Node, new_node: ^Node) {
@@ -30,7 +25,5 @@ insert_before :: proc "contextless" (list: ^List, current_node: ^Node, new_node:
             list.head = new_node
         }
         current_node.prev = new_node
-    } else {
-		panic_contextless("insert_before")
-	}
+    }
 }

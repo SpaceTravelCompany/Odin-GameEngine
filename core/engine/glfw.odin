@@ -6,7 +6,6 @@ import "base:library"
 import "base:runtime"
 import "core:bytes"
 import "core:c"
-import "core:debug/trace"
 import "core:fmt"
 import "core:mem"
 import "core:os"
@@ -270,7 +269,7 @@ glfw_system_start :: proc() {
 			for m, i in glfw_monitors {
 				if m == monitor {
 					log.infof(
-						"SYSLOG : DEL %s monitor name: %s, x:%d, y:%d, size.x:%d, size.y:%d, refleshrate%d\n",
+						"SYSLOG : DEL %s monitor name: %s, x:%d, y:%d, size.x:%d, size.y:%d, refleshrate:%d\n",
 						"primary" if monitors[i].is_primary else "",
 						monitors[i].name,
 						monitors[i].rect.left,
@@ -287,8 +286,10 @@ glfw_system_start :: proc() {
 			}
 		}
 	}
-	//Unless you will be using OpenGL or OpenGL ES with the same window as Vulkan, there is no need to create a context. You can disable context creation with the GLFW_CLIENT_API hint.
-	glfw.WindowHint(glfw.CLIENT_API, glfw.NO_API)
+	if get_vulkan_version().major < 1 {
+		//Unless you will be using OpenGL or OpenGL ES with the same window as Vulkan, there is no need to create a context. You can disable context creation with the GLFW_CLIENT_API hint.
+		glfw.WindowHint(glfw.CLIENT_API, glfw.NO_API)
+	}
 
 	glfw_init_monitors()
 	glfw.SetMonitorCallback(glfw_monitor_proc)
@@ -321,7 +322,6 @@ glfw_system_destroy :: proc() {
 
 glfw_loop :: proc() {
 	glfw_key_proc :: proc "c" (window: glfw.WindowHandle, key, scancode, action, mods: c.int) {
-		//glfw.KEY_SPACE
 		if key > key_size-1 || key < 0 || !reflect.is_valid_enum_value(key_code, key) {
 			return
 		}

@@ -37,7 +37,8 @@ graphics_device :: #force_inline proc "contextless" () -> vk.Device {
 
 
 // Pipelines
-@private shape_pipeline: object_pipeline
+@private shape_compute_pipeline: compute_pipeline
+@private screen_copy_pipeline: object_pipeline
 @private img_pipeline: object_pipeline
 @private animate_img_pipeline: object_pipeline
 
@@ -138,6 +139,13 @@ object_pipeline :: struct {
     __descriptor_set_layouts:[]vk.DescriptorSetLayout,
 
     draw_method:object_draw_method,
+	allocator: runtime.Allocator,
+}
+
+compute_pipeline :: struct {
+	__pipeline:vk.Pipeline,
+    __pipeline_layout:vk.PipelineLayout,
+    __descriptor_set_layouts:[]vk.DescriptorSetLayout,
 	allocator: runtime.Allocator,
 }
 
@@ -249,15 +257,18 @@ descriptor_type :: enum {
 	UNIFORM_DYNAMIC,  // vk.DescriptorType.UNIFORM_BUFFER_DYNAMIC
 	UNIFORM,  // vk.DescriptorType.UNIFORM_BUFFER
 	STORAGE,
-	STORAGE_IMAGE,  // TODO (xfitgd)
+	STORAGE_IMAGE,
 }
 
 def_color_transform :: #force_inline proc "contextless" () -> ^color_transform {
 	return &__def_color_transform
 }
 
-get_shape_pipeline :: #force_inline proc "contextless" () -> ^object_pipeline {
-	return &shape_pipeline
+get_shape_compute_pipeline :: #force_inline proc "contextless" () -> ^compute_pipeline {
+	return &shape_compute_pipeline
+}
+get_screen_copy_pipeline :: #force_inline proc "contextless" () -> ^object_pipeline {
+	return &screen_copy_pipeline
 }
 get_img_pipeline :: #force_inline proc "contextless" () -> ^object_pipeline {
 	return &img_pipeline
@@ -401,6 +412,15 @@ graphics_cmd_bind_descriptor_sets :: #force_inline proc "contextless" (
 		if vulkan_version.major > 0 {
 			vk.CmdBindDescriptorSets(cmd.__handle, pipeline_bind_point, layout, first_set, descriptor_set_count, p_descriptor_sets, dynamic_offset_count, p_dynamic_offsets)
 		} else {
+		}
+	}
+}
+
+graphics_cmd_dispatch :: proc "contextless" (cmd: command_buffer, group_count_x: u32, group_count_y: u32, group_count_z: u32) {
+	when is_web {
+	} else {
+		if vulkan_version.major > 0 {
+			vk.CmdDispatch(cmd.__handle, group_count_x, group_count_y, group_count_z)
 		}
 	}
 }
@@ -676,16 +696,10 @@ default_multisample_state :: #force_inline proc "contextless" () -> ^vk.Pipeline
 }
 
 
-@(private) graphics_recreate_swapchain :: #force_inline proc() {vk_recreate_swap_chain()}
-@(private) graphics_recreate_surface :: #force_inline proc() {vk_recreate_surface()}
-@(private) graphics_allocator_init :: #force_inline proc() {vk_allocator_init()}
-@(private) graphics_allocator_destroy :: #force_inline proc() {vk_allocator_destroy()}
-
-when ODIN_DEBUG {
-	@private SHADER_COMPILE_OPTION :: "none"
-} else {
-	@private SHADER_COMPILE_OPTION :: "speed"
-}
+@(private) graphics_recreate_swapchain :: proc() {vk_recreate_swap_chain()}
+@(private) graphics_recreate_surface :: proc() {vk_recreate_surface()}
+@(private) graphics_allocator_init :: proc() {vk_allocator_init()}
+@(private) graphics_allocator_destroy :: proc() {vk_allocator_destroy()}
 
 @(private) refresh_pre_matrix :: proc() {
 	if library.is_mobile {
@@ -703,7 +717,6 @@ when ODIN_DEBUG {
 		}
 	}
 }
-
 
 descriptor_set_layout_binding :: vk.DescriptorSetLayoutBinding
 vertex_input_binding_description :: vk.VertexInputBindingDescription
@@ -727,18 +740,8 @@ shader_lang :: enum {
 descriptor_set_layout_binding_init :: vk.DescriptorSetLayoutBindingInit
 
 
-object_pipeline_deinit :: proc(self:^object_pipeline) {
-	graphics_wait_graphics_idle()
-    vk.DestroyPipelineLayout(graphics_device(), self.__pipeline_layout, nil)
-    vk.DestroyPipeline(graphics_device(), self.__pipeline, nil)
-    delete(self.__descriptor_set_layouts, self.allocator)
-}
-
-
-@private __shader_inited := false
-@private __shader_mtx:sync.Mutex
-
-// shader compiler initialization (glslang) (once per process)
+@(private="file") __shader_inited := false
+@(private="file") __shader_mtx:sync.Mutex
 @private __shader_init :: proc "contextless" () {
 	// glslang 초기화 (한 번만 호출) (프로세스 별로 호출 필요, 스레드 아님)
 	if !intrinsics.atomic_load_explicit(&__shader_inited, .Relaxed) {
@@ -750,8 +753,6 @@ object_pipeline_deinit :: proc(self:^object_pipeline) {
 		intrinsics.atomic_store_explicit(&__shader_inited, true, .Relaxed)
 	}
 }
-
-// shader compiler deinitialization (glslang)
 @(private, fini) __shader_deinit :: proc "contextless" () {
 	if intrinsics.atomic_load_explicit(&__shader_inited, .Relaxed) {
 		sync.mutex_lock(&__shader_mtx)
@@ -759,6 +760,130 @@ object_pipeline_deinit :: proc(self:^object_pipeline) {
 		glslang.finalize_process()
 		intrinsics.atomic_store_explicit(&__shader_inited, false, .Relaxed)
 	}
+}
+
+@private __glslang_compile_shader :: proc(shader_code:string, shader_lang:shader_lang, stage:glslang.Shader_Stage) ->
+ (spirv_data:[]u8, program:^glslang.Program, success:bool = true) {
+	__shader_init()
+
+	code_str := strings.clone_to_cstring(shader_code, context.temp_allocator)
+	defer delete(code_str, context.temp_allocator)
+
+	input := glslang.Input{
+		language = shader_lang == .HLSL ? glslang.Source.HLSL : glslang.Source.GLSL,
+		stage = stage,
+		client = glslang.Client.VULKAN,
+		client_version = glslang.Target_Client_Version.VULKAN_1_4,
+		target_language = glslang.Target_Language.SPV,
+		target_language_version = glslang.Target_Language_Version.SPV_1_6,
+		code = code_str,
+		default_version = 100,
+		default_profile = glslang.Profile.NO_PROFILE,
+		force_default_version_and_profile = 0,
+		forward_compatible = 0,
+		messages = glslang.Messages.DEFAULT_BIT,
+		resource = glslang.default_resource(),
+		callbacks = {},
+		callbacks_ctx = nil,
+	}
+	ver := get_vulkan_version()
+	if ver.major == 1 {
+		switch ver.minor {
+			case 0:
+				input.target_language_version = glslang.Target_Language_Version.SPV_1_0
+				input.client_version = glslang.Target_Client_Version.VULKAN_1_0
+			case 1:
+				input.target_language_version = glslang.Target_Language_Version.SPV_1_3
+				input.client_version = glslang.Target_Client_Version.VULKAN_1_1
+			case 2:
+				input.target_language_version = glslang.Target_Language_Version.SPV_1_5
+				input.client_version = glslang.Target_Client_Version.VULKAN_1_2
+			case 3:
+				input.client_version = glslang.Target_Client_Version.VULKAN_1_3
+			case://4 and above
+		}
+	}
+	shader := glslang.shader_create(&input)
+	if shader == nil {
+		log.error("custom_object_pipeline_init: failed to create shader\n")
+		return nil, nil, false
+	}
+	defer glslang.shader_delete(shader)
+	
+	glslang.shader_set_entry_point(shader, "main")
+
+	if glslang.shader_preprocess(shader, &input) == 0 {
+		info_log := glslang.shader_get_info_log(shader)
+		debug_log := glslang.shader_get_info_debug_log(shader)
+		if info_log != nil {
+			log.error(info_log, "\n")
+		}
+		if debug_log != nil {
+			log.error(debug_log, "\n")
+		}
+		return nil, nil, false
+	}
+	
+	if glslang.shader_parse(shader, &input) == 0 {
+		info_log := glslang.shader_get_info_log(shader)
+		debug_log := glslang.shader_get_info_debug_log(shader)
+		if info_log != nil {
+			log.error(info_log, "\n")
+		}
+		if debug_log != nil {
+			log.error(debug_log, "\n")
+		}
+		return nil, nil, false
+	}
+	
+	program = glslang.program_create()
+	if program == nil {
+		log.error("custom_object_pipeline_init: failed to create program\n")
+		return nil, nil, false
+	}
+	glslang.program_add_shader(program, shader)
+	
+	link_messages := cast(c.int)(glslang.Messages.SPV_RULES_BIT) | cast(c.int)(glslang.Messages.VULKAN_RULES_BIT)
+	if glslang.program_link(program, link_messages) == 0 {
+		info_log := glslang.program_get_info_log(program)
+		debug_log := glslang.program_get_info_debug_log(program)
+		if info_log != nil {
+			log.error(info_log, "\n")
+		}
+		if debug_log != nil {
+			log.error(debug_log, "\n")
+		}
+		glslang.program_delete(program)
+		return nil, nil, false
+	}
+	
+	spv_options := glslang.SPV_Options{
+		generate_debug_info = false,
+		strip_debug_info = false,
+		disable_optimizer = false,
+		optimize_size = false,
+		disassemble = false,
+		validate = true,
+		emit_nonsemantic_shader_debug_info = false,
+		emit_nonsemantic_shader_debug_source = false,
+		compile_only = false,
+		optimize_allow_expanded_id_bound = false,
+	}
+	when ODIN_DEBUG {
+		spv_options.generate_debug_info = true
+		spv_options.disable_optimizer = true
+		spv_options.emit_nonsemantic_shader_debug_info = true
+		spv_options.emit_nonsemantic_shader_debug_source = true
+	}
+	glslang.program_SPIRV_generate_with_options(program, stage, &spv_options)
+	
+	spirv_size := glslang.program_SPIRV_get_size(program)
+	spirv_data = mem.make_non_zeroed([]u8, size_of(u32) * spirv_size, 64, context.temp_allocator)
+	glslang.program_SPIRV_get(program, cast(^c.uint)&spirv_data[0])
+	
+	spirv_messages := glslang.program_SPIRV_get_messages(program)
+	if spirv_messages != nil {log.error(spirv_messages, "\n")}
+	return
 }
 
 custom_object_pipeline_init :: proc(self:^object_pipeline,
@@ -771,7 +896,7 @@ custom_object_pipeline_init :: proc(self:^object_pipeline,
     geometry_shader:Maybe(shader_code) = nil,
     depth_stencil_state:Maybe(vk.PipelineDepthStencilStateCreateInfo) = nil,
     color_blend_state:Maybe(vk.PipelineColorBlendStateCreateInfo) = nil,
-	shader_lang:shader_lang = .GLSL, allocator := context.allocator) -> bool {
+	shader_lang:shader_lang = .GLSL, allocator := context.allocator) -> (success:bool) {
 
     self.draw_method = draw_method
 	self.allocator = allocator
@@ -805,129 +930,10 @@ custom_object_pipeline_init :: proc(self:^object_pipeline,
         if shaders[i] != nil {
             switch s in shaders[i].? {
                 case string:
-					__shader_init()
-
-					code_str := strings.clone_to_cstring(s, context.temp_allocator)
-					defer delete(code_str, context.temp_allocator)
-
-                    // Input 구조체 설정
-                    input := glslang.Input{
-                        language = shader_lang == .HLSL ? glslang.Source.HLSL : glslang.Source.GLSL,
-                        stage = shader_kinds[i],
-                        client = glslang.Client.VULKAN,
-                        client_version = glslang.Target_Client_Version.VULKAN_1_4,
-                        target_language = glslang.Target_Language.SPV,
-                        target_language_version = glslang.Target_Language_Version.SPV_1_6,
-                        code = code_str,
-                        default_version = 100,
-                        default_profile = glslang.Profile.NO_PROFILE,
-                        force_default_version_and_profile = 0,
-                        forward_compatible = 0,
-                        messages = glslang.Messages.DEFAULT_BIT,
-                        resource = glslang.default_resource(),
-                        callbacks = {},
-                        callbacks_ctx = nil,
-                    }
-					ver := get_vulkan_version()
-					if ver.major == 1 {
-						switch ver.minor {
-							case 0:
-								input.target_language_version = glslang.Target_Language_Version.SPV_1_0
-								input.client_version = glslang.Target_Client_Version.VULKAN_1_0
-							case 1:
-								input.target_language_version = glslang.Target_Language_Version.SPV_1_3
-								input.client_version = glslang.Target_Client_Version.VULKAN_1_1
-							case 2:
-								input.target_language_version = glslang.Target_Language_Version.SPV_1_5
-								input.client_version = glslang.Target_Client_Version.VULKAN_1_2
-							case 3:
-								input.client_version = glslang.Target_Client_Version.VULKAN_1_3
-							case://4 and above
-						}
-					}
-                    shader := glslang.shader_create(&input)
-                    if shader == nil {
-                        log.error("custom_object_pipeline_init: failed to create shader\n")
-                        return false
-                    }
-                    defer glslang.shader_delete(shader)
-                    
-                    glslang.shader_set_entry_point(shader, "main")
-
-					if glslang.shader_preprocess(shader, &input) == 0 {
-						info_log := glslang.shader_get_info_log(shader)
-                        debug_log := glslang.shader_get_info_debug_log(shader)
-                        if info_log != nil {
-                            log.error(info_log, "\n")
-                        }
-                        if debug_log != nil {
-                            log.error(debug_log, "\n")
-                        }
-                        return false
-					}
-                    
-                    if glslang.shader_parse(shader, &input) == 0 {
-                        info_log := glslang.shader_get_info_log(shader)
-                        debug_log := glslang.shader_get_info_debug_log(shader)
-                        if info_log != nil {
-                            log.error(info_log, "\n")
-                        }
-                        if debug_log != nil {
-                            log.error(debug_log, "\n")
-                        }
-                        return false
-                    }
-                    
-                    program := glslang.program_create()
-                    if program == nil {
-                        log.error("custom_object_pipeline_init: failed to create program\n")
-                        return false
-                    }
-                    glslang.program_add_shader(program, shader)
-                    
-                    link_messages := cast(c.int)(glslang.Messages.SPV_RULES_BIT) | cast(c.int)(glslang.Messages.VULKAN_RULES_BIT)
-                    if glslang.program_link(program, link_messages) == 0 {
-                        info_log := glslang.program_get_info_log(program)
-                        debug_log := glslang.program_get_info_debug_log(program)
-                        if info_log != nil {
-                            log.error(info_log, "\n")
-                        }
-                        if debug_log != nil {
-                            log.error(debug_log, "\n")
-                        }
-                        glslang.program_delete(program)
-                        return false
-                    }
-                    
-                    spv_options := glslang.SPV_Options{
-                        generate_debug_info = false,
-                        strip_debug_info = false,
-                        disable_optimizer = false,
-                        optimize_size = false,
-                        disassemble = false,
-                        validate = true,
-                        emit_nonsemantic_shader_debug_info = false,
-                        emit_nonsemantic_shader_debug_source = false,
-                        compile_only = false,
-                        optimize_allow_expanded_id_bound = false,
-                    }
-					when ODIN_DEBUG {
-						spv_options.generate_debug_info = true
-						spv_options.disable_optimizer = true
-						spv_options.emit_nonsemantic_shader_debug_info = true
-						spv_options.emit_nonsemantic_shader_debug_source = true
-					}
-                    glslang.program_SPIRV_generate_with_options(program, shader_kinds[i], &spv_options)
-                    
-                    spirv_size := glslang.program_SPIRV_get_size(program)
-                    spirv_data = mem.make_non_zeroed([]u8, size_of(u32) * spirv_size, 64, context.temp_allocator)
-                    glslang.program_SPIRV_get(program, cast(^c.uint)&spirv_data[0])
-                    
-                    spirv_messages := glslang.program_SPIRV_get_messages(program)
-                    if spirv_messages != nil {log.error(spirv_messages, "\n")}
-                    
-                    shader_bytes = spirv_data
-                    shader_programs[i] = program
+					success:bool
+					spirv_data, shader_programs[i], success = __glslang_compile_shader(s, shader_lang, shader_kinds[i])
+					if !success do return false
+					shader_bytes = spirv_data
                 case []byte:
                     shader_bytes = s
             }
@@ -956,14 +962,18 @@ custom_object_pipeline_init :: proc(self:^object_pipeline,
     viewportState := vk.PipelineViewportStateCreateInfoInit()
 
 	res: vk.Result
-    self.__descriptor_set_layouts = mem.make_non_zeroed_slice([]vk.DescriptorSetLayout, len(descriptor_set_layouts), allocator)
-	mem.copy_non_overlapping(&self.__descriptor_set_layouts[0], &descriptor_set_layouts[0], len(descriptor_set_layouts) * size_of(vk.DescriptorSetLayout))
+	if descriptor_set_layouts != nil && len(descriptor_set_layouts) > 0 {
+    	self.__descriptor_set_layouts = mem.make_non_zeroed_slice([]vk.DescriptorSetLayout, len(descriptor_set_layouts), allocator)
+		mem.copy_non_overlapping(&self.__descriptor_set_layouts[0], &descriptor_set_layouts[0], len(descriptor_set_layouts) * size_of(vk.DescriptorSetLayout))
+	}
+	defer if !success {delete(self.__descriptor_set_layouts, allocator)}
+
     self.__pipeline_layout, res = vk.PipelineLayoutInit(graphics_device(), self.__descriptor_set_layouts)
 	if res != .SUCCESS {
 		log.errorf("custom_object_pipeline_init: PipelineLayoutInit : %s\n", res)
-		delete(self.__descriptor_set_layouts, allocator)
 		return false
 	}
+	defer if !success {vk.DestroyPipelineLayout(graphics_device(), self.__pipeline_layout, nil)}
 
     vertexInputState:Maybe(vk.PipelineVertexInputStateCreateInfo)
     if vertex_input_binding != nil && vertex_input_attribute != nil {
@@ -978,13 +988,81 @@ custom_object_pipeline_init :: proc(self:^object_pipeline,
         viewportState,
         vertexInputState == nil ? nil : &vertexInputState.?,
 		color_blend_state == nil ? vk.DefaultPipelineColorBlendStateCreateInfo : color_blend_state.?) {
-		delete(self.__descriptor_set_layouts, allocator)
-		vk.DestroyPipelineLayout(graphics_device(), self.__pipeline_layout, nil)
         return false
     }
     return true
 }
 
+compute_pipeline_init :: proc(self: ^compute_pipeline,
+  	compute_shader:shader_code,
+	descriptor_set_layouts:[]vk.DescriptorSetLayout,
+	shader_lang:shader_lang = .GLSL,
+	allocator := context.allocator) -> (success:bool) {
+	
+	self.allocator = allocator
+
+    shader_kind : glslang.Shader_Stage : .COMPUTE
+    shader_vkflag : vk.ShaderStageFlags : {.COMPUTE}
+    shader_program : ^glslang.Program
+    shader_module : vk.ShaderModule
+    defer {
+		if shader_module != 0 {
+			vk.DestroyShaderModule(graphics_device(), shader_module, nil)
+		}
+    }
+    defer if shader_program != nil {
+        glslang.program_delete(shader_program)
+    }
+
+	spirv_data : []u8 = nil
+    shader_bytes:[]byte
+	switch s in compute_shader {
+		case string:
+			success:bool
+			spirv_data, shader_program, success = __glslang_compile_shader(s, shader_lang, shader_kind)
+			if !success do return false
+			shader_bytes = spirv_data
+		case []byte:
+			shader_bytes = s
+	}
+	res: vk.Result
+	shader_module, res = vk.CreateShaderModule2(graphics_device(), shader_bytes)
+	if res != .SUCCESS {
+		log.errorf("custom_object_pipeline_init: CreateShaderModule2 : %s\n", res)
+		return false
+	} 
+	if spirv_data != nil do delete(spirv_data, context.temp_allocator)
+
+	if descriptor_set_layouts != nil && len(descriptor_set_layouts) > 0 {
+		self.__descriptor_set_layouts = mem.make_non_zeroed_slice([]vk.DescriptorSetLayout, len(descriptor_set_layouts), allocator)
+		mem.copy_non_overlapping(&self.__descriptor_set_layouts[0], &descriptor_set_layouts[0], len(descriptor_set_layouts) * size_of(vk.DescriptorSetLayout))
+	}
+	defer if !success {delete(self.__descriptor_set_layouts, allocator)}
+
+	self.__pipeline_layout, res = vk.PipelineLayoutInit(graphics_device(), descriptor_set_layouts)
+	if res != .SUCCESS {
+		log.errorf("compute_pipeline_init: PipelineLayoutInit : %s\n", res)
+		return false
+	}
+	defer if !success {vk.DestroyPipelineLayout(graphics_device(), self.__pipeline_layout, nil)}
+
+	compute_pipeline_create_info := vk.ComputePipelineCreateInfo{
+		sType = .COMPUTE_PIPELINE_CREATE_INFO,
+		stage = vk.PipelineShaderStageCreateInfo{
+			sType = .PIPELINE_SHADER_STAGE_CREATE_INFO,
+			stage = shader_vkflag,
+			module = shader_module,
+			pName = "main",
+		},
+		layout = self.__pipeline_layout,
+	}
+	res = vk.CreateComputePipelines(graphics_device(), 0, 1, &compute_pipeline_create_info, nil, &self.__pipeline)
+	if res != .SUCCESS {
+		log.errorf("compute_pipeline_init: CreateComputePipelines : %s\n", res)
+		return false
+	}
+    return true
+}
 
 create_graphics_pipeline :: proc(
 	self: ^object_pipeline,
@@ -1017,6 +1095,24 @@ create_graphics_pipeline :: proc(
 	return true
 }
 
+object_pipeline_deinit :: proc(self:^object_pipeline) {
+	graphics_wait_graphics_idle()
+    vk.DestroyPipelineLayout(graphics_device(), self.__pipeline_layout, nil)
+    vk.DestroyPipeline(graphics_device(), self.__pipeline, nil)
+    if self.__descriptor_set_layouts != nil {
+        delete(self.__descriptor_set_layouts, self.allocator)
+    }
+}
+
+compute_pipeline_deinit :: proc(self:^compute_pipeline) {
+	graphics_wait_graphics_idle()
+	vk.DestroyPipelineLayout(graphics_device(), self.__pipeline_layout, nil)
+	vk.DestroyPipeline(graphics_device(), self.__pipeline, nil)
+	if self.__descriptor_set_layouts != nil {
+		delete(self.__descriptor_set_layouts, self.allocator)
+	}
+}
+
 graphics_destriptor_set_layout_init :: proc(bindings: []vk.DescriptorSetLayoutBinding) -> vk.DescriptorSetLayout {
 	return vk.DescriptorSetLayoutInit(graphics_device(), bindings)
 }
@@ -1034,9 +1130,11 @@ animate_img_descriptor_set_layout :: proc() -> vk.DescriptorSetLayout {
 	res = pool.get(&gBufferPool)
 	
 	if self not_in gMapResource {
-		map_insert(&gMapResource, self, make([dynamic]union_resource, __graphics_tlsf_allocator))
+		tmp := map_insert(&gMapResource, self, make([dynamic]union_resource, __graphics_tlsf_allocator))
+		append(tmp, res)
+	} else {
+		append(&gMapResource[self], res)
 	}
-	append(&gMapResource[self], res)
 	return res
 }
 
@@ -1048,9 +1146,11 @@ animate_img_descriptor_set_layout :: proc() -> vk.DescriptorSetLayout {
 	res = pool.get(&gTexturePool)
 	
 	if self not_in gMapResource {
-		map_insert(&gMapResource, self, make([dynamic]union_resource, __graphics_tlsf_allocator))
+		tmp := map_insert(&gMapResource, self, make([dynamic]union_resource, __graphics_tlsf_allocator))
+		append(tmp, res)
+	} else {
+		append(&gMapResource[self], res)
 	}
-	append(&gMapResource[self], res)
 	return res
 }
 
@@ -1063,16 +1163,16 @@ animate_img_descriptor_set_layout :: proc() -> vk.DescriptorSetLayout {
 		sync.mutex_unlock(&gMapResourceMtx)
 	}
 	
-	if self not_in gMapResource || len(gMapResource[self]) == 0 {
-		return false
-	}
+	if self not_in gMapResource do return false
+	tmp := gMapResource[self]
+	if len(tmp) == 0 do return false
 	
-	for i in 0..<len(gMapResource[self]) {
-		if gMapResource[self][i] == resource {
-			ordered_remove(&gMapResource[self], i)
+	for i in 0..<len(tmp) {
+		if tmp[i] == resource {
+			ordered_remove(&tmp, i)
 
-			if len(gMapResource[self]) == 0 {
-				delete(gMapResource[self])
+			if len(tmp) == 0 {
+				delete(tmp)
 				delete_key(&gMapResource, self)		
 			}
 			return true
@@ -1085,20 +1185,20 @@ animate_img_descriptor_set_layout :: proc() -> vk.DescriptorSetLayout {
 graphics_get_resource :: proc "contextless" (self: rawptr) -> union_resource {
 	sync.mutex_lock(&gMapResourceMtx)
 	defer sync.mutex_unlock(&gMapResourceMtx)
-	if self not_in gMapResource || len(gMapResource[self]) == 0 {
-		return nil
-	}
-	return gMapResource[self][len(gMapResource[self]) - 1]
+	if self not_in gMapResource do return nil
+	tmp := gMapResource[self]
+	if len(tmp) == 0 do return nil
+	return tmp[len(tmp) - 1]
 }
 
 // Get first resource from stack (for rendering - oldest)
 graphics_get_resource_draw :: proc "contextless" (self: rawptr) -> union_resource {
 	sync.mutex_lock(&gMapResourceMtx)
 	defer sync.mutex_unlock(&gMapResourceMtx)
-	if self not_in gMapResource || len(gMapResource[self]) == 0 {
-		return nil
-	}
-	for res in gMapResource[self] {
+	if self not_in gMapResource do return nil
+	tmp := gMapResource[self]
+	if len(tmp) == 0 do return nil
+	for res in tmp {
 		switch r in res {
 		case ^buffer_resource:
 			if r.completed do return res

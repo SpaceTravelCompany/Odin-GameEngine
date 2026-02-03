@@ -289,6 +289,7 @@ execute_copy_buffer_to_texture :: proc(cmd: vk.CommandBuffer, src: ^buffer_resou
 			layerCount     = target.option.len,
 		},
 	}
+	
 	vk.CmdCopyBufferToImage(cmd, src.__resource.vk_buffer, target.__resource.vk_image, .TRANSFER_DST_OPTIMAL, 1, &region)
 	vk_transition_image_layout(cmd, target.__resource.vk_image, 1, 0, target.option.len, .TRANSFER_DST_OPTIMAL, .SHADER_READ_ONLY_OPTIMAL)
 }

@@ -345,9 +345,11 @@ itransform_object_cvt_area_window_coord :: proc(self:^itransform_object, area:li
 	if viewport_ == nil {
 		viewport_ = def_viewport()
 	}
-	area_ := linalg.Area_MulMatrix(area, self.mat, context.temp_allocator)
-	area_ = linalg.Area_MulMatrix(area_, viewport_.camera.mat, context.temp_allocator)
-	area_ = linalg.Area_MulMatrix(area_, viewport_.projection.mat, allocator)
+	area_1 := linalg.Area_MulMatrix(area, self.mat, context.temp_allocator)
+	area_2 := linalg.Area_MulMatrix(area_1, viewport_.camera.mat, context.temp_allocator)
+	area_ := linalg.Area_MulMatrix(area_2, viewport_.projection.mat, allocator)
+	if res, ok := area_1.([][2]f32); ok do delete(res, context.temp_allocator)
+	if res, ok := area_2.([][2]f32); ok do delete(res, context.temp_allocator)
 
 	switch &n in area_ {
 	case linalg.rect:

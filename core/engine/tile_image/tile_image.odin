@@ -19,13 +19,7 @@ tile_image :: struct {
     using _:engine.itransform_object,
     src: ^tile_texture_array,
     tile_idx:u32,
-	tile_uniform:byte,
-}
-
-set_uniform_resources_tile_image :: proc(self:^tile_image, resources:[]engine.union_resource) {
-    resources[0] = engine.graphics_get_resource(self).(^engine.buffer_resource)
-    resources[1] = engine.graphics_get_resource(self.color_transform).(^engine.buffer_resource)
-    resources[2] = engine.graphics_get_resource(&self.tile_uniform).(^engine.buffer_resource)
+	tile_set:engine.descriptor_set(1),
 }
 
 
@@ -51,18 +45,20 @@ colorTransform:^engine.color_transform = nil, vtable:^engine.iobject_vtable = ni
 
     }
 
-	 engine.buffer_resource_create_buffer(&self.tile_uniform, {
+	 engine.buffer_resource_create_buffer(&self.tile_idx, {
         size = size_of(u32),
         type = .UNIFORM,
         resource_usage = .CPU,
     }, mem.ptr_to_bytes(&self.tile_idx), true)
+	self.tile_set.__resources[0] = engine.graphics_get_resource(&self.tile_idx)
+    engine.update_descriptor_set(&self.set)
 
     engine.itransform_object_init(self, colorTransform, self.vtable)
 	self.actual_type = typeid_of(tile_image)
 }
 
 _super_tile_image_deinit :: proc(self:^tile_image) {
-    engine.buffer_resource_deinit(&self.tile_uniform)
+    engine.buffer_resource_deinit(&self.tile_idx)
 
     engine._super_itransform_object_deinit(auto_cast self)
 }
@@ -93,13 +89,15 @@ Returns:
 tile_image_update_idx :: proc(self:^tile_image, idx:u32) {
     self.tile_idx = idx
 
-    engine.buffer_resource_copy_update(&self.tile_uniform, &self.tile_idx)
+    engine.buffer_resource_copy_update(&self.tile_idx, &self.tile_idx)
 }
 
 _super_tile_image_draw :: proc (self:^tile_image, cmd:engine.command_buffer, viewport:^engine.viewport) {
     engine.graphics_cmd_bind_pipeline(cmd, .GRAPHICS, engine.get_animate_img_pipeline().__pipeline)
-    engine.graphics_cmd_bind_descriptor_sets(cmd, .GRAPHICS, engine.get_animate_img_pipeline().__pipeline_layout, 0, 3,
-        &([]vk.DescriptorSet{self.set.__set,  viewport.set.__set, self.src.set.__set,})[0], 0, nil)
+    engine.graphics_cmd_bind_descriptor_sets(cmd, .GRAPHICS, engine.get_animate_img_pipeline().__pipeline_layout,
+	 0, 4,
+        &([]vk.DescriptorSet{self.set.__set, viewport.set.__set, self.src.set.__set, self.tile_set.__set})[0], 
+		0, nil)
 
     engine.graphics_cmd_draw(cmd, 6, 1, 0, 0)
 }

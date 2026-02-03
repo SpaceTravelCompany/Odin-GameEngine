@@ -7,6 +7,7 @@ import "core:sync"
 import "core:thread"
 import vk "vendor:vulkan"
 import "core:log"
+import "base:runtime"
 
 
 // ============================================================================
@@ -313,6 +314,7 @@ vk_recreate_swap_chain :: proc() {
 		//thread pool 사용해서 각각 처리
 		size_task_data :: struct {
 			cmd: ^layer,
+			allocator: runtime.Allocator,
 		}
 		
 		size_task_proc :: proc(task: thread.Task) {
@@ -320,12 +322,14 @@ vk_recreate_swap_chain :: proc() {
 			for obj in data.cmd.scene {
 				iobject_size(auto_cast obj)
 			}
+			free(data, data.allocator)
 		}
 
 		// Add each layer as a task to thread pool
 		for cmd in __g_layer {
 			data := new(size_task_data, context.temp_allocator)
 			data.cmd = cmd
+			data.allocator = context.temp_allocator
 			thread.pool_add_task(&g_thread_pool, context.allocator, size_task_proc, data)
 		}
 		thread.pool_wait_all(&g_thread_pool)

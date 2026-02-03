@@ -48,19 +48,24 @@ execute_update_descriptor_set :: proc(set: ^i_descriptor_set, update_list: ^[dyn
 	@static mtx: sync.Mutex
 	if set.__set == 0 {
 		sync.mutex_lock(&mtx)
+		tmp : [dynamic]descriptor_pool_mem
+		exists: bool = false
 		if raw_data(set.size) in gDesciptorPools {
+			tmp = gDesciptorPools[raw_data(set.size)]
+			exists = true
 		} else {
-			gDesciptorPools[raw_data(set.size)] = mem.make_non_zeroed([dynamic]descriptor_pool_mem, gVkMemTlsfAllocator)
-			non_zero_append(&gDesciptorPools[raw_data(set.size)], descriptor_pool_mem{cnt = 0})
-			__create_descriptor_pool(set.size, &gDesciptorPools[raw_data(set.size)][0])
+			tmp = mem.make_non_zeroed([dynamic]descriptor_pool_mem, gVkMemTlsfAllocator)
+			non_zero_append(&tmp, descriptor_pool_mem{cnt = 0})
+			__create_descriptor_pool(set.size, &tmp[0])
 		}
 
-		last := &gDesciptorPools[raw_data(set.size)][len(gDesciptorPools[raw_data(set.size)]) - 1]
+		last := &tmp[len(tmp) - 1]
 		if last.cnt >= vkPoolBlock {
-			non_zero_append(&gDesciptorPools[raw_data(set.size)], descriptor_pool_mem{cnt = 0})
-			last = &gDesciptorPools[raw_data(set.size)][len(gDesciptorPools[raw_data(set.size)]) - 1]
+			non_zero_append(&tmp, descriptor_pool_mem{cnt = 0})
+			last = &tmp[len(tmp) - 1]
 			__create_descriptor_pool(set.size, last)
 		}
+		if !exists do gDesciptorPools[raw_data(set.size)]  = tmp
 		sync.mutex_unlock(&mtx)
 
 		last.cnt += 1

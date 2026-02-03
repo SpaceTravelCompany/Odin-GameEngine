@@ -307,6 +307,7 @@ close :: proc "contextless" () {
 		//thread pool 사용해서 각각 처리
 		update_task_data :: struct {
 			cmd: ^layer,
+			allocator: runtime.Allocator,
 		}
 		
 		update_task_proc :: proc(task: thread.Task) {
@@ -314,12 +315,14 @@ close :: proc "contextless" () {
 			for obj in data.cmd.scene {
 				iobject_update(auto_cast obj)
 			}
+			free(data, data.allocator)
 		}
 		
 		// Add each render_cmd as a task to thread pool
 		for cmd in __g_layer {
 			data := new(update_task_data, context.temp_allocator)
 			data.cmd = cmd
+			data.allocator = context.temp_allocator
 			thread.pool_add_task(&g_thread_pool, context.allocator, update_task_proc, data)
 		}
 		thread.pool_wait_all(&g_thread_pool)
