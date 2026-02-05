@@ -17,6 +17,17 @@ pointu :: [2]u32
 pointf64 :: [2]f64
 matrix44 :: Matrix4x4f32
 
+center_pt_pos :: enum {
+    Center,
+    Left,
+    Right,
+    TopLeft,
+    Top,
+    TopRight,
+    BottomLeft,
+    Bottom,
+    BottomRight,
+}
 
 Rect_ :: struct($T: typeid) where intrinsics.type_is_numeric(T) {
 	left: T,
@@ -559,4 +570,106 @@ Area_PointIn :: #force_inline proc "contextless" (area:Area($T), pt:[2]T) -> boo
 
 xy_mirror_point :: #force_inline proc "contextless" (pivot : [2]$T, target : [2]T) -> [2]T where intrinsics.type_is_float(T) {
 	return [2]T{2,2} * pivot - target
+}
+
+
+@(require_results)
+srtc_2d_matrix :: proc "contextless" (t: point3d, s: point, r: f32, cp:point) -> Matrix4x4f32 {
+	pivot := matrix4_translate(point3d{cp.x,cp.y,0.0})
+	translation := matrix4_translate(t)
+	rotation := matrix4_rotate_f32(r, Vector3f32{0.0, 0.0, 1.0})
+	scale := matrix4_scale(point3d{s.x,s.y,1.0})
+	return mul(translation, mul(rotation, mul(scale, pivot)))
+}
+
+@(require_results)
+srt_2d_matrix :: proc "contextless" (t: point3d, s: point, r: f32) -> Matrix4x4f32 {
+	translation := matrix4_translate(t)
+	rotation := matrix4_rotate_f32(r, Vector3f32{0.0, 0.0, 1.0})
+	scale := matrix4_scale(point3d{s.x,s.y,1.0})
+	return mul(translation, mul(rotation, scale))
+}
+
+@(require_results)
+st_2d_matrix :: proc "contextless" (t: point3d, s: point) -> Matrix4x4f32 {
+	translation := matrix4_translate(t)
+	scale := matrix4_scale(point3d{s.x,s.y,1.0})
+	return mul(translation, scale)
+}
+
+@(require_results)
+rt_2d_matrix :: proc "contextless" (t: point3d, r: f32) -> Matrix4x4f32 {
+	translation := matrix4_translate(t)
+    rotation := matrix4_rotate_f32(r, Vector3f32{0.0, 0.0, 1.0})
+	return mul(translation, rotation)
+}
+
+
+@(require_results)
+t_2d_matrix :: proc "contextless" (t: point3d) -> Matrix4x4f32 {
+	translation := matrix4_translate(t)
+	return translation
+}
+
+@(require_results)
+src_2d_matrix :: proc "contextless" (s: point, r: f32, cp:point) -> Matrix4x4f32 {
+	pivot := matrix4_translate(point3d{cp.x,cp.y,0.0})
+	rotation := matrix4_rotate_f32(r, Vector3f32{0.0, 0.0, 1.0})
+	scale := matrix4_scale(point3d{s.x,s.y,1.0})
+	return mul(rotation, mul(scale, pivot))
+}
+
+@(require_results)
+sr_2d_matrix :: proc "contextless" (s: point, r: f32) -> Matrix4x4f32 {
+	rotation := matrix4_rotate_f32(r, Vector3f32{0.0, 0.0, 1.0})
+	scale := matrix4_scale(point3d{s.x,s.y,1.0})
+	return mul(rotation, scale)
+}
+
+@(require_results)
+s_2d_matrix :: proc "contextless" (s: point) -> Matrix4x4f32 {
+	scale := matrix4_scale(point3d{s.x,s.y,1.0})
+	return scale
+}
+
+@(require_results)
+r_2d_matrix :: proc "contextless" (r: f32) -> Matrix4x4f32 {
+    rotation := matrix4_rotate_f32(r, Vector3f32{0.0, 0.0, 1.0})
+	return rotation
+}
+
+@(require_results)
+srt_2d_matrix2 :: proc "contextless" (t: point3d, s: point, r: f32, cp:point) -> Matrix4x4f32 {
+    if cp != {0.0, 0.0} {
+        return srtc_2d_matrix(t,s,r,cp)
+    }
+    if r != 0.0 {
+        if s != {1.0, 1.0} {
+            return srt_2d_matrix(t,s,r)
+        } else {
+            return rt_2d_matrix(t,r)
+        }
+    }
+    if s != {1.0, 1.0} {
+        return st_2d_matrix(t,s)
+    }
+    return t_2d_matrix(t)
+}
+
+@(require_results)
+sr_2d_matrix2 :: proc "contextless" (s: point, r: f32, cp:point) -> Maybe(Matrix4x4f32) {
+    if cp != {0.0, 0.0} {
+        return src_2d_matrix(s,r,cp)
+    }
+    if r != 0.0 {
+        if s != {1.0, 1.0} {
+            return sr_2d_matrix(s,r)
+        } else {
+            return r_2d_matrix(r)
+        }
+    }
+    if s != {1.0, 1.0} {
+        return s_2d_matrix(s)
+    }
+    return nil
 }

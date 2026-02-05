@@ -14,9 +14,9 @@ iobject_vtable :: struct {
     deinit: #type proc (self:^iobject),
     update: #type proc (self:^iobject),
     size: #type proc (self:^iobject),
+	update_descriptor_set: #type proc (self:^iobject),
+	descriptor_set_layout : vk.DescriptorSetLayout,
 }
-
-
 
 /*
 Base object interface structure for all renderable objects
@@ -24,11 +24,16 @@ Base object interface structure for all renderable objects
 Contains vtable for polymorphic behavior
 */
 iobject :: struct {
-    actual_type: typeid,
+	allocator: runtime.Allocator,
     vtable: ^iobject_vtable,
+	actual_type: typeid,
+	set: vk.DescriptorSet,
+	set_idx: u32,
 }
+
 @private __itransform_object_vtable :iobject_vtable = iobject_vtable {
-    deinit = auto_cast _super_itransform_object_deinit,
+    deinit = auto_cast itransform_object_deinit,
+	descriptor_set_layout = base_descriptor_set_layout(),
 }
 
 /*
@@ -39,123 +44,23 @@ Contains transformation matrix, descriptor set for polymorphic behavior
 itransform_object :: struct {
 	using _: iobject,
     using _: __matrix_in,
-    set:descriptor_set(2),
     color_transform: ^color_transform,
 }
 
 @private __matrix_in :: struct {
     mat: linalg.matrix44,
+	mat_idx:Maybe(u32),
 }
 
-@(require_results)
-srtc_2d_matrix :: proc "contextless" (t: linalg.point3d, s: linalg.point, r: f32, cp:linalg.point) -> linalg.Matrix4x4f32 {
-	pivot := linalg.matrix4_translate(linalg.point3d{cp.x,cp.y,0.0})
-	translation := linalg.matrix4_translate(t)
-	rotation := linalg.matrix4_rotate_f32(r, linalg.Vector3f32{0.0, 0.0, 1.0})
-	scale := linalg.matrix4_scale(linalg.point3d{s.x,s.y,1.0})
-	return linalg.mul(translation, linalg.mul(rotation, linalg.mul(scale, pivot)))
-}
-
-@(require_results)
-srt_2d_matrix :: proc "contextless" (t: linalg.point3d, s: linalg.point, r: f32) -> linalg.Matrix4x4f32 {
-	translation := linalg.matrix4_translate(t)
-	rotation := linalg.matrix4_rotate_f32(r, linalg.Vector3f32{0.0, 0.0, 1.0})
-	scale := linalg.matrix4_scale(linalg.point3d{s.x,s.y,1.0})
-	return linalg.mul(translation, linalg.mul(rotation, scale))
-}
-
-@(require_results)
-st_2d_matrix :: proc "contextless" (t: linalg.point3d, s: linalg.point) -> linalg.Matrix4x4f32 {
-	translation := linalg.matrix4_translate(t)
-	scale := linalg.matrix4_scale(linalg.point3d{s.x,s.y,1.0})
-	return linalg.mul(translation, scale)
-}
-
-@(require_results)
-rt_2d_matrix :: proc "contextless" (t: linalg.point3d, r: f32) -> linalg.Matrix4x4f32 {
-	translation := linalg.matrix4_translate(t)
-    rotation := linalg.matrix4_rotate_f32(r, linalg.Vector3f32{0.0, 0.0, 1.0})
-	return linalg.mul(translation, rotation)
-}
-
-
-@(require_results)
-t_2d_matrix :: proc "contextless" (t: linalg.point3d) -> linalg.Matrix4x4f32 {
-	translation := linalg.matrix4_translate(t)
-	return translation
-}
-
-@(require_results)
-src_2d_matrix :: proc "contextless" (s: linalg.point, r: f32, cp:linalg.point) -> linalg.Matrix4x4f32 {
-	pivot := linalg.matrix4_translate(linalg.point3d{cp.x,cp.y,0.0})
-	rotation := linalg.matrix4_rotate_f32(r, linalg.Vector3f32{0.0, 0.0, 1.0})
-	scale := linalg.matrix4_scale(linalg.point3d{s.x,s.y,1.0})
-	return linalg.mul(rotation, linalg.mul(scale, pivot))
-}
-
-@(require_results)
-sr_2d_matrix :: proc "contextless" (s: linalg.point, r: f32) -> linalg.Matrix4x4f32 {
-	rotation := linalg.matrix4_rotate_f32(r, linalg.Vector3f32{0.0, 0.0, 1.0})
-	scale := linalg.matrix4_scale(linalg.point3d{s.x,s.y,1.0})
-	return linalg.mul(rotation, scale)
-}
-
-@(require_results)
-s_2d_matrix :: proc "contextless" (s: linalg.point) -> linalg.Matrix4x4f32 {
-	scale := linalg.matrix4_scale(linalg.point3d{s.x,s.y,1.0})
-	return scale
-}
-
-@(require_results)
-r_2d_matrix :: proc "contextless" (r: f32) -> linalg.Matrix4x4f32 {
-    rotation := linalg.matrix4_rotate_f32(r, linalg.Vector3f32{0.0, 0.0, 1.0})
-	return rotation
-}
-
-@(require_results)
-srt_2d_matrix2 :: proc "contextless" (t: linalg.point3d, s: linalg.point, r: f32, cp:linalg.point) -> linalg.Matrix4x4f32 {
-    if cp != {0.0, 0.0} {
-        return srtc_2d_matrix(t,s,r,cp)
-    }
-    if r != 0.0 {
-        if s != {1.0, 1.0} {
-            return srt_2d_matrix(t,s,r)
-        } else {
-            return rt_2d_matrix(t,r)
-        }
-    }
-    if s != {1.0, 1.0} {
-        return st_2d_matrix(t,s)
-    }
-    return t_2d_matrix(t)
-}
-
-@(require_results)
-sr_2d_matrix2 :: proc "contextless" (s: linalg.point, r: f32, cp:linalg.point) -> Maybe(linalg.Matrix4x4f32) {
-    if cp != {0.0, 0.0} {
-        return src_2d_matrix(s,r,cp)
-    }
-    if r != 0.0 {
-        if s != {1.0, 1.0} {
-            return sr_2d_matrix(s,r)
-        } else {
-            return r_2d_matrix(r)
-        }
-    }
-    if s != {1.0, 1.0} {
-        return s_2d_matrix(s)
-    }
-    return nil
-}
-
-_super_itransform_object_deinit :: proc (self:^itransform_object) {
-	resource := graphics_get_resource(self)
+itransform_object_deinit :: proc (self:^itransform_object) {
+	resource :punion_resource = graphics_get_resource(self.mat_idx)
 	if resource != nil {
-		buffer_resource_deinit(self)
+		buffer_resource_deinit(self.mat_idx.?)
 	}
 }
 
-iobject_init :: proc(self:^iobject) {
+iobject_init :: proc(self:^iobject, allocator:runtime.Allocator) {
+    self.allocator = allocator
     self.actual_type = typeid_of(iobject)
 }
 
@@ -166,43 +71,55 @@ itransform_object_init :: proc(self:^itransform_object, _color_transform:^color_
 		self.vtable = &__itransform_object_vtable
 	} else {
 		self.vtable = vtable
-		if self.vtable.deinit == nil do self.vtable.deinit = auto_cast _super_itransform_object_deinit
+		if self.vtable.deinit == nil do self.vtable.deinit = auto_cast itransform_object_deinit
+		if self.vtable.update_descriptor_set == nil do self.vtable.update_descriptor_set = auto_cast itransform_object_update_descriptor_set
+		if self.vtable.descriptor_set_layout == 0 do self.vtable.descriptor_set_layout = base_descriptor_set_layout()
 	}
 
+	iobject_init(self, self.allocator)
     self.actual_type = typeid_of(itransform_object)
 }
 
-set_uniform_resources_transform_object :: proc(self:^itransform_object, resources:[]union_resource)  {
-    resources[0] = graphics_get_resource(self)
-    resources[1] = graphics_get_resource(self.color_transform)
+@private itransform_object_update_descriptor_set :: proc(self:^itransform_object) {
+	if self.set == 0 {
+		self.set, self.set_idx = get_descriptor_set(descriptor_pool_size__base_uniform_pool[:], base_descriptor_set_layout())
+	}
+	update_descriptor_set(self.set, descriptor_pool_size__base_uniform_pool[:], {
+		graphics_get_resource(self.mat_idx.?),
+		graphics_get_resource(self.color_transform.mat_idx.?),
+	})
 }
 
-
 itransform_object_update_transform :: proc(self:^itransform_object, pos:linalg.point3d, rotation:f32 = 0.0, scale:linalg.point = {1.0,1.0}, pivot:linalg.point = {0.0,0.0}) {
-    itransform_object_update_transform_matrix_raw(self, srt_2d_matrix2(pos, scale, rotation, pivot))
+    itransform_object_update_transform_matrix_raw(self, linalg.srtc_2d_matrix(pos, scale, rotation, pivot))
 }
 itransform_object_update_transform_matrix_raw :: proc(self:^itransform_object, _mat:linalg.matrix44) {
     self.mat = _mat
     
-    // Check if resource exists in gMapResource
-    resource := graphics_get_resource(self)
+    resource :punion_resource = graphics_get_resource(self.mat_idx)
 	if resource == nil {
-        buffer_resource_create_buffer(self, {
+        buffer_resource_create_buffer(nil, {
             size = size_of(linalg.matrix44),
             type = .UNIFORM,
             resource_usage = .CPU,
-        }, mem.ptr_to_bytes(&self.mat), true)
+        }, mem.ptr_to_bytes(&self.mat))
 
-        set_uniform_resources_transform_object(self, self.set.__resources[:])
-		update_descriptor_set(&self.set)
+		self.vtable.update_descriptor_set(self)
 	} else {
-		buffer_resource_copy_update(self, &self.mat)
+		buffer_resource_copy_update(self.mat_idx.?, &self.mat)
 	}
 }
 itransform_object_change_color_transform :: proc(self:^itransform_object, _color_transform:^color_transform) {
     self.color_transform = _color_transform
-    set_uniform_resources_transform_object(self, self.set.__resources[:])
-	update_descriptor_set(&self.set)
+	resource :punion_resource = graphics_get_resource(self.mat_idx)
+	if resource == nil {
+		buffer_resource_create_buffer(nil, {
+			size = size_of(linalg.matrix44),
+			type = .UNIFORM,
+			resource_usage = .CPU,
+		}, mem.ptr_to_bytes(&self.mat))
+	}
+	self.vtable.update_descriptor_set(self)
 }
 
 /*
@@ -235,8 +152,11 @@ Returns:
 iobject_deinit :: proc(self:^iobject) {
     if self.vtable != nil && self.vtable.deinit != nil {
         self.vtable.deinit(self)
-    } else {
-        log.panic("iobjectType_Deinit: unknown object type\n")
+    }
+	self.vtable = nil
+    if self.set != 0 {
+        put_descriptor_set(self.set_idx, self.vtable.descriptor_set_layout)
+        self.set = 0
     }
 }
 
@@ -244,14 +164,12 @@ iobject_update :: proc(self:^iobject) {
     if self.vtable != nil && self.vtable.update != nil {
         self.vtable.update(self)
     }
-    //Update Not Required Default
 }
 
 iobject_size :: proc(self:^iobject) {
     if self.vtable != nil && self.vtable.size != nil {
         self.vtable.size(self)
     }
-    //Size Not Required Default
 }
 
 set_render_clear_color :: proc "contextless" (_color:linalg.point3dw) {
@@ -259,8 +177,8 @@ set_render_clear_color :: proc "contextless" (_color:linalg.point3dw) {
 }
 
 __vertex_buf_init :: proc (self:^__vertex_buf($NodeType), array:[]NodeType, _flag:resource_usage, _useGPUMem := false, allocator :Maybe(runtime.Allocator) = nil) {
-    if len(array) == 0 do log.panic("vertex_buf_init: array is empty\n")
-    buffer_resource_create_buffer(self, {
+    assert(len(array) > 0)
+    _, self.idx = buffer_resource_create_buffer(self.idx, {
         size = vk.DeviceSize(len(array) * size_of(NodeType)),
         type = .VERTEX,
         resource_usage = _flag,
@@ -271,7 +189,9 @@ __vertex_buf_init :: proc (self:^__vertex_buf($NodeType), array:[]NodeType, _fla
 }
 
 __vertex_buf_deinit :: proc (self:^__vertex_buf($NodeType)) {
-    buffer_resource_deinit(self)
+  	 if self.idx != nil {
+		buffer_resource_deinit(self.idx.?)
+	}
 }
 
 __vertex_buf_update :: proc (self:^__vertex_buf($NodeType), array:[]NodeType, allocator :Maybe(runtime.Allocator) = nil) {
@@ -279,8 +199,8 @@ __vertex_buf_update :: proc (self:^__vertex_buf($NodeType), array:[]NodeType, al
 }
 
 __storage_buf_init :: proc (self:^__storage_buf($NodeType), array:[]NodeType, _flag:resource_usage, _useGPUMem := false) {
-    if len(array) == 0 do log.panic("storage_buf_init: array is empty\n")
-    buffer_resource_create_buffer(self, {
+     assert(len(array) > 0)
+    _, self.idx = buffer_resource_create_buffer(self.idx, {
         size = vk.DeviceSize(len(array) * size_of(NodeType)),
         type = .STORAGE,
         resource_usage = _flag,
@@ -291,7 +211,9 @@ __storage_buf_init :: proc (self:^__storage_buf($NodeType), array:[]NodeType, _f
 }
 
 __storage_buf_deinit :: proc (self:^__storage_buf($NodeType)) {
-    buffer_resource_deinit(self)
+    if self.idx != nil {
+		buffer_resource_deinit(self.idx.?)
+	}
 }
 
 __storage_buf_update :: proc (self:^__storage_buf($NodeType), array:[]NodeType) {
@@ -299,8 +221,8 @@ __storage_buf_update :: proc (self:^__storage_buf($NodeType), array:[]NodeType) 
 }
 
 __index_buf_init :: proc (self:^__index_buf, array:[]u32, _flag:resource_usage, _useGPUMem := false, allocator :Maybe(runtime.Allocator) = nil) {
-    if len(array) == 0 do log.panic("index_buf_init: array is empty\n")
-    buffer_resource_create_buffer(self, {
+    assert(len(array) > 0)
+    _, self.idx = buffer_resource_create_buffer(self.idx, {
         size = vk.DeviceSize(len(array) * size_of(u32)),
         type = .INDEX,
         resource_usage = _flag,
@@ -311,19 +233,23 @@ __index_buf_init :: proc (self:^__index_buf, array:[]u32, _flag:resource_usage, 
 
 
 __index_buf_deinit :: proc (self:^__index_buf) {
-    buffer_resource_deinit(self)
+	if self.idx != nil {
+		buffer_resource_deinit(self.idx.?)
+	}
 }
 
 __index_buf_update :: #force_inline proc (self:^__index_buf, array:[]u32, allocator :Maybe(runtime.Allocator) = nil) {
-    buffer_resource_map_update_slice(self, array, allocator)
+    if self.idx != nil do buffer_resource_map_update_slice(self.idx.?, array, allocator)
 }
 
 __vertex_buf :: struct($NodeType:typeid) {
 	data:[]NodeType,
+	idx:Maybe(u32),
 }
 __index_buf :: distinct __vertex_buf(u32)
 __storage_buf :: struct($NodeType:typeid) {
 	data:[]NodeType,
+	idx:Maybe(u32),
 }
 
 /*

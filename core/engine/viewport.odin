@@ -1,8 +1,8 @@
 package engine
 
 import "core:math/linalg"
-import "core:mem"
 import vk "vendor:vulkan"
+import "base:runtime"
 
 /*
 Viewport structure for managing rendering areas and camera/projection settings
@@ -16,10 +16,13 @@ Contains:
 viewport :: struct {
 	camera : ^camera,
 	projection : ^projection,
-	set:descriptor_set(2),
+	set:vk.DescriptorSet,
+	set_idx:u32,
 	viewport_area : Maybe(linalg.rect),
+	allocator: runtime.Allocator,
 }
 
+//내부구조는 base_descriptor_set_layout와 동일
 viewport_descriptor_set_layout :: proc "contextless" () -> vk.DescriptorSetLayout {
 	return __base_descriptor_set_layout
 }
@@ -34,18 +37,21 @@ Inputs:
 Returns:
 - None
 */
-viewport_init_update :: proc (self:^viewport) {
-	if self.set.bindings == nil {
-		self.set.bindings = descriptor_set_binding__base_uniform_pool[:]
-    	self.set.size = descriptor_pool_size__base_uniform_pool[:]
-    	self.set.layout = viewport_descriptor_set_layout()
+viewport_init_update :: proc (self:^viewport, allocator := context.allocator) {
+	self.allocator = allocator
+	if vulkan_version.major > 0 {
+		if self.set == 0 {
+			self.set, self.set_idx = get_descriptor_set(descriptor_pool_size__base_uniform_pool[:], base_descriptor_set_layout())
+		}
 	}
-	
-	self.set.__resources[0] = graphics_get_resource(self.camera)
-	self.set.__resources[1] = graphics_get_resource(self.projection)
-	update_descriptor_set(&self.set)
 }
 
+viewport_deinit :: proc(self:^viewport) {
+	if self.set != 0 {
+        put_descriptor_set(self.set_idx, base_descriptor_set_layout())
+        self.set = 0
+    }
+}
 def_viewport :: proc "contextless" () -> ^viewport {
 	return &__g_default_viewport
 }

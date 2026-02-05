@@ -12,6 +12,7 @@ import "core:fmt"
 import vk "vendor:vulkan"
 import "core:log"
 import "core:mem/tlsf"
+import "core:container/pool"
 
 // Conversion Functions
 
@@ -62,7 +63,7 @@ descriptor_type_to_vk_descriptor_type :: proc "contextless" (t: descriptor_type)
 
 // Constants
 
-vkPoolBlock :: 1024
+vkPoolBlock :u32: 256
 vkUniformSizeBlock :: 2 * mem.Megabyte
 VkMaxMemIdxCnt : int : 4
 
@@ -108,7 +109,7 @@ OpCreateTexture :: struct {
 }
 
 OpDestroyBuffer :: struct {
-	self: rawptr,
+	idx: u32,
 	src: ^buffer_resource,
 }
 
@@ -117,17 +118,13 @@ OpReleaseUniform :: struct {
 }
 
 OpDestroyTexture :: struct {
-	self: rawptr,
+	idx: u32,
 	src: ^texture_resource,
 }
 
-Op__UpdateDescriptorSet :: struct {
-	set: ^i_descriptor_set,
-}
-
 Op__AddResToObj :: struct {
-	self: rawptr,
-	res: union_resource,
+	idx: u32,
+	res: punion_resource,
 }
 
 // Types - Structs (Memory buffer)
@@ -182,7 +179,6 @@ OpNode :: union {
 	OpDestroyBuffer,
 	OpReleaseUniform,
 	OpDestroyTexture,
-	Op__UpdateDescriptorSet,
 }
 
 // Types - Buffer and Texture Type Union (internal)
@@ -218,8 +214,6 @@ destroy_node :: struct {
 }
 opDestroyQueues: [dynamic]destroy_node
 opDestroyQueueMtx: sync.Mutex
-
-gDesciptorPools: map[[^]descriptor_pool_size][dynamic]descriptor_pool_mem
 
 gUniforms: [dynamic]vk_uniform_alloc
 gTempUniforms: [dynamic]vk_temp_uniform_struct
@@ -363,6 +357,8 @@ vk_allocator_init :: proc() {
 	gUniforms = mem.make_non_zeroed([dynamic]vk_uniform_alloc, gVkMemTlsfAllocator)
 	gTempUniforms = mem.make_non_zeroed([dynamic]vk_temp_uniform_struct, gVkMemTlsfAllocator)
 	gNonInsertedUniforms = mem.make_non_zeroed([dynamic]vk_temp_uniform_struct, gVkMemTlsfAllocator)
+	gDesciptorPools = mem.make_map(map[vk.DescriptorSetLayout]descriptor_pool_mem, gVkMemTlsfAllocator)
+	gTmpDesciptorPoolSizes = mem.make_non_zeroed([dynamic]vk.DescriptorPoolSize, gVkMemTlsfAllocator)
 }
 
 
@@ -382,22 +378,19 @@ vk_allocator_destroy :: proc() {
 	delete(gVkMemBufs)
 
 	for _, &value in gDesciptorPools {
-		for i in value {
-			vk.DestroyDescriptorPool(vk_device, i.pool, nil)
-		}
-		delete(value)
+		descriptor_pool_mem_destroy(&value)
 	}
 	for i in gUniforms {
 		delete(i.uniforms)
 	}
-
+	
+	delete(gTmpDesciptorPoolSizes)
 	delete(gDesciptorPools)
 	delete(gUniforms)
 	delete(gTempUniforms)
 	delete(gNonInsertedUniforms)
 	delete(opQueue)
 	delete(opDestroyQueues)
-	delete(gMapResource)
 	delete(gVkMemIdxCnts, gVkMemTlsfAllocator)
 
 	tlsf.destroy(&gVkMemTlsf)
@@ -642,8 +635,6 @@ vk_exec_gpu_commands_task :: proc(task: thread.Task) {
 	gVkUpdateDesciptorSetList := mem.make_non_zeroed([dynamic]vk.WriteDescriptorSet, arena_allocator)
 	for node in opExecQueue {
 		#partial switch n in node {
-		case Op__UpdateDescriptorSet:
-			execute_update_descriptor_set(n.set, &gVkUpdateDesciptorSetList, arena_allocator)
 		case OpCopyBuffer:
 			haveCmds = true
 		case OpCopyBufferToTexture:

@@ -15,6 +15,8 @@ import "core:thread"
 import "core:log"
 
 
+ENGINE_ROOT :: #directory
+
 dt :: #force_inline proc "contextless" () -> f64 {
 	 return delta_time
 }

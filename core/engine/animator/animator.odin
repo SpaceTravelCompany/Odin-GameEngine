@@ -231,9 +231,9 @@ ianimate_object_vtable :: struct {
 
 
 @private animate_image_vtable :ianimate_object_vtable = ianimate_object_vtable {
-    draw = auto_cast _super_animate_image_draw,
-    deinit = auto_cast _super_animate_image_deinit,
-    get_frame_cnt = auto_cast _super_animate_image_get_frame_cnt,
+    draw = auto_cast animate_image_draw,
+    deinit = auto_cast animate_image_deinit,
+    get_frame_cnt = auto_cast animate_image_get_frame_cnt,
 }
 
 
@@ -249,21 +249,21 @@ colorTransform:^engine.color_transform = nil, vtable:^ianimate_object_vtable = n
         self.vtable = &animate_image_vtable
     } else {
         self.vtable = vtable
-		 if self.vtable.draw == nil do self.vtable.draw = auto_cast _super_animate_image_draw
-   	 	if self.vtable.deinit == nil do self.vtable.deinit = auto_cast _super_animate_image_deinit
-    	if ((^ianimate_object_vtable)(self.vtable)).get_frame_cnt == nil do ((^ianimate_object_vtable)(self.vtable)).get_frame_cnt = auto_cast _super_animate_image_get_frame_cnt
+		 if self.vtable.draw == nil do self.vtable.draw = auto_cast animate_image_draw
+   	 	if self.vtable.deinit == nil do self.vtable.deinit = auto_cast animate_image_deinit
+    	if ((^ianimate_object_vtable)(self.vtable)).get_frame_cnt == nil do ((^ianimate_object_vtable)(self.vtable)).get_frame_cnt = auto_cast animate_image_get_frame_cnt
     }
 
     ianimate_object_init(self, colorTransform, auto_cast self.vtable)
     self.actual_type = typeid_of(animate_image)
 }
 
-_super_animate_image_deinit :: proc(self:^animate_image) {
+animate_image_deinit :: proc(self:^animate_image) {
     engine.buffer_resource_deinit(&self.frame)
-    engine._super_itransform_object_deinit(auto_cast self)
+    engine.itransform_object_deinit(auto_cast self)
 }
 
-animate_image_get_frame_cnt :: _super_animate_image_get_frame_cnt
+animate_image_get_frame_cnt :: animate_image_get_frame_cnt
 
 /*
 Gets the total number of frames for the animated image
@@ -274,7 +274,7 @@ Inputs:
 Returns:
 - The total number of frames in the texture array
 */
-_super_animate_image_get_frame_cnt :: proc "contextless" (self:^animate_image) -> u32 {
+animate_image_get_frame_cnt :: proc "contextless" (self:^animate_image) -> u32 {
 	res, ok := engine.graphics_get_resource(self.src).(^engine.texture_resource)
 	if !ok do return 0
 
@@ -291,7 +291,7 @@ animate_image_change_color_transform :: #force_inline proc(self:^animate_image, 
     engine.itransform_object_change_color_transform(self, colorTransform)
 }
 
-_super_animate_image_draw :: proc (self:^animate_image, cmd:engine.command_buffer, viewport:^engine.viewport) {
+animate_image_draw :: proc (self:^animate_image, cmd:engine.command_buffer, viewport:^engine.viewport) {
     engine.graphics_cmd_bind_pipeline(cmd, .GRAPHICS, engine.get_animate_img_pipeline().__pipeline)
     engine.graphics_cmd_bind_descriptor_sets(cmd, .GRAPHICS, engine.get_animate_img_pipeline().__pipeline_layout,
 	 0, 4,

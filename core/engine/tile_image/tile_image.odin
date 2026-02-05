@@ -24,8 +24,8 @@ tile_image :: struct {
 
 
 @private tile_image_vtable :engine.iobject_vtable = engine.iobject_vtable {
-    draw = auto_cast _super_tile_image_draw,
-    deinit = auto_cast _super_tile_image_deinit,
+    draw = auto_cast tile_image_draw,
+    deinit = auto_cast tile_image_deinit,
 }
 
 tile_image_init :: proc(self:^tile_image, src:^tile_texture_array,
@@ -40,9 +40,8 @@ colorTransform:^engine.color_transform = nil, vtable:^engine.iobject_vtable = ni
         self.vtable = &tile_image_vtable
     } else {
         self.vtable = vtable
-		if self.vtable.draw == nil do self.vtable.draw = auto_cast _super_tile_image_draw
-    	if self.vtable.deinit == nil do self.vtable.deinit = auto_cast _super_tile_image_deinit
-
+		if self.vtable.draw == nil do self.vtable.draw = auto_cast tile_image_draw
+    	if self.vtable.deinit == nil do self.vtable.deinit = auto_cast tile_image_deinit
     }
 
 	 engine.buffer_resource_create_buffer(&self.tile_idx, {
@@ -57,10 +56,10 @@ colorTransform:^engine.color_transform = nil, vtable:^engine.iobject_vtable = ni
 	self.actual_type = typeid_of(tile_image)
 }
 
-_super_tile_image_deinit :: proc(self:^tile_image) {
+tile_image_deinit :: proc(self:^tile_image) {
     engine.buffer_resource_deinit(&self.tile_idx)
 
-    engine._super_itransform_object_deinit(auto_cast self)
+    engine.itransform_object_deinit(auto_cast self)
 }
 
 
@@ -92,7 +91,7 @@ tile_image_update_idx :: proc(self:^tile_image, idx:u32) {
     engine.buffer_resource_copy_update(&self.tile_idx, &self.tile_idx)
 }
 
-_super_tile_image_draw :: proc (self:^tile_image, cmd:engine.command_buffer, viewport:^engine.viewport) {
+tile_image_draw :: proc (self:^tile_image, cmd:engine.command_buffer, viewport:^engine.viewport) {
     engine.graphics_cmd_bind_pipeline(cmd, .GRAPHICS, engine.get_animate_img_pipeline().__pipeline)
     engine.graphics_cmd_bind_descriptor_sets(cmd, .GRAPHICS, engine.get_animate_img_pipeline().__pipeline_layout,
 	 0, 4,

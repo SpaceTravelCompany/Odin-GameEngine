@@ -211,14 +211,14 @@ button_vtable :: struct {
 }
 
 @private image_button_vtable :button_vtable = button_vtable {
-    draw = auto_cast _super_image_button_draw,
+    draw = auto_cast image_button_draw,
 	__over_exists = auto_cast image_button_over_exists,
 	__down_exists = auto_cast image_button_down_exists,
 	__up_exists = auto_cast image_button_up_exists,
 }
 
 @private shape_button_vtable :button_vtable = button_vtable {
-    draw = auto_cast _super_shape_button_draw,
+    draw = auto_cast shape_button_draw,
 	__over_exists = auto_cast shape_button_over_exists,
 	__down_exists = auto_cast shape_button_down_exists,
 	__up_exists = auto_cast shape_button_up_exists,
@@ -243,7 +243,7 @@ shape_button_up_exists :: proc (self:^shape_button) -> bool {
 	return self.up_shape_src != nil
 }
 
-_super_image_button_draw :: proc (self:^image_button, cmd:engine.command_buffer, viewport:^engine.viewport) {
+image_button_draw :: proc (self:^image_button, cmd:engine.command_buffer, viewport:^engine.viewport) {
     texture :^engine.texture
 
     switch self.state {
@@ -277,18 +277,18 @@ ref_viewport:^engine.viewport = nil) {
 		self.vtable = &image_button_vtable
 	} else {
 		self.vtable = vtable
-		if self.vtable.draw == nil do self.vtable.draw = auto_cast _super_image_button_draw
+		if self.vtable.draw == nil do self.vtable.draw = auto_cast image_button_draw
 		if (^button_vtable)(self.vtable).__over_exists == nil do (^button_vtable)(self.vtable).__over_exists = auto_cast image_button_over_exists
 		if (^button_vtable)(self.vtable).__down_exists == nil do (^button_vtable)(self.vtable).__down_exists = auto_cast image_button_down_exists
 		if (^button_vtable)(self.vtable).__up_exists == nil do (^button_vtable)(self.vtable).__up_exists = auto_cast image_button_up_exists
 	}
-	_super_button_init(self, colorTransform, auto_cast self.vtable)
+	button_init(self, colorTransform, auto_cast self.vtable)
 	self.actual_type = typeid_of(image_button)
 	self.ref_viewport = ref_viewport
 }
 
 
-_super_shape_button_draw :: proc (self:^shape_button, cmd:engine.command_buffer, viewport:^engine.viewport) {
+shape_button_draw :: proc (self:^shape_button, cmd:engine.command_buffer, viewport:^engine.viewport) {
     shape_src :^shape.shape_src
 
     switch self.state {
@@ -308,7 +308,7 @@ _super_shape_button_draw :: proc (self:^shape_button, cmd:engine.command_buffer,
 button_unregister :: proc (self:^button) {
 }
 
-_super_button_init :: proc (self:^button, colorTransform:^engine.color_transform = nil, vtable:^button_vtable = nil,
+button_init :: proc (self:^button, colorTransform:^engine.color_transform = nil, vtable:^button_vtable = nil,
 ref_viewport:^engine.viewport = nil) {
 	if vtable == nil {
 		self.vtable = &__button_vtable
@@ -336,11 +336,11 @@ ref_viewport:^engine.viewport = nil) {
 		self.vtable = &shape_button_vtable
 	} else {
 		self.vtable = vtable
-		if self.vtable.draw == nil do self.vtable.draw = auto_cast _super_shape_button_draw
+		if self.vtable.draw == nil do self.vtable.draw = auto_cast shape_button_draw
 		if (^button_vtable)(self.vtable).__over_exists == nil do (^button_vtable)(self.vtable).__over_exists = auto_cast shape_button_over_exists
 		if (^button_vtable)(self.vtable).__down_exists == nil do (^button_vtable)(self.vtable).__down_exists = auto_cast shape_button_down_exists
 		if (^button_vtable)(self.vtable).__up_exists == nil do (^button_vtable)(self.vtable).__up_exists = auto_cast shape_button_up_exists
 	}
-	_super_button_init(self, colorTransform, auto_cast self.vtable)
+	button_init(self, colorTransform, auto_cast self.vtable)
 	self.actual_type = typeid_of(shape_button)
 }

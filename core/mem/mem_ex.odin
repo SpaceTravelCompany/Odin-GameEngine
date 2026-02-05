@@ -130,6 +130,34 @@ resize_slice :: proc(oldData: $T/[]$E, #any_int newLen: int, allocator := contex
 	return transmute(T)s, err
 }
 
+@(require_results)
+resize_non_zeroed_slice_aligned :: proc(oldData: $T/[]$E, #any_int newLen: int, alignment: int, allocator := context.allocator, loc := #caller_location) -> (T, runtime.Allocator_Error) #optional_allocator_error {
+	make_resize_slice_error_loc(loc, len(oldData), newLen)
+	if len(oldData) == newLen do return oldData, .None
+
+	data, err := runtime.non_zero_mem_resize(raw_data(oldData), len(oldData) * size_of(E), newLen * size_of(E), alignment, allocator)
+	if err != .None {
+		return nil, err
+	}
+	s := runtime.Raw_Slice{raw_data(data), newLen}
+
+	return transmute(T)s, err
+}
+
+@(require_results)
+resize_slice_aligned :: proc(oldData: $T/[]$E, #any_int newLen: int, alignment: int, allocator := context.allocator, loc := #caller_location) -> (T, runtime.Allocator_Error) #optional_allocator_error {
+	make_resize_slice_error_loc(loc, len(oldData), newLen)
+	if len(oldData) == newLen do return oldData, .None
+	data, err := runtime.mem_resize(raw_data(oldData), len(oldData) * size_of(E), newLen * size_of(E), alignment,  allocator)
+	if err != .None {
+		return nil, err
+	}
+	s := runtime.Raw_Slice{raw_data(data), newLen}
+
+	return transmute(T)s, err
+}
+
+
 @(disabled=ODIN_NO_BOUNDS_CHECK)
 make_resize_slice_error_loc :: #force_inline proc "contextless" (loc := #caller_location, #any_int oldLen: int, #any_int newLen: int) {
 	if 0 <= oldLen && 0 <= newLen {

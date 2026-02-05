@@ -23,7 +23,6 @@ INSTANCE_EXTENSIONS: [2]cstring = {
 @(rodata)
 LAYERS: [1]cstring = {"VK_LAYER_KHRONOS_validation"}
 
-msaa_count :: 1
 
 when msaa_count == 4 {
 	VK_SAMPLE_COUNT_FLAGS :: vk.SampleCountFlags{._4}

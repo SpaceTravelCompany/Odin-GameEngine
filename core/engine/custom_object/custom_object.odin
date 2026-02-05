@@ -31,8 +31,8 @@ custom_object :: struct {
 
 
 @private custom_object_vtable :engine.iobject_vtable = engine.iobject_vtable{
-    draw = auto_cast _super_custom_object_draw,
-    deinit = auto_cast _super_custom_object_deinit,
+    draw = auto_cast custom_object_draw,
+    deinit = auto_cast custom_object_deinit,
 }
 
 custom_object_init :: proc(self:^custom_object,
@@ -57,7 +57,7 @@ custom_object_init :: proc(self:^custom_object,
 		pool_sizes_copy := mem.make_non_zeroed_slice([]engine.descriptor_pool_size, len(pool_sizes[i]), allocator)
 		mem.copy_non_overlapping(&pool_sizes_copy[0], &pool_sizes[i][0], len(pool_sizes[i]))
 		
-		ptr, _ := mem.alloc(size_of(engine.p_descriptor_set) + ((int(num_resources)-1) * size_of(engine.union_resource)), 
+		ptr, _ := mem.alloc(size_of(engine.p_descriptor_set) + ((int(num_resources)-1) * size_of(engine.punion_resource)), 
 		mem.DEFAULT_ALIGNMENT, allocator)
 		self.sets[i] = auto_cast ptr
 		self.sets[i].bindings = pool_binding_copy
@@ -70,8 +70,8 @@ custom_object_init :: proc(self:^custom_object,
         self.vtable = &custom_object_vtable
     } else {
         self.vtable = vtable
-		if self.vtable.draw == nil do self.vtable.draw = auto_cast _super_custom_object_draw
-    	if self.vtable.deinit == nil do self.vtable.deinit = auto_cast _super_custom_object_deinit
+		if self.vtable.draw == nil do self.vtable.draw = auto_cast custom_object_draw
+    	if self.vtable.deinit == nil do self.vtable.deinit = auto_cast custom_object_deinit
     }
 
     engine.iobject_init(self)
@@ -79,7 +79,7 @@ custom_object_init :: proc(self:^custom_object,
 }
 
 
-_super_custom_object_deinit :: proc(self:^custom_object) {
+custom_object_deinit :: proc(self:^custom_object) {
 	for i in 0..<len(self.sets) {
 		mem.free(self.sets[i], self.allocator)
 		delete(self.sets[i].bindings, self.allocator)
@@ -88,23 +88,6 @@ _super_custom_object_deinit :: proc(self:^custom_object) {
     delete(self.sets, self.allocator)
 }
 
-
-_super_custom_object_draw :: proc(self:^custom_object, cmd:engine.command_buffer) {
-    sets := mem.make_non_zeroed_slice([]vk.DescriptorSet, len(self.sets), context.temp_allocator)
-    defer delete(sets, context.temp_allocator)
-
-    for i in 0..<len(self.sets) {
-        sets[i] = self.sets[i].__set
-    }
-
-    engine.graphics_cmd_bind_pipeline(cmd, .GRAPHICS, self.p_pipeline.__pipeline)
-    engine.graphics_cmd_bind_descriptor_sets(cmd, .GRAPHICS, self.p_pipeline.__pipeline_layout, 0, auto_cast len(self.sets),
-        &sets[0], 0, nil)
-
-    if self.p_pipeline.draw_method.type == .Draw {
-        engine.graphics_cmd_draw(cmd, self.p_pipeline.draw_method.vertex_count, self.p_pipeline.draw_method.instance_count, self.p_pipeline.draw_method.first_vertex, self.p_pipeline.draw_method.first_instance)
-    } else if self.p_pipeline.draw_method.type == .DrawIndexed {
-        engine.graphics_cmd_draw_indexed(cmd, self.p_pipeline.draw_method.index_count, self.p_pipeline.draw_method.instance_count, self.p_pipeline.draw_method.first_index, self.p_pipeline.draw_method.vertex_offset, self.p_pipeline.draw_method.first_instance)
-    }
+custom_object_draw :: proc(self:^custom_object, cmd:engine.command_buffer) {
+  	engine.graphics_pipeline_draw(cmd, self.p_pipeline, self.sets)
 }
-

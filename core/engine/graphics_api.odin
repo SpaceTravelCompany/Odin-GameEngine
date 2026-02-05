@@ -1,5 +1,6 @@
 package engine
 
+import "core:unicode/utf8/utf8string"
 import "base:intrinsics"
 import "base:library"
 import "base:runtime"
@@ -15,19 +16,20 @@ import "core:mem/tlsf"
 import "vendor:wasm/WebGL"
 import "vendor:OpenGL"
 import "vendor:wgpu"
+import "core:thread"
+import img "core:image"
+import "core:container/intrusive/list"
 
 import vk "vendor:vulkan"
 
-
+msaa_count :: #config(MSAA_COUNT, 1)
 MAX_FRAMES_IN_FLIGHT :: #config(MAX_FRAMES_IN_FLIGHT, 2)
 
 @private swap_img_cnt : u32 = 3
 
-
 graphics_device :: #force_inline proc "contextless" () -> vk.Device {
 	return vk_device
 }
-
 
 // Graphics State
 @private g_clear_color: [4]f32 = {0.0, 0.0, 0.0, 1.0}
@@ -37,16 +39,11 @@ graphics_device :: #force_inline proc "contextless" () -> vk.Device {
 
 
 // Pipelines
-@private shape_compute_pipeline: compute_pipeline
 @private screen_copy_pipeline: object_pipeline
-@private img_pipeline: object_pipeline
-@private animate_img_pipeline: object_pipeline
 
 // Descriptor Set Layouts
 @private __base_descriptor_set_layout: vk.DescriptorSetLayout
-@private __img_descriptor_set_layout: vk.DescriptorSetLayout
-@private __animate_img_descriptor_set_layout: vk.DescriptorSetLayout
-// copy_screen_descriptor_set_layout: vk.DescriptorSetLayout
+@private __copy_screen_descriptor_set_layout: vk.DescriptorSetLayout
 
 // Samplers
 @private linear_sampler: vk.Sampler
@@ -55,7 +52,7 @@ graphics_device :: #force_inline proc "contextless" () -> vk.Device {
 // Default Color Transform
 @private __def_color_transform: color_transform
 
-union_resource :: union {
+punion_resource :: union {
 	^buffer_resource,
 	^texture_resource,
 }
@@ -106,6 +103,11 @@ buffer_create_option :: struct {
 	use_gcpu_mem: bool,
 }
 
+texture_type :: enum {
+	TEX2D,
+	// TEX3D, //TODO
+}
+
 texture_create_option :: struct {
 	len: u32,
 	width: u32,
@@ -122,12 +124,9 @@ texture_create_option :: struct {
 descriptor_pool_size :: struct {
 	type: descriptor_type,
 	cnt: u32,
+	binding: u32,
 }
 
-descriptor_pool_mem :: struct {
-	pool: vk.DescriptorPool,
-	cnt: u32,
-}
 
 graphics_size :: vk.DeviceSize
 resource_range :: rawptr
@@ -176,72 +175,18 @@ get_vulkan_version :: proc "contextless" () -> VULKAN_VERSION {
 	return vulkan_version
 }
 
-
-i_descriptor_set :: struct {
-	layout: vk.DescriptorSetLayout,
-	/// created inside update_descriptor_set call
-	__set: vk.DescriptorSet,
-	size: []descriptor_pool_size,
-	bindings: []u32,
-	num_resources: u32,
-}
-
-descriptor_set :: struct($N:int) {
-	using _: i_descriptor_set,
-	__resources: [N]union_resource,
-}
-
-p_descriptor_set :: struct {
-	using _: i_descriptor_set,
-	__resources: [1]union_resource,
-}
-
 command_buffer :: struct #packed {
 	__handle: vk.CommandBuffer,
 }
 
 color_transform :: struct {
 	mat: linalg.matrix44,
-}
-
-texture :: struct {
-	set: descriptor_set(1),
-	sampler: vk.Sampler,
-	pixel_data: []byte,
-	width: u32,
-	height: u32,
+	mat_idx:Maybe(u32),
 }
 
 resource_usage :: enum {
 	GPU,
 	CPU,
-}
-
-texture_type :: enum {
-	TEX2D,
-	// TEX3D,
-}
-
-texture_usage :: enum {
-	IMAGE_RESOURCE,
-	FRAME_BUFFER,
-	__INPUT_ATTACHMENT,
-	__TRANSIENT_ATTACHMENT,
-	__STORAGE_IMAGE,
-}
-texture_usages :: bit_set[texture_usage]
-
-texture_fmt :: enum {
-	DefaultColor,
-	DefaultDepth,
-	R8G8B8A8Unorm,
-	B8G8R8A8Unorm,
-	// B8G8R8A8Srgb,
-	// R8G8B8A8Srgb,
-	D24UnormS8Uint,
-	D32SfloatS8Uint,
-	D16UnormS8Uint,
-	R8Unorm,
 }
 
 buffer_type :: enum {
@@ -260,21 +205,13 @@ descriptor_type :: enum {
 	STORAGE_IMAGE,
 }
 
+
 def_color_transform :: #force_inline proc "contextless" () -> ^color_transform {
 	return &__def_color_transform
 }
 
-get_shape_compute_pipeline :: #force_inline proc "contextless" () -> ^compute_pipeline {
-	return &shape_compute_pipeline
-}
 get_screen_copy_pipeline :: #force_inline proc "contextless" () -> ^object_pipeline {
 	return &screen_copy_pipeline
-}
-get_img_pipeline :: #force_inline proc "contextless" () -> ^object_pipeline {
-	return &img_pipeline
-}
-get_animate_img_pipeline :: #force_inline proc "contextless" () -> ^object_pipeline {
-	return &animate_img_pipeline
 }
 base_descriptor_set_layout :: #force_inline proc "contextless" () -> vk.DescriptorSetLayout {
 	return __base_descriptor_set_layout
@@ -468,6 +405,7 @@ graphics_cmd_bind_index_buffer :: proc "contextless" (
 	}
 }
 
+
 graphics_cmd_draw :: proc "contextless" (
 	cmd: command_buffer,
 	vertex_count: u32,
@@ -506,13 +444,13 @@ graphics_cmd_draw_indexed :: proc "contextless" (
 }
 
 buffer_resource_create_buffer :: proc(
-	self: rawptr,
+	idx: Maybe(u32),
 	option: buffer_create_option,
 	data: []byte,
 	is_copy: bool = false,
 	allocator: Maybe(runtime.Allocator) = nil,
-) {
-	out_res: union_resource = graphics_add_resource_buffer(self)
+) -> (^buffer_resource, u32) {
+	out_res, ridx := graphics_add_resource_buffer(idx)
 	out_res.(^buffer_resource).option = option
 
 	if is_copy {
@@ -528,35 +466,34 @@ buffer_resource_create_buffer :: proc(
 	} else {
 		append_op(OpCreateBuffer{src = out_res.(^buffer_resource), data = data, allocator = allocator})
 	}
+	return out_res.(^buffer_resource), ridx
 }
 
-buffer_resource_deinit :: proc(self: rawptr) {
-	base := graphics_get_resource(self)
+buffer_resource_deinit :: proc(idx: u32) {
+	base := graphics_get_resource(idx)
 	if base == nil do return
 
 	switch b in base {
 	case ^buffer_resource:
 		if b.option.type == .UNIFORM {
-			graphics_pop_resource(self, base)
+			graphics_pop_resource(idx, base)
 			append_op(OpReleaseUniform{src = b})
 		} else {
-			// 나중에 지운다.
-			append_op(OpDestroyBuffer{self = self, src = b})
+			append_op(OpDestroyBuffer{idx = idx, src = b})// 나중에 지운다.
 		}
 	case ^texture_resource:
 		if b.mem_buffer == nil {
-			graphics_pop_resource(self, base)
+			graphics_pop_resource(idx, base)
 			vk.DestroyImageView(vk_device, b.img_view, nil)
 		} else {
-			// 나중에 지운다.
-			append_op(OpDestroyTexture{self = self, src = b})
+			append_op(OpDestroyTexture{idx = idx, src = b})// 나중에 지운다.
 		}
 	}
 }
 
-buffer_resource_copy_update :: proc(self: rawptr, data: $T, allocator: Maybe(runtime.Allocator) = nil)
+buffer_resource_copy_update :: proc(idx: u32, data: $T, allocator: Maybe(runtime.Allocator) = nil)
 where intrinsics.type_is_slice(T) || intrinsics.type_is_pointer(T) {
-	base := graphics_get_resource(self)
+	base := graphics_get_resource(idx)
 	if base == nil do return
 
 	copyData: []byte
@@ -584,9 +521,9 @@ where intrinsics.type_is_slice(T) || intrinsics.type_is_pointer(T) {
 	}
 }
 
-buffer_resource_map_update_slice :: #force_inline proc(self: rawptr, array: $T/[]$E, allocator: Maybe(runtime.Allocator) = nil) {
+buffer_resource_map_update_slice :: proc(idx: u32, array: $T/[]$E, allocator: Maybe(runtime.Allocator) = nil) {
 	_data := mem.slice_to_bytes(array)
-	base := graphics_get_resource(self)
+	base := graphics_get_resource(idx)
 	if base == nil do return
 	switch b in base {
 	case ^buffer_resource:
@@ -597,14 +534,14 @@ buffer_resource_map_update_slice :: #force_inline proc(self: rawptr, array: $T/[
 }
 
 buffer_resource_create_texture :: proc(
-	self: rawptr,
+	idx: Maybe(u32),
 	option: texture_create_option,
 	sampler: vk.Sampler,
 	data: []byte,
 	is_copy: bool = false,
 	allocator: Maybe(runtime.Allocator) = nil,
-) {
-	out_res: union_resource = graphics_add_resource_texture(self)
+) -> (^texture_resource, u32) {
+	out_res, ridx := graphics_add_resource_texture(idx)
 	out_res.(^texture_resource).sampler = sampler
 	out_res.(^texture_resource).option = option
 
@@ -620,10 +557,39 @@ buffer_resource_create_texture :: proc(
 	} else {
 		append_op(OpCreateTexture{src = out_res.(^texture_resource), data = data, allocator = allocator})
 	}
+	return out_res.(^texture_resource), ridx
 }
 
-update_descriptor_set :: proc(descriptor_sets: ^i_descriptor_set) {
-	vk_update_descriptor_set(descriptor_sets)
+update_descriptor_set :: proc(set: vk.DescriptorSet, size: []descriptor_pool_size, resources: []punion_resource) {
+	when !is_web {
+		if vulkan_version.major > 0 {
+			vk_execute_update_descriptor_set(set, size, resources)
+		}
+	} else {
+		set := set;size := size;resources := resources
+	}
+}
+
+//get a descriptor set from the descriptor pool
+get_descriptor_set :: proc(size: []descriptor_pool_size, layout: vk.DescriptorSetLayout) -> (set:vk.DescriptorSet, idx: u32) {
+	when !is_web {
+		if vulkan_version.major > 0 {
+			return add_descriptor_set(size, layout)
+		}
+	} else {
+		size := size;layout := layout
+	}
+	return 0, 0
+}
+//put a descriptor set back to the descriptor pool
+put_descriptor_set :: proc(idx: u32, layout: vk.DescriptorSetLayout) {
+	when !is_web {
+		if vulkan_version.major > 0 {
+			del_descriptor_set(idx, layout)
+		}
+	} else {
+		idx := idx;layout := layout
+	}
 }
 
 color_transform_init_matrix_raw :: proc(self: ^color_transform, mat: linalg.matrix44 = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1}) {
@@ -631,8 +597,8 @@ color_transform_init_matrix_raw :: proc(self: ^color_transform, mat: linalg.matr
 	__color_transform_init(self)
 }
 
-@private __color_transform_init :: #force_inline proc(self: ^color_transform) {
-	buffer_resource_create_buffer(self, {
+@private __color_transform_init :: proc(self: ^color_transform) {
+	_, self.mat_idx = buffer_resource_create_buffer(self.mat_idx, {
 		size = size_of(linalg.matrix44),
 		type = .UNIFORM,
 		resource_usage = .CPU,
@@ -649,7 +615,7 @@ Returns:
 - None
 */
 color_transform_deinit :: proc(self: ^color_transform) {
-	buffer_resource_deinit(self)
+	if self.mat_idx != nil do buffer_resource_deinit(self.mat_idx.?)
 }
 
 /*
@@ -687,11 +653,11 @@ get_graphics_origin_format :: proc "contextless" () -> vk.Format {
 	return vk_fmt.format
 }
 
-default_render_pass :: #force_inline proc "contextless" () -> vk.RenderPass {
+default_render_pass :: proc "contextless" () -> vk.RenderPass {
 	return vk_render_pass
 }
 
-default_multisample_state :: #force_inline proc "contextless" () -> ^vk.PipelineMultisampleStateCreateInfo {
+default_multisample_state :: proc "contextless" () -> ^vk.PipelineMultisampleStateCreateInfo {
 	return &vkPipelineMultisampleStateCreateInfo
 }
 
@@ -878,7 +844,7 @@ descriptor_set_layout_binding_init :: vk.DescriptorSetLayoutBindingInit
 	glslang.program_SPIRV_generate_with_options(program, stage, &spv_options)
 	
 	spirv_size := glslang.program_SPIRV_get_size(program)
-	spirv_data = mem.make_non_zeroed([]u8, size_of(u32) * spirv_size, 64, context.temp_allocator)
+	spirv_data = mem.make_non_zeroed([]u8, size_of(u32) * spirv_size, context.temp_allocator)
 	glslang.program_SPIRV_get(program, cast(^c.uint)&spirv_data[0])
 	
 	spirv_messages := glslang.program_SPIRV_get_messages(program)
@@ -886,7 +852,7 @@ descriptor_set_layout_binding_init :: vk.DescriptorSetLayoutBindingInit
 	return
 }
 
-custom_object_pipeline_init :: proc(self:^object_pipeline,
+object_pipeline_init :: proc(self:^object_pipeline,
     descriptor_set_layouts:[]vk.DescriptorSetLayout,
     vertex_input_binding:Maybe([]vertex_input_binding_description),
     vertex_input_attribute:Maybe([]vertex_input_attribute_description),
@@ -1114,48 +1080,61 @@ compute_pipeline_deinit :: proc(self:^compute_pipeline) {
 }
 
 graphics_destriptor_set_layout_init :: proc(bindings: []vk.DescriptorSetLayoutBinding) -> vk.DescriptorSetLayout {
-	return vk.DescriptorSetLayoutInit(graphics_device(), bindings)
+	when !is_web {
+		if vulkan_version.major > 0 {
+			return vk.DescriptorSetLayoutInit(graphics_device(), bindings)
+		}
+	}
+	return 0
 }
-
-animate_img_descriptor_set_layout :: proc() -> vk.DescriptorSetLayout {
-	return __animate_img_descriptor_set_layout
+graphics_destriptor_set_layout_destroy :: proc(layout: ^vk.DescriptorSetLayout) {
+	when !is_web {
+		if vulkan_version.major > 0 && layout^ != 0 {
+			vk.DestroyDescriptorSetLayout(graphics_device(), layout^, nil)
+			layout^ = 0
+		}
+	}
 }
 
 // Add resource to gMapResource stack (push_back)
-@private graphics_add_resource_buffer :: proc(self: rawptr) -> union_resource {
+@private graphics_add_resource_buffer :: proc(idx: Maybe(u32)) -> (punion_resource, u32) {
 	sync.mutex_lock(&gMapResourceMtx)
 	defer sync.mutex_unlock(&gMapResourceMtx)
 
-	res: union_resource
-	res = pool.get(&gBufferPool)
-	
-	if self not_in gMapResource {
-		tmp := map_insert(&gMapResource, self, make([dynamic]union_resource, __graphics_tlsf_allocator))
-		append(tmp, res)
+	res: u32
+	if idx == nil {
+		if gMapResource_free_len == 0 do gMapResource_add_block()
+		res = gMapResource_idx[gMapResource_free_len - 1]
+		gMapResource_free_len -= 1
 	} else {
-		append(&gMapResource[self], res)
+		res = idx.?
 	}
-	return res
+
+	list.push_back(&gMapResource[res], &new(union_resource_node, gVkMemTlsfAllocator).node)
+	((^union_resource_node)(gMapResource[res].head)).res = buffer_resource{}
+	return &((^union_resource_node)(gMapResource[res].head)).res.(buffer_resource), res
 }
 
-@private graphics_add_resource_texture :: proc(self: rawptr) -> union_resource {
+@private graphics_add_resource_texture :: proc(idx: Maybe(u32)) -> (punion_resource, u32) {
 	sync.mutex_lock(&gMapResourceMtx)
 	defer sync.mutex_unlock(&gMapResourceMtx)
 
-	res: union_resource
-	res = pool.get(&gTexturePool)
-	
-	if self not_in gMapResource {
-		tmp := map_insert(&gMapResource, self, make([dynamic]union_resource, __graphics_tlsf_allocator))
-		append(tmp, res)
+	res: u32
+	if idx == nil {
+		if gMapResource_free_len == 0 do gMapResource_add_block()
+		res = gMapResource_idx[gMapResource_free_len - 1]
+		gMapResource_free_len -= 1
 	} else {
-		append(&gMapResource[self], res)
+		res = idx.?
 	}
-	return res
+
+	list.push_back(&gMapResource[res], &new(union_resource_node, gVkMemTlsfAllocator).node)
+	((^union_resource_node)(gMapResource[res].head)).res = texture_resource{}
+	return &((^union_resource_node)(gMapResource[res].head)).res.(texture_resource), res
 }
 
-// Remove specific resource from gMapResource by union_resource(not free union_resource)
-@private graphics_pop_resource :: proc(self: rawptr, resource: union_resource, lock := true) -> bool {
+// Remove specific resource from gMapResource by punion_resource(not free punion_resource)
+@private graphics_pop_resource :: proc(idx: u32, resource: punion_resource, lock := true) {
 	if lock {
 		sync.mutex_lock(&gMapResourceMtx)
 	}
@@ -1163,56 +1142,115 @@ animate_img_descriptor_set_layout :: proc() -> vk.DescriptorSetLayout {
 		sync.mutex_unlock(&gMapResourceMtx)
 	}
 	
-	if self not_in gMapResource do return false
-	tmp := gMapResource[self]
-	if len(tmp) == 0 do return false
-	
-	for i in 0..<len(tmp) {
-		if tmp[i] == resource {
-			ordered_remove(&tmp, i)
-
-			if len(tmp) == 0 {
-				delete(tmp)
-				delete_key(&gMapResource, self)		
-			}
-			return true
+    iter := list.iterator_head( gMapResource[idx], union_resource_node, "node")
+    for node, success := list.iterate_next(&iter);success; {
+        switch &n in node.res {
+			case buffer_resource:
+				if r, ok := resource.(^buffer_resource); ok && &n == r {
+					tt : ^union_resource_node
+					tt, success = list.iterate_next(&iter)
+					list.remove(& gMapResource[idx], auto_cast node)
+					free(node, gVkMemTlsfAllocator)
+					node = tt
+					continue
+				}
+			case texture_resource:
+				if r, ok := resource.(^texture_resource); ok && &n == r {
+					tt : ^union_resource_node
+					tt, success = list.iterate_next(&iter)
+					list.remove(& gMapResource[idx], auto_cast node)
+					free(node, gVkMemTlsfAllocator)
+					node = tt
+					continue
+				}
 		}
+		node, success = list.iterate_next(&iter)
+    }
+	if gMapResource[idx].head == nil {
+		gMapResource_idx[gMapResource_free_len] = idx
+		gMapResource_free_len += 1
 	}
-	return false
 }
 
 // Get last resource from stack (most recently created)
-graphics_get_resource :: proc "contextless" (self: rawptr) -> union_resource {
+graphics_get_resource :: proc "contextless" (idx: Maybe(u32)) -> punion_resource {
+	if idx == nil do return nil
 	sync.mutex_lock(&gMapResourceMtx)
 	defer sync.mutex_unlock(&gMapResourceMtx)
-	if self not_in gMapResource do return nil
-	tmp := gMapResource[self]
-	if len(tmp) == 0 do return nil
-	return tmp[len(tmp) - 1]
-}
-
-// Get first resource from stack (for rendering - oldest)
-graphics_get_resource_draw :: proc "contextless" (self: rawptr) -> union_resource {
-	sync.mutex_lock(&gMapResourceMtx)
-	defer sync.mutex_unlock(&gMapResourceMtx)
-	if self not_in gMapResource do return nil
-	tmp := gMapResource[self]
-	if len(tmp) == 0 do return nil
-	for res in tmp {
-		switch r in res {
-		case ^buffer_resource:
-			if r.completed do return res
-		case ^texture_resource:
-			if r.completed do return res
-		}
+	if gMapResource[idx.?].tail == nil do return nil
+	switch &res in ((^union_resource_node)(gMapResource[idx.?].tail)).res {
+		case buffer_resource:
+			return &res
+		case texture_resource:
+			return &res
 	}
 	return nil
 }
 
-@private gMapResource: map[rawptr][dynamic]union_resource
+// Get first resource from stack (for rendering - oldest)
+graphics_get_resource_draw :: proc "contextless" (idx: Maybe(u32)) -> punion_resource {
+	if idx == nil do return nil
+	sync.mutex_lock(&gMapResourceMtx)
+	defer sync.mutex_unlock(&gMapResourceMtx)
+	if gMapResource[idx.?].head == nil do return nil
+	switch &res in ((^union_resource_node)(gMapResource[idx.?].head)).res {
+		case buffer_resource:
+			return &res
+		case texture_resource:
+			return &res
+	}
+	return nil
+}
+
+@private gMapResource_add_block :: proc() {
+	old_len := u32(len(gMapResource))
+	gMapResource = mem.resize_slice(gMapResource, old_len + gMapResource_Block, gVkMemTlsfAllocator)
+	gMapResource_idx = mem.resize_non_zeroed_slice(gMapResource_idx, old_len + gMapResource_Block, gVkMemTlsfAllocator)
+	for i: u32 = old_len; i < old_len + gMapResource_Block; i += 1 {
+		gMapResource_idx[gMapResource_free_len] = i
+		gMapResource_free_len += 1
+	}
+}
+
+@private gMapResource_init :: proc() {
+	gMapResource = mem.make([]list.List, gMapResource_Block, __graphics_tlsf_allocator)
+	gMapResource_idx = mem.make_non_zeroed([]u32, gMapResource_Block, __graphics_tlsf_allocator)
+	gMapResource_free_len = 0
+	for i: u32 = 0; i < gMapResource_Block; i += 1 {
+		gMapResource_idx[gMapResource_free_len] = i
+		gMapResource_free_len += 1
+	}
+}
+
+@private gMapResource_destroy :: proc() {
+	sync.mutex_lock(&gMapResourceMtx)
+	defer sync.mutex_unlock(&gMapResourceMtx)
+	gMapResource_free_len = 0
+	for res in gMapResource {
+		it := list.iterator_head(res, union_resource_node, "node")
+		for node in list.iterate_next(&it) {
+			free(node, __graphics_tlsf_allocator)
+		}
+	}
+	delete(gMapResource, __graphics_tlsf_allocator)
+	delete(gMapResource_idx, __graphics_tlsf_allocator)
+}
+
+
+@private union_resource_node :: struct {
+	node:list.Node,
+	res : union #no_nil {
+		buffer_resource,
+		texture_resource,
+	}
+}
+
+
+@private gMapResource: []list.List
+@private gMapResource_idx: []u32
+@private gMapResource_free_len: u32
 @private gMapResourceMtx: sync.Mutex
-@private gBufferPool: pool.Pool(buffer_resource)
-@private gTexturePool: pool.Pool(texture_resource)
+@private gMapResource_Block :: 512
 
 @private __graphics_tlsf : tlsf.Allocator
 @private __graphics_tlsf_allocator : runtime.Allocator
@@ -1234,4 +1272,19 @@ render_guard :: proc "contextless" () -> bool {
 //!DO NOT CALL THIS FROM WITHIN ENGINE CALLBACKS
 render_try_lock :: proc "contextless" () -> bool {
 	return sync.mutex_try_lock(&__g_layer_mtx)
+}
+
+//!vertex, index buffers set manually
+graphics_pipeline_draw :: proc "contextless" (cmd:command_buffer, pipeline:^object_pipeline, sets:[]vk.DescriptorSet) {
+	if vulkan_version.major > 0 {
+		graphics_cmd_bind_pipeline(cmd, .GRAPHICS, pipeline.__pipeline)
+		graphics_cmd_bind_descriptor_sets(cmd, .GRAPHICS, pipeline.__pipeline_layout, 0, u32(len(sets)),
+			&sets[0], 0, nil)
+	}
+
+    if pipeline.draw_method.type == .Draw {
+        graphics_cmd_draw(cmd, pipeline.draw_method.vertex_count, pipeline.draw_method.instance_count, pipeline.draw_method.first_vertex, pipeline.draw_method.first_instance)
+    } else if pipeline.draw_method.type == .DrawIndexed {
+        graphics_cmd_draw_indexed(cmd, pipeline.draw_method.index_count, pipeline.draw_method.instance_count, pipeline.draw_method.first_index, pipeline.draw_method.vertex_offset, pipeline.draw_method.first_instance)
+    }
 }
