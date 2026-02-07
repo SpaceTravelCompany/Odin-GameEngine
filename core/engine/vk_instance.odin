@@ -70,7 +70,7 @@ vk_create_instance :: proc() {
 		apiVersion         = vk.API_VERSION_1_4,
 		engineVersion      = vk.MAKE_VERSION(1, 0, 0),
 		applicationVersion = vk.MAKE_VERSION(1, 0, 0),
-		pEngineName        = "Xfit",
+		pEngineName        = "SpaceEngine",
 		pApplicationName   = ODIN_BUILD_PROJECT_NAME,
 	}
 	FN_vkEnumerateInstanceVersion := vk.ProcEnumerateInstanceVersion(vk.GetInstanceProcAddr(nil, "vkEnumerateInstanceVersion"))

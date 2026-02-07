@@ -102,7 +102,7 @@ engine_main :: proc(
 	window_y:Maybe(int) = nil,
 	window_width:Maybe(int) = nil,
 	window_height:Maybe(int) = nil,
-	v_sync:v_sync = .Double,
+	v_sync:v_sync = .Triple,
 	screen_mode:screen_mode = .Window,
 	screen_idx:int = 0,
 	max_frame:f64 = 0.0,

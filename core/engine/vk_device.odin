@@ -98,15 +98,10 @@ vk_create_logical_device :: proc() {
 		vulkanMemoryModel = true,
 		vulkanMemoryModelDeviceScope = true,
 		bufferDeviceAddress = true,
-		storageBuffer8BitAccess = true,
 		scalarBlockLayout = true,
 	}
-	REQUIRED_VK_RAY_QUERY_FEATURES := vk.PhysicalDeviceRayQueryFeaturesKHR  {
-		sType = .PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR,
-		rayQuery = true,
-	}
 	if get_vulkan_version().major > 1 || get_vulkan_version().minor >= 3 {
-		REQUIRED_VK_RAY_QUERY_FEATURES.pNext = &REQUIRED_VK_13_FEATURES
+		REQUIRED_VK_12_FEATURES.pNext = &REQUIRED_VK_13_FEATURES
 	}
 	REQUIRED_VK_11_FEATURES := vk.PhysicalDeviceVulkan11Features {
 		sType                         = .PHYSICAL_DEVICE_VULKAN_1_1_FEATURES,
@@ -115,7 +110,6 @@ vk_create_logical_device :: proc() {
 	}
 	if get_vulkan_version().major > 1 || get_vulkan_version().minor >= 2 {
 		REQUIRED_VK_11_FEATURES.pNext = &REQUIRED_VK_12_FEATURES
-		REQUIRED_VK_12_FEATURES.pNext = &REQUIRED_VK_RAY_QUERY_FEATURES
 	}
 	REQUIRED_FEATURES := vk.PhysicalDeviceFeatures2 {
 		sType    = .PHYSICAL_DEVICE_FEATURES_2,

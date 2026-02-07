@@ -25,6 +25,13 @@ scene: [dynamic]^engine.iobject
 textShapes: geometry.shapes
 texture:engine.texture
 
+img: ^sprite.sprite
+orbit_angle: f32
+ORBIT_CENTER_X: f32 : 0
+ORBIT_CENTER_Y: f32 : 0
+ORBIT_RADIUS: f32 : 200
+ORBIT_ANGULAR_SPEED: f32 : 1.0
+
 CANVAS_W :f32: 1280
 CANVAS_H :f32: 720
 
@@ -34,26 +41,6 @@ bgSndSrc : ^sound.sound_src
 bgSnd : ^sound.sound
 
 bgSndFileData:[]u8
-
-GUI_Sprite_Vtable: engine.iobject_vtable = {
-    size = auto_cast GUI_Sprite_Size,
-}
-GUI_Sprite_Init :: proc(self:^GUI_Sprite, src:^engine.texture,
-colorTransform:^engine.color_transform = nil) {
-    sprite.sprite_init(auto_cast self, src, colorTransform, &GUI_Sprite_Vtable)
-    gui.gui_component_size(self, &self.com)
-	self.actual_type = typeid_of(GUI_Sprite)
-}
-
-GUI_Sprite_Size :: proc(self:^GUI_Sprite) {
-    gui.gui_component_size(self, &self.com)
-}
-
-
-GUI_Sprite :: struct {
-    using _:sprite.sprite,
-    com:gui.gui_component,
-}
 
 panda_img : []u8 = #load("panda.qoi")
 github_mark_svg : []u8 = #load("github-mark.svg")
@@ -172,13 +159,8 @@ Init ::proc() {
             procedure = panda_img_allocator_proc,
             data = auto_cast qoiD,})
 
-    img: ^GUI_Sprite = new(GUI_Sprite)
-    img.com.gui_scale = {0.7,0.7}
-    img.com.gui_rotation = math.to_radians_f32(45.0)
-    img.com.gui_align_x = .left
-    img.com.gui_pos.x = 200.0
-
-	GUI_Sprite_Init(img, &texture)
+    img = new(sprite.sprite)
+	sprite.sprite_init(img, &texture)
 
     fmt.printfln("texture width: %d, height: %d", qoi.qoi_converter_width(qoiD), qoi.qoi_converter_height(qoiD))
     
@@ -188,7 +170,22 @@ Init ::proc() {
     //Show
     engine.layer_show(renderCmd)
 }
-Update ::proc() {
+
+Update :: proc() {
+	@static dt_count:uint
+	@static dt_time:f64
+	sprite.sprite_update_transform(img,
+	linalg.point3d{ORBIT_CENTER_X + ORBIT_RADIUS * math.cos_f32(orbit_angle),
+	ORBIT_CENTER_Y + ORBIT_RADIUS * math.sin_f32(orbit_angle), 0})
+	orbit_angle += f32(engine.dt()) * ORBIT_ANGULAR_SPEED
+
+	dt_time += engine.dt()
+	dt_count += 1
+	if dt_time >= 1.0 {
+		fmt.printfln("fps : %f", 1.0 / (dt_time / f64(dt_count)))
+		dt_time -= 1.0
+		dt_count = 0
+	}
 }
 
 Destroy ::proc() {

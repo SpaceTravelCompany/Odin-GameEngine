@@ -612,15 +612,6 @@ __vk_op_execute_in :: proc() -> ^[dynamic]OpNode {
 	for &node in opMapCopyQueue {
 		non_zero_append(opExecQueue, node)
 	}
-	for node in opExecQueue {
-		#partial switch n in node {
-		case OpUpdateDescriptorSet:
-			vk_execute_update_descriptor_set(n.set, n.size, n.resource)
-			delete(n.resource, n.allocator)
-		case:
-			continue
-		}
-	}
 
 	return opExecQueue
 }
@@ -698,24 +689,15 @@ vk_exec_gpu_commands_task :: proc(task: thread.Task) {
 	}
 
 	haveCmds := false
-	gVkUpdateDesciptorSetList := mem.make_non_zeroed([dynamic]vk.WriteDescriptorSet, arena_allocator)
 	for node in opExecQueue {
 		#partial switch n in node {
 		case OpCopyBuffer:
 			haveCmds = true
+			break
 		case OpCopyBufferToTexture:
 			haveCmds = true
+			break
 		}
-	}
-
-	if len(gVkUpdateDesciptorSetList) > 0 {
-		vk.UpdateDescriptorSets(
-			vk_device,
-			auto_cast len(gVkUpdateDesciptorSetList),
-			raw_data(gVkUpdateDesciptorSetList),
-			0,
-			nil,
-		)
 	}
 
 	if haveCmds {
@@ -751,8 +733,28 @@ vk_exec_gpu_commands_task :: proc(task: thread.Task) {
 		if res != .SUCCESS do log.panicf("res := vk.QueueSubmit(vk_graphics_queue, 1, &submitInfo, 0) : %s\n", res)
 		sync.mutex_unlock(&vk_queue_mutex)
 
+		for node in opExecQueue {
+			#partial switch n in node {
+			case OpUpdateDescriptorSet:
+				vk_execute_update_descriptor_set(n.set, n.size, n.resource)
+				delete(n.resource, n.allocator)
+			case:
+				continue
+			}
+		}
+
 		vk.WaitForFences(vk_device, 1, &vk_allocator_fence, true, max(u64))
 		if res != .SUCCESS do log.panicf("res := vk.WaitForFences(vk_device, 1, &vk_allocator_fence, true, max(u64)) : %s\n", res)
+	} else {
+		for node in opExecQueue {
+			#partial switch n in node {
+			case OpUpdateDescriptorSet:
+				vk_execute_update_descriptor_set(n.set, n.size, n.resource)
+				delete(n.resource, n.allocator)
+			case:
+				continue
+			}
+		}
 	}
 
 	sync.mutex_lock(&gMapResourceMtx)
