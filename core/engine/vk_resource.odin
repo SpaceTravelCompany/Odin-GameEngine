@@ -5,7 +5,7 @@ import "base:runtime"
 import "core:container/pool"
 import vk "vendor:vulkan"
 import "core:log"
-
+import "core:sync"
 
 // ============================================================================
 // Resource - Buffer Create/Destroy (No Async)
@@ -24,13 +24,11 @@ buffer_resource_CreateBufferNoAsync :: #force_inline proc(
 
 buffer_resource_DestroyBufferNoAsync :: proc(self: ^buffer_resource) {
 	vk_mem_buffer_UnBindBufferNode(auto_cast self.mem_buffer, self.__resource.vk_buffer, self.idx)
-	pool.put(&gBufferPool, self)
 }
 
 buffer_resource_DestroyTextureNoAsync :: proc(self: ^texture_resource) {
-	vk.DestroyImageView(vk_device, self.img_view, nil)
+	vk.DestroyImageView(vk_device, self.img_view, &gVkAllocationCallbacks)
 	vk_mem_buffer_UnBindBufferNode(auto_cast self.mem_buffer, self.__resource.vk_image, self.idx)
-	pool.put(&gTexturePool, self)
 }
 
 buffer_resource_MapCopy :: #force_inline proc(
@@ -96,7 +94,9 @@ executeCreateBuffer :: proc(
 		bufInfo.usage |= {.TRANSFER_DST}
 		if src.option.size > auto_cast len(data) do log.panicf("create_buffer _data not enough size. %d, %d\n", src.option.size, len(data))
 
-		last = pool.get(&gBufferPool)
+		sync.lock(&opDestroyQueueMtx)
+		last = new(buffer_resource, gVkDestroyTlsfAllocator)
+		sync.unlock(&opDestroyQueueMtx)
 		buffer_resource_CreateBufferNoAsync(outQueue, last, {
 			size           = src.option.size,
 			resource_usage = .CPU,
@@ -107,7 +107,7 @@ executeCreateBuffer :: proc(
 		if data == nil do log.panic("staging buffer data can't nil\n")
 	}
 
-	res := vk.CreateBuffer(vk_device, &bufInfo, nil, &src.__resource.vk_buffer)
+	res := vk.CreateBuffer(vk_device, &bufInfo, &gVkAllocationCallbacks, &src.__resource.vk_buffer)
 	if res != .SUCCESS do log.panicf("res := vk.CreateBuffer(vk_device, &bufInfo, nil, &self.__resource) : %s\n", res)
 
 	src.mem_buffer = auto_cast vk_mem_buffer_CreateFromResourceSingle(src.__resource.vk_buffer) if src.option.single else 
@@ -196,7 +196,9 @@ executeCreateTexture :: proc(
 	if data != nil && src.option.resource_usage == .GPU {
 		imgInfo.usage |= {.TRANSFER_DST}
 
-		last = pool.get(&gBufferPool)
+		sync.lock(&opDestroyQueueMtx)
+		last = new(buffer_resource, gVkDestroyTlsfAllocator)
+		sync.unlock(&opDestroyQueueMtx)
 		buffer_resource_CreateBufferNoAsync(outQueue, last, {
 			size           = auto_cast (imgInfo.extent.width * imgInfo.extent.height * imgInfo.extent.depth * imgInfo.arrayLayers * bit),
 			resource_usage = .CPU,
@@ -205,7 +207,7 @@ executeCreateTexture :: proc(
 		}, data, allocator)
 	}
 
-	res := vk.CreateImage(vk_device, &imgInfo, nil, &src.__resource.vk_image)
+	res := vk.CreateImage(vk_device, &imgInfo, &gVkAllocationCallbacks, &src.__resource.vk_image)
 	if res != .SUCCESS do log.panicf("res := vk.CreateImage(vk_device, &imgInfo, nil, &src.__resource) : %s\n", res)
 
 	src.mem_buffer = auto_cast vk_mem_buffer_CreateFromResourceSingle(src.__resource.vk_image) if src.option.single else
@@ -229,7 +231,7 @@ executeCreateTexture :: proc(
 		imgViewInfo.viewType = imgInfo.arrayLayers > 1 ? .D2_ARRAY : .D2
 	}
 
-	res = vk.CreateImageView(vk_device, &imgViewInfo, nil, &src.img_view)
+	res = vk.CreateImageView(vk_device, &imgViewInfo, &gVkAllocationCallbacks, &src.img_view)
 	if res != .SUCCESS do log.panicf("res = vk.CreateImageView(vk_device, &imgViewInfo, nil, &src.img_view) : %s\n", res)
 
 	if data != nil {
@@ -292,4 +294,37 @@ execute_copy_buffer_to_texture :: proc(cmd: vk.CommandBuffer, src: ^buffer_resou
 	
 	vk.CmdCopyBufferToImage(cmd, src.__resource.vk_buffer, target.__resource.vk_image, .TRANSFER_DST_OPTIMAL, 1, &region)
 	vk_transition_image_layout(cmd, target.__resource.vk_image, 1, 0, target.option.len, .TRANSFER_DST_OPTIMAL, .SHADER_READ_ONLY_OPTIMAL)
+}
+
+
+/*
+Converts a texture format to a Vulkan format
+
+Inputs:
+- t: The texture format to convert
+
+Returns:
+- The corresponding Vulkan format
+*/
+@(require_results)
+texture_fmt_to_vk_fmt :: proc "contextless" (t: texture_fmt) -> vk.Format {
+	switch t {
+	case .DefaultColor:
+		return get_graphics_origin_format()
+	case .DefaultDepth:
+		return texture_fmt_to_vk_fmt(depth_fmt)
+	case .R8G8B8A8Unorm:
+		return .R8G8B8A8_UNORM
+	case .B8G8R8A8Unorm:
+		return .B8G8R8A8_UNORM
+	case .D24UnormS8Uint:
+		return .D24_UNORM_S8_UINT
+	case .D16UnormS8Uint:
+		return .D16_UNORM_S8_UINT
+	case .D32SfloatS8Uint:
+		return .D32_SFLOAT_S8_UINT
+	case .R8Unorm:
+		return .R8_UNORM
+	}
+	return get_graphics_origin_format()
 }

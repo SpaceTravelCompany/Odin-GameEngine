@@ -2,11 +2,8 @@ package engine_test
 
 import "core:fmt"
 import "core:mem"
-import "core:thread"
 import "core:math"
-import "core:math/rand"
 import "core:math/linalg"
-import "core:reflect"
 import "base:runtime"
 import "core:os/os2"
 import "core:sys/android"
@@ -15,6 +12,7 @@ import "core:image/qoi"
 import "core:engine/font"
 import "core:engine/sound"
 import "core:engine/shape"
+import "core:engine/sprite"
 import "core:engine/geometry"
 import "core:engine/gui"
 import "vendor:svg"
@@ -24,7 +22,7 @@ is_android :: engine.is_android
 renderCmd : ^engine.layer
 scene: [dynamic]^engine.iobject
 
-shapeSrc: shape.shape_src
+textShapes: geometry.shapes
 texture:engine.texture
 
 CANVAS_W :f32: 1280
@@ -37,23 +35,23 @@ bgSnd : ^sound.sound
 
 bgSndFileData:[]u8
 
-GUI_Image_Vtable: engine.iobject_vtable = {
-    size = auto_cast GUI_Image_Size,
+GUI_Sprite_Vtable: engine.iobject_vtable = {
+    size = auto_cast GUI_Sprite_Size,
 }
-GUI_Image_Init :: proc(self:^GUI_Image, src:^engine.texture,
+GUI_Sprite_Init :: proc(self:^GUI_Sprite, src:^engine.texture,
 colorTransform:^engine.color_transform = nil) {
-    engine.image_init(auto_cast self, src, colorTransform, &GUI_Image_Vtable)
+    sprite.sprite_init(auto_cast self, src, colorTransform, &GUI_Sprite_Vtable)
     gui.gui_component_size(self, &self.com)
-	self.actual_type = typeid_of(GUI_Image)
+	self.actual_type = typeid_of(GUI_Sprite)
 }
 
-GUI_Image_Size :: proc(self:^GUI_Image) {
+GUI_Sprite_Size :: proc(self:^GUI_Sprite) {
     gui.gui_component_size(self, &self.com)
 }
 
 
-GUI_Image :: struct {
-    using _:engine.image,
+GUI_Sprite :: struct {
+    using _:sprite.sprite,
     com:gui.gui_component,
 }
 
@@ -72,15 +70,15 @@ panda_img_allocator_proc :: proc(allocator_data: rawptr, mode: runtime.Allocator
 	return nil, nil
 }
 
-svg_shape_src : shape.shape_src
+svg_parser:svg.svg_parser
 init_svg :: proc() {
-    svg_parser, err := svg.init_parse(github_mark_svg, context.temp_allocator)
+	err : svg.SVG_ERROR
+    svg_parser, err = svg.init_parse(github_mark_svg, context.allocator)
     if err != nil {
         fmt.panicf("svg.init_parse: %s", err)
     }
-    defer svg.deinit(&svg_parser)
 
-	geometry.poly_transform_matrix(&svg_parser.shapes, engine.srtc_2d_matrix(
+	geometry.poly_transform_matrix(&svg_parser.shapes, linalg.srtc_2d_matrix(
 		t = {0,0,0},
 		cp = {-8,8},
 		s = {30,30},
@@ -88,12 +86,8 @@ init_svg :: proc() {
 	))
 
     svg_shape := new(shape.shape)
-    shape_err := shape.shape_src_init(&svg_shape_src, &svg_parser.shapes)
-    if shape_err != nil {
-        fmt.panicf("shape.shape_src_init: %s", shape_err)
-    }
 
-    shape.shape_init(svg_shape, &svg_shape_src)
+    shape.shape_init(svg_shape, &svg_parser.shapes)
     engine.itransform_object_update_transform(svg_shape, {0,0,0}, 0.0, {1, 1})
     engine.layer_add_object(renderCmd, svg_shape)
 }
@@ -134,21 +128,15 @@ Init ::proc() {
 	
     renderOpt := font.font_render_opt{
         color = linalg.point3dw{1,1,1,1},
-        flag = .GPU,
         scale = linalg.point{3,3},
     }
-
     rawText, shapeErr := font.font_render_string(ft, "안녕", renderOpt, context.allocator)
     if shapeErr != nil {
         fmt.panicf("font.font_render_string: %s", shapeErr)
     }
-    defer free(rawText)
-    //!DO NOT geometry.raw_shape_free, auto delete vertex and index data after shape_src_init_raw completed
-    //!only delete raw single pointer
+    textShapes = rawText
 
-    shape.shape_src_init_raw(&shapeSrc, rawText, allocator = context.allocator)
-
-    shape.shape_init(shape_obj, &shapeSrc)
+    shape.shape_init(shape_obj, &textShapes)
 	engine.itransform_object_update_transform(shape_obj, {-0.0, 0, 10}, math.to_radians_f32(45.0), {3, 3})
     engine.layer_add_object(renderCmd, shape_obj)
 
@@ -181,17 +169,16 @@ Init ::proc() {
     engine.texture_init(&texture,
          u32(qoi.qoi_converter_width(qoiD)), u32(qoi.qoi_converter_height(qoiD)),
           imgData, runtime.Allocator{
-            procedure= panda_img_allocator_proc,
-            data= auto_cast qoiD,
-          })
+            procedure = panda_img_allocator_proc,
+            data = auto_cast qoiD,})
 
-    img: ^GUI_Image = new(GUI_Image)
+    img: ^GUI_Sprite = new(GUI_Sprite)
     img.com.gui_scale = {0.7,0.7}
     img.com.gui_rotation = math.to_radians_f32(45.0)
     img.com.gui_align_x = .left
     img.com.gui_pos.x = 200.0
 
-	GUI_Image_Init(img, &texture)
+	GUI_Sprite_Init(img, &texture)
 
     fmt.printfln("texture width: %d, height: %d", qoi.qoi_converter_width(qoiD), qoi.qoi_converter_height(qoiD))
     
@@ -205,7 +192,6 @@ Update ::proc() {
 }
 
 Destroy ::proc() {
-    shape.shape_src_deinit(&shapeSrc)
     engine.texture_deinit(&texture)
     len := engine.layer_get_object_len(renderCmd)
     for i in 0..<len {
@@ -214,14 +200,19 @@ Destroy ::proc() {
         free(obj)
     }
     engine.layer_deinit(renderCmd)
+	for n in textShapes.nodes {
+		delete(n.lines, context.allocator)
+	}
+	delete(textShapes.nodes, context.allocator)
 
 	delete(scene)
 
 	font.font_deinit(ft)
-	shape.shape_src_deinit(&svg_shape_src)
 
     sound.sound_src_deinit(bgSndSrc)
     delete(bgSndFileData)
+
+	svg.deinit(&svg_parser)
 }
 
 BREAKPOINT_ON_TRACKING_ALLOCATOR :: true

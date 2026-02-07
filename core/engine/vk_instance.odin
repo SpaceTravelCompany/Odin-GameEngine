@@ -180,7 +180,7 @@ vk_create_instance :: proc() {
 	if validation_layer_support() && ODIN_DEBUG {
 		debugUtilsCreateInfo := vk.DebugUtilsMessengerCreateInfoEXT {
 			sType = vk.StructureType.DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
-			messageSeverity = vk.DebugUtilsMessageSeverityFlagsEXT{.ERROR, .VERBOSE, .WARNING},
+			messageSeverity = vk.DebugUtilsMessageSeverityFlagsEXT{.ERROR, .VERBOSE, .WARNING, .INFO},
 			messageType     = vk.DebugUtilsMessageTypeFlagsEXT {.GENERAL, .VALIDATION, .PERFORMANCE},
 			pfnUserCallback = vk_debug_callback,
 			pUserData       = nil,

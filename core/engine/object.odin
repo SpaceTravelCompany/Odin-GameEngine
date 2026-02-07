@@ -98,7 +98,7 @@ itransform_object_update_transform_matrix_raw :: proc(self:^itransform_object, _
     
     resource :punion_resource = graphics_get_resource(self.mat_idx)
 	if resource == nil {
-        buffer_resource_create_buffer(nil, {
+        _, self.mat_idx = buffer_resource_create_buffer(nil, {
             size = size_of(linalg.matrix44),
             type = .UNIFORM,
             resource_usage = .CPU,
@@ -113,7 +113,7 @@ itransform_object_change_color_transform :: proc(self:^itransform_object, _color
     self.color_transform = _color_transform
 	resource :punion_resource = graphics_get_resource(self.mat_idx)
 	if resource == nil {
-		buffer_resource_create_buffer(nil, {
+		_, self.mat_idx = buffer_resource_create_buffer(nil, {
 			size = size_of(linalg.matrix44),
 			type = .UNIFORM,
 			resource_usage = .CPU,
@@ -153,11 +153,11 @@ iobject_deinit :: proc(self:^iobject) {
     if self.vtable != nil && self.vtable.deinit != nil {
         self.vtable.deinit(self)
     }
-	self.vtable = nil
     if self.set != 0 {
         put_descriptor_set(self.set_idx, self.vtable.descriptor_set_layout)
         self.set = 0
     }
+	self.vtable = nil
 }
 
 iobject_update :: proc(self:^iobject) {

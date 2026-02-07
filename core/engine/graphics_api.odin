@@ -81,14 +81,12 @@ __graphics_api_image :: struct #raw_union {
 
 buffer_resource :: struct {
 	using _: base_resource,
-	self:^buffer_resource,
 	option: buffer_create_option,
 	__resource: __graphics_api_buffer,
 }
 
 texture_resource :: struct {
 	using _: base_resource,
-	self:^texture_resource,
 	img_view: vk.ImageView,
 	sampler: vk.Sampler,
 	option: texture_create_option,
@@ -476,15 +474,16 @@ buffer_resource_deinit :: proc(idx: u32) {
 	switch b in base {
 	case ^buffer_resource:
 		if b.option.type == .UNIFORM {
-			graphics_pop_resource(idx, base)
-			append_op(OpReleaseUniform{src = b})
+			del := graphics_pop_resource(idx, base, true)
+			append_op(OpReleaseUniform{src = b, del = del})
 		} else {
 			append_op(OpDestroyBuffer{idx = idx, src = b})// 나중에 지운다.
 		}
 	case ^texture_resource:
 		if b.mem_buffer == nil {
-			graphics_pop_resource(idx, base)
-			vk.DestroyImageView(vk_device, b.img_view, nil)
+			del := graphics_pop_resource(idx, base, true)
+			vk.DestroyImageView(vk_device, b.img_view, &gVkAllocationCallbacks)
+			graphics_free_resource(del, lock = true)
 		} else {
 			append_op(OpDestroyTexture{idx = idx, src = b})// 나중에 지운다.
 		}
@@ -563,7 +562,14 @@ buffer_resource_create_texture :: proc(
 update_descriptor_set :: proc(set: vk.DescriptorSet, size: []descriptor_pool_size, resources: []punion_resource) {
 	when !is_web {
 		if vulkan_version.major > 0 {
-			vk_execute_update_descriptor_set(set, size, resources)
+			resource_slice := mem.make_non_zeroed([]punion_resource, len(resources), vk_def_allocator())
+			mem.copy_non_overlapping(raw_data(resource_slice), raw_data(resources), len(resources) * size_of(punion_resource))
+			append_op(OpUpdateDescriptorSet{
+				set = set,
+				size = size,
+				resource = resource_slice,
+				allocator = vk_def_allocator(),
+			})
 		}
 	} else {
 		set := set;size := size;resources := resources
@@ -631,7 +637,7 @@ Returns:
 color_transform_update_matrix_raw :: proc(self: ^color_transform, _mat: linalg.matrix44) {
 	self.mat = _mat
 	// Get resource from gMapResource
-	buffer_resource_copy_update(self,&self.mat)
+	if self.mat_idx != nil do buffer_resource_copy_update(self.mat_idx.?, &self.mat)
 }
 
 @private graphics_create :: proc() {
@@ -1108,9 +1114,12 @@ graphics_destriptor_set_layout_destroy :: proc(layout: ^vk.DescriptorSetLayout) 
 		gMapResource_free_len -= 1
 	} else {
 		res = idx.?
+		if gMapResource[res].head == nil {
+			gMapResource_free_len -= 1
+		}
 	}
 
-	list.push_back(&gMapResource[res], &new(union_resource_node, gVkMemTlsfAllocator).node)
+	list.push_back(&gMapResource[res], &new(union_resource_node, __graphics_tlsf_allocator).node)
 	((^union_resource_node)(gMapResource[res].head)).res = buffer_resource{}
 	return &((^union_resource_node)(gMapResource[res].head)).res.(buffer_resource), res
 }
@@ -1126,19 +1135,22 @@ graphics_destriptor_set_layout_destroy :: proc(layout: ^vk.DescriptorSetLayout) 
 		gMapResource_free_len -= 1
 	} else {
 		res = idx.?
+		if gMapResource[res].head == nil {
+			gMapResource_free_len -= 1
+		}
 	}
 
-	list.push_back(&gMapResource[res], &new(union_resource_node, gVkMemTlsfAllocator).node)
+	list.push_back(&gMapResource[res], &new(union_resource_node, __graphics_tlsf_allocator).node)
 	((^union_resource_node)(gMapResource[res].head)).res = texture_resource{}
 	return &((^union_resource_node)(gMapResource[res].head)).res.(texture_resource), res
 }
 
 // Remove specific resource from gMapResource by punion_resource(not free punion_resource)
-@private graphics_pop_resource :: proc(idx: u32, resource: punion_resource, lock := true) {
-	if lock {
+@private graphics_pop_resource :: proc(idx: u32, resource: punion_resource, $lock : bool) -> (res: ^union_resource_node) {
+	when lock {
 		sync.mutex_lock(&gMapResourceMtx)
 	}
-	defer if lock {
+	defer when lock {
 		sync.mutex_unlock(&gMapResourceMtx)
 	}
 	
@@ -1150,18 +1162,16 @@ graphics_destriptor_set_layout_destroy :: proc(layout: ^vk.DescriptorSetLayout) 
 					tt : ^union_resource_node
 					tt, success = list.iterate_next(&iter)
 					list.remove(& gMapResource[idx], auto_cast node)
-					free(node, gVkMemTlsfAllocator)
-					node = tt
-					continue
+					res = node
+					break
 				}
 			case texture_resource:
 				if r, ok := resource.(^texture_resource); ok && &n == r {
 					tt : ^union_resource_node
 					tt, success = list.iterate_next(&iter)
 					list.remove(& gMapResource[idx], auto_cast node)
-					free(node, gVkMemTlsfAllocator)
-					node = tt
-					continue
+					res = node
+					break
 				}
 		}
 		node, success = list.iterate_next(&iter)
@@ -1170,7 +1180,19 @@ graphics_destriptor_set_layout_destroy :: proc(layout: ^vk.DescriptorSetLayout) 
 		gMapResource_idx[gMapResource_free_len] = idx
 		gMapResource_free_len += 1
 	}
+	return res
 }
+
+@private graphics_free_resource :: proc(node: ^union_resource_node, $lock : bool) {
+	when lock {
+		sync.mutex_lock(&gMapResourceMtx)
+	}
+	defer when lock {
+		sync.mutex_unlock(&gMapResourceMtx)
+	}
+	free(node, __graphics_tlsf_allocator)
+}
+
 
 // Get last resource from stack (most recently created)
 graphics_get_resource :: proc "contextless" (idx: Maybe(u32)) -> punion_resource {
@@ -1193,21 +1215,24 @@ graphics_get_resource_draw :: proc "contextless" (idx: Maybe(u32)) -> punion_res
 	sync.mutex_lock(&gMapResourceMtx)
 	defer sync.mutex_unlock(&gMapResourceMtx)
 	if gMapResource[idx.?].head == nil do return nil
-	switch &res in ((^union_resource_node)(gMapResource[idx.?].head)).res {
-		case buffer_resource:
-			return &res
-		case texture_resource:
-			return &res
+	iter := list.iterator_head(gMapResource[idx.?], union_resource_node, "node")
+	for node in list.iterate_next(&iter) {
+		switch &res in (^union_resource_node)(node).res {
+			case buffer_resource:
+				if res.completed do return &res
+			case texture_resource:
+				if res.completed do return &res
+		}
 	}
 	return nil
 }
 
 @private gMapResource_add_block :: proc() {
 	old_len := u32(len(gMapResource))
-	gMapResource = mem.resize_slice(gMapResource, old_len + gMapResource_Block, gVkMemTlsfAllocator)
-	gMapResource_idx = mem.resize_non_zeroed_slice(gMapResource_idx, old_len + gMapResource_Block, gVkMemTlsfAllocator)
+	gMapResource = mem.resize_slice(gMapResource, old_len + gMapResource_Block, __graphics_tlsf_allocator)
+	gMapResource_idx = mem.resize_non_zeroed_slice(gMapResource_idx, old_len + gMapResource_Block, __graphics_tlsf_allocator)
 	for i: u32 = old_len; i < old_len + gMapResource_Block; i += 1 {
-		gMapResource_idx[gMapResource_free_len] = i
+		gMapResource_idx[i] = i
 		gMapResource_free_len += 1
 	}
 }

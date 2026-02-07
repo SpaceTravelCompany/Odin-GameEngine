@@ -43,6 +43,9 @@ viewport_init_update :: proc (self:^viewport, allocator := context.allocator) {
 		if self.set == 0 {
 			self.set, self.set_idx = get_descriptor_set(descriptor_pool_size__base_uniform_pool[:], base_descriptor_set_layout())
 		}
+		update_descriptor_set(self.set, descriptor_pool_size__base_uniform_pool[:], {
+			graphics_get_resource(self.camera.mat_idx), graphics_get_resource(self.projection.mat_idx) 
+		})
 	}
 }
 

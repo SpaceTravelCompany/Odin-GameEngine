@@ -24,7 +24,9 @@ vec2 quad[6] = {
     vec2(-0.5, 0.5)
 };
 
+
 void main() {
-    gl_Position = proj.proj * view.view * model.model * vec4(quad[gl_VertexIndex] * vec2(textureSize(texSampler, 0)), 0.0, 1.0);
     fragTexCoord = (quad[gl_VertexIndex] + vec2(0.5,0.5)) * vec2(1,-1);
+
+	gl_Position = proj.proj * view.view * model.model * vec4(quad[gl_VertexIndex] * vec2(textureSize(texSampler, 0)), 0.0, 1.0);
 }

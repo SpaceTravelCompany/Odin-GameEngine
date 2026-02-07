@@ -5,7 +5,50 @@ import "core:mem"
 import "core:log"
 import vk "vendor:vulkan"
 import "base:runtime"
+import "base:intrinsics"
 import "core:sync"
+
+
+@(private="file") vk_allocation_callback :: proc "system" (pUserData: rawptr, size: int, alignment: int, allocationScope: vk.SystemAllocationScope) -> rawptr {
+	context = runtime.Context{
+		allocator = gVkPoolTlsfAllocator,
+	}
+	res, err := mem.alloc(size, alignment, context.allocator)
+	if err != .None {
+		return nil
+	}
+	return res
+}
+
+@(private="file") vk_reallocation_callback :: proc "system" (pUserData: rawptr, pOriginal: rawptr, size: int, alignment: int, allocationScope: vk.SystemAllocationScope) -> rawptr {
+	// context = runtime.Context{
+	// 	allocator = gVkPoolTlsfAllocator,
+	// }
+	// res, err := mem.resize(mem.ptr_offset((^int)(pOriginal), -1), ((^int)(pOriginal))^, size + size_of(int), alignment, context.allocator)
+	// if err != .None {
+	// 	return nil
+	// }
+	// ((^int)(res))^ = size + size_of(int)
+	// return mem.ptr_offset((^int)(res), 1)
+	intrinsics.trap()//never execute now. why exists?
+}
+
+@(private="file") vk_free_callback :: proc "system" (pUserData: rawptr, pMemory: rawptr) {
+	context = runtime.Context{
+		allocator = gVkPoolTlsfAllocator,
+	}
+
+	free(pMemory, context.allocator)
+}
+
+@(private="file") gVkPoolAllocationCallbacks: vk.AllocationCallbacks = {
+	pUserData = nil,
+	pfnAllocation = vk_allocation_callback,
+	pfnReallocation = vk_reallocation_callback,
+	pfnFree = vk_free_callback,
+	pfnInternalAllocation = nil,
+	pfnInternalFree = nil,
+}
 
 
 descriptor_pool_mem :: struct {
@@ -19,14 +62,13 @@ descriptor_pool_mem :: struct {
 
 // Free-stack: O(1) get one free pool index. Call descriptor_pool_mem_init_free_stack after pools/vk_pools are set up (or grown).
 descriptor_pool_mem_init :: proc(d: ^descriptor_pool_mem, layout: vk.DescriptorSetLayout) {
-	d.free_stack_len = 0
-	d.free_stack = mem.make_non_zeroed([]u32, vkPoolBlock, gVkMemTlsfAllocator)
+	d.free_stack = mem.make_non_zeroed([]u32, vkPoolBlock, gVkPoolTlsfAllocator)
 	for i:u32 = 0; i < u32(len(d.free_stack)); i += 1 {
-		d.free_stack[d.free_stack_len] = u32(i)
+		d.free_stack[i] = u32(i)
 	}
 	d.free_stack_len = u32(len(d.free_stack))
-	d.vk_pools = mem.make_non_zeroed([dynamic]vk.DescriptorPool, gVkMemTlsfAllocator)
-	d.sets = mem.make_non_zeroed([]vk.DescriptorSet, vkPoolBlock, gVkMemTlsfAllocator)
+	d.vk_pools = mem.make_non_zeroed([dynamic]vk.DescriptorPool, gVkPoolTlsfAllocator)
+	d.sets = mem.make_non_zeroed([]vk.DescriptorSet, vkPoolBlock, gVkPoolTlsfAllocator)
 	d.layout = layout
 }
 descriptor_pool_mem_get_free :: proc "contextless" (d: ^descriptor_pool_mem) -> (index: u32, ok: bool) {
@@ -39,9 +81,9 @@ descriptor_pool_mem_get_free :: proc "contextless" (d: ^descriptor_pool_mem) -> 
 descriptor_pool_mem_add_block :: proc (d: ^descriptor_pool_mem, size: []descriptor_pool_size) {
 	old_len :u32 = u32(len(d.free_stack))
 	d.free_stack = mem.resize_non_zeroed_slice(d.free_stack,
-	old_len + vkPoolBlock, gVkMemTlsfAllocator)
+	old_len + vkPoolBlock, gVkPoolTlsfAllocator)
 	d.sets = mem.resize_non_zeroed_slice(d.sets,
-	old_len + vkPoolBlock, gVkMemTlsfAllocator)
+	old_len + vkPoolBlock, gVkPoolTlsfAllocator)
 	for i:u32 = old_len; i < old_len + vkPoolBlock; i += 1 {
 		d.free_stack[d.free_stack_len] = u32(i)
 		d.free_stack_len += 1
@@ -54,17 +96,23 @@ descriptor_pool_mem_release :: proc "contextless" (d: ^descriptor_pool_mem, inde
 	d.free_stack_len += 1
 }
 
-descriptor_pool_mem_destroy :: proc (d: ^descriptor_pool_mem) {
-	for i in 0..<len(d.vk_pools) {
-		vk.DestroyDescriptorPool(vk_device, d.vk_pools[i], nil)
+descriptor_pool_mem_destroy_all :: proc () {
+	sync.mutex_lock(&gDesciptorPoolsMtx)
+	defer sync.mutex_unlock(&gDesciptorPoolsMtx)
+
+	for _, d in gDesciptorPools {
+		for i in 0..<len(d.vk_pools) {
+			vk.DestroyDescriptorPool(vk_device, d.vk_pools[i], &gVkPoolAllocationCallbacks)
+		}
+		delete(d.vk_pools)
+		delete(d.sets, gVkPoolTlsfAllocator)
+		delete(d.free_stack, gVkPoolTlsfAllocator)
 	}
-	delete(d.vk_pools)
-	delete(d.sets, gVkMemTlsfAllocator)
-	delete(d.free_stack, gVkMemTlsfAllocator)
 }
 
 gDesciptorPools: map[vk.DescriptorSetLayout]descriptor_pool_mem
 gTmpDesciptorPoolSizes: [dynamic]vk.DescriptorPoolSize
+gTmpDesciptorSetLayouts: [dynamic]vk.DescriptorSetLayout
 
 
 
@@ -81,25 +129,29 @@ __create_descriptor_pool :: proc(size: []descriptor_pool_size, out: ^descriptor_
 		maxSets       = vkPoolBlock,
 	}
 	resize(&out.vk_pools, len(out.vk_pools) + 1)
-	res := vk.CreateDescriptorPool(vk_device, &poolInfo, nil, &out.vk_pools[len(out.vk_pools) - 1])
+	res := vk.CreateDescriptorPool(vk_device, &poolInfo, &gVkPoolAllocationCallbacks, &out.vk_pools[len(out.vk_pools) - 1])
 	if res != .SUCCESS do log.panicf("res := vk.CreateDescriptorPool(vk_device, &poolInfo, nil, &out.vk_pools[len(out.vk_pools) - 1]) : %s\n", res)
 
+	resize(&gTmpDesciptorSetLayouts, vkPoolBlock)
+	for i in 0..<vkPoolBlock {
+		gTmpDesciptorSetLayouts[i] = out.layout
+	}
 	allocInfo := vk.DescriptorSetAllocateInfo {
 		sType              = .DESCRIPTOR_SET_ALLOCATE_INFO,
 		descriptorPool     = out.vk_pools[len(out.vk_pools) - 1],
 		descriptorSetCount = vkPoolBlock,
-		pSetLayouts        = &out.layout,
+		pSetLayouts        = &gTmpDesciptorSetLayouts[0],
 	}
 	res = vk.AllocateDescriptorSets(vk_device, &allocInfo, &out.sets[u32(len(out.vk_pools) - 1) * vkPoolBlock])
 	if res != .SUCCESS do log.panicf("res := vk.AllocateDescriptorSets(vk_device, &allocInfo, &out.sets[u32(len(out.vk_pools) - 1) * vkPoolBlock]) : %s\n", res)
 }
 
-@(private="file") descriptor_pool_mtx: sync.Mutex
+@(private="file") gDesciptorPoolsMtx: sync.Mutex
 
 add_descriptor_set :: proc(size: []descriptor_pool_size, layout: vk.DescriptorSetLayout) -> (set:vk.DescriptorSet, idx: u32) {
 	tmp : ^descriptor_pool_mem
-	sync.mutex_lock(&descriptor_pool_mtx)
-	defer sync.mutex_unlock(&descriptor_pool_mtx)
+	sync.mutex_lock(&gDesciptorPoolsMtx)
+	defer sync.mutex_unlock(&gDesciptorPoolsMtx)
 
 	if layout in gDesciptorPools {
 		tmp = &gDesciptorPools[layout]
@@ -118,8 +170,8 @@ add_descriptor_set :: proc(size: []descriptor_pool_size, layout: vk.DescriptorSe
 }
 
 del_descriptor_set :: proc(idx: u32, layout: vk.DescriptorSetLayout) {
-	sync.mutex_lock(&descriptor_pool_mtx)
-	defer sync.mutex_unlock(&descriptor_pool_mtx)
+	sync.mutex_lock(&gDesciptorPoolsMtx)
+	defer sync.mutex_unlock(&gDesciptorPoolsMtx)
 	descriptor_pool_mem_release(&gDesciptorPools[layout], idx)
 }
 

@@ -5,14 +5,11 @@ import "base:runtime"
 import "base:intrinsics"
 import "core:container/intrusive/list"
 import "core:mem"
-import "core:mem/virtual"
 import "core:sync"
 import "core:thread"
-import "core:fmt"
 import vk "vendor:vulkan"
 import "core:log"
 import "core:mem/tlsf"
-import "core:container/pool"
 
 // Conversion Functions
 
@@ -111,20 +108,25 @@ OpCreateTexture :: struct {
 OpDestroyBuffer :: struct {
 	idx: u32,
 	src: ^buffer_resource,
+	del: ^union_resource_node,
 }
 
 OpReleaseUniform :: struct {
 	src: ^buffer_resource,
+	del: ^union_resource_node,
 }
 
 OpDestroyTexture :: struct {
 	idx: u32,
 	src: ^texture_resource,
+	del: ^union_resource_node,
 }
 
-Op__AddResToObj :: struct {
-	idx: u32,
-	res: punion_resource,
+OpUpdateDescriptorSet :: struct {
+	set:       vk.DescriptorSet,
+	size:      []descriptor_pool_size,
+	resource:  []punion_resource,
+	allocator: runtime.Allocator,
 }
 
 // Types - Structs (Memory buffer)
@@ -179,6 +181,7 @@ OpNode :: union {
 	OpDestroyBuffer,
 	OpReleaseUniform,
 	OpDestroyTexture,
+	OpUpdateDescriptorSet,
 }
 
 // Types - Buffer and Texture Type Union (internal)
@@ -225,7 +228,51 @@ gVkMemIdxCnts: []int
 gVkMemTlsfAllocator: runtime.Allocator
 gVkMemTlsf: tlsf.Allocator
 
-// Public API - Allocator
+gVkPoolTlsfAllocator: runtime.Allocator
+gVkPoolTlsf: tlsf.Allocator
+
+gVkDestroyTlsfAllocator: runtime.Allocator
+gVkDestroyTlsf: tlsf.Allocator
+
+@(private="file") vk_allocation_callback :: proc "system" (pUserData: rawptr, size: int, alignment: int, allocationScope: vk.SystemAllocationScope) -> rawptr {
+	context = runtime.Context{
+		allocator = gVkMemTlsfAllocator,
+	}
+	res, err := mem.alloc(size, alignment, context.allocator)
+	if err != .None {
+		return nil
+	}
+	return res
+}
+
+@(private="file") vk_reallocation_callback :: proc "system" (pUserData: rawptr, pOriginal: rawptr, size: int, alignment: int, allocationScope: vk.SystemAllocationScope) -> rawptr {
+	// context = runtime.Context{
+	// 	allocator = gVkMemTlsfAllocator,
+	// }
+	// res, err := mem.resize(pOriginal, size, size, alignment, context.allocator)
+	// if err != .None {
+	// 	return nil
+	// }
+	intrinsics.trap()//never execute now. why exists?
+}
+
+@(private="file") vk_free_callback :: proc "system" (pUserData: rawptr, pMemory: rawptr) {
+	context = runtime.Context{
+		allocator = gVkMemTlsfAllocator,
+	}
+
+	free(pMemory, context.allocator)
+}
+
+gVkAllocationCallbacks: vk.AllocationCallbacks = {
+	pUserData = nil,
+	pfnAllocation = vk_allocation_callback,
+	pfnReallocation = vk_reallocation_callback,
+	pfnFree = vk_free_callback,
+	pfnInternalAllocation = nil,
+	pfnInternalFree = nil,
+}
+
 
 vk_def_allocator :: proc() -> runtime.Allocator {
 	return __vk_def_allocator
@@ -304,8 +351,13 @@ vk_init_block_len :: proc() {
 
 vk_allocator_init :: proc() {
 	__vk_def_allocator = context.allocator
-	_ = tlsf.init_from_allocator(&gVkMemTlsf, context.allocator, mem.Megabyte * 8, mem.Megabyte * 8)
+	_ = tlsf.init_from_allocator(&gVkMemTlsf, context.allocator, mem.Megabyte * 128, mem.Megabyte * 128)
 	gVkMemTlsfAllocator = tlsf.allocator(&gVkMemTlsf)
+	_ = tlsf.init_from_allocator(&gVkDestroyTlsf, context.allocator, mem.Megabyte * 4, mem.Megabyte * 4)
+	gVkDestroyTlsfAllocator = tlsf.allocator(&gVkDestroyTlsf)
+
+	_ = tlsf.init_from_allocator(&gVkPoolTlsf, context.allocator, mem.Megabyte * 4, mem.Megabyte * 4)
+	gVkPoolTlsfAllocator = tlsf.allocator(&gVkPoolTlsf)
 
 	gVkMemBufs = mem.make_non_zeroed([dynamic]^vk_mem_buffer, gVkMemTlsfAllocator)
 
@@ -358,7 +410,8 @@ vk_allocator_init :: proc() {
 	gTempUniforms = mem.make_non_zeroed([dynamic]vk_temp_uniform_struct, gVkMemTlsfAllocator)
 	gNonInsertedUniforms = mem.make_non_zeroed([dynamic]vk_temp_uniform_struct, gVkMemTlsfAllocator)
 	gDesciptorPools = mem.make_map(map[vk.DescriptorSetLayout]descriptor_pool_mem, gVkMemTlsfAllocator)
-	gTmpDesciptorPoolSizes = mem.make_non_zeroed([dynamic]vk.DescriptorPoolSize, gVkMemTlsfAllocator)
+	gTmpDesciptorPoolSizes = mem.make_non_zeroed([dynamic]vk.DescriptorPoolSize, gVkPoolTlsfAllocator)
+	gTmpDesciptorSetLayouts = mem.make_non_zeroed([dynamic]vk.DescriptorSetLayout, gVkPoolTlsfAllocator)
 }
 
 
@@ -377,14 +430,14 @@ vk_allocator_destroy :: proc() {
 	}
 	delete(gVkMemBufs)
 
-	for _, &value in gDesciptorPools {
-		descriptor_pool_mem_destroy(&value)
-	}
+	descriptor_pool_mem_destroy_all()
+	
 	for i in gUniforms {
 		delete(i.uniforms)
 	}
 	
 	delete(gTmpDesciptorPoolSizes)
+	delete(gTmpDesciptorSetLayouts)
 	delete(gDesciptorPools)
 	delete(gUniforms)
 	delete(gTempUniforms)
@@ -394,6 +447,8 @@ vk_allocator_destroy :: proc() {
 	delete(gVkMemIdxCnts, gVkMemTlsfAllocator)
 
 	tlsf.destroy(&gVkMemTlsf)
+	tlsf.destroy(&gVkDestroyTlsf)
+	tlsf.destroy(&gVkPoolTlsf)
 }
 
 vk_find_mem_type :: proc "contextless" (
@@ -413,10 +468,6 @@ vk_find_mem_type :: proc "contextless" (
 	success = false
 	return
 }
-
-// ============================================================================
-// Public API - Op Execute
-// ============================================================================
 
 vk_op_execute :: proc() {
 	opExecQueue := __vk_op_execute_in()
@@ -473,7 +524,7 @@ __vk_op_execute_in :: proc() -> ^[dynamic]OpNode {
 	for node in opExecQueue {
 		#partial switch n in node {
 		case OpReleaseUniform:
-			executeReleaseUniform(opExecQueue, n.src)
+			executeReleaseUniform(opExecQueue, n.src, n.del)
 		case:
 			continue
 		}
@@ -559,6 +610,15 @@ __vk_op_execute_in :: proc() -> ^[dynamic]OpNode {
 	for &node in opMapCopyQueue {
 		non_zero_append(opExecQueue, node)
 	}
+	for node in opExecQueue {
+		#partial switch n in node {
+		case OpUpdateDescriptorSet:
+			vk_execute_update_descriptor_set(n.set, n.size, n.resource)
+			delete(n.resource, n.allocator)
+		case:
+			continue
+		}
+	}
 
 	return opExecQueue
 }
@@ -586,14 +646,18 @@ vk_destroy_resources :: proc(destroy_all := false) {
 				#partial switch n in node {
 				case OpDestroyBuffer:
 					executeDestroyBuffer(n.src)
+					graphics_free_resource(n.del, true)
 				case OpDestroyTexture:
 					executeDestroyTexture(n.src)
+					graphics_free_resource(n.del, true)
 				case OpCopyBuffer:
 					executeDestroyBuffer(n.src)
 					if n.allocator != nil do delete(n.data, n.allocator.?)
+					free(n.src, gVkDestroyTlsfAllocator)
 				case OpCopyBufferToTexture:
 					executeDestroyBuffer(n.src)
 					if n.allocator != nil do delete(n.data, n.allocator.?)
+					free(n.src, gVkDestroyTlsfAllocator)
 				}
 			}
 			delete(nodes.op)
@@ -690,22 +754,24 @@ vk_exec_gpu_commands_task :: proc(task: thread.Task) {
 	}
 
 	sync.mutex_lock(&gMapResourceMtx)
-	for node in opExecQueue {
-		#partial switch n in node {
+	for &node in opExecQueue {
+		#partial switch &n in node {
 		case OpCreateBuffer:
-			n.src.completed = true
+			n.src.completed = true//need lock/unlock gMapResourceMtx
 		case OpCreateTexture:
-			n.src.completed = true
+			n.src.completed = true//need lock/unlock gMapResourceMtx
 		case OpDestroyBuffer:
-			graphics_pop_resource(n.self, n.src, false)
+			del := graphics_pop_resource(n.idx, n.src, false)
+			n.del = del
 		case OpDestroyTexture:
-			graphics_pop_resource(n.self, n.src, false)
+			del := graphics_pop_resource(n.idx, n.src, false)
+			n.del = del
 		}
 	}
 	sync.mutex_unlock(&gMapResourceMtx)
 
 	sync.mutex_lock(&opDestroyQueueMtx)
-	nodes := mem.make_non_zeroed([dynamic]OpNode, vk_def_allocator())
+	nodes := mem.make_non_zeroed([dynamic]OpNode, gVkDestroyTlsfAllocator)
 	non_zero_append(&opDestroyQueues, destroy_node{op = nodes, stack_count = MAX_FRAMES_IN_FLIGHT})
 	for &node in opExecQueue {
 		#partial switch &n in node {
@@ -738,48 +804,6 @@ vk_exec_gpu_commands_task :: proc(task: thread.Task) {
 		thread.pool_pop_done(&vk_allocator_thread_pool) or_break
 	}
 }
-
-
-// ============================================================================
-// Public API - Texture Format Conversion
-// ============================================================================
-
-/*
-Converts a texture format to a Vulkan format
-
-Inputs:
-- t: The texture format to convert
-
-Returns:
-- The corresponding Vulkan format
-*/
-@(require_results)
-texture_fmt_to_vk_fmt :: proc "contextless" (t: texture_fmt) -> vk.Format {
-	switch t {
-	case .DefaultColor:
-		return get_graphics_origin_format()
-	case .DefaultDepth:
-		return texture_fmt_to_vk_fmt(depth_fmt)
-	case .R8G8B8A8Unorm:
-		return .R8G8B8A8_UNORM
-	case .B8G8R8A8Unorm:
-		return .B8G8R8A8_UNORM
-	case .D24UnormS8Uint:
-		return .D24_UNORM_S8_UINT
-	case .D16UnormS8Uint:
-		return .D16_UNORM_S8_UINT
-	case .D32SfloatS8Uint:
-		return .D32_SFLOAT_S8_UINT
-	case .R8Unorm:
-		return .R8_UNORM
-	}
-	return get_graphics_origin_format()
-}
-
-
-// ============================================================================
-// Private - Op Queue Operations
-// ============================================================================
 
 append_op :: proc(node: OpNode) {
 	sync.atomic_mutex_lock(&gQueueMtx)

@@ -177,7 +177,7 @@ main :: proc() {
 			"-no-bounds-check" if !debug else ({}),
 			strings.join({"-out:", outSos[i]}, "", context.temp_allocator), 
 			o, 
-			"-debug" if debug else ({}),
+			"-debug" if debug else "-lto:thin",
 			//"-show-system-calls" if debug else ({}),
 			//"-sanitize:address" if debug else ({}),
 			"-build-mode:shared",
@@ -231,7 +231,7 @@ main :: proc() {
 		out_path, 
 		o,
 		"-target:js_wasm32",
-		"-debug" if debug else ({}),
+		"-debug" if debug else "-lto:thin",
 		//"-show-debug-messages",//!for debug
 		fmt.tprintf("-extra-linker-flags:\"--export-table --import-memory --initial-memory=%d --max-memory=%d\"", 
 		INITIAL_MEMORY_BYTES, MAX_MEMORY_BYTES),
@@ -280,7 +280,7 @@ main :: proc() {
 		out_path, 
 		o,
 		target_arch if target_arch != "" else ({}),
-		"-debug" if debug else ({}),
+		"-debug" if debug else "-lto:thin",
 		//"-show-debug-messages",//!for debug
 		resource.? if resource != nil else ({}),
 		"-subsystem:windows" if ODIN_OS == .Windows else ({}),

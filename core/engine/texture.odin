@@ -67,36 +67,10 @@ texture_fmt :: enum {
 }
 
 /*
-Converts pixel format to the default graphics format (in-place conversion)
-
-Inputs:
-- pixels: Input pixel data
-- out: Output buffer for converted pixels (can overlap with input)
-- inPixelFmt: Input pixel format (default: .RGBA)
-
-Returns:
-- None
+Converts pixel format to the default graphics format. Allocates and returns converted buffer; caller must free.
 */
-color_fmt_convert_default_overlap :: proc (pixels:[]byte, out:[]byte, inPixelFmt:img.color_fmt = .RGBA) {
-    defcol := default_color_fmt()
-    if defcol == inPixelFmt {
-        if &pixels[0] != &out[0] do mem.copy(&out[0], &pixels[0], len(pixels))
-    } else if inPixelFmt == .RGBA || inPixelFmt == .BGRA { //convert pixel format
-        for i in 0..<len(pixels)/4 {//TODO SIMD (xfigd)
-            temp:[4]byte
-            temp[0] = pixels[i * 4 + 2]
-            temp[1] = pixels[i * 4 + 1]
-            temp[2] = pixels[i * 4 + 0]
-            temp[3] = pixels[i * 4 + 3]
-
-            out[i * 4 + 0] = temp[0]
-            out[i * 4 + 1] = temp[1]
-            out[i * 4 + 2] = temp[2]
-            out[i * 4 + 3] = temp[3]
-        }   
-    } else {
-        log.errorf("color_fmt_convert_default: Unsupported pixel format: %s\n", inPixelFmt)
-    }
+color_fmt_convert_default :: proc(pixels: []byte, inPixelFmt: img.color_fmt = .RGBA, allocator := context.allocator) -> []byte {
+	return img.color_fmt_convert(pixels, inPixelFmt, default_color_fmt(), allocator)
 }
 
 
@@ -252,22 +226,6 @@ create_random_texture_grey :: proc(width, height: u32, out_texture:^texture, all
 }
 
 
-color_fmt_convert_default :: proc (pixels:[]byte, out:[]byte, inPixelFmt:img.color_fmt = .RGBA) {
-    defcol := default_color_fmt()
-    if defcol == inPixelFmt {
-        mem.copy_non_overlapping(&out[0], &pixels[0], len(pixels))
-    } else if inPixelFmt == .RGBA || inPixelFmt == .BGRA { //convert pixel format
-        for i in 0..<len(pixels)/4 {//TODO SIMD (xfigd)    
-            out[i * 4 + 0] = pixels[i * 4 + 2]
-            out[i * 4 + 1] = pixels[i * 4 + 1]
-            out[i * 4 + 2] = pixels[i * 4 + 0]
-            out[i * 4 + 3] = pixels[i * 4 + 3]
-        }   
-    } else {
-        log.errorf("color_fmt_convert_default: Unsupported pixel format: %s\n", inPixelFmt)
-    }
-}
-
 /*
 Initializes a texture with the given width, height, pixels, and sampler
 
@@ -336,9 +294,13 @@ texture_init :: proc(
 	self.sampler = sampler == 0 ? get_linear_sampler() : sampler
 	self.set, self.set_idx = get_descriptor_set(descriptor_pool_size__single_sampler_pool[:], __texture_descriptor_set_layout)
 
-	color_fmt_convert_default_overlap(pixels, pixels, in_pixel_fmt)
+	converted := color_fmt_convert_default(pixels, in_pixel_fmt, context.temp_allocator)
+	if converted != nil {
+		mem.copy_non_overlapping(raw_data(pixels), raw_data(converted), len(converted))
+		delete(converted, context.temp_allocator)
+	}
 
-	res : punion_resource
+	res: punion_resource
 	res, self.idx = buffer_resource_create_texture(self.idx, {
 		width = width,
 		height = height,
@@ -527,12 +489,16 @@ texture_point_in :: proc(texture: ^texture, point: linalg.point, mat: linalg.mat
 
 
 
-texture_array_init :: proc(self:^texture_array, width:u32, height:u32, count:u32, pixels:[]byte, sampler:vk.Sampler = 0, inPixelFmt:img.color_fmt = .RGBA, allocator := context.allocator) {
+texture_array_init :: proc(self:^texture_array, width:u32, height:u32, count:u32, pixels:[]byte, sampler:vk.Sampler = 0, inPixelFmt:img.color_fmt = .RGBA,
+	pixels_allocator := context.allocator) {
     self.sampler = sampler == 0 ? get_linear_sampler() : sampler
     self.set, self.set_idx = get_descriptor_set(descriptor_pool_size__single_sampler_pool[:], __texture_descriptor_set_layout)
 
-    allocPixels := mem.make_non_zeroed_slice([]byte, count * width * height * 4, allocator)
-    color_fmt_convert_default(pixels, allocPixels, inPixelFmt)
+    converted := color_fmt_convert_default(pixels, inPixelFmt, context.temp_allocator)
+    if converted != nil {
+		mem.copy_non_overlapping(raw_data(pixels), raw_data(converted), len(converted))
+		delete(converted, context.temp_allocator)
+	}
 
     res : punion_resource
 	res, self.idx = buffer_resource_create_texture(self.idx, {
@@ -545,7 +511,7 @@ texture_array_init :: proc(self:^texture_array, width:u32, height:u32, count:u32
         texture_usage = {.IMAGE_RESOURCE},
         type = .TEX2D,
         resource_usage = .GPU,
-    }, self.sampler, allocPixels, false, allocator)
+    }, self.sampler, pixels, false, pixels_allocator)
 
     update_descriptor_set(self.set, descriptor_pool_size__single_sampler_pool[:], {res})
 	self.pixel_data = pixels

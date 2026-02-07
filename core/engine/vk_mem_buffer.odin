@@ -5,8 +5,6 @@ import "core:container/intrusive/list"
 import "core:math"
 import "core:mem"
 import "core:slice"
-import "core:sync"
-import "core:debug/trace"
 import "core:log"
 import vk "vendor:vulkan"
 
@@ -39,7 +37,7 @@ vk_mem_buffer_Init :: proc(
 		memBuf.len = memBuf.allocateInfo.allocationSize / cellSize
 	}
 
-	res := vk.AllocateMemory(vk_device, &memBuf.allocateInfo, nil, &memBuf.deviceMem)
+	res := vk.AllocateMemory(vk_device, &memBuf.allocateInfo, &gVkAllocationCallbacks, &memBuf.deviceMem)
 	if res != .SUCCESS {
 		return nil
 	}
@@ -67,7 +65,7 @@ vk_mem_buffer_InitSingle :: proc(cellSize: vk.DeviceSize, typeFilter: u32) -> Ma
 	)
 	if !success do log.panic("memBuf.allocateInfo.memoryTypeIndex, success = vk_find_mem_type(typeFilter, vk.MemoryPropertyFlags{.DEVICE_LOCAL})\n")
 
-	res := vk.AllocateMemory(vk_device, &memBuf.allocateInfo, nil, &memBuf.deviceMem)
+	res := vk.AllocateMemory(vk_device, &memBuf.allocateInfo, &gVkAllocationCallbacks, &memBuf.deviceMem)
 	if res != .SUCCESS do log.panicf("res := vk.AllocateMemory(vk_device, &memBuf.allocateInfo, nil, &memBuf.deviceMem) : %s\n", res)
 
 	return memBuf
@@ -79,7 +77,7 @@ vk_mem_buffer_InitSingle :: proc(cellSize: vk.DeviceSize, typeFilter: u32) -> Ma
 // ============================================================================
 
 vk_mem_buffer_Deinit2 :: proc(self: ^vk_mem_buffer) {
-	vk.FreeMemory(vk_device, self.deviceMem, nil)
+	vk.FreeMemory(vk_device, self.deviceMem, &gVkAllocationCallbacks)
 	if !self.single {
 		n: ^list.Node
 		for n = self.list.head; n.next != nil; {
@@ -176,9 +174,9 @@ vk_mem_buffer_UnBindBufferNode :: proc(
 	range: resource_range,
 ) where T == vk.Buffer || T == vk.Image {
 	when T == vk.Buffer {
-		vk.DestroyBuffer(vk_device, vkResource, nil)
+		vk.DestroyBuffer(vk_device, vkResource, &gVkAllocationCallbacks)
 	} else when T == vk.Image {
-		vk.DestroyImage(vk_device, vkResource, nil)
+		vk.DestroyImage(vk_device, vkResource, &gVkAllocationCallbacks)
 	}
 
 	if self.single {

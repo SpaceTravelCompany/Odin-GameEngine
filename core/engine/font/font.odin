@@ -25,7 +25,12 @@ font :: struct {}
     allocator:mem.Allocator,
 }
 
-@(private="file") SCALE_DEFAULT : f32 : 256
+@(private) char_data :: struct {
+    advance_x:f32,
+    shapes:Maybe(geometry.shapes),
+}
+
+@(private) SCALE_DEFAULT : f32 : 256
 
 
 font_render_opt :: struct {
@@ -36,7 +41,6 @@ font_render_opt :: struct {
     color:Maybe(linalg.point3dw),
     area:Maybe(linalg.point),
     thickness:f32,//if 0, no stroke
-    flag:engine.resource_usage,
 }
 
 font_render_opt2 :: struct {
@@ -149,41 +153,43 @@ font_set_scale :: proc(self:^font, scale:f32) {
     sync.mutex_unlock(&self_.mutex)
 }
 
-@(private="file") _font_render_string2 :: proc(_str:string,
+font_render_string2 :: proc(_str:string,
 _renderOpt:font_render_opt2,
 allocator : runtime.Allocator) -> (shapes:geometry.shapes, err:geometry.shape_error = nil) {
     i : int = 0
     opt := _renderOpt.opt
+	
+	nodes := mem.make_non_zeroed([dynamic]geometry.shape_node, context.temp_allocator) or_return
+	defer delete(nodes)
 
     for r in _renderOpt.ranges {
         opt.scale = _renderOpt.opt.scale * r.scale
         opt.color = r.color
 
         if r.len == 0 || i + auto_cast r.len >= len(_str) {
-            shapes = _font_render_string(auto_cast r.font, _str[i:], opt, allocator) or_return
+            _font_render_string(auto_cast r.font, _str[i:], opt, &nodes,  &shapes.rect, allocator) or_return
             break;
         } else {
-            shapes = _font_render_string(auto_cast r.font, _str[i:i + auto_cast r.len], opt, allocator) or_return
+            _font_render_string(auto_cast r.font, _str[i:i + auto_cast r.len], opt, &nodes, &shapes.rect, allocator) or_return
             i += auto_cast r.len
         }
     }
+    shapes.nodes = mem.make_non_zeroed([]geometry.shape_node, len(nodes), allocator) or_return
+    mem.copy_non_overlapping(raw_data(shapes.nodes), raw_data(nodes), len(nodes) * size_of(geometry.shape_node))
     return
 }
 //input _vertArr and _indArr must use context.temp_allocator
 @(private="file") _font_render_string :: proc(self:^font_t,
     _str:string,
-    _renderOpt:font_render_opt,
-    allocator : runtime.Allocator) -> (shapes:geometry.shapes, err:geometry.shape_error = nil) {
+    _renderOpt:font_render_opt, nodes:^[dynamic]geometry.shape_node, rect:^linalg.rect,
+    allocator : runtime.Allocator) -> (err:geometry.shape_error = nil) {
 
     maxP : linalg.point = {min(f32), min(f32)}
     minP : linalg.point = {max(f32), max(f32)}
 
     offset : linalg.point = {}
-	shapes = geometry.shapes{
-		nodes = make([]geometry.shape_node, 0, allocator),
-	}
-	defer if err != nil do delete(shapes.nodes, allocator)
 
+	shape_old_len := len(nodes^)
     sync.mutex_lock(&self.mutex)
 	defer sync.mutex_unlock(&self.mutex)
     for s in _str {
@@ -199,12 +205,12 @@ allocator : runtime.Allocator) -> (shapes:geometry.shapes, err:geometry.shape_er
             err = .EmptyColor
             return
         }
-        _font_render_char(self, s, &shapes, &offset, _renderOpt.area, _renderOpt.scale,
-             _renderOpt.color, _renderOpt.stroke_color, _renderOpt.thickness) or_return
+        _font_render_char(self, s, &offset, nodes,  _renderOpt.area, _renderOpt.scale,
+             _renderOpt.color, _renderOpt.stroke_color, _renderOpt.thickness, allocator) or_return
         
         maxP = math.max_array(maxP,linalg.point{offset.x, offset.y + f32(self.face.size.metrics.height) / (64.0 * self.scale) })
     }
-    if len(_vertArr) == 0 {
+    if len(nodes^) == shape_old_len {
         err = .EmptyPolygon
         return
     }
@@ -214,18 +220,31 @@ allocator : runtime.Allocator) -> (shapes:geometry.shapes, err:geometry.shape_er
     maxP = {min(f32), min(f32)}
     minP = {max(f32), max(f32)}
 
-    for &v in _vertArr^ {
-        v.pos -= _renderOpt.pivot * size * _renderOpt.scale
-        v.pos += _renderOpt.offset
-
-        minP = math.min_array(minP, v.pos)
-        maxP = math.max_array(maxP, v.pos)
+    for &v in nodes^ {
+		for &l in v.lines {
+			l.start = l.start - _renderOpt.pivot * size * _renderOpt.scale + _renderOpt.offset
+			minP = math.min_array(minP, l.start)
+			maxP = math.max_array(maxP, l.start)
+			l.end = l.end - _renderOpt.pivot * size * _renderOpt.scale + _renderOpt.offset
+			minP = math.min_array(minP, l.end)
+			maxP = math.max_array(maxP, l.end)
+			if l.type != .Line {
+				l.control0 = l.control0 - _renderOpt.pivot * size * _renderOpt.scale + _renderOpt.offset
+				minP = math.min_array(minP, l.control0)
+				maxP = math.max_array(maxP, l.control0)
+				if l.type != .Quadratic {
+					l.control1 = l.control1 - _renderOpt.pivot * size * _renderOpt.scale + _renderOpt.offset
+					maxP = math.max_array(maxP, l.control1)
+					minP = math.min_array(minP, l.control1)
+				}
+			}
+		}
     }
-    shapes.rect = linalg.Rect_Init(minP.x, maxP.x, maxP.y, minP.y)
+    rect^ = linalg.Rect_Init(minP.x, maxP.x, maxP.y, minP.y)
 
-    subX :f32 = shapes.rect.left + (shapes.rect.right - shapes.rect.left) / 2.0
-    subY :f32 = -shapes.rect.top + (shapes.rect.top - shapes.rect.bottom) / 2.0//remove rect.pos xy
-    for &n in shapes.nodes {//move to center
+    subX :f32 = rect^.left + (rect^.right - rect^.left) / 2.0
+    subY :f32 = -rect^.top + (rect^.top - rect^.bottom) / 2.0//remove rect.pos xy
+    for &n in nodes^ {//move to center
         for &l in n.lines {
             l.start.x -= subX
             l.start.y += subY
@@ -240,25 +259,24 @@ allocator : runtime.Allocator) -> (shapes:geometry.shapes, err:geometry.shape_er
 			}
         }
     }
-	tmpr := shapes.rect
-    shapes.rect.left = -(tmpr.right - tmpr.left) / 2.0
-    shapes.rect.top = (tmpr.top - tmpr.bottom) / 2.0
-	shapes.rect.bottom = -(tmpr.top - tmpr.bottom) / 2.0
-    shapes.rect.right = (tmpr.right - tmpr.left) / 2.0
-
-    pt = offset * _renderOpt.scale + _renderOpt.offset
+	tmpr := rect^
+    rect^.left = -(tmpr.right - tmpr.left) / 2.0
+    rect^.top = (tmpr.top - tmpr.bottom) / 2.0
+	rect^.bottom = -(tmpr.top - tmpr.bottom) / 2.0
+    rect^.right = (tmpr.right - tmpr.left) / 2.0
     return
 }
 
 @(private="file") _font_render_char :: proc(self:^font_t,
     _char:rune,
     offset:^linalg.point,
-	shapes:^geometry.shapes,
+	nodes:^[dynamic]geometry.shape_node,
     area:Maybe(linalg.point),
     scale:linalg.point,
     color:Maybe(linalg.point3dw),
     stroke_color:linalg.point3dw,
     thickness:f32,
+	allocator : runtime.Allocator,
 ) -> (shapeErr:geometry.shape_error = nil) {
     FTMoveTo :: proc "c" (to: ^freetype.Vector, user: rawptr) -> c.int {
         data : ^font_user_data = auto_cast user
@@ -270,6 +288,7 @@ allocator : runtime.Allocator) -> (shapes:geometry.shapes, err:geometry.shape_er
             data.polygonCount += 1
             data.lineCount = 0
         }
+		data.lines_da[data.polygonCount] = mem.make_non_zeroed([dynamic]geometry.shape_line, context.temp_allocator)
         return 0
     }
     FTLineTo :: proc "c" (to: ^freetype.Vector, user: rawptr) -> c.int {
@@ -327,7 +346,6 @@ allocator : runtime.Allocator) -> (shapes:geometry.shapes, err:geometry.shape_er
     }
     font_user_data :: struct {
         pen : linalg.point,
-        nodes : []geometry.shape_node,
 		lines_da:[][dynamic]geometry.shape_line,
         lineCount : u32,
         polygonCount : u32,
@@ -341,180 +359,129 @@ allocator : runtime.Allocator) -> (shapes:geometry.shapes, err:geometry.shape_er
         cubic_to = FTCubicTo,
     }
 
-    thickness2 := color != nil ? -thickness : thickness
-    thickness2 = f32(int(thickness2 * 10000 / 10000)) //소수점 아래 4자리 이하로 자른다. //!need test
-	ok := FONT_KEY{_char, thickness2} in self.char_array
+	charD:char_data
+	ch := _char
+	for {
+		fIdx := freetype.get_char_index(self.face, auto_cast ch)
+		if fIdx == 0 {
+			if ch == '□' do log.panicf("not found □\n")
+			ch = '□'
+			continue
+		}
+		err := freetype.load_glyph(self.face, fIdx, {.No_Bitmap})
+		if err != .Ok do log.panicf("load_glyph: %s\n", err)
 
-    if ok {
-        charD = &self.char_array[FONT_KEY{_char, thickness2}]
-    } else {
-        ch := _char
-        for {
-            fIdx := freetype.get_char_index(self.face, auto_cast ch)
-            if fIdx == 0 {
-                if ch == '□' do log.panicf("not found □\n")
-                ok = FONT_KEY{'□', thickness2} in self.char_array
-                if ok {
-                    charD = &self.char_array[FONT_KEY{'□', thickness2}]
-                    break
-                }
-                ch = '□'
-
-                continue
-            }
-            err := freetype.load_glyph(self.face, fIdx, {.No_Bitmap})
-            if err != .Ok do log.panicf("load_glyph: %s\n", err)
-
-            if self.face.glyph.outline.n_points == 0 {
-                charData : char_data = {
-                    advance_x = f32(self.face.glyph.advance.x) / (64.0 * self.scale),
-                    raw_shape = nil,
-                }
-                self.char_array[FONT_KEY{ch, thickness2}] = charData
-
-                charD = &self.char_array[FONT_KEY{ch, thickness2}]
-                break
-            }
-    
-            //TODO (xfitgd) FT_Outline_New FT_Outline_Copy FT_Outline_Done로 임시객체로 복제하여 Lock Free 구현
-            if freetype.outline_get_orientation(&self.face.glyph.outline) == freetype.Orientation.FILL_RIGHT {
-                freetype.outline_reverse(&self.face.glyph.outline)
-            }
-
-            // 최대 폴리곤 개수는 n_contours와 같음
-            max_polygons := self.face.glyph.outline.n_contours
-            nodes_slice := mem.make_non_zeroed([]geometry.shape_node, max_polygons, size_of(uint) << 3, context.temp_allocator)
-            defer delete(nodes_slice, context.temp_allocator)
-            
-            data : font_user_data = {
-				context_ = context,
-                lineCount = 0,
-                nodes = nodes_slice,
-                polygonCount = 0,
-                scale = self.scale,
-				lines_da = mem.make_non_zeroed([][dynamic]geometry.shape_line, max_polygons, size_of(uint) << 3, context.temp_allocator),
-            }
-			defer {
-				for lines in data.lines_da {
-					delete(lines)
-				}
-				delete(data.lines_da, context.temp_allocator)
+		if self.face.glyph.outline.n_points == 0 {
+			charD = {
+				advance_x = f32(self.face.glyph.advance.x) / (64.0 * self.scale),
+				shapes = nil,
 			}
-        
-            err = freetype.outline_decompose(&self.face.glyph.outline, &funcs, &data)
-            if err != .Ok do log.panicf("outline_decompose: %s\n", err)
+			break
+		}
 
-            charData : char_data
-            if data.lineCount == 0 {
-                charData = {
-                    advance_x = f32(self.face.glyph.advance.x) / (64.0 * self.scale),
-                    raw_shape = nil
-                }
-                self.char_array[FONT_KEY{ch, thickness2}] = charData
-            
-                charD = &self.char_array[FONT_KEY{ch, thickness2}]
-                break
-            } else {
-                // 마지막 폴리곤의 선분 개수 추가
-                if data.lineCount > 0 {
-					data.polygonCount += 1
-                }
-				for i in 0..<data.polygonCount {
-					data.nodes[i].lines = data.lines_da[i][:]
-					data.nodes[i].color = linalg.point3dw{0,0,0,2}
-					data.nodes[i].stroke_color = linalg.point3dw{0,0,0,1}
-					data.nodes[i].thickness = thickness
-				}
-                poly := geometry.shapes{
-                    nodes = data.nodes[:data.polygonCount],
-                }
+		//TODO (xfitgd) FT_Outline_New FT_Outline_Copy FT_Outline_Done로 임시객체로 복제하여 Lock Free 구현
+		if freetype.outline_get_orientation(&self.face.glyph.outline) == freetype.Orientation.FILL_RIGHT {
+			freetype.outline_reverse(&self.face.glyph.outline)
+		}
 
-                rawP : ^geometry.raw_shape
-                rawP , shapeErr = geometry.shapes_compute_polygon(&poly, self.allocator)//높은 부하 작업 High load operations	
+		// 최대 폴리곤 개수는 n_contours와 같음
+		max_polygons := self.face.glyph.outline.n_contours
+		
+		data : font_user_data = {
+			context_ = context,
+			lineCount = 0,
+			polygonCount = 0,
+			scale = self.scale,
+			lines_da = mem.make_non_zeroed([][dynamic]geometry.shape_line, max_polygons, size_of(uint) << 3, context.temp_allocator),
+		}
+		defer {
+			for lines in data.lines_da {
+				delete(lines)
+			}
+			delete(data.lines_da, context.temp_allocator)
+		}
+	
+		err = freetype.outline_decompose(&self.face.glyph.outline, &funcs, &data)
+		if err != .Ok do log.panicf("outline_decompose: %s\n", err)
 
-                if shapeErr != nil do return
-
-                // if len(rawP.vertices) > 0 {
-                //     maxP :linalg.point = {min(f32), min(f32)}
-                //     minP :linalg.point = {max(f32), max(f32)}
-
-                //     for v in rawP.vertices {
-                //         minP = math.min_array(minP, v.pos)
-                //         maxP = math.max_array(maxP, v.pos)
-                //     }
-                //     rawP.rect = linalg.Rect_Init_LTRB(minP.x, maxP.x, maxP.y, minP.y)
-                // }
-
-                charData = {
-                    advance_x = f32(self.face.glyph.advance.x) / (64.0 * self.scale),
-                    raw_shape = rawP,
-                }
-            }
-            self.char_array[FONT_KEY{ch, thickness2}] = charData
-            
-            charD = &self.char_array[FONT_KEY{ch, thickness2}]
-            break
-        }
-    }
-    ww := charD.raw_shape == nil ? charD.advance_x : charD.raw_shape.rect.right
+		if data.lineCount == 0 {
+			charD = {
+				advance_x = f32(self.face.glyph.advance.x) / (64.0 * self.scale),
+				shapes = nil
+			}
+			break
+		} else {
+			// 마지막 폴리곤의 선분 개수 추가
+			if data.lineCount > 0 {
+				data.polygonCount += 1
+			}
+			poly := geometry.shapes{}
+			poly.nodes = mem.make_non_zeroed_aligned_slice([]geometry.shape_node, data.polygonCount, size_of(uint) << 3, context.temp_allocator)
+			for i in 0..<data.polygonCount {
+				poly.nodes[i].lines = mem.make_non_zeroed_aligned_slice([]geometry.shape_line, len(data.lines_da[i]), size_of(uint) << 3, allocator)
+				mem.copy_non_overlapping(&poly.nodes[i].lines[0], &data.lines_da[i][0], size_of(geometry.shape_line) * len(data.lines_da[i]))
+				poly.nodes[i].color = linalg.point3dw{0,0,0,2}
+				poly.nodes[i].stroke_color = linalg.point3dw{0,0,0,1}
+				poly.nodes[i].thickness = thickness
+			}
+			
+			if shapeErr != nil do return
+			
+			charD = {
+				advance_x = f32(self.face.glyph.advance.x) / (64.0 * self.scale),
+				shapes = poly,
+			}
+		}	
+		break
+	}
+	defer if charD.shapes != nil {
+		delete(charD.shapes.?.nodes, context.temp_allocator)
+	}
+    ww := charD.shapes == nil ? charD.advance_x : charD.shapes.?.rect.right
     if area != nil && offset.x + ww >= area.?.x {
         offset.y -= f32(self.face.size.metrics.height) / (64.0 * self.scale) 
         offset.x = 0
         if offset.y <= -area.?.y do return
     }
-   if charD.raw_shape != nil {
-        vlen := len(_vertArr^)
+	if charD.shapes != nil {
+		vlen := len(nodes^)
 
-        non_zero_resize_dynamic_array(_vertArr, vlen + len(charD.raw_shape.vertices))
-        runtime.mem_copy_non_overlapping(&_vertArr^[vlen], &charD.raw_shape.vertices[0], len(charD.raw_shape.vertices) * size_of(geometry.shape_vertex2d))
-
-        i := vlen
-        for ;i < len(_vertArr^);i += 1 {
-            _vertArr^[i].pos += offset^
-            _vertArr^[i].pos *= scale
-            if _vertArr^[i].color.a == 1.0 {
-                _vertArr^[i].color = stroke_color
-            } else if _vertArr^[i].color.a == 2.0 {
-                _vertArr^[i].color = color.?
-            }
-        }
-
-        ilen := len(_indArr^)
-        non_zero_resize_dynamic_array(_indArr, ilen + len(charD.raw_shape.indices))
-        runtime.mem_copy_non_overlapping(&_indArr^[ilen], &charD.raw_shape.indices[0], len(charD.raw_shape.indices) * size_of(u32))
-
-        i = ilen
-        for ;i < len(_indArr^);i += 1 {
-            _indArr^[i] += auto_cast vlen
-        }
-    }
+		non_zero_append(nodes, ..charD.shapes.?.nodes[:])
+		for &node in nodes^[vlen:] {
+			for &line in node.lines {
+				line.start += offset^
+				line.start *= scale
+				line.end += offset^
+				line.end *= scale
+				if line.type != .Line {
+					line.control0 += offset^
+					line.control0 *= scale
+					if line.type != .Quadratic {
+						line.control1 += offset^
+						line.control1 *= scale
+					}
+				}
+			}
+			if node.color.a == 1.0 {
+				node.color = stroke_color
+			} else if node.color.a == 2.0 {
+				node.color = color.?
+			}
+		}
+	}
     offset.x += charD.advance_x
-
     return
 }
-
-font_render_string2 :: proc(_str:string, _renderOpt:font_render_opt2, allocator := context.allocator) -> (res:^geometry.raw_shape, err:geometry.shape_error = nil) {
-    vertList := make([dynamic]geometry.shape_vertex2d, allocator) or_return
-    defer if err != nil do delete(vertList)
-
-    indList := make([dynamic]u32, allocator) or_return
-    defer if err != nil do delete(indList)
-
-    _font_render_string2(_str, _renderOpt, &vertList, &indList, allocator) or_return
-    shrink(&vertList)
-    shrink(&indList)
-    res = new (geometry.raw_shape, allocator) or_return
-    res^ = {
-        vertices = vertList[:],
-        indices = indList[:],
-    }
-    return
-}
-
 
 font_render_string :: proc(self:^font, _str:string, _renderOpt:font_render_opt, allocator := context.allocator) -> (res:geometry.shapes, err:geometry.shape_error = nil) {
 	if self == nil do log.panicf("font_render_string: font is nil\n")
 
-    res, rect := _font_render_string(auto_cast self, _str, _renderOpt, allocator) or_return
+    nodes := mem.make_non_zeroed([dynamic]geometry.shape_node, context.temp_allocator) or_return
+    defer delete(nodes)
+
+    _font_render_string(auto_cast self, _str, _renderOpt, &nodes, &res.rect, allocator) or_return
+
+	res.nodes = mem.make_non_zeroed([]geometry.shape_node, len(nodes), allocator) or_return
+	mem.copy_non_overlapping(raw_data(res.nodes), raw_data(nodes), len(nodes) * size_of(geometry.shape_node))
     return
 }

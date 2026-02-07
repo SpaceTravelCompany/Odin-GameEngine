@@ -83,7 +83,7 @@ create_new_uniform_buffer :: proc(
 		size  = g.max_size,
 		usage = {.UNIFORM_BUFFER},
 	}
-	res := vk.CreateBuffer(vk_device, &bufInfo, nil, &g.buf.vk_buffer)
+	res := vk.CreateBuffer(vk_device, &bufInfo, &gVkAllocationCallbacks, &g.buf.vk_buffer)
 	if res != .SUCCESS do log.panicf("res := vk.CreateBuffer(vk_device, &bufInfo, nil, &g.buf) : %s\n", res)
 
 	g.mem_buffer = vk_mem_buffer_CreateFromResource(g.buf.vk_buffer, {.HOST_CACHED, .HOST_VISIBLE}, &g.idx, 0, .UNIFORM)
@@ -104,6 +104,7 @@ create_new_uniform_buffer :: proc(
 executeReleaseUniform :: proc(
 	opExecQueue: ^[dynamic]OpNode,
 	buf: ^buffer_resource,
+	del: ^union_resource_node,
 ) {
 	gUniforms[buf.g_uniform_indices[0]].uniforms[buf.g_uniform_indices[1]] = nil
 
@@ -121,6 +122,6 @@ executeReleaseUniform :: proc(
 
 		return
 	} else {
-		pool.put(&gBufferPool, buf)
+		graphics_free_resource(del, lock = true)
 	}
 }

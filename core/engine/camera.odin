@@ -45,12 +45,12 @@ camera_init_matrix_raw :: proc (self:^camera, mat:linalg.matrix44) {
     __camera_init(self)
 }
 
-@private __camera_init :: #force_inline proc(self:^camera) {
-    buffer_resource_create_buffer(self, {
+@private __camera_init :: proc(self:^camera) {
+    _, self.mat_idx = buffer_resource_create_buffer(self.mat_idx, {
         size = size_of(linalg.matrix44),
         type = .UNIFORM,
         resource_usage = .CPU,
-    }, mem.ptr_to_bytes(&self.mat), true)
+    }, mem.ptr_to_bytes(&self.mat))
 }
 
 /*
@@ -82,7 +82,7 @@ Returns:
 */
 camera_update_matrix_raw :: proc(self:^camera, _mat:linalg.matrix44) {
     self.mat = _mat
-    buffer_resource_copy_update(self, &self.mat)
+    if self.mat_idx != nil do buffer_resource_copy_update(self.mat_idx.?, &self.mat)
 }
 
 @private __camera_update :: #force_inline proc(self:^camera, eye_vec:linalg.point3d, focus_vec:linalg.point3d, up_vec:linalg.point3d = {0,0,1}) {
@@ -110,7 +110,7 @@ Returns:
 - None
 */
 camera_deinit :: proc(self:^camera) {
-    buffer_resource_deinit(self)
+    if self.mat_idx != nil do buffer_resource_deinit(self.mat_idx.?)
 }
 
 /*

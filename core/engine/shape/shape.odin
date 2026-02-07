@@ -66,10 +66,6 @@ colorTransform:^engine.color_transform = nil, vtable:^engine.iobject_vtable = ni
 
     self.shapes = shapes
 
-    self.set.bindings = engine.descriptor_set_binding__base_uniform_pool[:]
-    self.set.size = engine.descriptor_pool_size__base_uniform_pool[:]
-    self.set.layout = engine.base_descriptor_set_layout()
-
     if vtable == nil {
         self.vtable = &shape_vtable
     } else {
@@ -91,6 +87,10 @@ shape_change_color_transform :: #force_inline proc(self:^shape, colorTransform:^
     engine.itransform_object_change_color_transform(self, colorTransform)
 }
 
+shape_bind_and_draw :: proc (cmd:engine.command_buffer, shapes:^geometry.shapes, mat:matrix[4,4]f32, viewport:^engine.viewport) {
+	//TODO: Implement shape bind and draw
+}
+
 shape_draw :: proc (self:^shape, cmd:engine.command_buffer, viewport:^engine.viewport) {
-	//TODO: Implement shape draw
+	shape_bind_and_draw(cmd, self.shapes, self.mat, viewport)
 }

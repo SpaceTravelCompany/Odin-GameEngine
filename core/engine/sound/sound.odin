@@ -52,6 +52,7 @@ sound_src :: struct {
 
 @private g_init :: proc() {
 	sound_allocator = runtime.default_allocator()// avoid g_sounds, g_end_sounds affects tracking allocator
+	context.allocator = sound_allocator
     g_sounds = make(map[^sound]struct{}, sound_allocator)
     g_end_sounds = make([dynamic]^sound, sound_allocator)
 
@@ -76,11 +77,10 @@ sound_src :: struct {
     if res != .SUCCESS do log.panicf("miniaudio.engine_init : %s\n", res)
 
     started = true
-    g_thread = thread.create(callback)
-    thread.start(g_thread)
+    g_thread = thread.create_and_start(callback, context, self_cleanup = true)
 }
 
-@(private = "file") callback :: proc(_: ^thread.Thread) {
+@(private = "file") callback :: proc() {
     for intrinsics.atomic_load_explicit(&started, .Relaxed) {
         sync.sema_wait(&g_sema)
         if !intrinsics.atomic_load_explicit(&started, .Relaxed) do break
