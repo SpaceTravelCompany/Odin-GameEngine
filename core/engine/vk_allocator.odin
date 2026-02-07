@@ -138,6 +138,7 @@ vk_mem_buffer_node :: struct {
 	free: bool,
 }
 
+// Pool holds only buffers or only images to avoid bufferImageGranularity alignment rules.
 vk_mem_buffer :: struct {
 	cellSize:     vk.DeviceSize,
 	mapStart:     vk.DeviceSize,
@@ -147,6 +148,7 @@ vk_mem_buffer :: struct {
 	deviceMem:    vk.DeviceMemory,
 	single:       bool,
 	cache:        bool,
+	forImages:    bool, // true = image-only pool, false = buffer-only pool
 	cur:          ^list.Node,
 	list:         list.List,
 	allocateInfo: vk.MemoryAllocateInfo,

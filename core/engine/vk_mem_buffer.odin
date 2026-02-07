@@ -298,8 +298,10 @@ vk_mem_buffer_CreateFromResource :: proc(
 	if maxSize_ % memRequire.alignment == 0 do cellCnt -= 1
 
 	memBuf = nil
+	isImage :: T == vk.Image
 	for b in gVkMemBufs {
 		if b.cellSize != memRequire.alignment do continue
+		if b.forImages != isImage do continue // do not mix buffer and image in same pool (bufferImageGranularity)
 		memType, ok = vk_find_mem_type(memRequire.memoryTypeBits, memProp_)
 		if !ok {
 			memProp_ = memProp
@@ -322,6 +324,7 @@ vk_mem_buffer_CreateFromResource :: proc(
 
 			for b in gVkMemBufs {
 				if b.cellSize != memRequire.alignment do continue
+				if b.forImages != isImage do continue
 				memType, ok := vk_find_mem_type(memRequire.memoryTypeBits,  {.HOST_VISIBLE, .HOST_CACHED})
 				if !ok do log.panic("vk_find_mem_type\n")
 				if !_BindBufferNode(b, memType, vkResource, cellCnt, outIdx, &memBuf) do continue
@@ -341,9 +344,11 @@ vk_mem_buffer_CreateFromResource :: proc(
 				}
 				memBuf = new(vk_mem_buffer, gVkMemTlsfAllocator)
 				memBuf^ = memBufT.?
+				memBuf.forImages = isImage
 			}
 		} else {
 			memBuf^ = memBufT.?
+			memBuf.forImages = isImage
 		}
 
 		if !_BindBufferNode(memBuf, memBuf.allocateInfo.memoryTypeIndex, vkResource, cellCnt, outIdx, &memBuf) do log.panic("vk_mem_buffer_BindBufferNode\n")
@@ -366,6 +371,7 @@ vk_mem_buffer_CreateFromResourceSingle :: proc(vkResource: $T) -> (memBuf: ^vk_m
 	memBuf = new(vk_mem_buffer, gVkMemTlsfAllocator)
 	outMemBuf := vk_mem_buffer_InitSingle(memRequire.size, memRequire.memoryTypeBits)
 	memBuf^ = outMemBuf.?
+	memBuf.forImages = T == vk.Image
 
 	vk_mem_buffer_BindBufferNode(memBuf, vkResource, 1) //can't (must no) error
 

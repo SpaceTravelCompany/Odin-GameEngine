@@ -2,7 +2,6 @@ package sound
 
 import "base:intrinsics"
 import "base:runtime"
-import "core:debug/trace"
 import "core:sync"
 import "core:thread"
 import "vendor:miniaudio"
