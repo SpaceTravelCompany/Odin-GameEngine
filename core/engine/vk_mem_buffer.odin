@@ -51,11 +51,12 @@ vk_mem_buffer_Init :: proc(
 	return memBuf
 }
 
-vk_mem_buffer_InitSingle :: proc(cellSize: vk.DeviceSize, typeFilter: u32) -> Maybe(vk_mem_buffer) {
+// allocatePNext: optional, e.g. ^vk.MemoryDedicatedAllocateInfo for Vk 1.1 dedicated allocation (requiresDedicatedAllocation).
+vk_mem_buffer_InitSingle :: proc(cellSize: vk.DeviceSize, typeFilter: u32, allocatePNext: rawptr = nil) -> Maybe(vk_mem_buffer) {
 	memBuf := vk_mem_buffer {
 		cellSize     = cellSize,
 		len          = 1,
-		allocateInfo = {sType = .MEMORY_ALLOCATE_INFO, allocationSize = 1 * cellSize},
+		allocateInfo = {sType = .MEMORY_ALLOCATE_INFO, allocationSize = 1 * cellSize, pNext = allocatePNext},
 		single       = true,
 	}
 	success: bool
@@ -358,18 +359,51 @@ vk_mem_buffer_CreateFromResource :: proc(
 	return
 }
 
+// Uses Vk 1.1 Get*MemoryRequirements2 + MemoryDedicatedRequirements; when requiresDedicatedAllocation, allocates with MemoryDedicatedAllocateInfo.
 vk_mem_buffer_CreateFromResourceSingle :: proc(vkResource: $T) -> (memBuf: ^vk_mem_buffer) where T == vk.Buffer || T == vk.Image {
 	memBuf = nil
 	memRequire: vk.MemoryRequirements
+	dedAllocPNext: rawptr = nil
+	if vulkan_version.minor >= 1 || vulkan_version.major > 1 {
+		req2: vk.MemoryRequirements2
+		dedReq: vk.MemoryDedicatedRequirements
+		dedReq.sType = .MEMORY_DEDICATED_REQUIREMENTS
+		req2.sType = .MEMORY_REQUIREMENTS_2
+		req2.pNext = &dedReq
 
-	when T == vk.Buffer {
-		vk.GetBufferMemoryRequirements(vk_device, vkResource, &memRequire)
-	} else when T == vk.Image {
-		vk.GetImageMemoryRequirements(vk_device, vkResource, &memRequire)
+		when T == vk.Buffer {
+			info2: vk.BufferMemoryRequirementsInfo2
+			info2.sType = .BUFFER_MEMORY_REQUIREMENTS_INFO_2
+			info2.buffer = vkResource
+			vk.GetBufferMemoryRequirements2(vk_device, &info2, &req2)
+		} else when T == vk.Image {
+			info2: vk.ImageMemoryRequirementsInfo2
+			info2.sType = .IMAGE_MEMORY_REQUIREMENTS_INFO_2
+			info2.image = vkResource
+			vk.GetImageMemoryRequirements2(vk_device, &info2, &req2)
+		}
+
+		memRequire = req2.memoryRequirements
+		dedAllocInfo: vk.MemoryDedicatedAllocateInfo
+		if dedReq.requiresDedicatedAllocation != false {
+			dedAllocInfo.sType = .MEMORY_DEDICATED_ALLOCATE_INFO
+			when T == vk.Buffer {
+				dedAllocInfo.buffer = vkResource
+			} else when T == vk.Image {
+				dedAllocInfo.image = vkResource
+			}
+			dedAllocPNext = &dedAllocInfo
+		}
+	} else {
+		when T == vk.Buffer {
+			vk.GetBufferMemoryRequirements(vk_device, vkResource, &memRequire)
+		} else when T == vk.Image {
+			vk.GetImageMemoryRequirements(vk_device, vkResource, &memRequire)
+		}
 	}
-
+	
 	memBuf = new(vk_mem_buffer, gVkMemTlsfAllocator)
-	outMemBuf := vk_mem_buffer_InitSingle(memRequire.size, memRequire.memoryTypeBits)
+	outMemBuf := vk_mem_buffer_InitSingle(memRequire.size, memRequire.memoryTypeBits, dedAllocPNext)
 	memBuf^ = outMemBuf.?
 	memBuf.forImages = T == vk.Image
 
